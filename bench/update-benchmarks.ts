@@ -19,6 +19,8 @@ const GuardedInput = z.object({ name: z.string() });
 import { katman } from "../src/api/katman.ts";
 import { compileProcedure, compileRouter, ContextPool } from "../src/api/compile.ts";
 import type { GuardDef, WrapDef } from "../src/api/types.ts";
+import { ResponseCache } from "../src/api/response-cache.ts";
+import { RequestCoalescer } from "../src/api/coalesce.ts";
 
 const k = katman({ context: () => ({}) });
 const auth = k.guard(() => ({ userId: 1 }));

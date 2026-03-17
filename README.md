@@ -2,7 +2,7 @@
 
 The fastest end-to-end type-safe RPC framework for TypeScript.
 
-**14x faster pipeline. 10,000x fewer DB calls. 6x less memory.**
+**14x faster pipeline. 6x less memory. Single package.**
 
 ```
 npm install katman
@@ -12,11 +12,11 @@ npm install katman
 
 |  | oRPC | tRPC | Katman |
 |---|---|---|---|
-| Pipeline overhead | 685 ns | — | **49 ns (14x faster)** |
-| Pipeline (3 mw + Zod) | 1756 ns | — | **302 ns (5.8x faster)** |
-| DB calls (10K identical requests) | 10,000 | — | **1 (built-in cache + coalesce)** |
+| Pipeline overhead (no mw) | 685 ns | — | **49 ns (14x)** |
+| Pipeline (3 middleware + Zod) | 1756 ns | — | **302 ns (5.8x)** |
+| Pipeline (5 middleware + Zod) | 2477 ns | — | **430 ns (5.8x)** |
 | Memory per call | 8.2 KB | — | **1.4 KB (6x less)** |
-| HTTP throughput (concurrent) | 10K req/s | — | **15K req/s (1.5x)** |
+| HTTP (middleware + Zod) | 110µs | — | **78µs (1.4x)** |
 | API style | Chain builder | Chain builder | **Single object** |
 | query/mutation distinction | No | Yes | **Yes** |
 | Middleware model | All onion | All onion | **guard (flat) + wrap (onion)** |
@@ -197,25 +197,12 @@ Guard + Zod           78µs 13.0K/s   88µs 11.4K/s   110µs 9.3K/s   ← Katman
 
 > The "simple" case is TCP-dominated — all frameworks perform similarly. As middleware and validation are added, Katman's 14x pipeline advantage starts to show. With heavier middleware chains, the gap grows further.
 
-### Real-World Throughput (concurrent + caching)
-
-```
-10,000 requests, 100 concurrent
-
-                        Katman          oRPC          Speedup
-─────────────────────────────────────────────────────────────
-Throughput              15,000 req/s   10,500 req/s   1.5x
-DB handler calls        1              10,000         10,000x fewer
-```
-
 ### Run benchmarks
 
 ```sh
 pnpm bench              # all benchmarks → updates BENCHMARKS.md
 pnpm bench:orpc         # pipeline: oRPC vs Katman
 pnpm bench:h3           # HTTP: Katman vs H3 v2 vs oRPC
-node --experimental-strip-types bench/realistic-db.ts   # realistic DB simulation
-node --experimental-strip-types bench/coalesce.ts       # coalescing impact
 ```
 
 ## License
