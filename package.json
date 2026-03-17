@@ -25,7 +25,10 @@
     "./pino": "./src/plugins/pino/index.ts",
     "./ratelimit": "./src/plugins/ratelimit/index.ts"
   },
-  "files": ["dist", "src"],
+  "files": [
+    "dist",
+    "src"
+  ],
   "scripts": {
     "build": "obuild",
     "dev": "vitest",
@@ -46,6 +49,7 @@
     "@orpc/contract": "^1.13.7",
     "@orpc/server": "^1.13.7",
     "@typescript/native-preview": "7.0.0-dev.20260316.1",
+    "h3": "2.0.1-rc.16",
     "mitata": "^1.0.34",
     "obuild": "^0.4.32",
     "oxfmt": "^0.41.0",
