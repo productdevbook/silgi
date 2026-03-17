@@ -203,8 +203,8 @@ async function runHTTPBenchmarks(): Promise<HTTPResult[]> {
     const s = createServer(async (req, res) => {
       const u = req.url ?? "/"; const q = u.indexOf("?");
       const p = q === -1 ? u.slice(1) : u.slice(1, q);
-      const pl = flat.get(p);
-      if (!pl) { res.statusCode = 404; res.end(); return; }
+      const route = flat.get(p);
+      if (!route) { res.statusCode = 404; res.end(); return; }
       const ctx = pool.borrow();
       try {
         let inp: unknown;
@@ -213,8 +213,9 @@ async function runHTTPBenchmarks(): Promise<HTTPResult[]> {
           const t: string = await new Promise(r => { let b = ""; req.on("data", (d: Buffer) => { b += d; }); req.on("end", () => r(b)); });
           if (t) inp = JSON.parse(t);
         } else if (req.method !== "GET") req.resume();
-        const out = await pl(ctx, inp, sig);
-        res.statusCode = 200; res.setHeader("content-type", "application/json"); res.end(JSON.stringify(out));
+        const r = route.handler(ctx, inp, sig);
+        const out = r instanceof Promise ? await r : r;
+        res.statusCode = 200; res.setHeader("content-type", "application/json"); res.end(route.stringify(out));
       } catch (e: any) { res.statusCode = e.status ?? 500; res.end(JSON.stringify({ error: e.message })); }
       finally { pool.release(ctx); }
     });

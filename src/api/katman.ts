@@ -204,8 +204,8 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
             const pathname = qIdx === -1 ? rawUrl.slice(1) : rawUrl.slice(1, qIdx);
 
             // O(1) flat Map lookup
-            const pipeline = fr.get(pathname);
-            if (!pipeline) {
+            const route = fr.get(pathname);
+            if (!route) {
               res.statusCode = 404;
               res.setHeader("content-type", "application/json");
               res.end('{"code":"NOT_FOUND","status":404,"message":"Not found"}');
@@ -216,11 +216,23 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
             const ctx = pool.borrow();
 
             try {
-              // Build context — pass Node headers directly (no Headers conversion)
-              const baseCtx = contextFactory(new Request(
-                `http://${req.headers.host ?? "localhost"}${rawUrl}`,
-                { method: req.method, headers: req.headers as any },
-              ));
+              // Build context — lightweight proxy instead of new Request() (saves 1.4µs)
+              const fakeReq = Object.create(null) as any;
+              fakeReq.url = `http://${req.headers.host ?? "localhost"}${rawUrl}`;
+              fakeReq.method = req.method;
+              fakeReq.headers = new Proxy(req.headers as any, {
+                get(target, prop) {
+                  if (typeof prop === "string") return target[prop.toLowerCase()];
+                  if (prop === Symbol.iterator) return function* () {
+                    for (const [k, v] of Object.entries(target)) {
+                      if (v !== undefined) yield [k, Array.isArray(v) ? v[0] : v];
+                    }
+                  };
+                  return undefined;
+                },
+              });
+
+              const baseCtx = contextFactory(fakeReq);
               const resolved = baseCtx instanceof Promise ? await baseCtx : baseCtx;
               const keys = Object.keys(resolved);
               for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = resolved[keys[i]!];
@@ -240,13 +252,14 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
                 req.resume();
               }
 
-              // Execute compiled pipeline — shared signal (no timer per request)
-              const output = await pipeline(ctx, rawInput, sharedSignal);
+              // Execute compiled pipeline — sync dispatch when possible
+              const pipeResult = route.handler(ctx, rawInput, sharedSignal);
+              const output = pipeResult instanceof Promise ? await pipeResult : pipeResult;
 
-              // Write response directly — no Response object
+              // Write response — schema-compiled fast stringify
               res.statusCode = 200;
               res.setHeader("content-type", "application/json");
-              res.end(stringifyJSON(output));
+              res.end(route.stringify(output));
             } catch (err) {
               if (!res.headersSent) {
                 const e = err instanceof KatmanError ? err : toKatmanError(err);
