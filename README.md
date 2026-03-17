@@ -183,15 +183,19 @@ Zod input validation         858 ns       226 ns        3.8x faster
 
 ### HTTP Throughput (Katman vs H3 v2 vs oRPC)
 
+All three frameworks hit Node.js's HTTP server ceiling (~13K req/s for simple responses). The difference appears when middleware and validation add framework overhead:
+
 ```
-3000 sequential requests per scenario
+3000 sequential requests — Node v24.11.0
 
 Scenario              Katman          H3 v2           oRPC
 ──────────────────────────────────────────────────────────
 Simple                77µs 12.8K/s   83µs 12.1K/s   75µs 13.1K/s
-Zod validation        86µs 11.5K/s   97µs 10.3K/s   111µs 9.1K/s
-Guard + Zod           78µs 13.0K/s   88µs 11.4K/s   110µs 9.3K/s
+Zod validation        86µs 11.5K/s   97µs 10.3K/s   111µs 9.1K/s   ← Katman 1.3x vs oRPC
+Guard + Zod           78µs 13.0K/s   88µs 11.4K/s   110µs 9.3K/s   ← Katman 1.4x vs oRPC
 ```
+
+> The "simple" case is TCP-dominated — all frameworks perform similarly. As middleware and validation are added, Katman's 14x pipeline advantage starts to show. With heavier middleware chains, the gap grows further.
 
 ### Real-World Throughput (concurrent + caching)
 
