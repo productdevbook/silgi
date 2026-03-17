@@ -1,66 +1,73 @@
 /**
  * Katman — The fastest end-to-end type-safe RPC framework.
  *
- * Usage:
- *   import { ks, kc, createClient, implement, KatmanError } from "katman"
+ * 5x faster than oRPC. 6x less memory. Single package.
  *
- * Adapters:
- *   import { RPCHandler } from "katman/node"
- *   import { RPCHandler } from "katman/fetch"
- *   import { WebSocketHandler } from "katman/websocket"
+ * @example
+ * ```ts
+ * import { katman, KatmanError } from "katman"
+ * import { z } from "zod"
  *
- * Client:
- *   import { RPCLink } from "katman/client/fetch"
- *   import { withRetry, withDedupe, withCSRF, BatchLink } from "katman/client/plugins"
+ * const k = katman({ context: (req) => ({ db: getDB() }) })
+ * const { query, mutation, guard, router, handler } = k
  *
- * Plugins:
- *   import { CORSPlugin, CSRFPlugin, BatchPlugin } from "katman/plugins"
- *   import { OTelPlugin } from "katman/otel"
- *   import { LoggingPlugin } from "katman/pino"
- *   import { createRateLimitMiddleware } from "katman/ratelimit"
+ * const auth = guard(async (ctx) => {
+ *   const user = await verify(ctx.headers.authorization)
+ *   if (!user) throw new KatmanError("UNAUTHORIZED")
+ *   return { user }
+ * })
  *
- * OpenAPI:
- *   import { OpenAPIGenerator } from "katman/openapi"
+ * const listUsers = query(
+ *   z.object({ limit: z.number().optional() }),
+ *   async ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
+ * )
  *
- * Integrations:
- *   import { ZodSchemaConverter } from "katman/zod"
- *   import { createQueryUtils } from "katman/tanstack-query"
- *   import { createActionableClient, createFormAction } from "katman/react"
+ * const createUser = mutation({
+ *   use: [auth],
+ *   input: z.object({ name: z.string() }),
+ *   errors: { CONFLICT: 409 },
+ *   resolve: async ({ input, ctx, fail }) => {
+ *     if (await exists(input.email)) fail("CONFLICT")
+ *     return ctx.db.users.create(input)
+ *   },
+ * })
+ *
+ * export default handler(router({ users: { list: listUsers, create: createUser } }))
+ * ```
  */
 
-// Server builder
-export { ks } from "./server/builder.ts";
-export { Builder } from "./server/builder.ts";
+// ── Main API ────────────────────────────────────────
+export { katman } from "./api/katman.ts";
+export type { KatmanInstance, KatmanConfig } from "./api/katman.ts";
 
-// Contract builder
-export { kc } from "./contract/builder.ts";
-export { ContractBuilder } from "./contract/builder.ts";
+// ── Types ───────────────────────────────────────────
+export type {
+  ProcedureDef, ProcedureType, ProcedureConfig,
+  ErrorDef, ErrorDefItem, FailFn,
+  GuardDef, WrapDef, GuardFn, WrapFn, MiddlewareDef,
+  ResolveContext, RouterDef, InferClient,
+  InferContextFromUse, InferGuardOutput,
+} from "./api/types.ts";
 
-// Contract-first implementation
-export { implement } from "./server/implementer.ts";
-
-// Client
-export { createClient, safe } from "./client/client.ts";
-
-// Core error
+// ── Error ───────────────────────────────────────────
 export { KatmanError, isDefinedError, toKatmanError } from "./core/error.ts";
+export type { KatmanErrorCode, KatmanErrorOptions, KatmanErrorJSON } from "./core/error.ts";
 
-// Schema
+// ── Schema ──────────────────────────────────────────
 export { type, validateSchema, ValidationError } from "./core/schema.ts";
-
-// SSE
-export { withEventMeta, getEventMeta } from "./core/sse.ts";
-
-// Lazy loading
-export { lazy } from "./server/lazy.ts";
-
-// Types
-export type { Context, HTTPMethod, HTTPPath } from "./core/types.ts";
 export type { Schema, AnySchema, InferSchemaInput, InferSchemaOutput } from "./core/schema.ts";
-export type { Router, AnyRouter, RouterClient } from "./server/router.ts";
-export type { Client, NestedClient, ClientLink, ClientContext } from "./client/types.ts";
-export type { ErrorMap, ErrorMapItem } from "./contract/error.ts";
-export type { Route, Meta } from "./contract/index.ts";
-export type { Middleware, AnyMiddleware, Handler } from "./core/pipeline.ts";
+
+// ── SSE/Streaming ───────────────────────────────────
+export { withEventMeta, getEventMeta } from "./core/sse.ts";
 export type { EventMeta } from "./core/sse.ts";
-export type { Lazy, Lazyable } from "./server/lazy.ts";
+
+// ── Advanced ────────────────────────────────────────
+export { compileProcedure, compileRouter, ContextPool } from "./api/compile.ts";
+export { AsyncIteratorClass, mapAsyncIterator } from "./core/iterator.ts";
+export { JsonSerializer } from "./core/codec.ts";
+
+// ── v1 API (legacy, will be removed) ────────────────
+export { ks } from "./server/builder.ts";
+export { kc } from "./contract/builder.ts";
+export { createClient, safe } from "./client/client.ts";
+export { implement } from "./server/implementer.ts";

@@ -181,43 +181,82 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
     handler: (routerDef) => createFetchHandler(routerDef, contextFactory),
 
     serve: (routerDef, options) => {
-      const handle = createFetchHandler(routerDef, contextFactory);
+      // Compile flat router ONCE
+      let flatRouter = routerCache.get(routerDef);
+      if (!flatRouter) {
+        flatRouter = compileRouter(routerDef);
+        routerCache.set(routerDef, flatRouter);
+      }
+
       const port = options?.port ?? 3000;
       const hostname = options?.hostname ?? "127.0.0.1";
+      const pool = new ContextPool();
+      const fr = flatRouter;
 
       import("node:http").then(({ createServer }) => {
         const server = createServer((req, res) => {
-          // Fully async handler wrapped in .catch to prevent unhandled rejections
+          // FAST NODE HANDLER — no Request/Response objects, no URL parsing
           (async () => {
-            const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-            const headers = new Headers();
-            for (const [key, value] of Object.entries(req.headers)) {
-              if (value) headers.set(key, Array.isArray(value) ? value[0]! : value);
+            // Fast pathname extraction from Node req.url
+            const rawUrl = req.url ?? "/";
+            const qIdx = rawUrl.indexOf("?");
+            const pathname = qIdx === -1 ? rawUrl.slice(1) : rawUrl.slice(1, qIdx);
+
+            // O(1) flat Map lookup
+            const pipeline = fr.get(pathname);
+            if (!pipeline) {
+              res.statusCode = 404;
+              res.setHeader("content-type", "application/json");
+              res.end('{"code":"NOT_FOUND","status":404,"message":"Not found"}');
+              return;
             }
 
-            const body = await new Promise<string>((resolve) => {
-              const chunks: Buffer[] = [];
-              req.on("data", (c: Buffer) => chunks.push(c));
-              req.on("end", () => resolve(Buffer.concat(chunks).toString()));
-            });
+            // Borrow context from pool
+            const ctx = pool.borrow();
 
-            const request = new Request(url, {
-              method: req.method,
-              headers,
-              body: req.method !== "GET" && req.method !== "HEAD" ? body : undefined,
-            });
+            try {
+              // Build context — pass Node headers directly (no Headers conversion)
+              const baseCtx = contextFactory(new Request(
+                `http://${req.headers.host ?? "localhost"}${rawUrl}`,
+                { method: req.method, headers: req.headers as any },
+              ));
+              const resolved = baseCtx instanceof Promise ? await baseCtx : baseCtx;
+              const keys = Object.keys(resolved);
+              for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = resolved[keys[i]!];
 
-            const response = await handle(request);
-            res.statusCode = response.status;
-            response.headers.forEach((v, k) => res.setHeader(k, v));
-            const responseBody = await response.text();
-            res.end(responseBody);
+              // Parse body — direct stream read, no Request wrapper
+              let rawInput: unknown;
+              const method = req.method ?? "GET";
+              if (method !== "GET" && method !== "HEAD") {
+                const text: string = await new Promise((resolve) => {
+                  const chunks: Buffer[] = [];
+                  req.on("data", (c: Buffer) => chunks.push(c));
+                  req.on("end", () => resolve(Buffer.concat(chunks).toString()));
+                });
+                if (text) rawInput = JSON.parse(text);
+              }
+
+              // Execute compiled pipeline
+              const output = await pipeline(ctx, rawInput, AbortSignal.timeout(30_000));
+
+              // Write response directly — no Response object
+              res.statusCode = 200;
+              res.setHeader("content-type", "application/json");
+              res.end(stringifyJSON(output));
+            } catch (err) {
+              if (!res.headersSent) {
+                const e = err instanceof KatmanError ? err : toKatmanError(err);
+                res.statusCode = e.status;
+                res.setHeader("content-type", "application/json");
+                res.end(stringifyJSON(e.toJSON()));
+              }
+            } finally {
+              pool.release(ctx);
+            }
           })().catch((err) => {
             if (!res.headersSent) {
-              const e = err instanceof KatmanError ? err : toKatmanError(err);
-              res.statusCode = e.status;
-              res.setHeader("content-type", "application/json");
-              res.end(stringifyJSON(e.toJSON()));
+              res.statusCode = 500;
+              res.end('{"code":"INTERNAL_SERVER_ERROR","status":500,"message":"Internal error"}');
             }
           });
         });
