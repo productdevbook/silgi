@@ -17,10 +17,10 @@ Measures raw middleware pipeline overhead using [mitata](https://github.com/evan
 
 | Scenario | oRPC | Katman | Speedup |
 |---|---|---|---|
-| No middleware | 676 ns | **48 ns** | **14.0x** |
-| Zod input validation | 825 ns | **217 ns** | **3.8x** |
-| 3 middleware + Zod | 1720 ns | **297 ns** | **5.8x** |
-| 5 middleware + Zod | 2279 ns | **418 ns** | **5.4x** |
+| No middleware | 677 ns | **46 ns** | **14.6x** |
+| Zod input validation | 839 ns | **218 ns** | **3.9x** |
+| 3 middleware + Zod | 1749 ns | **293 ns** | **6.0x** |
+| 5 middleware + Zod | 2288 ns | **432 ns** | **5.3x** |
 
 ## HTTP Performance (full request/response over TCP)
 
@@ -28,9 +28,9 @@ Real-world latency — 3000 sequential requests per scenario.
 
 | Scenario | Katman | H3 v2 | oRPC | vs H3 | vs oRPC |
 |---|---|---|---|---|---|
-| Simple (no mw, no validation) | **76µs** (13073/s) | 83µs (12069/s) | 75µs (13351/s) | **1.1x faster** | 1.0x slower |
-| Zod input validation | **87µs** (11437/s) | 96µs (10392/s) | 110µs (9054/s) | **1.1x faster** | **1.3x faster** |
-| Guard + Zod validation | **80µs** (12504/s) | 90µs (11066/s) | 109µs (9195/s) | **1.1x faster** | **1.4x faster** |
+| Simple (no mw, no validation) | **78µs** (12778/s) | 84µs (11930/s) | 79µs (12646/s) | **1.1x faster** | ~tied |
+| Zod input validation | **88µs** (11407/s) | 96µs (10406/s) | 110µs (9110/s) | **1.1x faster** | **1.3x faster** |
+| Guard + Zod validation | **75µs** (13268/s) | 89µs (11240/s) | 110µs (9128/s) | **1.2x faster** | **1.5x faster** |
 
 ## How to run
 

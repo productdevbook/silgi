@@ -201,48 +201,53 @@ async function runHTTPBenchmarks(): Promise<HTTPResult[]> {
   const flat = compileRouter(katmanRouter);
   const pool = new ContextPool();
   const sig = new AbortController().signal;
-  const jsonH = { "content-type": "application/json" };
   const kSrv: Server = await new Promise(r => {
-    const s = createServer((req, res) => {
+    const s = createServer({ keepAlive: true, requestTimeout: 0, headersTimeout: 0 }, (req, res) => {
       const u = req.url ?? "/"; const q = u.indexOf("?");
       const p = q === -1 ? u.slice(1) : u.slice(1, q);
       const route = flat.get(p);
       if (!route) { res.writeHead(404); res.end(); return; }
 
-      // No body needed: sync fast path — zero async, zero Promise
       const cl = req.headers["content-length"];
       if (!cl || cl === "0" || req.method === "GET" || req.method === "HEAD") {
-        if (cl) req.resume(); // only drain if there's a body to drain
-        const ctx = pool.borrow();
+        if (cl) req.resume();
+        const ctx: Record<string, unknown> = Object.create(null);
         try {
           const r = route.handler(ctx, undefined, sig);
           if (r instanceof Promise) {
-            r.then(out => { res.writeHead(200, jsonH); res.end(route.stringify(out)); })
-             .catch(e => { res.writeHead(e.status ?? 500); res.end(); })
-             .finally(() => pool.release(ctx));
+            r.then(out => {
+              const b = route.stringify(out);
+              res.writeHead(200, { "content-type": "application/json", "content-length": b.length });
+              res.end(b);
+            }).catch(e => { res.writeHead(e.status ?? 500); res.end(); });
           } else {
-            res.writeHead(200, jsonH); res.end(route.stringify(r)); pool.release(ctx);
+            const b = route.stringify(r);
+            res.writeHead(200, { "content-type": "application/json", "content-length": b.length });
+            res.end(b);
           }
-        } catch (e: any) { res.writeHead(e.status ?? 500); res.end(); pool.release(ctx); }
+        } catch (e: any) { res.writeHead(e.status ?? 500); res.end(); }
         return;
       }
 
-      // Body needed: async path
       let body = "";
       req.on("data", (d: Buffer) => { body += d; });
       req.on("end", () => {
-        const ctx = pool.borrow();
+        const ctx: Record<string, unknown> = Object.create(null);
         try {
           const inp = body ? JSON.parse(body) : undefined;
           const r = route.handler(ctx, inp, sig);
           if (r instanceof Promise) {
-            r.then(out => { res.writeHead(200, jsonH); res.end(route.stringify(out)); })
-             .catch(e => { res.writeHead(e.status ?? 500); res.end(); })
-             .finally(() => pool.release(ctx));
+            r.then(out => {
+              const b = route.stringify(out);
+              res.writeHead(200, { "content-type": "application/json", "content-length": b.length });
+              res.end(b);
+            }).catch(e => { res.writeHead(e.status ?? 500); res.end(); });
           } else {
-            res.writeHead(200, jsonH); res.end(route.stringify(r)); pool.release(ctx);
+            const b = route.stringify(r);
+            res.writeHead(200, { "content-type": "application/json", "content-length": b.length });
+            res.end(b);
           }
-        } catch (e: any) { res.writeHead(e.status ?? 500); res.end(); pool.release(ctx); }
+        } catch (e: any) { res.writeHead(e.status ?? 500); res.end(); }
       });
     });
     s.listen(KP, "127.0.0.1", () => r(s));
@@ -332,12 +337,14 @@ async function main() {
     `| Scenario | Katman | H3 v2 | oRPC | vs H3 | vs oRPC |`,
     `|---|---|---|---|---|---|`,
     ...httpResults.map(r => {
-      const vsH3 = r.h3_us > r.katman_us
-        ? `**${(r.h3_us / r.katman_us).toFixed(1)}x faster**`
-        : `${(r.katman_us / r.h3_us).toFixed(1)}x slower`;
-      const vsOr = r.orpc_us > r.katman_us
-        ? `**${(r.orpc_us / r.katman_us).toFixed(1)}x faster**`
-        : `${(r.katman_us / r.orpc_us).toFixed(1)}x slower`;
+      const ratio_h3 = r.h3_us / r.katman_us;
+      const vsH3 = ratio_h3 > 1.05 ? `**${ratio_h3.toFixed(1)}x faster**`
+        : ratio_h3 < 0.95 ? `${(1/ratio_h3).toFixed(1)}x slower`
+        : `~tied`;
+      const ratio_or = r.orpc_us / r.katman_us;
+      const vsOr = ratio_or > 1.05 ? `**${ratio_or.toFixed(1)}x faster**`
+        : ratio_or < 0.95 ? `${(1/ratio_or).toFixed(1)}x slower`
+        : `~tied`;
       return `| ${r.name} | **${r.katman_us}µs** (${r.katman_rps}/s) | ${r.h3_us}µs (${r.h3_rps}/s) | ${r.orpc_us}µs (${r.orpc_rps}/s) | ${vsH3} | ${vsOr} |`;
     }),
   ].join("\n");
