@@ -32,7 +32,10 @@
   "scripts": {
     "build": "obuild",
     "dev": "vitest",
-    "bench": "node --experimental-strip-types bench/vs-orpc.ts",
+    "bench": "node --experimental-strip-types bench/update-benchmarks.ts",
+    "bench:orpc": "node --experimental-strip-types bench/vs-orpc.ts",
+    "bench:h3": "node --experimental-strip-types bench/vs-h3.ts",
+    "bench:http": "node --experimental-strip-types bench/http.ts",
     "bench:micro": "node --experimental-strip-types bench/micro.ts",
     "bench:pipeline": "node --experimental-strip-types bench/pipeline.ts",
     "play": "node --experimental-strip-types playground/v2-server.ts",
