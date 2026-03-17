@@ -333,8 +333,8 @@ function createFetchHandler(
     const pathname = qMark === -1 ? url.slice(pathStart + 1) : url.slice(pathStart + 1, qMark);
 
     // O(1) flat Map lookup
-    const pipeline = flatRouter!.get(pathname);
-    if (!pipeline) {
+    const route = flatRouter!.get(pathname);
+    if (!route) {
       return new Response(notFoundBody, { status: 404, headers: jsonHeaders });
     }
 
@@ -371,7 +371,7 @@ function createFetchHandler(
       }
 
       // Execute compiled pipeline — sync dispatch when possible
-      const pipelineResult = pipeline(ctx, rawInput, request.signal);
+      const pipelineResult = route.handler(ctx, rawInput, request.signal);
       const output = pipelineResult instanceof Promise ? await pipelineResult : pipelineResult;
 
       // SSE streaming
@@ -380,8 +380,8 @@ function createFetchHandler(
         return new Response(stream, { headers: sseHeaders });
       }
 
-      // JSON response
-      return new Response(stringifyJSON(output), { status: 200, headers: jsonHeaders });
+      // JSON response — schema-compiled fast stringify
+      return new Response(route.stringify(output), { status: 200, headers: jsonHeaders });
     } catch (error) {
       if (error instanceof ValidationError) {
         return new Response(

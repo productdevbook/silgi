@@ -15,6 +15,7 @@
 import type { ProcedureDef, GuardDef, WrapDef, MiddlewareDef, ErrorDef } from "./types.ts";
 import { validateSchema, type AnySchema } from "../core/schema.ts";
 import { KatmanError } from "../core/error.ts";
+import { compileStringify } from "./fast-stringify.ts";
 
 /**
  * Compiled pipeline — called per request.
@@ -262,7 +263,12 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
 
 // ── FLAT MAP ROUTER ─────────────────────────────────
 
-export type FlatRouter = Map<string, CompiledHandler>;
+export interface CompiledRoute {
+  handler: CompiledHandler;
+  stringify: (value: unknown) => string;
+}
+
+export type FlatRouter = Map<string, CompiledRoute>;
 
 /**
  * Compile a router tree into a flat Map for O(1) lookup.
@@ -276,7 +282,11 @@ export function compileRouter(def: Record<string, unknown>): FlatRouter {
   function walk(node: unknown, path: string[]): void {
     if (isProcedureDef(node)) {
       const key = path.join("/");
-      map.set(key, compileProcedure(node as ProcedureDef));
+      const proc = node as ProcedureDef;
+      map.set(key, {
+        handler: compileProcedure(proc),
+        stringify: compileStringify(proc.output),
+      });
       return;
     }
     if (typeof node === "object" && node !== null) {
