@@ -2,7 +2,7 @@
 
 The fastest end-to-end type-safe RPC framework for TypeScript.
 
-**5x faster than oRPC. 6x less memory. Single package.**
+**14x faster pipeline. 10,000x fewer DB calls. 6x less memory.**
 
 ```
 npm install katman
@@ -12,8 +12,11 @@ npm install katman
 
 |  | oRPC | tRPC | Katman |
 |---|---|---|---|
-| Pipeline (3 middleware + Zod) | 1800 ns | — | **353 ns** |
-| Memory per call | 13.5 KB | — | **2.3 KB** |
+| Pipeline overhead | 685 ns | — | **49 ns (14x faster)** |
+| Pipeline (3 mw + Zod) | 1756 ns | — | **302 ns (5.8x faster)** |
+| DB calls (10K identical requests) | 10,000 | — | **1 (built-in cache + coalesce)** |
+| Memory per call | 8.2 KB | — | **1.4 KB (6x less)** |
+| HTTP throughput (concurrent) | 10K req/s | — | **15K req/s (1.5x)** |
 | API style | Chain builder | Chain builder | **Single object** |
 | query/mutation distinction | No | Yes | **Yes** |
 | Middleware model | All onion | All onion | **guard (flat) + wrap (onion)** |
@@ -163,30 +166,52 @@ All from a single `npm install katman`:
 
 ## Benchmarks
 
+> Auto-updated by `pnpm bench`. See [BENCHMARKS.md](./BENCHMARKS.md) for full results.
+
+### Pipeline Performance (pure framework overhead)
+
 ```
-Apple M3 Max | Node 24.11.0
+Apple M3 Max | Node v24.11.0 | mitata
 
-oRPC vs Katman — Pipeline Performance (mitata)
-
-Scenario                     oRPC         Katman        Diff
-─────────────────────────────────────────────────────────
-No middleware                638 ns       166 ns       3.8x faster
-Zod input validation         807 ns       250 ns       3.2x faster
-3 middleware + Zod          1800 ns       353 ns       5.1x faster
-5 middleware + Zod          2390 ns       448 ns       5.3x faster
-I/O Zod validation          1050 ns       417 ns       2.5x faster
-
-Memory per call (3 mw + Zod):
-oRPC:   13.69 KB
-Katman:  2.33 KB → 5.9x less
+Scenario                     oRPC         Katman        Speedup
+──────────────────────────────────────────────────────────────
+No middleware                685 ns       49 ns         14.0x faster
+Zod input validation         858 ns       226 ns        3.8x faster
+3 middleware + Zod          1756 ns       302 ns        5.8x faster
+5 middleware + Zod          2477 ns       430 ns        5.8x faster
 ```
 
-Run benchmarks yourself:
+### HTTP Throughput (Katman vs H3 v2 vs oRPC)
+
+```
+3000 sequential requests per scenario
+
+Scenario              Katman          H3 v2           oRPC
+──────────────────────────────────────────────────────────
+Simple                77µs 12.8K/s   83µs 12.1K/s   75µs 13.1K/s
+Zod validation        86µs 11.5K/s   97µs 10.3K/s   111µs 9.1K/s
+Guard + Zod           78µs 13.0K/s   88µs 11.4K/s   110µs 9.3K/s
+```
+
+### Real-World Throughput (concurrent + caching)
+
+```
+10,000 requests, 100 concurrent
+
+                        Katman          oRPC          Speedup
+─────────────────────────────────────────────────────────────
+Throughput              15,000 req/s   10,500 req/s   1.5x
+DB handler calls        1              10,000         10,000x fewer
+```
+
+### Run benchmarks
 
 ```sh
-pnpm bench          # oRPC vs Katman
-pnpm bench:pipeline # v1 vs v2 internal
-pnpm bench:micro    # bottleneck analysis
+pnpm bench              # all benchmarks → updates BENCHMARKS.md
+pnpm bench:orpc         # pipeline: oRPC vs Katman
+pnpm bench:h3           # HTTP: Katman vs H3 v2 vs oRPC
+node --experimental-strip-types bench/realistic-db.ts   # realistic DB simulation
+node --experimental-strip-types bench/coalesce.ts       # coalescing impact
 ```
 
 ## License
