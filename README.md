@@ -10,13 +10,13 @@ npm install katman
 
 ## Why Katman?
 
-|  | oRPC | tRPC | Katman |
+|  | Bare Node | oRPC | Katman |
 |---|---|---|---|
-| Pipeline overhead (no mw) | 685 ns | — | **49 ns (14x)** |
-| Pipeline (3 middleware + Zod) | 1756 ns | — | **302 ns (5.8x)** |
-| Pipeline (5 middleware + Zod) | 2477 ns | — | **430 ns (5.8x)** |
-| Memory per call | 8.2 KB | — | **1.4 KB (6x less)** |
-| HTTP (middleware + Zod) | 110µs | — | **78µs (1.4x)** |
+| HTTP overhead (body + Zod) | 0µs (baseline) | +25µs | **~0µs** |
+| HTTP latency (body + Zod) | 84µs | 109µs | **80µs (1.4x vs oRPC)** |
+| Pipeline (no middleware) | — | 685 ns | **49 ns (14x)** |
+| Pipeline (3 middleware + Zod) | — | 1756 ns | **302 ns (5.8x)** |
+| Memory per call | — | 8.2 KB | **1.4 KB (6x less)** |
 | API style | Chain builder | Chain builder | **Single object** |
 | query/mutation distinction | No | Yes | **Yes** |
 | Middleware model | All onion | All onion | **guard (flat) + wrap (onion)** |
@@ -181,21 +181,33 @@ Zod input validation         858 ns       226 ns        3.8x faster
 5 middleware + Zod          2477 ns       430 ns        5.8x faster
 ```
 
-### HTTP Throughput (Katman vs H3 v2 vs oRPC)
+### HTTP Framework Overhead (the real comparison)
 
-All three frameworks hit Node.js's HTTP server ceiling (~13K req/s for simple responses). The difference appears when middleware and validation add framework overhead:
+How much latency does each framework add on top of bare Node.js?
+
+```
+Apple M3 Max | Node v24.11.0 | 5000 requests
+
+                         Latency     Framework overhead
+───────────────────────────────────────────────────────
+Bare Node (floor)        84µs        0µs (baseline)
+Katman                   80µs        ~0µs ← near-zero overhead
+oRPC                    109µs       +25µs
+```
+
+Katman adds virtually **zero overhead** to bare Node.js HTTP. oRPC adds 25µs per request — that's the 14x pipeline difference showing up in real HTTP.
+
+### HTTP Throughput (Katman vs H3 v2 vs oRPC)
 
 ```
 3000 sequential requests — Node v24.11.0
 
 Scenario              Katman          H3 v2           oRPC
 ──────────────────────────────────────────────────────────
-Simple                77µs 12.8K/s   83µs 12.1K/s   75µs 13.1K/s
-Zod validation        86µs 11.5K/s   97µs 10.3K/s   111µs 9.1K/s   ← Katman 1.3x vs oRPC
-Guard + Zod           78µs 13.0K/s   88µs 11.4K/s   110µs 9.3K/s   ← Katman 1.4x vs oRPC
+Simple                57µs 17.7K/s   71µs 14.0K/s   69µs 14.5K/s
+Zod validation        80µs 12.4K/s   92µs 10.9K/s  103µs  9.7K/s
+Guard + Zod           77µs 12.9K/s   91µs 10.9K/s  110µs  9.1K/s
 ```
-
-> The "simple" case is TCP-dominated — all frameworks perform similarly. As middleware and validation are added, Katman's 14x pipeline advantage starts to show. With heavier middleware chains, the gap grows further.
 
 ### Run benchmarks
 
