@@ -25,7 +25,7 @@ import type {
   InferContextFromUse,
 } from "./types.ts";
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from "../core/schema.ts";
-import { compileProcedure, type CompiledHandler } from "./compile.ts";
+import { compileProcedure, compileRouter, ContextPool, type CompiledHandler, type FlatRouter } from "./compile.ts";
 import { KatmanError, toKatmanError, isErrorStatus } from "../core/error.ts";
 import { ValidationError, validateSchema } from "../core/schema.ts";
 import { stringifyJSON, parseEmptyableJSON, once } from "../core/utils.ts";
@@ -172,7 +172,9 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
 
     router: (def) => {
       assignPaths(def);
-      compileAll(def);
+      // Compile to flat Map — O(1) lookup at request time
+      const flat = compileRouter(def);
+      routerCache.set(def, flat);
       return def;
     },
 
@@ -230,19 +232,9 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
   return instance;
 }
 
-// ── Pipeline Cache ──────────────────────────────────
+// ── Flat Router Cache ───────────────────────────────
 
-const pipelineCache = new WeakMap<ProcedureDef, CompiledHandler>();
-
-function compileAll(def: RouterDef, path: string[] = []): void {
-  for (const [key, value] of Object.entries(def)) {
-    if (isProcedureDef(value)) {
-      pipelineCache.set(value, compileProcedure(value));
-    } else if (typeof value === "object" && value !== null) {
-      compileAll(value as RouterDef, [...path, key]);
-    }
-  }
-}
+const routerCache = new WeakMap<RouterDef, FlatRouter>();
 
 function isProcedureDef(value: unknown): value is ProcedureDef {
   return (
@@ -275,26 +267,43 @@ function createFetchHandler(
   routerDef: RouterDef,
   contextFactory: (req: Request) => Record<string, unknown> | Promise<Record<string, unknown>>,
 ): (request: Request) => Promise<Response> {
-  return async (request: Request): Promise<Response> => {
-    const url = new URL(request.url);
-    const pathSegments = url.pathname.split("/").filter(Boolean);
+  // Get or compile the flat router map — O(1) lookup
+  let flatRouter = routerCache.get(routerDef);
+  if (!flatRouter) {
+    flatRouter = compileRouter(routerDef);
+    routerCache.set(routerDef, flatRouter);
+  }
 
-    // Find procedure
-    const procedure = findProcedure(routerDef, pathSegments);
-    if (!procedure) {
-      return new Response(
-        JSON.stringify({ code: "NOT_FOUND", status: 404, message: "Procedure not found" }),
-        { status: 404, headers: { "content-type": "application/json" } },
-      );
+  // Context pool — zero allocation per request
+  const ctxPool = new ContextPool();
+
+  // Pre-allocate response headers (reused across requests)
+  const jsonHeaders = { "content-type": "application/json" };
+  const sseHeaders = { "content-type": "text/event-stream", "cache-control": "no-cache" };
+  const notFoundBody = JSON.stringify({ code: "NOT_FOUND", status: 404, message: "Procedure not found" });
+
+  return async (request: Request): Promise<Response> => {
+    // O(1) route lookup — no tree walking
+    const pathname = new URL(request.url).pathname;
+    const routeKey = pathname.startsWith("/") ? pathname.slice(1) : pathname;
+
+    const pipeline = flatRouter!.get(routeKey);
+    if (!pipeline) {
+      return new Response(notFoundBody, { status: 404, headers: jsonHeaders });
     }
 
+    // Borrow context from pool
+    const ctx = ctxPool.borrow();
+
     try {
-      // Build context
-      const ctx = await contextFactory(request);
+      // Populate context from factory
+      const baseCtx = await contextFactory(request);
+      Object.assign(ctx, baseCtx);
 
       // Parse input
       let rawInput: unknown;
       if (request.method === "GET") {
+        const url = new URL(request.url);
         const data = url.searchParams.get("data");
         rawInput = data ? JSON.parse(data) : undefined;
       } else {
@@ -302,61 +311,31 @@ function createFetchHandler(
         rawInput = text ? parseEmptyableJSON(text) : undefined;
       }
 
-      // Get compiled pipeline
-      let pipeline = pipelineCache.get(procedure);
-      if (!pipeline) {
-        pipeline = compileProcedure(procedure);
-        pipelineCache.set(procedure, pipeline);
-      }
-
-      // Execute
-      const output = await pipeline(ctx as Record<string, unknown>, rawInput, request.signal);
+      // Execute compiled pipeline
+      const output = await pipeline(ctx, rawInput, request.signal);
 
       // SSE streaming
       if (output && typeof output === "object" && Symbol.asyncIterator in (output as object)) {
         const stream = iteratorToEventStream(output as AsyncIterableIterator<unknown>);
-        return new Response(stream, {
-          headers: { "content-type": "text/event-stream", "cache-control": "no-cache" },
-        });
+        return new Response(stream, { headers: sseHeaders });
       }
 
       // JSON response
-      return new Response(stringifyJSON(output), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
+      return new Response(stringifyJSON(output), { status: 200, headers: jsonHeaders });
     } catch (error) {
       if (error instanceof ValidationError) {
         return new Response(
           JSON.stringify({ code: "BAD_REQUEST", status: 400, message: error.message, data: { issues: error.issues } }),
-          { status: 400, headers: { "content-type": "application/json" } },
+          { status: 400, headers: jsonHeaders },
         );
       }
       const e = error instanceof KatmanError ? error : toKatmanError(error);
-      return new Response(stringifyJSON(e.toJSON()), {
-        status: e.status,
-        headers: { "content-type": "application/json" },
-      });
+      return new Response(stringifyJSON(e.toJSON()), { status: e.status, headers: jsonHeaders });
+    } finally {
+      // Return context to pool
+      ctxPool.release(ctx);
     }
   };
-}
-
-function findProcedure(router: RouterDef, path: string[]): ProcedureDef | undefined {
-  if (path.length === 0) return undefined;
-
-  const [head, ...tail] = path;
-  const child = router[head!];
-  if (!child) return undefined;
-
-  if (isProcedureDef(child)) {
-    return tail.length === 0 ? child : undefined;
-  }
-
-  if (typeof child === "object" && child !== null) {
-    return findProcedure(child as RouterDef, tail);
-  }
-
-  return undefined;
 }
 
 // ── Re-exports ──────────────────────────────────────

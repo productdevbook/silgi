@@ -23,7 +23,7 @@ export type {
   InferGuardOutput,
 } from "./types.ts";
 
-export { compileProcedure, type CompiledHandler } from "./compile.ts";
+export { compileProcedure, compileRouter, ContextPool, type CompiledHandler, type FlatRouter } from "./compile.ts";
 
 // Re-exports
 export { KatmanError, toKatmanError } from "../core/error.ts";
