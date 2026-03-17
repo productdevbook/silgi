@@ -370,8 +370,9 @@ function createFetchHandler(
         }
       }
 
-      // Execute compiled pipeline
-      const output = await pipeline(ctx, rawInput, request.signal);
+      // Execute compiled pipeline — sync dispatch when possible
+      const pipelineResult = pipeline(ctx, rawInput, request.signal);
+      const output = pipelineResult instanceof Promise ? await pipelineResult : pipelineResult;
 
       // SSE streaming
       if (output && typeof output === "object" && Symbol.asyncIterator in (output as object)) {

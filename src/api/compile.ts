@@ -16,12 +16,15 @@ import type { ProcedureDef, GuardDef, WrapDef, MiddlewareDef, ErrorDef } from ".
 import { validateSchema, type AnySchema } from "../core/schema.ts";
 import { KatmanError } from "../core/error.ts";
 
-/** Compiled pipeline — called per request */
+/**
+ * Compiled pipeline — called per request.
+ * May return sync value OR Promise — caller uses instanceof check.
+ */
 export type CompiledHandler = (
   ctx: Record<string, unknown>,
   rawInput: unknown,
   signal: AbortSignal,
-) => Promise<unknown>;
+) => unknown | Promise<unknown>;
 
 // ── Helpers ─────────────────────────────────────────
 
@@ -209,36 +212,42 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
   // Pre-select the optimal guard runner (compiled once, used per-request)
   const runGuards = selectGuardRunner(guards);
 
-  // ── Fast path: no wraps (most common) ────────────
+  // ── SYNC FAST PATH: no wraps, no validation, all sync guards ──
+  // Eliminates ALL async overhead (~94ns per await removed)
+  if (wraps.length === 0 && !inputSchema && !outputSchema) {
+    return (ctx, rawInput, signal) => {
+      const guardResult = runGuards(ctx);
+      // If guards are sync, entire pipeline is sync — zero Promises
+      if (guardResult && isThenable(guardResult)) {
+        return (guardResult as Promise<void>).then(() =>
+          resolveFn({ input: rawInput, ctx, fail: failFn, signal })
+        );
+      }
+      // SYNC PATH — no Promise created at all
+      const output = resolveFn({ input: rawInput, ctx, fail: failFn, signal });
+      return output; // may be value or Promise depending on user's resolve fn
+    };
+  }
+
+  // ── SEMI-SYNC: no wraps, has validation ────────────
   if (wraps.length === 0) {
     return async (ctx, rawInput, signal) => {
-      // Guards — unrolled, zero closures
       const guardResult = runGuards(ctx);
-      if (guardResult) await guardResult; // only await if async
-
-      // Validate input
+      if (guardResult) await guardResult;
       const input = inputSchema ? await validateSchema(inputSchema, rawInput) : rawInput;
-
-      // Execute
       const output = await resolveFn({ input, ctx, fail: failFn, signal });
-
-      // Validate output
       return outputSchema ? await validateSchema(outputSchema, output) : output;
     };
   }
 
-  // ── Wrap path: build onion only for wraps ────────
+  // ── WRAP PATH: onion only for wraps ────────────────
   return async (ctx, rawInput, signal) => {
-    // Guards — unrolled
     const guardResult = runGuards(ctx);
     if (guardResult) await guardResult;
-
-    // Validate input
     const input = inputSchema ? await validateSchema(inputSchema, rawInput) : rawInput;
 
-    // Build wrap onion (closures only for wraps count, not total middleware)
-    let execute: () => Promise<unknown> = () =>
-      Promise.resolve(resolveFn({ input, ctx, fail: failFn, signal }));
+    let execute: () => unknown | Promise<unknown> = () =>
+      resolveFn({ input, ctx, fail: failFn, signal });
 
     for (let i = wraps.length - 1; i >= 0; i--) {
       const wrapFn = wraps[i]!.fn;
