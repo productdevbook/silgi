@@ -16,7 +16,10 @@
     "./client/plugins": "./src/client/plugins/index.ts",
     "./openapi": "./src/openapi/index.ts"
   },
-  "files": ["dist", "src"],
+  "files": [
+    "dist",
+    "src"
+  ],
   "scripts": {
     "build": "obuild",
     "dev": "vitest",
@@ -30,7 +33,11 @@
     "@standard-schema/spec": "^1.0.0"
   },
   "devDependencies": {
+    "@orpc/client": "^1.13.7",
+    "@orpc/contract": "^1.13.7",
+    "@orpc/server": "^1.13.7",
     "@typescript/native-preview": "7.0.0-dev.20260316.1",
+    "mitata": "^1.0.34",
     "obuild": "^0.4.32",
     "oxfmt": "^0.41.0",
     "oxlint": "^1.56.0",
