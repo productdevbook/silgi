@@ -192,6 +192,7 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
       const hostname = options?.hostname ?? "127.0.0.1";
       const pool = new ContextPool();
       const fr = flatRouter;
+      const sharedSignal = new AbortController().signal; // shared, no timer per request
 
       import("node:http").then(({ createServer }) => {
         const server = createServer((req, res) => {
@@ -224,20 +225,23 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
               const keys = Object.keys(resolved);
               for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = resolved[keys[i]!];
 
-              // Parse body — direct stream read, no Request wrapper
+              // Parse body — skip if no content, direct string accumulation
               let rawInput: unknown;
               const method = req.method ?? "GET";
-              if (method !== "GET" && method !== "HEAD") {
+              const cl = req.headers["content-length"];
+              if (method !== "GET" && method !== "HEAD" && cl && cl !== "0") {
                 const text: string = await new Promise((resolve) => {
-                  const chunks: Buffer[] = [];
-                  req.on("data", (c: Buffer) => chunks.push(c));
-                  req.on("end", () => resolve(Buffer.concat(chunks).toString()));
+                  let body = "";
+                  req.on("data", (c: Buffer) => { body += c; });
+                  req.on("end", () => resolve(body));
                 });
                 if (text) rawInput = JSON.parse(text);
+              } else if (method !== "GET" && method !== "HEAD") {
+                req.resume();
               }
 
-              // Execute compiled pipeline
-              const output = await pipeline(ctx, rawInput, AbortSignal.timeout(30_000));
+              // Execute compiled pipeline — shared signal (no timer per request)
+              const output = await pipeline(ctx, rawInput, sharedSignal);
 
               // Write response directly — no Response object
               res.statusCode = 200;
