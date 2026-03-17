@@ -1,0 +1,45 @@
+{
+  "name": "katman",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "description": "The fastest end-to-end type-safe RPC framework for TypeScript",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server/index.ts",
+    "./client": "./src/client/index.ts",
+    "./contract": "./src/contract/index.ts",
+    "./node": "./src/server/adapters/node/index.ts",
+    "./fetch": "./src/server/adapters/fetch/index.ts",
+    "./plugins": "./src/server/plugins/index.ts",
+    "./client/fetch": "./src/client/adapters/fetch/index.ts",
+    "./client/plugins": "./src/client/plugins/index.ts",
+    "./openapi": "./src/openapi/index.ts"
+  },
+  "files": ["dist", "src"],
+  "scripts": {
+    "build": "obuild",
+    "dev": "vitest",
+    "lint": "oxlint . && oxfmt --check .",
+    "lint:fix": "oxlint . --fix && oxfmt .",
+    "fmt": "oxfmt .",
+    "test": "pnpm lint && pnpm typecheck && vitest run",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@standard-schema/spec": "^1.0.0"
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "7.0.0-dev.20260316.1",
+    "obuild": "^0.4.32",
+    "oxfmt": "^0.41.0",
+    "oxlint": "^1.56.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0",
+    "zod": "^4.3.6"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.32.1"
+}
