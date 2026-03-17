@@ -247,8 +247,8 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
     if (guardResult) await guardResult;
     const input = inputSchema ? await validateSchema(inputSchema, rawInput) : rawInput;
 
-    let execute: () => unknown | Promise<unknown> = () =>
-      resolveFn({ input, ctx, fail: failFn, signal });
+    let execute: () => Promise<unknown> = () =>
+      Promise.resolve(resolveFn({ input, ctx, fail: failFn, signal }));
 
     for (let i = wraps.length - 1; i >= 0; i--) {
       const wrapFn = wraps[i]!.fn;

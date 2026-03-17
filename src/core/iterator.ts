@@ -44,7 +44,7 @@ export class AsyncIteratorClass<TYield, TReturn = void>
     }
   }
 
-  async return(value?: TReturn): Promise<IteratorResult<TYield, TReturn>> {
+  async return(value?: TReturn | PromiseLike<TReturn>): Promise<IteratorResult<TYield, TReturn>> {
     this.#isDone = true;
     await this.#doCleanup("return");
     return { done: true, value: value as TReturn };
@@ -101,7 +101,7 @@ export function streamToIterator<T>(stream: ReadableStream<T>): AsyncIteratorCla
   return new AsyncIteratorClass<T>(
     async () => {
       const { done, value } = await reader.read();
-      if (done) return { done: true, value: undefined as T };
+      if (done) return { done: true, value: undefined } as IteratorReturnResult<void>;
       return { done: false, value };
     },
     async () => { reader.releaseLock(); await stream.cancel(); },

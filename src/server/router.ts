@@ -28,7 +28,7 @@ export type RouterClient<T extends AnyRouter, TClientContext = Record<never, nev
   T extends Procedure<any, any, infer TIn, infer TOut, any, any>
     ? (input: TIn extends undefined ? void : TIn, options?: { signal?: AbortSignal; context?: TClientContext }) => Promise<TOut>
     : T extends Record<string, Lazyable<AnyRouter>>
-      ? { [K in keyof T]: RouterClient<T[K] extends Lazyable<infer R> ? R : never, TClientContext> }
+      ? { [K in keyof T]: RouterClient<(T[K] extends Lazyable<infer R> ? R : never) & AnyRouter, TClientContext> }
       : never;
 
 /** Infer the initial context type from a router */

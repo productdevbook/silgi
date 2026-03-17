@@ -79,7 +79,7 @@ export class KatmanError<
     registry.add(this);
   }
 
-  static [Symbol.hasInstance](instance: unknown): boolean {
+  static override [Symbol.hasInstance](instance: unknown): boolean {
     if (typeof instance !== "object" || instance === null) return false;
     let proto = Object.getPrototypeOf(instance);
     while (proto) {

@@ -84,15 +84,15 @@ export class ContractBuilder<
   prefix(prefix: string): ContractBuilder<TInputSchema, TOutputSchema, TErrorMap, TMeta> {
     return new ContractBuilder({
       ...this["~katman"],
-      prefix: mergePrefix(this["~katman"].prefix, prefix),
-    });
+      prefix: mergePrefix((this["~katman"] as ContractBuilderDef<TInputSchema, TOutputSchema, TErrorMap, TMeta>).prefix, prefix),
+    } as ContractBuilderDef<TInputSchema, TOutputSchema, TErrorMap, TMeta>);
   }
 
   tag(...tags: string[]): ContractBuilder<TInputSchema, TOutputSchema, TErrorMap, TMeta> {
     return new ContractBuilder({
       ...this["~katman"],
-      tags: mergeTags(this["~katman"].tags, tags),
-    });
+      tags: mergeTags((this["~katman"] as ContractBuilderDef<TInputSchema, TOutputSchema, TErrorMap, TMeta>).tags, tags),
+    } as ContractBuilderDef<TInputSchema, TOutputSchema, TErrorMap, TMeta>);
   }
 
   /**

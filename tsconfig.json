@@ -10,6 +10,8 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitOverride": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
     "rootDir": "src",
     "outDir": "dist",
     "paths": {

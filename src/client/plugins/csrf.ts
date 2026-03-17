@@ -32,7 +32,7 @@ export function withCSRF<TClientContext extends ClientContext>(
           ...callOptions.context,
           __csrfHeader: { name: headerName, value: headerValue },
         },
-      } as ClientOptions<TClientContext>;
+      } as unknown as ClientOptions<TClientContext>;
 
       return link.call(path, input, enhancedOptions);
     },

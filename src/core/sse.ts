@@ -259,7 +259,7 @@ export function eventStreamToIterator<T = unknown>(
   } = {},
 ): AsyncIteratorClass<T> {
   const deserialize = options.deserialize ?? ((d: string) => JSON.parse(d) as T);
-  const decodedStream = stream.pipeThrough(new TextDecoderStream());
+  const decodedStream = stream.pipeThrough(new TextDecoderStream() as any);
   const reader = decodedStream.getReader();
 
   const eventQueue: EventMessage[] = [];
@@ -285,7 +285,7 @@ export function eventStreamToIterator<T = unknown>(
           eventResolve?.();
           break;
         }
-        sseDecoder.feed(value);
+        sseDecoder.feed(value as string);
       }
     } catch {
       streamDone = true;
@@ -313,8 +313,7 @@ export function eventStreamToIterator<T = unknown>(
               throw Object.assign(new Error(errorData.message ?? "Stream error"), errorData);
             }
             case "done": {
-              const value = msg.data ? deserialize(msg.data) : (undefined as T);
-              return { done: true, value };
+              return { done: true, value: undefined } as IteratorReturnResult<void>;
             }
             default:
               continue;
@@ -322,7 +321,7 @@ export function eventStreamToIterator<T = unknown>(
         }
 
         if (streamDone) {
-          return { done: true, value: undefined as T };
+          return { done: true, value: undefined } as IteratorReturnResult<void>;
         }
 
         await new Promise<void>((resolve) => {

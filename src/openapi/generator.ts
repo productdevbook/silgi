@@ -171,7 +171,7 @@ export class OpenAPIGenerator {
     if (def.errorMap) {
       const errorsByStatus = new Map<number, { code: string; schema?: JSONSchema }[]>();
 
-      for (const [code, config] of Object.entries(def.errorMap)) {
+      for (const [code, config] of Object.entries(def.errorMap) as [string, { status?: number; data?: any }][]) {
         if (!config) continue;
         const status = config.status ?? 500;
         if (!errorsByStatus.has(status)) errorsByStatus.set(status, []);

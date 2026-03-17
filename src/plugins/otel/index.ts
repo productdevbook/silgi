@@ -36,7 +36,7 @@ export interface Tracer {
 export function createOTelMiddleware<TContext extends Context = Context>(
   tracer: Tracer,
 ): Middleware<TContext, TContext> {
-  return async (opts: MiddlewareOptions<TContext, unknown>, input: unknown) => {
+  return (async (opts: MiddlewareOptions<TContext, unknown>, input: unknown) => {
     const span = tracer.startSpan("rpc.call", {
       attributes: {
         "rpc.system": "katman",
@@ -57,7 +57,7 @@ export function createOTelMiddleware<TContext extends Context = Context>(
     } finally {
       span.end();
     }
-  };
+  }) as Middleware<TContext, TContext>;
 }
 
 // === OTel Handler Plugin ===

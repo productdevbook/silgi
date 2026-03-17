@@ -93,7 +93,7 @@ export interface RateLimitMiddlewareOptions<TContext extends Context = Context> 
 export function createRateLimitMiddleware<TContext extends Context = Context>(
   options: RateLimitMiddlewareOptions<TContext>,
 ): Middleware<TContext, TContext> {
-  return async (opts: MiddlewareOptions<TContext, unknown>, input: unknown) => {
+  return (async (opts: MiddlewareOptions<TContext, unknown>, input: unknown) => {
     const key = await options.keyFn(opts.context, input);
     const result = await options.limiter.limit(key);
 
@@ -110,7 +110,7 @@ export function createRateLimitMiddleware<TContext extends Context = Context>(
     }
 
     return opts.next();
-  };
+  }) as Middleware<TContext, TContext>;
 }
 
 // === Rate Limit Response Headers (Handler Plugin) ===
