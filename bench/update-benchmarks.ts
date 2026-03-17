@@ -201,25 +201,49 @@ async function runHTTPBenchmarks(): Promise<HTTPResult[]> {
   const flat = compileRouter(katmanRouter);
   const pool = new ContextPool();
   const sig = new AbortController().signal;
+  const jsonH = { "content-type": "application/json" };
   const kSrv: Server = await new Promise(r => {
-    const s = createServer(async (req, res) => {
+    const s = createServer((req, res) => {
       const u = req.url ?? "/"; const q = u.indexOf("?");
       const p = q === -1 ? u.slice(1) : u.slice(1, q);
       const route = flat.get(p);
-      if (!route) { res.statusCode = 404; res.end(); return; }
-      const ctx = pool.borrow();
-      try {
-        let inp: unknown;
-        const cl = req.headers["content-length"];
-        if (req.method !== "GET" && cl && cl !== "0") {
-          const t: string = await new Promise(r => { let b = ""; req.on("data", (d: Buffer) => { b += d; }); req.on("end", () => r(b)); });
-          if (t) inp = JSON.parse(t);
-        } else if (req.method !== "GET") req.resume();
-        const r = route.handler(ctx, inp, sig);
-        const out = r instanceof Promise ? await r : r;
-        res.statusCode = 200; res.setHeader("content-type", "application/json"); res.end(route.stringify(out));
-      } catch (e: any) { res.statusCode = e.status ?? 500; res.end(JSON.stringify({ error: e.message })); }
-      finally { pool.release(ctx); }
+      if (!route) { res.writeHead(404); res.end(); return; }
+
+      // No body needed: sync fast path — zero async, zero Promise
+      const cl = req.headers["content-length"];
+      if (!cl || cl === "0" || req.method === "GET" || req.method === "HEAD") {
+        if (cl) req.resume(); // only drain if there's a body to drain
+        const ctx = pool.borrow();
+        try {
+          const r = route.handler(ctx, undefined, sig);
+          if (r instanceof Promise) {
+            r.then(out => { res.writeHead(200, jsonH); res.end(route.stringify(out)); })
+             .catch(e => { res.writeHead(e.status ?? 500); res.end(); })
+             .finally(() => pool.release(ctx));
+          } else {
+            res.writeHead(200, jsonH); res.end(route.stringify(r)); pool.release(ctx);
+          }
+        } catch (e: any) { res.writeHead(e.status ?? 500); res.end(); pool.release(ctx); }
+        return;
+      }
+
+      // Body needed: async path
+      let body = "";
+      req.on("data", (d: Buffer) => { body += d; });
+      req.on("end", () => {
+        const ctx = pool.borrow();
+        try {
+          const inp = body ? JSON.parse(body) : undefined;
+          const r = route.handler(ctx, inp, sig);
+          if (r instanceof Promise) {
+            r.then(out => { res.writeHead(200, jsonH); res.end(route.stringify(out)); })
+             .catch(e => { res.writeHead(e.status ?? 500); res.end(); })
+             .finally(() => pool.release(ctx));
+          } else {
+            res.writeHead(200, jsonH); res.end(route.stringify(r)); pool.release(ctx);
+          }
+        } catch (e: any) { res.writeHead(e.status ?? 500); res.end(); pool.release(ctx); }
+      });
     });
     s.listen(KP, "127.0.0.1", () => r(s));
   });
