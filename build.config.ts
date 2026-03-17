@@ -23,6 +23,7 @@ export default defineBuildConfig({
         "./src/plugins/otel/index.ts",
         "./src/plugins/pino/index.ts",
         "./src/plugins/ratelimit/index.ts",
+        "./src/api/index.ts",
       ],
     },
   ],

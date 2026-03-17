@@ -1,0 +1,365 @@
+/**
+ * katman() — the main entry point.
+ *
+ * Creates a Katman instance with typed context.
+ * All procedure/middleware factories are methods on this instance,
+ * so context type flows automatically.
+ *
+ * Usage:
+ *   const k = katman({ context: (req) => ({ db, headers }) })
+ *   export const { query, mutation, guard, wrap, router, handler } = k
+ */
+
+import type {
+  ProcedureDef,
+  ProcedureType,
+  ProcedureConfig,
+  ErrorDef,
+  GuardDef,
+  WrapDef,
+  GuardFn,
+  WrapFn,
+  MiddlewareDef,
+  ResolveContext,
+  RouterDef,
+  InferContextFromUse,
+} from "./types.ts";
+import type { AnySchema, InferSchemaInput, InferSchemaOutput } from "../core/schema.ts";
+import { compileProcedure, type CompiledHandler } from "./compile.ts";
+import { KatmanError, toKatmanError, isErrorStatus } from "../core/error.ts";
+import { ValidationError, validateSchema } from "../core/schema.ts";
+import { stringifyJSON, parseEmptyableJSON, once } from "../core/utils.ts";
+import { iteratorToEventStream } from "../core/sse.ts";
+
+// ── Katman Instance ─────────────────────────────────
+
+export interface KatmanConfig<TCtx extends Record<string, unknown>> {
+  context: (req: Request) => TCtx | Promise<TCtx>;
+}
+
+export interface KatmanInstance<TBaseCtx extends Record<string, unknown>> {
+  /** Create a guard middleware (flat, zero-closure) */
+  guard: <TReturn extends Record<string, unknown> | void>(
+    fn: GuardFn<TBaseCtx, TReturn>,
+  ) => GuardDef<TBaseCtx, TReturn>;
+
+  /** Create a wrap middleware (onion, before+after) */
+  wrap: (fn: WrapFn<TBaseCtx>) => WrapDef<TBaseCtx>;
+
+  /** Define a query (GET, cacheable, idempotent) */
+  query: QueryFactory<TBaseCtx>;
+
+  /** Define a mutation (POST, side effects) */
+  mutation: MutationFactory<TBaseCtx>;
+
+  /** Define a subscription (SSE stream) */
+  subscription: SubscriptionFactory<TBaseCtx>;
+
+  /** Assemble router and compile pipelines */
+  router: <T extends RouterDef>(def: T) => T;
+
+  /** Create a Fetch API handler: (Request) => Response */
+  handler: (router: RouterDef) => (request: Request) => Promise<Response>;
+
+  /** Create & start a Node.js HTTP server */
+  serve: (router: RouterDef, options?: { port?: number; hostname?: string }) => void;
+}
+
+// ── Procedure Factories ──────────────────────────────
+
+interface QueryFactory<TBaseCtx> {
+  // Short: query(resolve)
+  <TOutput>(
+    resolve: (opts: ResolveContext<TBaseCtx, undefined, {}>) => Promise<TOutput> | TOutput,
+  ): ProcedureDef<"query", undefined, TOutput, {}>;
+
+  // Short: query(input, resolve)
+  <TInput, TOutput>(
+    input: AnySchema,
+    resolve: (opts: ResolveContext<TBaseCtx, TInput, {}>) => Promise<TOutput> | TOutput,
+  ): ProcedureDef<"query", TInput, TOutput, {}>;
+
+  // Config: query({ use, input, output, errors, resolve })
+  <TInput, TOutput, TErrors extends ErrorDef, const TUse extends readonly MiddlewareDef[]>(
+    config: ProcedureConfig<TBaseCtx, TInput, TOutput, TErrors, TUse>,
+  ): ProcedureDef<"query", TInput, TOutput, TErrors>;
+}
+
+interface MutationFactory<TBaseCtx> {
+  <TOutput>(
+    resolve: (opts: ResolveContext<TBaseCtx, undefined, {}>) => Promise<TOutput> | TOutput,
+  ): ProcedureDef<"mutation", undefined, TOutput, {}>;
+
+  <TInput, TOutput>(
+    input: AnySchema,
+    resolve: (opts: ResolveContext<TBaseCtx, TInput, {}>) => Promise<TOutput> | TOutput,
+  ): ProcedureDef<"mutation", TInput, TOutput, {}>;
+
+  <TInput, TOutput, TErrors extends ErrorDef, const TUse extends readonly MiddlewareDef[]>(
+    config: ProcedureConfig<TBaseCtx, TInput, TOutput, TErrors, TUse>,
+  ): ProcedureDef<"mutation", TInput, TOutput, TErrors>;
+}
+
+interface SubscriptionFactory<TBaseCtx> {
+  <TOutput>(
+    resolve: (opts: ResolveContext<TBaseCtx, undefined, {}>) => AsyncIterableIterator<TOutput>,
+  ): ProcedureDef<"subscription", undefined, TOutput, {}>;
+
+  <TInput, TOutput>(
+    input: AnySchema,
+    resolve: (opts: ResolveContext<TBaseCtx, TInput, {}>) => AsyncIterableIterator<TOutput>,
+  ): ProcedureDef<"subscription", TInput, TOutput, {}>;
+
+  <TInput, TOutput, TErrors extends ErrorDef, const TUse extends readonly MiddlewareDef[]>(
+    config: ProcedureConfig<TBaseCtx, TInput, TOutput, TErrors, TUse>,
+  ): ProcedureDef<"subscription", TInput, TOutput, TErrors>;
+}
+
+// ── Implementation ──────────────────────────────────
+
+function createProcedure(type: ProcedureType, ...args: unknown[]): ProcedureDef {
+  // Short form: (resolve)
+  if (args.length === 1 && typeof args[0] === "function") {
+    return {
+      type,
+      input: null,
+      output: null,
+      errors: null,
+      use: null,
+      resolve: args[0] as Function,
+      route: null,
+    };
+  }
+
+  // Short form: (input, resolve)
+  if (args.length === 2 && typeof args[1] === "function") {
+    return {
+      type,
+      input: args[0] as AnySchema,
+      output: null,
+      errors: null,
+      use: null,
+      resolve: args[1] as Function,
+      route: null,
+    };
+  }
+
+  // Config form: ({ use, input, output, errors, resolve, ... })
+  const config = args[0] as ProcedureConfig<any, any, any, any, any>;
+  return {
+    type,
+    input: config.input ?? null,
+    output: config.output ?? null,
+    errors: config.errors ?? null,
+    use: config.use ?? null,
+    resolve: config.resolve,
+    route: config.route ?? null,
+  };
+}
+
+export function katman<TBaseCtx extends Record<string, unknown>>(
+  config: KatmanConfig<TBaseCtx>,
+): KatmanInstance<TBaseCtx> {
+  const contextFactory = config.context;
+
+  const instance: KatmanInstance<TBaseCtx> = {
+    guard: (fn) => ({ kind: "guard" as const, fn }),
+    wrap: (fn) => ({ kind: "wrap" as const, fn }),
+
+    query: ((...args: unknown[]) => createProcedure("query", ...args)) as QueryFactory<TBaseCtx>,
+    mutation: ((...args: unknown[]) => createProcedure("mutation", ...args)) as MutationFactory<TBaseCtx>,
+    subscription: ((...args: unknown[]) => createProcedure("subscription", ...args)) as SubscriptionFactory<TBaseCtx>,
+
+    router: (def) => {
+      assignPaths(def);
+      compileAll(def);
+      return def;
+    },
+
+    handler: (routerDef) => createFetchHandler(routerDef, contextFactory),
+
+    serve: (routerDef, options) => {
+      const handle = createFetchHandler(routerDef, contextFactory);
+      const port = options?.port ?? 3000;
+      const hostname = options?.hostname ?? "127.0.0.1";
+
+      import("node:http").then(({ createServer }) => {
+        const server = createServer((req, res) => {
+          // Fully async handler wrapped in .catch to prevent unhandled rejections
+          (async () => {
+            const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+            const headers = new Headers();
+            for (const [key, value] of Object.entries(req.headers)) {
+              if (value) headers.set(key, Array.isArray(value) ? value[0]! : value);
+            }
+
+            const body = await new Promise<string>((resolve) => {
+              const chunks: Buffer[] = [];
+              req.on("data", (c: Buffer) => chunks.push(c));
+              req.on("end", () => resolve(Buffer.concat(chunks).toString()));
+            });
+
+            const request = new Request(url, {
+              method: req.method,
+              headers,
+              body: req.method !== "GET" && req.method !== "HEAD" ? body : undefined,
+            });
+
+            const response = await handle(request);
+            res.statusCode = response.status;
+            response.headers.forEach((v, k) => res.setHeader(k, v));
+            const responseBody = await response.text();
+            res.end(responseBody);
+          })().catch((err) => {
+            if (!res.headersSent) {
+              const e = err instanceof KatmanError ? err : toKatmanError(err);
+              res.statusCode = e.status;
+              res.setHeader("content-type", "application/json");
+              res.end(stringifyJSON(e.toJSON()));
+            }
+          });
+        });
+
+        server.listen(port, hostname, () => {
+          console.log(`\nKatman server running at http://${hostname}:${port}\n`);
+        });
+      });
+    },
+  };
+
+  return instance;
+}
+
+// ── Pipeline Cache ──────────────────────────────────
+
+const pipelineCache = new WeakMap<ProcedureDef, CompiledHandler>();
+
+function compileAll(def: RouterDef, path: string[] = []): void {
+  for (const [key, value] of Object.entries(def)) {
+    if (isProcedureDef(value)) {
+      pipelineCache.set(value, compileProcedure(value));
+    } else if (typeof value === "object" && value !== null) {
+      compileAll(value as RouterDef, [...path, key]);
+    }
+  }
+}
+
+function isProcedureDef(value: unknown): value is ProcedureDef {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "type" in value &&
+    "resolve" in value &&
+    typeof (value as ProcedureDef).resolve === "function"
+  );
+}
+
+// ── Auto Path Assignment ────────────────────────────
+
+function assignPaths(def: RouterDef, prefix: string[] = []): void {
+  for (const [key, value] of Object.entries(def)) {
+    const currentPath = [...prefix, key];
+    if (isProcedureDef(value)) {
+      if (!value.route) {
+        (value as any).route = { path: "/" + currentPath.join("/") };
+      }
+    } else if (typeof value === "object" && value !== null) {
+      assignPaths(value as RouterDef, currentPath);
+    }
+  }
+}
+
+// ── Fetch Handler ───────────────────────────────────
+
+function createFetchHandler(
+  routerDef: RouterDef,
+  contextFactory: (req: Request) => Record<string, unknown> | Promise<Record<string, unknown>>,
+): (request: Request) => Promise<Response> {
+  return async (request: Request): Promise<Response> => {
+    const url = new URL(request.url);
+    const pathSegments = url.pathname.split("/").filter(Boolean);
+
+    // Find procedure
+    const procedure = findProcedure(routerDef, pathSegments);
+    if (!procedure) {
+      return new Response(
+        JSON.stringify({ code: "NOT_FOUND", status: 404, message: "Procedure not found" }),
+        { status: 404, headers: { "content-type": "application/json" } },
+      );
+    }
+
+    try {
+      // Build context
+      const ctx = await contextFactory(request);
+
+      // Parse input
+      let rawInput: unknown;
+      if (request.method === "GET") {
+        const data = url.searchParams.get("data");
+        rawInput = data ? JSON.parse(data) : undefined;
+      } else {
+        const text = await request.text();
+        rawInput = text ? parseEmptyableJSON(text) : undefined;
+      }
+
+      // Get compiled pipeline
+      let pipeline = pipelineCache.get(procedure);
+      if (!pipeline) {
+        pipeline = compileProcedure(procedure);
+        pipelineCache.set(procedure, pipeline);
+      }
+
+      // Execute
+      const output = await pipeline(ctx as Record<string, unknown>, rawInput, request.signal);
+
+      // SSE streaming
+      if (output && typeof output === "object" && Symbol.asyncIterator in (output as object)) {
+        const stream = iteratorToEventStream(output as AsyncIterableIterator<unknown>);
+        return new Response(stream, {
+          headers: { "content-type": "text/event-stream", "cache-control": "no-cache" },
+        });
+      }
+
+      // JSON response
+      return new Response(stringifyJSON(output), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        return new Response(
+          JSON.stringify({ code: "BAD_REQUEST", status: 400, message: error.message, data: { issues: error.issues } }),
+          { status: 400, headers: { "content-type": "application/json" } },
+        );
+      }
+      const e = error instanceof KatmanError ? error : toKatmanError(error);
+      return new Response(stringifyJSON(e.toJSON()), {
+        status: e.status,
+        headers: { "content-type": "application/json" },
+      });
+    }
+  };
+}
+
+function findProcedure(router: RouterDef, path: string[]): ProcedureDef | undefined {
+  if (path.length === 0) return undefined;
+
+  const [head, ...tail] = path;
+  const child = router[head!];
+  if (!child) return undefined;
+
+  if (isProcedureDef(child)) {
+    return tail.length === 0 ? child : undefined;
+  }
+
+  if (typeof child === "object" && child !== null) {
+    return findProcedure(child as RouterDef, tail);
+  }
+
+  return undefined;
+}
+
+// ── Re-exports ──────────────────────────────────────
+
+export { KatmanError, toKatmanError, isErrorStatus } from "../core/error.ts";
+export { type, validateSchema, ValidationError } from "../core/schema.ts";
