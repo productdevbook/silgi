@@ -30,6 +30,7 @@ import { KatmanError, toKatmanError, isErrorStatus } from "../core/error.ts";
 import { ValidationError, validateSchema } from "../core/schema.ts";
 import { stringifyJSON, parseEmptyableJSON, once } from "../core/utils.ts";
 import { iteratorToEventStream } from "../core/sse.ts";
+import { generateOpenAPI, scalarHTML, type ScalarOptions } from "./scalar.ts";
 
 // ── Katman Instance ─────────────────────────────────
 
@@ -62,7 +63,12 @@ export interface KatmanInstance<TBaseCtx extends Record<string, unknown>> {
   handler: (router: RouterDef) => (request: Request) => Promise<Response>;
 
   /** Create & start a Node.js HTTP server */
-  serve: (router: RouterDef, options?: { port?: number; hostname?: string }) => void;
+  serve: (router: RouterDef, options?: {
+    port?: number;
+    hostname?: string;
+    /** Enable Scalar API Reference UI at /reference and /openapi.json */
+    scalar?: boolean | ScalarOptions;
+  }) => void;
 }
 
 // ── Procedure Factories ──────────────────────────────
@@ -74,15 +80,15 @@ interface QueryFactory<TBaseCtx> {
   ): ProcedureDef<"query", undefined, TOutput, {}>;
 
   // Short: query(input, resolve)
-  <TInput, TOutput>(
-    input: AnySchema,
-    resolve: (opts: ResolveContext<TBaseCtx, TInput, {}>) => Promise<TOutput> | TOutput,
-  ): ProcedureDef<"query", TInput, TOutput, {}>;
+  <TSchema extends AnySchema, TOutput>(
+    input: TSchema,
+    resolve: (opts: ResolveContext<TBaseCtx, InferSchemaOutput<TSchema>, {}>) => Promise<TOutput> | TOutput,
+  ): ProcedureDef<"query", InferSchemaInput<TSchema>, TOutput, {}>;
 
   // Config: query({ use, input, output, errors, resolve })
-  <TInput, TOutput, TErrors extends ErrorDef, const TUse extends readonly MiddlewareDef[]>(
-    config: ProcedureConfig<TBaseCtx, TInput, TOutput, TErrors, TUse>,
-  ): ProcedureDef<"query", TInput, TOutput, TErrors>;
+  <TOutput, TErrors extends ErrorDef, const TUse extends readonly MiddlewareDef[], TInputSchema extends AnySchema | undefined = undefined>(
+    config: ProcedureConfig<TBaseCtx, TInputSchema, TOutput, TErrors, TUse>,
+  ): ProcedureDef<"query", TInputSchema extends AnySchema ? InferSchemaInput<TInputSchema> : undefined, TOutput, TErrors>;
 }
 
 interface MutationFactory<TBaseCtx> {
@@ -90,14 +96,14 @@ interface MutationFactory<TBaseCtx> {
     resolve: (opts: ResolveContext<TBaseCtx, undefined, {}>) => Promise<TOutput> | TOutput,
   ): ProcedureDef<"mutation", undefined, TOutput, {}>;
 
-  <TInput, TOutput>(
-    input: AnySchema,
-    resolve: (opts: ResolveContext<TBaseCtx, TInput, {}>) => Promise<TOutput> | TOutput,
-  ): ProcedureDef<"mutation", TInput, TOutput, {}>;
+  <TSchema extends AnySchema, TOutput>(
+    input: TSchema,
+    resolve: (opts: ResolveContext<TBaseCtx, InferSchemaOutput<TSchema>, {}>) => Promise<TOutput> | TOutput,
+  ): ProcedureDef<"mutation", InferSchemaInput<TSchema>, TOutput, {}>;
 
-  <TInput, TOutput, TErrors extends ErrorDef, const TUse extends readonly MiddlewareDef[]>(
-    config: ProcedureConfig<TBaseCtx, TInput, TOutput, TErrors, TUse>,
-  ): ProcedureDef<"mutation", TInput, TOutput, TErrors>;
+  <TOutput, TErrors extends ErrorDef, const TUse extends readonly MiddlewareDef[], TInputSchema extends AnySchema | undefined = undefined>(
+    config: ProcedureConfig<TBaseCtx, TInputSchema, TOutput, TErrors, TUse>,
+  ): ProcedureDef<"mutation", TInputSchema extends AnySchema ? InferSchemaInput<TInputSchema> : undefined, TOutput, TErrors>;
 }
 
 interface SubscriptionFactory<TBaseCtx> {
@@ -105,14 +111,14 @@ interface SubscriptionFactory<TBaseCtx> {
     resolve: (opts: ResolveContext<TBaseCtx, undefined, {}>) => AsyncIterableIterator<TOutput>,
   ): ProcedureDef<"subscription", undefined, TOutput, {}>;
 
-  <TInput, TOutput>(
-    input: AnySchema,
-    resolve: (opts: ResolveContext<TBaseCtx, TInput, {}>) => AsyncIterableIterator<TOutput>,
-  ): ProcedureDef<"subscription", TInput, TOutput, {}>;
+  <TSchema extends AnySchema, TOutput>(
+    input: TSchema,
+    resolve: (opts: ResolveContext<TBaseCtx, InferSchemaOutput<TSchema>, {}>) => AsyncIterableIterator<TOutput>,
+  ): ProcedureDef<"subscription", InferSchemaInput<TSchema>, TOutput, {}>;
 
-  <TInput, TOutput, TErrors extends ErrorDef, const TUse extends readonly MiddlewareDef[]>(
-    config: ProcedureConfig<TBaseCtx, TInput, TOutput, TErrors, TUse>,
-  ): ProcedureDef<"subscription", TInput, TOutput, TErrors>;
+  <TOutput, TErrors extends ErrorDef, const TUse extends readonly MiddlewareDef[], TInputSchema extends AnySchema | undefined = undefined>(
+    config: ProcedureConfig<TBaseCtx, TInputSchema, TOutput, TErrors, TUse>,
+  ): ProcedureDef<"subscription", TInputSchema extends AnySchema ? InferSchemaInput<TInputSchema> : undefined, TOutput, TErrors>;
 }
 
 // ── Implementation ──────────────────────────────────
@@ -190,18 +196,41 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
 
       const port = options?.port ?? 3000;
       const hostname = options?.hostname ?? "127.0.0.1";
-      const pool = new ContextPool();
       const fr = flatRouter;
       const sharedSignal = new AbortController().signal; // shared, no timer per request
+
+      // Scalar API Reference (pre-computed, zero per-request cost)
+      const scalarEnabled = !!options?.scalar;
+      let specJson: string | undefined;
+      let specHtml: string | undefined;
+      if (scalarEnabled) {
+        const scalarOpts = typeof options!.scalar === "object" ? options!.scalar : {};
+        const spec = generateOpenAPI(routerDef, scalarOpts);
+        specJson = JSON.stringify(spec);
+        specHtml = scalarHTML(`http://${hostname}:${port}/openapi.json`, scalarOpts);
+      }
 
       const notFound = '{"code":"NOT_FOUND","status":404,"message":"Not found"}';
 
       import("node:http").then(({ createServer }) => {
-        // FIX #4: createServer options — disable timeouts (saves ~1µs/req)
         const server = createServer({ keepAlive: true, requestTimeout: 0, headersTimeout: 0 }, (req, res) => {
           const rawUrl = req.url ?? "/";
           const qIdx = rawUrl.indexOf("?");
           const pathname = qIdx === -1 ? rawUrl.slice(1) : rawUrl.slice(1, qIdx);
+
+          // Scalar routes (only if enabled)
+          if (scalarEnabled) {
+            if (pathname === "openapi.json") {
+              res.writeHead(200, { "content-type": "application/json", "content-length": Buffer.byteLength(specJson!) });
+              res.end(specJson);
+              return;
+            }
+            if (pathname === "reference") {
+              res.writeHead(200, { "content-type": "text/html", "content-length": Buffer.byteLength(specHtml!) });
+              res.end(specHtml);
+              return;
+            }
+          }
 
           const route = fr.get(pathname);
           if (!route) {
@@ -298,7 +327,9 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
         });
 
         server.listen(port, hostname, () => {
-          console.log(`\nKatman server running at http://${hostname}:${port}\n`);
+          console.log(`\nKatman server running at http://${hostname}:${port}`);
+          if (scalarEnabled) console.log(`Scalar API Reference at http://${hostname}:${port}/reference`);
+          console.log();
         });
       });
     },

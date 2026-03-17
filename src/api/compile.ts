@@ -235,7 +235,7 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
     return async (ctx, rawInput, signal) => {
       const guardResult = runGuards(ctx);
       if (guardResult) await guardResult;
-      const input = inputSchema ? await validateSchema(inputSchema, rawInput) : rawInput;
+      const input = inputSchema ? await validateSchema(inputSchema, rawInput ?? {}) : rawInput;
       const output = await resolveFn({ input, ctx, fail: failFn, signal });
       return outputSchema ? await validateSchema(outputSchema, output) : output;
     };
@@ -245,7 +245,7 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
   return async (ctx, rawInput, signal) => {
     const guardResult = runGuards(ctx);
     if (guardResult) await guardResult;
-    const input = inputSchema ? await validateSchema(inputSchema, rawInput) : rawInput;
+    const input = inputSchema ? await validateSchema(inputSchema, rawInput ?? {}) : rawInput;
 
     let execute: () => Promise<unknown> = () =>
       Promise.resolve(resolveFn({ input, ctx, fail: failFn, signal }));

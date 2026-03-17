@@ -97,17 +97,21 @@ export interface ResolveContext<TCtx, TInput, TErrors extends ErrorDef> {
 
 export interface ProcedureConfig<
   TCtx,
-  TInput,
+  TInputSchema extends AnySchema | undefined,
   TOutput,
   TErrors extends ErrorDef,
   TUse extends readonly MiddlewareDef[],
 > {
   use?: TUse;
-  input?: AnySchema;
+  input?: TInputSchema;
   output?: AnySchema;
   errors?: TErrors;
   resolve: (
-    opts: ResolveContext<InferContextFromUse<TUse, TCtx>, TInput, TErrors>,
+    opts: ResolveContext<
+      InferContextFromUse<TUse, TCtx>,
+      TInputSchema extends AnySchema ? InferSchemaOutput<TInputSchema> : undefined,
+      TErrors
+    >,
   ) => Promise<TOutput> | TOutput;
   route?: Route;
   meta?: Meta;

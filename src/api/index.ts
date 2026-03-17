@@ -25,6 +25,8 @@ export type {
 
 export { compileProcedure, compileRouter, ContextPool, type CompiledHandler, type FlatRouter } from "./compile.ts";
 
+export { generateOpenAPI, scalarHTML, type ScalarOptions } from "./scalar.ts";
+
 // Re-exports
 export { KatmanError, toKatmanError } from "../core/error.ts";
 export { type, validateSchema, ValidationError } from "../core/schema.ts";
