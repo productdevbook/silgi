@@ -42,9 +42,9 @@ oRPC ile karsilastirildiginda Katman'da eksik olan ozellikler.
 
 ## Client Gelistirmeleri
 
-- [ ] **DynamicLink** — Runtime'da link secimi (cache, auth, feature flags bazli)
-- [ ] **Client Merging** — Birden fazla client'i tek typed object'e birlestirme
-- [ ] **Client Interceptors** — Link seviyesinde middleware hooks
+- [x] **DynamicLink** — Runtime'da link secimi (cache, auth, feature flags bazli)
+- [x] **Client Merging** — `mergeClients()` ile birden fazla client'i birlestirme
+- [x] **Client Interceptors** — `withInterceptors()` ile link-level hooks
 
 ## TanStack Query Gelistirmeleri
 
