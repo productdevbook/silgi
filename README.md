@@ -84,6 +84,7 @@ Auto-generated on Apple M3 Max, Node.js v24.
 |---|---|---|---|
 | **Node.js 22+** | 9 us/req | Full | Full |
 | **Bun** | 2 us/req | Full | Full |
+| **Deno** | Full | -- | -- |
 
 ## Features
 

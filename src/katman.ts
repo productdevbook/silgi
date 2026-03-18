@@ -192,6 +192,20 @@ function createProcedure(type: ProcedureType, ...args: unknown[]): ProcedureDef 
   };
 }
 
+/**
+ * Create a Katman RPC instance with typed context.
+ *
+ * @example
+ * ```ts
+ * const k = katman({
+ *   context: (req) => ({ db: getDB(), user: getUser(req) }),
+ *   hooks: {
+ *     request: ({ path }) => console.log(`-> ${path}`),
+ *   },
+ * })
+ * const { query, mutation, guard, wrap, router, serve } = k
+ * ```
+ */
 export function katman<TBaseCtx extends Record<string, unknown>>(
   config: KatmanConfig<TBaseCtx>,
 ): KatmanInstance<TBaseCtx> {

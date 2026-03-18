@@ -68,6 +68,10 @@ export { AsyncIteratorClass, mapAsyncIterator } from "./core/iterator.ts";
 // ── Client (re-export for convenience) ──────────────
 export { createClient, safe } from "./client/client.ts";
 
+// ── Lazy Loading ────────────────────────────────────
+export { lazy, isLazy, resolveLazy } from "./lazy.ts";
+export type { LazyRouter } from "./lazy.ts";
+
 // ── OpenAPI / Scalar ────────────────────────────────
 export { generateOpenAPI, scalarHTML } from "./scalar.ts";
 export type { ScalarOptions } from "./scalar.ts";
