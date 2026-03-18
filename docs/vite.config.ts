@@ -20,15 +20,13 @@ export default defineConfig({
     // please see https://tanstack.com/start/latest/docs/framework/react/guide/hosting#nitro for guides on hosting
     nitro({
       serverDir: 'server',
-      rolldownConfig: {
-        external: ['@takumi-rs/core'],
-      },
+      traceDeps:  ['@takumi-rs/core', '@takumi-rs/image-response'],
     }),
   ],
   resolve: {
     tsconfigPaths: true,
   },
   ssr: {
-    external: ['@takumi-rs/image-response'],
+    external: ["@takumi-rs/image-response", "typescript", "twoslash", "shiki"],
   },
 });
