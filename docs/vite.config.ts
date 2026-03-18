@@ -20,12 +20,7 @@ export default defineConfig({
     // please see https://tanstack.com/start/latest/docs/framework/react/guide/hosting#nitro for guides on hosting
     nitro({
       serverDir: 'server',
-      preset: 'cloudflare-pages',
-      compatibilityDate: '2025-04-01',
-      cloudflare: {
-        nodeCompat: true,
-      },
-      externals: {
+      rolldownConfig: {
         external: ['@takumi-rs/core'],
       },
     }),

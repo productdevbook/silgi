@@ -3,3 +3,7 @@ dist
 *.tsbuildinfo
 .turbo
 coverage
+
+# Deploy (k8s credentials, secrets)
+deploy/
+deploy.sh
