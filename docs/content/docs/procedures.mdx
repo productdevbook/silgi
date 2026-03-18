@@ -124,6 +124,32 @@ The nesting becomes the URL path:
 - `users.list` → `POST /users/list`
 - `admin.stats` → `POST /admin/stats`
 
+## Metadata
+
+Attach custom key-value metadata to any procedure using the `meta` field:
+
+```ts twoslash
+// @noErrors
+const listUsers = k.query({
+  input: z.object({ limit: z.number().optional() }),
+  meta: { cacheable: true, rateLimit: 100 },
+  resolve: ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
+})
+```
+
+Metadata is stored on the procedure definition and can be read by middleware:
+
+```ts twoslash
+// @noErrors
+const cacheWrap = k.wrap(async (ctx, next) => {
+  // Access meta from the procedure being executed
+  // Useful for conditional caching, logging, authorization policies
+  return next()
+})
+```
+
+Common use cases: cache policies, rate limit tiers, feature flags, authorization rules, and documentation hints.
+
 <Callout>
 Export the router type so the client can use it: `export type AppRouter = typeof appRouter`
 </Callout>

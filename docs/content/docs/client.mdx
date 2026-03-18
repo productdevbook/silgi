@@ -275,6 +275,31 @@ if (isError) {
 
 See the [Typed Errors](/docs/errors) page for the complete error handling guide, including the `defined` flag for distinguishing business errors from unexpected failures.
 
+## Server-side client
+
+For SSR, server components, or testing — use `createServerClient` to get the same typed client interface without any network overhead:
+
+```ts twoslash
+// @noErrors
+import { createServerClient } from "katman/client/server"
+
+const client = createServerClient(appRouter, {
+  context: () => ({ db: getDB() }),
+})
+
+// Same API as the HTTP client — but runs in-process
+const users = await client.users.list({ limit: 10 })
+const user = await client.users.create({ name: "Alice" })
+```
+
+The server client compiles the router once and reuses the compiled handlers. Every call runs the full pipeline (guards, wraps, validation) — the only thing skipped is HTTP serialization.
+
+This is especially useful for:
+
+- **SSR data fetching** — call procedures during server rendering without a network round-trip
+- **Testing** — write integration tests against the real pipeline without starting a server
+- **Server-to-server** — call procedures from background jobs, cron tasks, or other services running in the same process
+
 ## What's next?
 
 - [Typed Errors](/docs/errors) — handle server errors on the client with full type safety

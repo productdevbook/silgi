@@ -40,6 +40,7 @@ export interface ProcedureDef<
   readonly use: readonly MiddlewareDef[] | null;
   readonly resolve: Function;
   readonly route: Route | null;
+  readonly meta: Meta | null;
 }
 
 // ── Error Types ────────────────────────────────────

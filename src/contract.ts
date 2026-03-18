@@ -133,6 +133,7 @@ function buildRouter(contractDef: ContractRouter, impls: any): any {
         use: null,
         resolve: impl,
         route: contractEntry.route ?? null,
+        meta: null,
       };
     } else {
       // Nested router

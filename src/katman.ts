@@ -163,6 +163,7 @@ function createProcedure(type: ProcedureType, ...args: unknown[]): ProcedureDef 
       use: null,
       resolve: args[0] as Function,
       route: null,
+      meta: null,
     };
   }
 
@@ -176,6 +177,7 @@ function createProcedure(type: ProcedureType, ...args: unknown[]): ProcedureDef 
       use: null,
       resolve: args[1] as Function,
       route: null,
+      meta: null,
     };
   }
 
@@ -189,6 +191,7 @@ function createProcedure(type: ProcedureType, ...args: unknown[]): ProcedureDef 
     use: config.use ?? null,
     resolve: config.resolve,
     route: config.route ?? null,
+    meta: config.meta ?? null,
   };
 }
 

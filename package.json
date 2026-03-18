@@ -81,6 +81,10 @@
     "./react": {
       "import": "./dist/integrations/react/index.mjs",
       "types": "./dist/integrations/react/index.d.mts"
+    },
+    "./client/server": {
+      "import": "./dist/client/server.mjs",
+      "types": "./dist/client/server.d.mts"
     }
   },
   "files": [

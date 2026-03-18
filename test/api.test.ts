@@ -192,12 +192,12 @@ describe("query() / mutation() / subscription()", () => {
     expect(proc.type).toBe("subscription");
   });
 
-  it("all procedures have same 7-property shape", () => {
+  it("all procedures have same 8-property shape", () => {
     const q = k.query(async () => "q");
     const m = k.mutation(async () => "m");
     const s = k.subscription(async function* () { yield 1; });
 
-    const keys = ["type", "input", "output", "errors", "use", "resolve", "route"];
+    const keys = ["type", "input", "output", "errors", "use", "resolve", "route", "meta"];
     expect(Object.keys(q).sort()).toEqual(keys.sort());
     expect(Object.keys(m).sort()).toEqual(keys.sort());
     expect(Object.keys(s).sort()).toEqual(keys.sort());

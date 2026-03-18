@@ -42,7 +42,7 @@ export type { KatmanInstance, KatmanConfig } from "./katman.ts";
 
 // ── Types ───────────────────────────────────────────
 export type {
-  ProcedureDef, ProcedureType, ProcedureConfig,
+  ProcedureDef, ProcedureType, ProcedureConfig, Meta,
   ErrorDef, ErrorDefItem, FailFn,
   GuardDef, WrapDef, GuardFn, WrapFn, MiddlewareDef,
   ResolveContext, RouterDef, InferClient,
@@ -60,6 +60,10 @@ export type { Schema, AnySchema, InferSchemaInput, InferSchemaOutput } from "./c
 // ── SSE/Streaming ───────────────────────────────────
 export { withEventMeta, getEventMeta } from "./core/sse.ts";
 export type { EventMeta } from "./core/sse.ts";
+
+// ── Callable ───────────────────────────────────────
+export { callable } from "./callable.ts";
+export type { CallableOptions } from "./callable.ts";
 
 // ── Advanced ────────────────────────────────────────
 export { compileProcedure, compileRouter, ContextPool } from "./compile.ts";
