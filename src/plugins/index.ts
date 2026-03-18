@@ -9,3 +9,13 @@ export {
   type RateLimitGuardOptions,
   type MemoryRateLimiterOptions,
 } from "./ratelimit.ts";
+export { compressionWrap, type CompressionOptions } from "./compression.ts";
+export { bodyLimitGuard, type BodyLimitOptions } from "./body-limit.ts";
+export { strictGetGuard } from "./strict-get.ts";
+export {
+  getCookie,
+  parseCookies,
+  setCookie,
+  deleteCookie,
+  type CookieOptions,
+} from "./cookies.ts";

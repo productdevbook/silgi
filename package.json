@@ -85,6 +85,10 @@
     "./client/server": {
       "import": "./dist/client/server.mjs",
       "types": "./dist/client/server.d.mts"
+    },
+    "./cookies": {
+      "import": "./dist/plugins/cookies.mjs",
+      "types": "./dist/plugins/cookies.d.mts"
     }
   },
   "files": [

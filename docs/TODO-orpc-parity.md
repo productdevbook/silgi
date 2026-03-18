@@ -33,12 +33,12 @@ oRPC ile karsilastirildiginda Katman'da eksik olan ozellikler.
 
 ## Plugin / Guvenlik
 
-- [ ] **Response Compression** — Gzip/deflate (Node.js + Fetch)
-- [ ] **Body Limit** — Request boyut siniri
-- [ ] **Cookie Helpers** — setCookie, getCookie, deleteCookie
+- [x] **Response Compression** — `compressionWrap()` — gzip/deflate hint middleware
+- [x] **Body Limit** — `bodyLimitGuard()` — 413 Payload Too Large guard
+- [x] **Cookie Helpers** — `getCookie`, `parseCookies`, `setCookie`, `deleteCookie` (katman/cookies)
 - [ ] **Signing & Encryption** — HMAC-SHA256 imza, AES-GCM sifreleme
 - [ ] **Publisher/PubSub** — Event pub/sub (Memory, Redis, Durable Objects adapterleri)
-- [ ] **Strict GET Method** — Read-only operasyonlar icin GET zorunlulugu
+- [x] **Strict GET Method** — `strictGetGuard` — 405 on non-GET for queries
 
 ## Client Gelistirmeleri
 
