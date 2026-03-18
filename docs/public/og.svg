@@ -63,8 +63,12 @@
 
   <!-- ═══ LEFT SIDE — Text ═══ -->
 
-  <!-- Eyebrow -->
-  <text x="80" y="180" fill="#8a7e6e" font-family="'Courier New', monospace" font-size="13" letter-spacing="5">KATMAN</text>
+  <!-- Logo + name -->
+  <g transform="translate(80, 130)">
+    <rect width="36" height="36" rx="8" fill="#edc462"/>
+    <circle cx="18" cy="18" r="5" fill="#0a0908"/>
+    <text x="48" y="27" fill="#ede6db" font-family="Georgia, serif" font-size="26" font-style="italic" letter-spacing="-0.5">Katman</text>
+  </g>
 
   <!-- Title -->
   <text x="76" y="270" fill="#ede6db" font-family="Georgia, serif" font-size="76" font-style="italic" letter-spacing="-2">Build in</text>
