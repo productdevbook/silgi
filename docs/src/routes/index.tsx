@@ -10,6 +10,7 @@ function Home() {
     <HomeLayout {...baseOptions()}>
       <div className="k-sans">
         <Hero />
+        <SponsorBanner />
         <Heading label="Architecture" title="Build your API in composable layers" />
         <ArchitectureGrid />
         <Heading label="Developer experience" title="From zero to production" />
@@ -18,11 +19,12 @@ function Home() {
         <ProtocolGrid />
         <Heading label="Integrations" title="Works with your stack" />
         <IntegrationGrid />
+        <SponsorsInline />
         <Heading label="Server" title="One line to deploy" />
         <ServerGrid />
         <Heading label="Plugins" title="Extend without ceremony" />
         <PluginGrid />
-        <Sponsors />
+        <SponsorsSection />
         <FooterCTA />
       </div>
     </HomeLayout>
@@ -44,15 +46,12 @@ function Hero() {
       <div className="relative grid md:grid-cols-2">
         <div className="flex flex-col justify-between gap-16 p-6 sm:p-10">
           <div className="flex flex-col gap-5 items-center md:items-start text-center md:text-left">
-            <span className="k-mono text-[10px] uppercase tracking-[.3em] text-[var(--k-dim)]">
-              Type-safe RPC for TypeScript
-            </span>
+            <span className="k-mono text-[10px] uppercase tracking-[.3em] text-[var(--k-dim)]">Type-safe RPC for TypeScript</span>
             <h1 className="k-serif text-[clamp(2.5rem,6vw,4.5rem)] leading-[0.95] tracking-[-0.02em] max-w-[22rem] k-shine">
               The RPC Framework for the Web
             </h1>
             <p className="text-[var(--k-warm)] md:text-lg max-w-[27rem] text-pretty font-light leading-relaxed">
-              Katman is a type-safe RPC framework with compiled pipelines
-              powering the next generation of TypeScript APIs.
+              Katman is a type-safe RPC framework with compiled pipelines powering the next generation of TypeScript APIs.
             </p>
             <div className="flex items-center gap-4 mt-6">
               <Link to="/docs/$" params={{ _splat: '' }} className="k-btn k-btn--primary">Get Started</Link>
@@ -112,6 +111,31 @@ const CODE = [
   '})',
 ].join('\n');
 
+/* ═══ SPONSOR BANNER — right after hero ═════════════ */
+
+function SponsorBanner() {
+  return (
+    <section className="k-wrapper k-wrapper--ticks">
+      <div className="grid lg:grid-cols-[1fr,auto] divide-y lg:divide-y-0 lg:divide-x divide-[var(--k-line)]">
+        <div className="p-6 sm:p-10 flex flex-col sm:flex-row items-center gap-6 sm:gap-10">
+          <span className="k-mono text-[10px] uppercase tracking-[.2em] text-[var(--k-dim)] shrink-0">Special Sponsor</span>
+          <div className="flex items-center gap-8 flex-wrap justify-center">
+            <a href="https://github.com/sponsors/productdevbook" target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center h-10 px-8 rounded-lg border border-dashed border-[var(--k-line)] text-[var(--k-dim)] text-[13px] hover:border-[var(--k-accent)]/30 hover:text-[var(--k-accent)] transition-colors">
+              Your Company
+            </a>
+          </div>
+        </div>
+        <a href="https://github.com/sponsors/productdevbook" target="_blank" rel="noopener noreferrer"
+          className="p-6 sm:px-10 flex items-center gap-3 text-[var(--k-dim)] hover:text-[var(--k-accent)] transition-colors">
+          <span className="text-[13px] font-light">Become a sponsor</span>
+          <span className="text-[var(--k-accent)]">→</span>
+        </a>
+      </div>
+    </section>
+  );
+}
+
 /* ═══ HEADING ═══════════════════════════════════════ */
 
 function Heading({ label, title }: { label: string; title: string }) {
@@ -148,7 +172,7 @@ function DXGrid() {
       <Cell bl><CT t="Lifecycle hooks" d="request, response, error, serve:start — powered by hookable. Sync fast-path when unused." /></Cell>
       <Cell bt><CT t="Response cache" d="ohash-keyed TTL cache with prefix invalidation. Skip pipeline + stringify on cache hit." /></Cell>
       <Cell bt bl><CT t="Lazy loading" d="lazy(() => import('./routes/users')) for code splitting. Cached after first load." /></Cell>
-      <Cell bt bl><CT t="Contract-first" d="Define the API shape, share with frontend, implement on backend. Types enforced by the compiler." /></Cell>
+      <Cell bt bl><CT t="Contract-first" d="Define the API shape, share with frontend, implement on backend. Types enforced." /></Cell>
     </section>
   );
 }
@@ -179,10 +203,35 @@ function ProtocolGrid() {
 function IntegrationGrid() {
   return (
     <section className="k-wrapper k-wrapper--ticks grid sm:grid-cols-2 lg:grid-cols-4">
-      <Cell><CT t="React Actions" d="createAction() returns [error, data] tuples. FormData support with bracket notation." /></Cell>
+      <Cell><CT t="React Actions" d="createAction() returns [error, data] tuples. FormData with bracket notation." /></Cell>
       <Cell bl><CT t="TanStack Query" d="queryOptions, mutationOptions, queryKey. React, Vue, Solid, Svelte." /></Cell>
       <Cell bl><CT t="AI SDK" d="routerToTools() — LLMs call your procedures through function calling." /></Cell>
-      <Cell bl><CT t="Fastify" d="Register as a Fastify plugin alongside existing REST routes." /></Cell>
+      <Cell bl><CT t="Fastify" d="Register as a plugin alongside existing REST routes." /></Cell>
+    </section>
+  );
+}
+
+/* ═══ SPONSORS INLINE — between sections ════════════ */
+
+function SponsorsInline() {
+  return (
+    <section className="k-wrapper">
+      <div className="grid md:grid-cols-[1fr,1.2fr] divide-y md:divide-y-0 md:divide-x divide-[var(--k-line)]">
+        <div className="p-6 sm:p-10">
+          <span className="k-mono text-[10px] uppercase tracking-[.3em] text-[var(--k-dim)] block mb-4">Gold Sponsors</span>
+          <p className="text-[13px] text-[var(--k-dim)] font-light leading-relaxed">
+            Support Katman development and get your logo on the homepage, README, and docs.
+          </p>
+        </div>
+        <div className="p-6 sm:p-10 grid grid-cols-3 gap-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <a key={i} href="https://github.com/sponsors/productdevbook" target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center h-16 rounded-lg border border-dashed border-[var(--k-line)] text-[var(--k-dim)] text-[11px] k-mono hover:border-[var(--k-accent)]/30 hover:text-[var(--k-accent)] transition-colors">
+              Sponsor
+            </a>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }
@@ -230,27 +279,31 @@ function PluginGrid() {
   );
 }
 
-/* ═══ SPONSORS ══════════════════════════════════════ */
+/* ═══ SPONSORS SECTION — full ═══════════════════════ */
 
-function Sponsors() {
+function SponsorsSection() {
   return (
     <section className="k-wrapper">
-      <div className="mx-auto max-w-[960px] px-6 sm:px-10 py-16 lg:py-20">
-        <span className="k-mono text-[10px] uppercase tracking-[.3em] text-[var(--k-dim)] block mb-4">Sponsors</span>
-        <h2 className="k-serif text-[clamp(1.8rem,4vw,2.8rem)] leading-[1.1] tracking-[-0.015em] text-[var(--k-cream)] mb-6">
-          Backed by the community
-        </h2>
-        <p className="text-[var(--k-warm)] font-light leading-relaxed max-w-md mb-12">
-          Katman is free and open source. Sponsors help us dedicate time to new features, performance, and documentation.
-        </p>
+      <div className="mx-auto max-w-[960px] px-6 sm:px-10 py-16 lg:py-24">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-8 mb-12">
+          <div>
+            <span className="k-mono text-[10px] uppercase tracking-[.3em] text-[var(--k-dim)] block mb-4">Sponsors</span>
+            <h2 className="k-serif text-[clamp(1.6rem,3vw,2.2rem)] leading-[1.1] text-[var(--k-cream)]">
+              Backed by the community
+            </h2>
+          </div>
+          <a href="https://github.com/sponsors/productdevbook" target="_blank" rel="noopener noreferrer" className="k-btn k-btn--ghost">
+            Become a Sponsor
+          </a>
+        </div>
 
         {/* Platinum */}
-        <div className="mb-10">
+        <div className="mb-8">
           <span className="k-mono text-[9px] uppercase tracking-[.25em] text-[var(--k-dim)] block mb-4">Platinum</span>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map((i) => (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
               <a key={i} href="https://github.com/sponsors/productdevbook" target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-center h-20 rounded-xl border border-dashed border-[var(--k-line)] text-[var(--k-dim)] text-sm hover:border-[var(--k-accent)]/30 hover:text-[var(--k-accent)] transition-colors">
+                className="flex items-center justify-center h-24 rounded-xl border border-dashed border-[var(--k-line)] text-[var(--k-dim)] text-sm hover:border-[var(--k-accent)]/30 hover:text-[var(--k-accent)] transition-colors">
                 Your logo here
               </a>
             ))}
@@ -258,26 +311,29 @@ function Sponsors() {
         </div>
 
         {/* Gold */}
-        <div className="mb-10">
+        <div className="mb-8">
           <span className="k-mono text-[9px] uppercase tracking-[.25em] text-[var(--k-dim)] block mb-4">Gold</span>
-          <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+            {[1, 2, 3, 4, 5].map((i) => (
               <a key={i} href="https://github.com/sponsors/productdevbook" target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-center h-14 rounded-lg border border-dashed border-[var(--k-line)] text-[var(--k-dim)] text-xs hover:border-[var(--k-accent)]/30 hover:text-[var(--k-accent)] transition-colors">
+                className="flex items-center justify-center h-16 rounded-lg border border-dashed border-[var(--k-line)] text-[var(--k-dim)] text-xs hover:border-[var(--k-accent)]/30 hover:text-[var(--k-accent)] transition-colors">
                 Sponsor
               </a>
             ))}
           </div>
         </div>
 
-        {/* Become a sponsor CTA */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pt-4">
-          <a href="https://github.com/sponsors/productdevbook" target="_blank" rel="noopener noreferrer" className="k-btn k-btn--primary">
-            Become a Sponsor
-          </a>
-          <span className="text-[13px] text-[var(--k-dim)] font-light">
-            via GitHub Sponsors or Open Collective
-          </span>
+        {/* Silver */}
+        <div>
+          <span className="k-mono text-[9px] uppercase tracking-[.25em] text-[var(--k-dim)] block mb-4">Silver</span>
+          <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              <a key={i} href="https://github.com/sponsors/productdevbook" target="_blank" rel="noopener noreferrer"
+                className="flex items-center justify-center h-12 rounded-lg border border-dashed border-[var(--k-line)] text-[var(--k-dim)] text-[10px] hover:border-[var(--k-accent)]/30 hover:text-[var(--k-accent)] transition-colors">
+                ♡
+              </a>
+            ))}
+          </div>
         </div>
       </div>
     </section>
@@ -308,11 +364,7 @@ function FooterCTA() {
 /* ═══ SHARED ════════════════════════════════════════ */
 
 function Cell({ children, bl, bt }: { children: React.ReactNode; bl?: boolean; bt?: boolean }) {
-  return (
-    <div className={`p-6 sm:p-10 ${bl ? 'border-l border-[var(--k-line)]' : ''} ${bt ? 'border-t border-[var(--k-line)]' : ''}`}>
-      {children}
-    </div>
-  );
+  return <div className={`p-6 sm:p-10 ${bl ? 'border-l border-[var(--k-line)]' : ''} ${bt ? 'border-t border-[var(--k-line)]' : ''}`}>{children}</div>;
 }
 
 function CT({ t, d }: { t: string; d: string }) {
