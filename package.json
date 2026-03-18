@@ -66,6 +66,14 @@
       "import": "./dist/plugins/ratelimit.mjs",
       "types": "./dist/plugins/ratelimit.d.mts"
     },
+    "./fastify": {
+      "import": "./dist/adapters/fastify.mjs",
+      "types": "./dist/adapters/fastify.d.mts"
+    },
+    "./contract": {
+      "import": "./dist/contract.mjs",
+      "types": "./dist/contract.d.mts"
+    },
     "./react": {
       "import": "./dist/integrations/react/index.mjs",
       "types": "./dist/integrations/react/index.d.mts"

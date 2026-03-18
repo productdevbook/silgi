@@ -21,6 +21,8 @@ export default defineBuildConfig({
         "./src/plugins/otel.ts",
         "./src/plugins/pino.ts",
         "./src/plugins/ratelimit.ts",
+        "./src/adapters/fastify.ts",
+        "./src/contract.ts",
       ],
     },
   ],
