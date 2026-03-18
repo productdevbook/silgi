@@ -21,6 +21,10 @@ export default defineConfig({
     nitro({
       serverDir: 'server',
       preset: 'cloudflare-pages',
+      compatibilityDate: '2025-04-01',
+      cloudflare: {
+        nodeCompat: true,
+      },
       externals: {
         external: ['@takumi-rs/core'],
       },
