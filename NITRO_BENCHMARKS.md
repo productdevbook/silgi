@@ -1,53 +1,46 @@
-# Katman vs Nitro/H3 — Performance Benchmark
+# Katman serve() vs Real Nitro v3 — Performance Benchmark
 
-Katman serve() vs Katman handler() (Nitro direct mode) vs H3 v2 native.
+Real server processes, real HTTP requests. No mocking, no wrapping.
 
-> 3000 sequential requests per scenario | Node v24.11.0
+- **Katman**: `playground/server.ts` via `k.serve()` (raw Node.js HTTP + compiled pipeline)
+- **Nitro**: `examples/nitro/server.ts` via `npx nitro dev` (real Nitro v3 runtime + Katman handler)
+
+> 2000 sequential requests per scenario | Node v24.11.0
 
 ## Results
 
-| Scenario | Katman serve() | Katman handler() | H3 v2 native |
+| Scenario | Katman serve() | Nitro (real) | Comparison |
 |---|---|---|---|
-| Health (no mw, no validation) | **75µs** 13,232/s | 81µs 12,299/s | 74µs 13,487/s |
-| List (Zod validation) | **84µs** 11,929/s | 93µs 10,699/s | 90µs 11,074/s |
-| Create (guard + Zod) | **76µs** 13,104/s | 87µs 11,551/s | 87µs 11,502/s |
+| Health (no mw, no validation) | **102µs** 9,781/s | 238µs 4,208/s | **2.3x faster** |
+| List users (Zod validation) | **108µs** 9,250/s | 231µs 4,322/s | **2.1x faster** |
+| Create user (guard + Zod) | **108µs** 9,268/s | 223µs 4,484/s | **2.1x faster** |
 
 ## Percentiles
 
-| Scenario | Mode | avg | p50 | p99 | req/s |
+| Scenario | Server | avg | p50 | p99 | req/s |
 |---|---|---|---|---|---|
-| Health | serve() | 75µs | 62µs | 203µs | 13,232 |
-| Health | handler() | 81µs | 73µs | 148µs | 12,299 |
-| Health | H3 v2 | 74µs | 68µs | 123µs | 13,487 |
-| List | serve() | **84µs** | 75µs | 144µs | **11,929** |
-| List | handler() | 93µs | 83µs | 156µs | 10,699 |
-| List | H3 v2 | 90µs | 80µs | 156µs | 11,074 |
-| Create | serve() | **76µs** | 69µs | 130µs | **13,104** |
-| Create | handler() | 87µs | 79µs | 119µs | 11,551 |
-| Create | H3 v2 | 87µs | 78µs | 159µs | 11,502 |
+| Health | Katman | **102µs** | 84µs | 423µs | **9,781** |
+| Health | Nitro | 238µs | 217µs | 490µs | 4,208 |
+| List | Katman | **108µs** | 93µs | 220µs | **9,250** |
+| List | Nitro | 231µs | 219µs | 395µs | 4,322 |
+| Create | Katman | **108µs** | 97µs | 189µs | **9,268** |
+| Create | Nitro | 223µs | 213µs | 337µs | 4,484 |
 
-## Analysis
+## Why the difference?
 
-**Katman serve()** (raw Node.js HTTP):
-- Fastest in validation + middleware scenarios (6-8% faster than H3)
-- Health check is neck-and-neck with H3 (~1%)
-- No Fetch API overhead — direct IncomingMessage/ServerResponse
+**Katman serve()** is a raw Node.js HTTP server with:
+- Direct `IncomingMessage`/`ServerResponse` — no Fetch API conversion
+- Compiled pipeline — guards unrolled, handlers pre-linked at startup
+- Context pooling — zero per-request allocation
+- Fast pathname extraction — string ops, no `new URL()`
 
-**Katman handler()** (Fetch API — used by Nitro direct mode):
-- ~7-10% overhead vs serve() due to Node→Request conversion
-- Equal to H3 in guarded scenarios, slightly slower in simple ones
-- This is what runs when you use `{ fetch: handler() }` with Nitro
+**Nitro** adds layers on top:
+- srvx server abstraction
+- H3 v2 middleware chain + error handling
+- Node → Fetch Request conversion per request
+- Dev mode overhead (file watcher, HMR, rolldown bundler)
 
-**H3 v2 native**:
-- Strong baseline — well optimized for simple routes
-- Slightly slower when Zod validation is added (no compiled pipeline)
-- p99 latency higher than Katman in guarded scenario (159µs vs 130µs)
-
-## Takeaway
-
-Katman serve() has the edge in **middleware-heavy** scenarios thanks to compiled pipelines and unrolled guard specialization. For simple health checks, H3 and Katman are effectively equal.
-
-When running on Nitro (via `{ fetch: handler() }`), the Fetch API conversion adds ~10% overhead, but Katman's compiled pipeline compensates in complex scenarios — making it roughly **equal to H3** for real-world use cases.
+> Note: Nitro dev mode includes watcher and HMR overhead. Production builds (`nitro build`) would be faster, but still carry the H3/srvx layer.
 
 ## Reproduce
 

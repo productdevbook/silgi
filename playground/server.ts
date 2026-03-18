@@ -149,7 +149,7 @@ export type AppRouter = typeof appRouter;
 // ── Serve ────────────────────────────────────────────
 
 k.serve(appRouter, {
-  port: 3456,
+  port: Number(process.env.PORT) || 3456,
   scalar: {
     title: "Katman Playground API",
     version: "0.1.0",
