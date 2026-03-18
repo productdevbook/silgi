@@ -1,68 +1,88 @@
 <svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="630">
+      <stop offset="0%" stop-color="#0c0a07"/>
+      <stop offset="100%" stop-color="#0a0908"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#edc462"/>
+      <stop offset="100%" stop-color="#e8a830"/>
+    </linearGradient>
+    <linearGradient id="layer-fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#edc462" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#edc462" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="20" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softglow">
+      <feGaussianBlur stdDeviation="40"/>
+    </filter>
+  </defs>
+
   <!-- Background -->
-  <rect width="1200" height="630" fill="#0a0908"/>
+  <rect width="1200" height="630" fill="url(#bg)"/>
 
-  <!-- Grain texture -->
-  <filter id="grain">
-    <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="4" stitchTiles="stitch"/>
-  </filter>
-  <rect width="1200" height="630" filter="url(#grain)" opacity="0.02"/>
+  <!-- Large ambient glow behind layers -->
+  <ellipse cx="850" cy="320" rx="350" ry="250" fill="#edc462" opacity="0.04" filter="url(#softglow)"/>
 
-  <!-- Horizontal strata lines -->
-  <line x1="0" y1="140" x2="1200" y2="140" stroke="white" stroke-opacity="0.04" stroke-width="1"/>
-  <line x1="0" y1="280" x2="1200" y2="280" stroke="white" stroke-opacity="0.04" stroke-width="1"/>
-  <line x1="0" y1="420" x2="1200" y2="420" stroke="white" stroke-opacity="0.04" stroke-width="1"/>
-  <line x1="0" y1="560" x2="1200" y2="560" stroke="white" stroke-opacity="0.04" stroke-width="1"/>
+  <!-- ═══ THREE STACKED LAYER CARDS — the hero visual ═══ -->
 
-  <!-- Ambient glow -->
-  <circle cx="600" cy="250" r="350" fill="#edc462" opacity="0.03"/>
-  <circle cx="600" cy="250" r="200" fill="#edc462" opacity="0.02"/>
+  <!-- Layer 3: TRANSPORT (bottom, largest) -->
+  <g transform="translate(620, 310)">
+    <rect x="0" y="0" width="500" height="110" rx="14" fill="#100f0c" stroke="white" stroke-opacity="0.07"/>
+    <circle cx="30" cy="30" r="7" fill="#bfa0cc"/>
+    <text x="48" y="36" fill="#bfa0cc" font-family="'Courier New', monospace" font-size="15" font-weight="bold" letter-spacing="3">TRANSPORT</text>
+    <text x="30" y="68" fill="#c9b99a" font-family="'Courier New', monospace" font-size="16">HTTP · HTTP/2 · WebSocket</text>
+    <text x="30" y="92" fill="#c9b99a" font-family="'Courier New', monospace" font-size="16">JSON · MessagePack · devalue</text>
+  </g>
 
-  <!-- Tick marks — left edge -->
-  <line x1="0" y1="0" x2="0" y2="8" stroke="white" stroke-opacity="0.06" stroke-width="1"/>
-  <line x1="0" y1="140" x2="0" y2="148" stroke="white" stroke-opacity="0.06" stroke-width="1"/>
-  <line x1="0" y1="280" x2="0" y2="288" stroke="white" stroke-opacity="0.06" stroke-width="1"/>
-  <line x1="0" y1="420" x2="0" y2="428" stroke="white" stroke-opacity="0.06" stroke-width="1"/>
-  <line x1="0" y1="560" x2="0" y2="568" stroke="white" stroke-opacity="0.06" stroke-width="1"/>
+  <!-- Layer 2: PIPELINE (middle) -->
+  <g transform="translate(660, 210)">
+    <rect x="0" y="0" width="460" height="110" rx="14" fill="#12110e" stroke="#edc462" stroke-opacity="0.15"/>
+    <circle cx="30" cy="30" r="7" fill="#7fb5ac"/>
+    <text x="48" y="36" fill="#7fb5ac" font-family="'Courier New', monospace" font-size="15" font-weight="bold" letter-spacing="3">PIPELINE</text>
+    <text x="30" y="68" fill="#ede6db" font-family="'Courier New', monospace" font-size="16">guard() · wrap() · compile()</text>
+    <text x="30" y="92" fill="#8a7e6e" font-family="'Courier New', monospace" font-size="14">pre-linked · unrolled · zero closures</text>
+  </g>
 
-  <!-- Tick marks — right edge -->
-  <line x1="1200" y1="0" x2="1200" y2="8" stroke="white" stroke-opacity="0.06" stroke-width="1"/>
-  <line x1="1200" y1="140" x2="1200" y2="148" stroke="white" stroke-opacity="0.06" stroke-width="1"/>
-  <line x1="1200" y1="280" x2="1200" y2="288" stroke="white" stroke-opacity="0.06" stroke-width="1"/>
-  <line x1="1200" y1="420" x2="1200" y2="428" stroke="white" stroke-opacity="0.06" stroke-width="1"/>
-  <line x1="1200" y1="560" x2="1200" y2="568" stroke="white" stroke-opacity="0.06" stroke-width="1"/>
+  <!-- Layer 1: CLIENT (top, brightest) -->
+  <g transform="translate(700, 120)">
+    <rect x="0" y="0" width="420" height="100" rx="14" fill="#161411" stroke="#edc462" stroke-opacity="0.25"/>
+    <rect x="-3" y="-3" width="426" height="106" rx="17" fill="none" stroke="#edc462" stroke-opacity="0.06"/>
+    <circle cx="30" cy="30" r="7" fill="#edc462"/>
+    <text x="48" y="36" fill="#edc462" font-family="'Courier New', monospace" font-size="15" font-weight="bold" letter-spacing="3">CLIENT</text>
+    <text x="30" y="66" fill="#ede6db" font-family="'Courier New', monospace" font-size="17" font-weight="bold">createClient&lt;AppRouter&gt;()</text>
+    <text x="30" y="88" fill="#8a7e6e" font-family="'Courier New', monospace" font-size="14">typed · inferred · end-to-end</text>
+  </g>
+
+  <!-- Connection lines between layers -->
+  <line x1="880" y1="230" x2="880" y2="212" stroke="#edc462" stroke-opacity="0.1" stroke-width="1" stroke-dasharray="3 3"/>
+  <line x1="880" y1="310" x2="880" y2="292" stroke="#edc462" stroke-opacity="0.08" stroke-width="1" stroke-dasharray="3 3"/>
+
+  <!-- ═══ LEFT SIDE — Text ═══ -->
 
   <!-- Eyebrow -->
-  <text x="100" y="200" fill="#5e5549" font-family="monospace" font-size="12" letter-spacing="4" text-transform="uppercase">TYPE-SAFE RPC FOR TYPESCRIPT</text>
+  <text x="80" y="180" fill="#8a7e6e" font-family="'Courier New', monospace" font-size="13" letter-spacing="5">KATMAN</text>
 
-  <!-- Title — "The RPC Framework" -->
-  <text x="100" y="300" fill="#ede6db" font-family="Georgia, 'Times New Roman', serif" font-size="72" font-style="italic" letter-spacing="-1">The RPC Framework</text>
-
-  <!-- Title — "for the Web" -->
-  <text x="100" y="380" fill="#edc462" font-family="Georgia, 'Times New Roman', serif" font-size="72" font-style="italic" letter-spacing="-1">for the Web</text>
+  <!-- Title -->
+  <text x="76" y="270" fill="#ede6db" font-family="Georgia, serif" font-size="76" font-style="italic" letter-spacing="-2">Build in</text>
+  <text x="76" y="360" fill="#edc462" font-family="Georgia, serif" font-size="76" font-style="italic" letter-spacing="-2" filter="url(#glow)">layers.</text>
 
   <!-- Subtitle -->
-  <text x="100" y="440" fill="#b5a892" font-family="sans-serif" font-size="20" font-weight="300">Compiled pipelines · Single package · Every runtime</text>
+  <text x="80" y="420" fill="#8a7e6e" font-family="sans-serif" font-size="18" font-weight="300">Type-safe RPC framework for TypeScript</text>
 
-  <!-- Layer indicators — bottom -->
-  <g transform="translate(100, 520)">
-    <circle cx="0" cy="0" r="4" fill="#edc462"/>
-    <text x="14" y="4" fill="#5e5549" font-family="monospace" font-size="11" letter-spacing="2">GUARDS</text>
-
-    <circle cx="130" cy="0" r="4" fill="#7fb5ac"/>
-    <text x="144" y="4" fill="#5e5549" font-family="monospace" font-size="11" letter-spacing="2">PIPELINE</text>
-
-    <circle cx="280" cy="0" r="4" fill="#bfa0cc"/>
-    <text x="294" y="4" fill="#5e5549" font-family="monospace" font-size="11" letter-spacing="2">TRANSPORT</text>
+  <!-- Install command -->
+  <g transform="translate(80, 470)">
+    <rect x="0" y="0" width="340" height="48" rx="8" fill="#100f0c" stroke="white" stroke-opacity="0.08"/>
+    <text x="20" y="31" fill="#5e5549" font-family="'Courier New', monospace" font-size="16">$</text>
+    <text x="42" y="31" fill="#ede6db" font-family="'Courier New', monospace" font-size="16">pnpm add katman</text>
   </g>
 
-  <!-- Install command — right side -->
-  <g transform="translate(750, 480)">
-    <rect x="0" y="0" width="350" height="44" rx="8" fill="white" fill-opacity="0.03" stroke="white" stroke-opacity="0.06"/>
-    <text x="20" y="28" fill="#5e5549" font-family="monospace" font-size="14">$</text>
-    <text x="40" y="28" fill="#ede6db" font-family="monospace" font-size="14">pnpm add katman</text>
-  </g>
+  <!-- Bottom tagline -->
+  <text x="80" y="572" fill="#5e5549" font-family="sans-serif" font-size="14">Compiled pipelines · Single package · Every runtime</text>
 
   <!-- Border -->
-  <rect x="0" y="0" width="1200" height="630" fill="none" stroke="white" stroke-opacity="0.06" stroke-width="1"/>
+  <rect x="0" y="0" width="1200" height="630" fill="none" stroke="white" stroke-opacity="0.04" stroke-width="1"/>
 </svg>
