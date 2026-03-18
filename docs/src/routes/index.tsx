@@ -8,7 +8,7 @@ export const Route = createFileRoute('/')({ component: Home });
 function Home() {
   return (
     <HomeLayout {...baseOptions()}>
-      <div className="k-sans">
+      <div className="k-sans max-w-6xl mx-auto k-landing">
         <Hero />
         <SponsorBanner />
         <Heading label="Architecture" title="Build your API in composable layers" />
@@ -365,7 +365,7 @@ function FooterCTA() {
 
 function W({ children, className = '', ticks, border }: { children: React.ReactNode; className?: string; ticks?: boolean; border?: boolean }) {
   const cls = ticks ? 'k-ticks' : border ? 'k-border' : '';
-  return <div className={`mx-auto max-w-6xl ${cls} ${className}`}>{children}</div>;
+  return <div className={`${cls} ${className}`}>{children}</div>;
 }
 
 function Cell({ children, bl, bt }: { children: React.ReactNode; bl?: boolean; bt?: boolean }) {

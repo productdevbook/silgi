@@ -73,6 +73,10 @@ html.light {
 
 .k-ticks {
   border-top: 1px solid var(--k-line);
+}
+
+/* Continuous vertical tick lines on the landing page container */
+.k-landing {
   background-image:
     linear-gradient(to right, var(--k-line) 1px, transparent 1px),
     linear-gradient(to right, var(--k-line) 1px, transparent 1px);
