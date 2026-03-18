@@ -79,7 +79,7 @@ function Page() {
   const markdownUrl = `/llms.mdx/docs/${[...slugs, 'index.mdx'].join('/')}`;
 
   return (
-    <DocsLayout {...baseOptions()} tree={pageTree}>
+    <DocsLayout {...baseOptions()} tree={pageTree} sidebar={{ defaultOpenLevel: 1 }}>
       <Link to={markdownUrl} hidden />
       <Suspense>{clientLoader.useContent(path, { markdownUrl, path })}</Suspense>
     </DocsLayout>

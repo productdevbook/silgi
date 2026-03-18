@@ -13,7 +13,11 @@ export function baseOptions(): BaseLayoutProps {
     },
     githubUrl: `https://github.com/${gitConfig.user}/${gitConfig.repo}`,
     links: [
-      { text: 'Docs', url: '/docs', active: 'nested-url' },
+      {
+        text: 'Documentation',
+        url: '/docs',
+        active: 'nested-url',
+      },
     ],
   };
 }
