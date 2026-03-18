@@ -13,28 +13,8 @@ export default defineConfig({
     mdx(await import('./source.config')),
     tailwindcss(),
     tanstackStart({
-      spa: {
-        enabled: true,
-        prerender: {
-          enabled: true,
-          crawlLinks: true,
-        },
-      },
-
-      pages: [
-        {
-          path: '/docs',
-        },
-        {
-          path: '/api/search',
-        },
-        {
-          path: 'llms-full.txt',
-        },
-        {
-          path: 'llms.txt',
-        },
-      ],
+      // prerender disabled due to fumadocs#3104 (tslib resolve bug)
+      // re-enable when upstream fix lands
     }),
     react(),
     // please see https://tanstack.com/start/latest/docs/framework/react/guide/hosting#nitro for guides on hosting
@@ -42,8 +22,5 @@ export default defineConfig({
   ],
   resolve: {
     tsconfigPaths: true,
-    alias: {
-      tslib: 'tslib/tslib.es6.js',
-    },
   },
 });
