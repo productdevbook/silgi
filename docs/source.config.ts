@@ -1,4 +1,6 @@
 import { defineConfig, defineDocs } from 'fumadocs-mdx/config';
+import { transformerTwoslash } from 'fumadocs-twoslash';
+import { rehypeCodeDefaultOptions } from 'fumadocs-core/mdx-plugins';
 
 export const docs = defineDocs({
   dir: 'content/docs',
@@ -9,4 +11,13 @@ export const docs = defineDocs({
   },
 });
 
-export default defineConfig();
+export default defineConfig({
+  mdxOptions: {
+    rehypeCodeOptions: {
+      transformers: [
+        ...(rehypeCodeDefaultOptions.transformers ?? []),
+        transformerTwoslash(),
+      ],
+    },
+  },
+});

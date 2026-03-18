@@ -21,11 +21,13 @@
     "@tanstack/start-static-server-functions": "1.166.9",
     "fumadocs-core": "16.6.17",
     "fumadocs-mdx": "14.2.10",
+    "fumadocs-twoslash": "^3.1.14",
     "fumadocs-ui": "16.6.17",
     "lucide-react": "^0.577.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "tailwind-merge": "^3.5.0",
+    "twoslash": "^0.3.6",
     "vite": "^8.0.0"
   },
   "devDependencies": {

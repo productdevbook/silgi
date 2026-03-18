@@ -135,16 +135,25 @@ Hooks have a **sync fast-path** — when all hooks are synchronous, zero Promise
 
 Types flow end-to-end — no codegen needed:
 
-```ts
-// Server
-const appRouter = router({
-  users: { list: listUsers, create: createUser },
-})
+```ts twoslash
+// @noErrors
+type InferClient<T> = {
+  [K in keyof T]: T[K] extends { resolve: (...args: any) => infer R }
+    ? () => Promise<R>
+    : T[K] extends object
+      ? InferClient<T[K]>
+      : never
+}
 
-// Client — full types inferred
+const appRouter = {
+  users: {
+    list: { resolve: () => [{ id: 1, name: "Alice" }] },
+    create: { resolve: () => ({ id: 2, name: "Bob" }) },
+  },
+}
+
 type Client = InferClient<typeof appRouter>
-// Client.users.list:   (input: { limit?: number }) => Promise<User[]>
-// Client.users.create: (input: { name: string })   => Promise<User>
+//   ^?
 ```
 
 ## Standard Schema
