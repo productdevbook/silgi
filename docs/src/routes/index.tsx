@@ -10,264 +10,326 @@ function Home() {
     <HomeLayout {...baseOptions()}>
       <div className="k-sans">
         <Hero />
-        <Div />
-        <Layers />
-        <Div />
-        <DX />
-        <Div />
-        <Protocols />
-        <Div />
-        <Closing />
+        <Heading label="Architecture" title="Build your API in composable layers" />
+        <ArchitectureGrid />
+        <Heading label="Developer experience" title="From zero to production" />
+        <DXGrid />
+        <Heading label="Wire formats" title="Three protocols, automatic negotiation" />
+        <ProtocolGrid />
+        <Heading label="Integrations" title="Works with your stack" />
+        <IntegrationGrid />
+        <Heading label="Server" title="One line to deploy" />
+        <ServerGrid />
+        <Heading label="Plugins" title="Extend without ceremony" />
+        <PluginGrid />
+        <Sponsors />
+        <FooterCTA />
       </div>
     </HomeLayout>
   );
 }
 
-/* ═══ HERO ═════════════════════════════════════════════ */
+/* ═══ HERO ═══════════════════════════════════════════ */
 
 function Hero() {
   const [pm, setPm] = useState<'pnpm' | 'npm' | 'bun'>('pnpm');
-  const cmd = { pnpm: 'pnpm add katman', npm: 'npm i katman', bun: 'bun add katman' };
+  const cmd = { npm: 'npm i katman', pnpm: 'pnpm add katman', bun: 'bun add katman' };
 
   return (
-    <section className="relative overflow-hidden k-grain k-strata">
+    <section className="k-wrapper k-wrapper--ticks relative overflow-hidden k-grain">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-1/2 top-[-20%] -translate-x-1/2 w-[min(900px,100vw)] aspect-square rounded-full bg-[var(--k-accent)] opacity-[0.04] blur-[160px]" />
+        <div className="absolute left-1/2 top-[-10%] -translate-x-1/2 w-[700px] aspect-square rounded-full bg-[var(--k-accent)] opacity-[0.03] blur-[160px]" />
       </div>
 
-      <div className="relative mx-auto max-w-[1080px] px-6 pt-32 pb-28 lg:pt-40 lg:pb-36">
-        <p className="k-reveal k-mono text-[11px] uppercase tracking-[.25em] text-[var(--k-dim)] mb-8">
-          Type-safe RPC for TypeScript
-        </p>
-
-        <h1 className="k-reveal-1 k-serif text-[clamp(3rem,8vw,6.5rem)] leading-[0.95] tracking-[-0.02em] mb-8">
-          Build in<br /><em className="text-[var(--k-accent)]">layers.</em>
-        </h1>
-
-        <p className="k-reveal-2 max-w-md text-[var(--k-warm)] text-lg leading-relaxed mb-12">
-          Katman compiles your guards and middleware into a pre&#8209;linked
-          pipeline at startup. Define once, run everywhere.
-        </p>
-
-        <div className="k-reveal-3 flex flex-wrap items-center gap-4 mb-16">
-          <Link to="/docs/$" params={{ _splat: '' }}
-            className="px-7 py-3 text-sm font-semibold text-black rounded-full bg-[var(--k-accent)] shadow-[0_0_32px_rgba(240,198,116,.15)] transition-shadow hover:shadow-[0_0_48px_rgba(240,198,116,.25)]">
-            Get started
-          </Link>
-          <a href="https://github.com/productdevbook/katman" target="_blank" rel="noopener noreferrer"
-            className="px-7 py-3 text-sm font-medium rounded-full border border-[var(--k-line)] text-[var(--k-warm)] transition hover:border-[var(--k-warm)]/30 hover:text-[var(--k-cream)]">
-            View source
-          </a>
-        </div>
-
-        <div className="k-reveal-4 inline-flex flex-col rounded-2xl border border-[var(--k-line)] bg-[#0e0d0b]/80 backdrop-blur-md shadow-[0_24px_80px_rgba(0,0,0,.4)]">
-          <div className="flex border-b border-[var(--k-line)]">
-            {(Object.keys(cmd) as Array<keyof typeof cmd>).map((k) => (
-              <button key={k} onClick={() => setPm(k)}
-                className={`k-mono px-5 py-2.5 text-[11px] transition-colors ${pm === k ? 'text-[var(--k-accent)]' : 'text-[var(--k-dim)] hover:text-[var(--k-warm)]'}`}>
-                {k}
-              </button>
-            ))}
-          </div>
-          <div className="px-5 py-3.5 k-mono text-sm">
-            <span className="text-[var(--k-dim)]">❯ </span>
-            <span className="text-[var(--k-cream)]">{cmd[pm]}</span>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ═══ LAYERS ══════════════════════════════════════════ */
-
-function Layers() {
-  return (
-    <section className="relative k-grain">
-      <div className="mx-auto max-w-[1080px] px-6 py-28 lg:py-36">
-        <div className="grid gap-20 lg:grid-cols-[1fr,1.2fr] items-center">
-          <div>
-            <p className="k-mono text-[11px] uppercase tracking-[.25em] text-[var(--k-dim)] mb-6">Architecture</p>
-            <h2 className="k-serif text-4xl lg:text-5xl leading-[1.05] tracking-[-0.02em] mb-6">
-              Three layers,<br /><em className="text-[var(--k-accent)]">one package</em>
-            </h2>
-            <p className="text-[var(--k-warm)] leading-relaxed mb-10">
-              <em className="k-serif text-[var(--k-cream)]">Katman</em> means <em className="k-serif">layer</em> in Turkish.
-              Your API is organized into composable strata — each with its own responsibility, all type&#8209;safe end to end.
+      <div className="relative grid md:grid-cols-2">
+        <div className="flex flex-col justify-between gap-16 p-6 sm:p-10">
+          <div className="flex flex-col gap-5 items-center md:items-start text-center md:text-left">
+            <span className="k-mono text-[10px] uppercase tracking-[.3em] text-[var(--k-dim)]">
+              Type-safe RPC for TypeScript
+            </span>
+            <h1 className="k-serif text-[clamp(2.5rem,6vw,4.5rem)] leading-[0.95] tracking-[-0.02em] max-w-[22rem] k-shine">
+              The RPC Framework for the Web
+            </h1>
+            <p className="text-[var(--k-warm)] md:text-lg max-w-[27rem] text-pretty font-light leading-relaxed">
+              Katman is a type-safe RPC framework with compiled pipelines
+              powering the next generation of TypeScript APIs.
             </p>
-            <div className="space-y-6">
-              <LR n="01" c="#f0c674" t="Guards" d="Enrich context. Return { user }, { permissions }. Flat — no callbacks." />
-              <LR n="02" c="#8abeb7" t="Pipeline" d="Compiled at startup. Guards unrolled. Wraps pre-linked. Zero closures." />
-              <LR n="03" c="#c9a0dc" t="Transport" d="HTTP, HTTP/2, WebSocket. JSON, MessagePack, devalue. Auto negotiation." />
+            <div className="flex items-center gap-4 mt-6">
+              <Link to="/docs/$" params={{ _splat: '' }} className="k-btn k-btn--primary">Get Started</Link>
+              <a href="https://github.com/productdevbook/katman" target="_blank" rel="noopener noreferrer" className="k-btn k-btn--ghost">View on GitHub</a>
             </div>
           </div>
 
-          <div className="relative">
-            <div className="absolute -inset-8 rounded-3xl bg-[var(--k-accent)]/[.03] blur-3xl k-breathe" />
-            <div className="relative rounded-2xl border border-[var(--k-line)] bg-[#0e0d0b] shadow-[0_32px_80px_rgba(0,0,0,.5)] overflow-hidden">
-              <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--k-line)]">
-                <div className="flex gap-[6px]">
-                  <i className="block w-[10px] h-[10px] rounded-full bg-white/[.07]" />
-                  <i className="block w-[10px] h-[10px] rounded-full bg-white/[.07]" />
-                  <i className="block w-[10px] h-[10px] rounded-full bg-white/[.07]" />
-                </div>
-                <span className="k-mono text-[11px] text-[var(--k-dim)] ml-2">server.ts</span>
+          <div className="hidden md:block w-full -mb-[1px]">
+            <div className="rounded-lg border border-[var(--k-line)] bg-[var(--k-raised)] overflow-hidden">
+              <div className="flex border-b border-[var(--k-line)]">
+                {(Object.keys(cmd) as Array<keyof typeof cmd>).map((k) => (
+                  <button key={k} onClick={() => setPm(k)}
+                    className={`k-mono flex-1 px-4 py-2 text-[10px] uppercase tracking-[.12em] transition-colors ${pm === k ? 'text-[var(--k-accent)] bg-white/[.02]' : 'text-[var(--k-dim)] hover:text-[var(--k-warm)]'}`}>
+                    {k}
+                  </button>
+                ))}
               </div>
-              <pre className="k-code k-mono p-6 text-[13px] leading-[1.9] overflow-x-auto" dangerouslySetInnerHTML={{ __html: CODE }} />
+              <div className="px-4 py-3 k-mono text-[13px] flex items-center justify-between">
+                <span><span className="text-[var(--k-dim)]">$ </span>{cmd[pm]}</span>
+                <span className="text-[var(--k-dim)] text-[10px]">bash</span>
+              </div>
             </div>
           </div>
+        </div>
+
+        <div className="relative border-l border-[var(--k-line)] overflow-hidden">
+          <pre className="k-code k-mono relative p-6 sm:p-10 text-[12.5px] leading-[1.9] overflow-x-auto min-h-[24rem]" dangerouslySetInnerHTML={{ __html: CODE }} />
         </div>
       </div>
     </section>
   );
 }
 
-function LR({ n, c, t, d }: { n: string; c: string; t: string; d: string }) {
+const CODE = [
+  '<span class="kw">import</span> { katman } <span class="kw">from</span> <span class="st">\'katman\'</span>',
+  '<span class="kw">import</span> { z } <span class="kw">from</span> <span class="st">\'zod\'</span>',
+  '',
+  '<span class="kw">const</span> k = <span class="fn">katman</span>({',
+  '  context: (req) =&gt; ({ db: <span class="fn">getDB</span>() }),',
+  '})',
+  '',
+  '<span class="cm">// Guard — flat, no callbacks</span>',
+  '<span class="kw">const</span> auth = k.<span class="fn">guard</span>(<span class="kw">async</span> (ctx) =&gt; {',
+  '  <span class="kw">const</span> user = <span class="kw">await</span> <span class="fn">verify</span>(ctx.headers.auth)',
+  '  <span class="kw">if</span> (!user) <span class="kw">throw new</span> <span class="fn">KatmanError</span>(<span class="st">\'UNAUTHORIZED\'</span>)',
+  '  <span class="kw">return</span> { user }',
+  '})',
+  '',
+  '<span class="cm">// Procedure — typed end-to-end</span>',
+  '<span class="kw">const</span> users = k.<span class="fn">query</span>(',
+  '  z.<span class="fn">object</span>({ limit: z.<span class="fn">number</span>().<span class="fn">optional</span>() }),',
+  '  ({ input, ctx }) =&gt; ctx.db.users.<span class="fn">find</span>(input)',
+  ')',
+  '',
+  'k.<span class="fn">serve</span>(k.<span class="fn">router</span>({ users }), {',
+  '  port: <span class="nr">3000</span>, scalar: <span class="kw">true</span>, ws: <span class="kw">true</span>',
+  '})',
+].join('\n');
+
+/* ═══ HEADING ═══════════════════════════════════════ */
+
+function Heading({ label, title }: { label: string; title: string }) {
   return (
-    <div className="flex items-start gap-4 group">
-      <div className="flex flex-col items-center pt-1">
-        <span className="k-mono text-[10px] text-[var(--k-dim)]">{n}</span>
-        <div className="mt-1.5 w-px h-full bg-[var(--k-line)] group-last:hidden" />
+    <section className="k-wrapper">
+      <div className="mx-auto max-w-[960px] px-6 sm:px-10 py-16 lg:py-20">
+        <span className="k-mono text-[10px] uppercase tracking-[.3em] text-[var(--k-dim)] block mb-4">{label}</span>
+        <h2 className="k-serif text-[clamp(1.8rem,4vw,2.8rem)] leading-[1.1] tracking-[-0.015em] text-[var(--k-cream)]">{title}</h2>
       </div>
-      <div>
-        <h3 className="font-semibold text-[var(--k-cream)] mb-1 flex items-center gap-2">
-          <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: c }} />{t}
-        </h3>
-        <p className="text-sm text-[var(--k-dim)] leading-relaxed">{d}</p>
-      </div>
-    </div>
+    </section>
   );
 }
 
-const CODE = `<span class="kw">import</span> <span class="tx">{ katman }</span> <span class="kw">from</span> <span class="st">'katman'</span>
-<span class="kw">import</span> <span class="tx">{ z }</span> <span class="kw">from</span> <span class="st">'zod'</span>
+/* ═══ ARCHITECTURE ══════════════════════════════════ */
 
-<span class="kw">const</span> <span class="tx">k = </span><span class="fn">katman</span><span class="tx">({</span>
-  <span class="tx">context: (req) =&gt; ({ db: </span><span class="fn">getDB</span><span class="tx">() }),</span>
-<span class="tx">})</span>
-
-<span class="cm">// Guard — returns context additions</span>
-<span class="kw">const</span> <span class="tx">auth = k.</span><span class="fn">guard</span><span class="tx">(</span><span class="kw">async</span> <span class="tx">(ctx) =&gt; {</span>
-  <span class="kw">const</span> <span class="tx">user = </span><span class="kw">await</span> <span class="fn">verify</span><span class="tx">(ctx.headers.auth)</span>
-  <span class="kw">if</span> <span class="tx">(!user) </span><span class="kw">throw new</span> <span class="fn">KatmanError</span><span class="tx">(</span><span class="st">'UNAUTHORIZED'</span><span class="tx">)</span>
-  <span class="kw">return</span> <span class="tx">{ user }</span>
-<span class="tx">})</span>
-
-<span class="cm">// Procedure — typed end-to-end</span>
-<span class="kw">const</span> <span class="tx">users = k.</span><span class="fn">query</span><span class="tx">(</span>
-  <span class="tx">z.</span><span class="fn">object</span><span class="tx">({ limit: z.</span><span class="fn">number</span><span class="tx">().</span><span class="fn">optional</span><span class="tx">() }),</span>
-  <span class="tx">({ input, ctx }) =&gt; ctx.db.users.</span><span class="fn">find</span><span class="tx">(input)</span>
-<span class="tx">)</span>
-
-<span class="tx">k.</span><span class="fn">serve</span><span class="tx">(k.</span><span class="fn">router</span><span class="tx">({ users }), {</span>
-  <span class="tx">port: </span><span class="nr">3000</span><span class="tx">, scalar: </span><span class="kw">true</span><span class="tx">, ws: </span><span class="kw">true</span>
-<span class="tx">})</span>`;
-
-/* ═══ DX GRID ═════════════════════════════════════════ */
-
-function DX() {
-  const items = [
-    { l: 'End-to-end types', d: 'Input, output, context, errors. Inferred — not generated.' },
-    { l: 'Single package', d: 'Server, client, plugins, codecs. One npm install.' },
-    { l: 'Standard Schema', d: 'Zod, Valibot, ArkType. Bring your own.' },
-    { l: 'Compiled guards', d: 'Unrolled at startup. Zero closures per request.' },
-    { l: 'Every runtime', d: 'Node, Bun, Deno, Cloudflare Workers.' },
-    { l: 'Scalar docs', d: 'OpenAPI 3.1 + interactive UI at /reference.' },
-  ];
-
+function ArchitectureGrid() {
   return (
-    <section className="relative k-grain">
-      <div className="mx-auto max-w-[1080px] px-6 py-28 lg:py-36">
-        <p className="k-mono text-[11px] uppercase tracking-[.25em] text-[var(--k-dim)] mb-6">Developer experience</p>
-        <h2 className="k-serif text-4xl lg:text-5xl leading-[1.05] tracking-[-0.02em] mb-20">
-          Less ceremony,<br /><em className="text-[var(--k-accent)]">more building</em>
-        </h2>
-        <div className="grid gap-px sm:grid-cols-2 lg:grid-cols-3 rounded-2xl overflow-hidden border border-[var(--k-line)]">
-          {items.map((item, i) => (
-            <div key={i} className="p-8 bg-[#0e0d0b] transition-colors hover:bg-[#13120f] k-shimmer">
-              <p className="k-mono text-[10px] uppercase tracking-[.2em] text-[var(--k-dim)] mb-3">0{i + 1}</p>
-              <h3 className="font-semibold text-[var(--k-cream)] mb-2">{item.l}</h3>
-              <p className="text-sm text-[var(--k-dim)] leading-relaxed">{item.d}</p>
+    <section className="k-wrapper k-wrapper--ticks grid md:grid-cols-2">
+      <Cell><CT t="Guards enrich context" d="Return { user }, { permissions } from a flat function. No onion callbacks. Types accumulate automatically." /></Cell>
+      <Cell bl><CT t="Compiled at startup" d="Guards are unrolled, wraps are pre-linked. The pipeline is a direct function chain — zero closures per request." /></Cell>
+      <Cell bt><CT t="Types flow end-to-end" d="Input, output, context, errors — fully typed from server to client. Inferred from your code, never generated." /></Cell>
+      <Cell bt bl><CT t="Standard Schema" d="Zod, Valibot, ArkType — bring your own validator. Works through the Standard Schema specification." /></Cell>
+    </section>
+  );
+}
+
+/* ═══ DX ════════════════════════════════════════════ */
+
+function DXGrid() {
+  return (
+    <section className="k-wrapper k-wrapper--ticks grid sm:grid-cols-2 lg:grid-cols-3">
+      <Cell><CT t="Single package" d="Server, client, plugins, codecs. One npm install. No monorepo of scoped packages." /></Cell>
+      <Cell bl><CT t="Typed errors" d="Define error maps per procedure. fail() is typed — the compiler catches wrong codes." /></Cell>
+      <Cell bl><CT t="Lifecycle hooks" d="request, response, error, serve:start — powered by hookable. Sync fast-path when unused." /></Cell>
+      <Cell bt><CT t="Response cache" d="ohash-keyed TTL cache with prefix invalidation. Skip pipeline + stringify on cache hit." /></Cell>
+      <Cell bt bl><CT t="Lazy loading" d="lazy(() => import('./routes/users')) for code splitting. Cached after first load." /></Cell>
+      <Cell bt bl><CT t="Contract-first" d="Define the API shape, share with frontend, implement on backend. Types enforced by the compiler." /></Cell>
+    </section>
+  );
+}
+
+/* ═══ PROTOCOLS ═════════════════════════════════════ */
+
+function ProtocolGrid() {
+  return (
+    <section className="k-wrapper k-wrapper--ticks grid md:grid-cols-3">
+      <Cell>
+        <Badge c="#9cb877" t="JSON" b="default" />
+        <p className="text-[13px] text-[var(--k-dim)] font-light leading-relaxed mt-3">Universal. Fastest encode/decode. Works everywhere. Zero config.</p>
+      </Cell>
+      <Cell bl>
+        <Badge c="var(--k-accent)" t="MessagePack" b="binary" />
+        <p className="text-[13px] text-[var(--k-dim)] font-light leading-relaxed mt-3">30% smaller payloads. Native Date. One flag: <code className="k-mono text-[var(--k-warm)]">binary: true</code></p>
+      </Cell>
+      <Cell bl>
+        <Badge c="#bfa0cc" t="devalue" b="rich types" />
+        <p className="text-[13px] text-[var(--k-dim)] font-light leading-relaxed mt-3">Date, Map, Set, BigInt, RegExp, circular refs. Automatic round-trip.</p>
+      </Cell>
+    </section>
+  );
+}
+
+/* ═══ INTEGRATIONS ══════════════════════════════════ */
+
+function IntegrationGrid() {
+  return (
+    <section className="k-wrapper k-wrapper--ticks grid sm:grid-cols-2 lg:grid-cols-4">
+      <Cell><CT t="React Actions" d="createAction() returns [error, data] tuples. FormData support with bracket notation." /></Cell>
+      <Cell bl><CT t="TanStack Query" d="queryOptions, mutationOptions, queryKey. React, Vue, Solid, Svelte." /></Cell>
+      <Cell bl><CT t="AI SDK" d="routerToTools() — LLMs call your procedures through function calling." /></Cell>
+      <Cell bl><CT t="Fastify" d="Register as a Fastify plugin alongside existing REST routes." /></Cell>
+    </section>
+  );
+}
+
+/* ═══ SERVER ════════════════════════════════════════ */
+
+function ServerGrid() {
+  return (
+    <section className="k-wrapper k-wrapper--ticks grid md:grid-cols-2">
+      <Cell>
+        <CT t="serve()" d="One-line Node.js server. Auto port finding, HTTP/2 with TLS, WebSocket on same port." />
+        <div className="mt-5 rounded-lg border border-[var(--k-line)] bg-[var(--k-raised)] p-4 k-mono text-[12px] text-[var(--k-dim)]">
+          <p>k.serve(router, {'{'}</p>
+          <p>&nbsp; port: <span className="text-[#d49a6a]">3000</span>,</p>
+          <p>&nbsp; scalar: <span className="text-[#bfa0cc]">true</span>,</p>
+          <p>&nbsp; ws: <span className="text-[#bfa0cc]">true</span>,</p>
+          <p>&nbsp; http2: {'{'} cert, key {'}'}</p>
+          <p>{'}'})</p>
+        </div>
+      </Cell>
+      <Cell bl>
+        <CT t="handler()" d="Fetch API handler — works everywhere. Content negotiation is automatic." />
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          {['Node.js', 'Bun', 'Deno', 'Cloudflare'].map((r) => (
+            <div key={r} className="rounded-lg border border-[var(--k-line)] px-4 py-2.5 text-center">
+              <span className="text-[13px] text-[var(--k-warm)] font-light">{r}</span>
             </div>
           ))}
         </div>
-      </div>
+      </Cell>
     </section>
   );
 }
 
-/* ═══ PROTOCOLS ═══════════════════════════════════════ */
+/* ═══ PLUGINS ═══════════════════════════════════════ */
 
-function Protocols() {
+function PluginGrid() {
   return (
-    <section className="relative k-grain">
-      <div className="mx-auto max-w-[1080px] px-6 py-28 lg:py-36">
-        <p className="k-mono text-[11px] uppercase tracking-[.25em] text-[var(--k-dim)] mb-6">Wire formats</p>
-        <h2 className="k-serif text-4xl lg:text-5xl leading-[1.05] tracking-[-0.02em] mb-6">
-          Choose your<br /><em className="text-[var(--k-accent)]">protocol</em>
+    <section className="k-wrapper k-wrapper--ticks grid sm:grid-cols-2 lg:grid-cols-4">
+      <Cell><CT t="CORS" d="corsHeaders() — string, array, or dynamic origin matching." /></Cell>
+      <Cell bl><CT t="OpenTelemetry" d="otelWrap(tracer) — each procedure call becomes a span." /></Cell>
+      <Cell bl><CT t="Pino" d="loggingHooks() — structured request/response/error logging." /></Cell>
+      <Cell bl><CT t="Rate Limiting" d="Sliding window guard. In-memory or custom backend." /></Cell>
+    </section>
+  );
+}
+
+/* ═══ SPONSORS ══════════════════════════════════════ */
+
+function Sponsors() {
+  return (
+    <section className="k-wrapper">
+      <div className="mx-auto max-w-[960px] px-6 sm:px-10 py-16 lg:py-20">
+        <span className="k-mono text-[10px] uppercase tracking-[.3em] text-[var(--k-dim)] block mb-4">Sponsors</span>
+        <h2 className="k-serif text-[clamp(1.8rem,4vw,2.8rem)] leading-[1.1] tracking-[-0.015em] text-[var(--k-cream)] mb-6">
+          Backed by the community
         </h2>
-        <p className="text-[var(--k-warm)] max-w-md leading-relaxed mb-16">
-          The server negotiates automatically. Send an Accept header — get the format you want.
+        <p className="text-[var(--k-warm)] font-light leading-relaxed max-w-md mb-12">
+          Katman is free and open source. Sponsors help us dedicate time to new features, performance, and documentation.
         </p>
-        <div className="grid gap-6 md:grid-cols-3">
-          <PC n="JSON" b="default" c="#a8c97f" ls={['Universal compatibility', 'Fastest encode/decode', 'Zero config']} />
-          <PC n="MessagePack" b="binary" c="var(--k-accent)" ls={['30% smaller payloads', 'Native Date support', 'binary: true']} />
-          <PC n="devalue" b="rich types" c="#c9a0dc" ls={['Date, Map, Set, BigInt', 'RegExp, circular refs', '2.7× faster than superjson']} />
+
+        {/* Platinum */}
+        <div className="mb-10">
+          <span className="k-mono text-[9px] uppercase tracking-[.25em] text-[var(--k-dim)] block mb-4">Platinum</span>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <a key={i} href="https://github.com/sponsors/productdevbook" target="_blank" rel="noopener noreferrer"
+                className="flex items-center justify-center h-20 rounded-xl border border-dashed border-[var(--k-line)] text-[var(--k-dim)] text-sm hover:border-[var(--k-accent)]/30 hover:text-[var(--k-accent)] transition-colors">
+                Your logo here
+              </a>
+            ))}
+          </div>
+        </div>
+
+        {/* Gold */}
+        <div className="mb-10">
+          <span className="k-mono text-[9px] uppercase tracking-[.25em] text-[var(--k-dim)] block mb-4">Gold</span>
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <a key={i} href="https://github.com/sponsors/productdevbook" target="_blank" rel="noopener noreferrer"
+                className="flex items-center justify-center h-14 rounded-lg border border-dashed border-[var(--k-line)] text-[var(--k-dim)] text-xs hover:border-[var(--k-accent)]/30 hover:text-[var(--k-accent)] transition-colors">
+                Sponsor
+              </a>
+            ))}
+          </div>
+        </div>
+
+        {/* Become a sponsor CTA */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pt-4">
+          <a href="https://github.com/sponsors/productdevbook" target="_blank" rel="noopener noreferrer" className="k-btn k-btn--primary">
+            Become a Sponsor
+          </a>
+          <span className="text-[13px] text-[var(--k-dim)] font-light">
+            via GitHub Sponsors or Open Collective
+          </span>
         </div>
       </div>
     </section>
   );
 }
 
-function PC({ n, b, c, ls }: { n: string; b: string; c: string; ls: string[] }) {
-  return (
-    <div className="rounded-2xl border border-[var(--k-line)] bg-[#0e0d0b] p-7 transition hover:border-white/[.08]">
-      <div className="flex items-center gap-3 mb-5">
-        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: c.startsWith('var') ? undefined : c, color: c.startsWith('var') ? c : undefined }} />
-        <h3 className="font-semibold text-[var(--k-cream)]">{n}</h3>
-        <span className="k-mono text-[10px] uppercase tracking-[.15em]" style={{ color: c }}>{b}</span>
-      </div>
-      <ul className="space-y-2">
-        {ls.map((l, i) => (
-          <li key={i} className="text-sm text-[var(--k-dim)] flex items-center gap-2">
-            <span className="w-1 h-1 rounded-full bg-[var(--k-line)]" />{l}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
+/* ═══ FOOTER CTA ════════════════════════════════════ */
 
-/* ═══ CTA ═════════════════════════════════════════════ */
-
-function Closing() {
+function FooterCTA() {
   return (
-    <section className="relative k-grain overflow-hidden">
+    <section className="k-wrapper relative k-grain overflow-hidden">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-1/2 bottom-[-30%] -translate-x-1/2 w-[600px] aspect-square rounded-full bg-[var(--k-accent)] opacity-[0.03] blur-[140px]" />
+        <div className="absolute left-1/2 bottom-[-20%] -translate-x-1/2 w-[500px] aspect-square rounded-full bg-[var(--k-accent)] opacity-[0.025] blur-[140px]" />
       </div>
-      <div className="relative mx-auto max-w-[1080px] px-6 py-32 lg:py-40 text-center">
-        <h2 className="k-serif text-4xl lg:text-6xl leading-[1] tracking-[-0.02em] mb-6">
-          Your first API,<br /><em className="text-[var(--k-accent)]">in five minutes</em>
+      <div className="relative mx-auto max-w-[960px] px-6 sm:px-10 py-24 lg:py-32 text-center flex flex-col items-center">
+        <h2 className="k-serif text-[clamp(2rem,4.5vw,3.2rem)] leading-[1.05] tracking-[-0.015em] mb-4 text-[var(--k-cream)]">
+          Start building with Katman
         </h2>
-        <p className="text-[var(--k-warm)] mb-12 max-w-sm mx-auto">
-          Follow the guide. Define a procedure. Start the server.
+        <p className="text-[var(--k-warm)] max-w-sm mb-10 font-light leading-relaxed">
+          Prepare for a development environment that can finally keep pace with the speed of your mind.
         </p>
-        <Link to="/docs/$" params={{ _splat: '' }}
-          className="inline-flex px-8 py-3.5 text-sm font-semibold text-black rounded-full bg-[var(--k-accent)] shadow-[0_0_40px_rgba(240,198,116,.12)] transition-shadow hover:shadow-[0_0_56px_rgba(240,198,116,.22)]">
-          Read the documentation
-        </Link>
+        <Link to="/docs/$" params={{ _splat: '' }} className="k-btn k-btn--primary">Get Started</Link>
       </div>
     </section>
   );
 }
 
-/* ═══ DIVIDER ═════════════════════════════════════════ */
+/* ═══ SHARED ════════════════════════════════════════ */
 
-function Div() {
+function Cell({ children, bl, bt }: { children: React.ReactNode; bl?: boolean; bt?: boolean }) {
   return (
-    <div className="mx-auto max-w-[1080px] px-6">
-      <div className="h-px bg-[var(--k-line)] k-line-grow" />
+    <div className={`p-6 sm:p-10 ${bl ? 'border-l border-[var(--k-line)]' : ''} ${bt ? 'border-t border-[var(--k-line)]' : ''}`}>
+      {children}
+    </div>
+  );
+}
+
+function CT({ t, d }: { t: string; d: string }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <h5 className="font-medium text-[var(--k-cream)]">{t}</h5>
+      <p className="text-[13px] text-[var(--k-dim)] font-light leading-relaxed max-w-[28rem] text-pretty">{d}</p>
+    </div>
+  );
+}
+
+function Badge({ c, t, b }: { c: string; t: string; b: string }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: c }} />
+      <h5 className="font-medium text-[var(--k-cream)]">{t}</h5>
+      <span className="k-mono text-[9px] uppercase tracking-[.15em] ml-auto" style={{ color: c }}>{b}</span>
     </div>
   );
 }
