@@ -13,24 +13,40 @@
 
 ## Pipeline Performance (pure execution, no HTTP)
 
-Measures raw middleware pipeline overhead using [mitata](https://github.com/evanwashere/mitata).
+Measures raw middleware pipeline overhead — Katman vs oRPC vs H3 v2.
 
-| Scenario | oRPC | Katman | Speedup |
-|---|---|---|---|
-| No middleware | 645 ns | **46 ns** | **13.9x** |
-| Zod input validation | 835 ns | **212 ns** | **3.9x** |
-| 3 middleware + Zod | 1697 ns | **298 ns** | **5.7x** |
-| 5 middleware + Zod | 2248 ns | **409 ns** | **5.5x** |
+| Scenario | Katman | oRPC | H3 v2 | vs oRPC | vs H3 |
+|---|---|---|---|---|---|
+| No middleware | **120 ns** | 701 ns | 2167 ns | **5.8x** | **18.1x** |
+| Zod input validation | **246 ns** | 843 ns | 4660 ns | **3.4x** | **18.9x** |
+| 3 middleware + Zod | **327 ns** | 1808 ns | 4333 ns | **5.5x** | **13.2x** |
+| 5 middleware + Zod | **449 ns** | 2428 ns | 4401 ns | **5.4x** | **9.8x** |
 
-## HTTP Performance (full request/response over TCP)
+## HTTP/1.1 Performance (full request/response over TCP)
 
 Real-world latency — 3000 sequential requests per scenario.
 
 | Scenario | Katman | H3 v2 | oRPC | vs H3 | vs oRPC |
 |---|---|---|---|---|---|
-| Simple (no mw, no validation) | **74µs** (13500/s) | 81µs (12407/s) | 74µs (13493/s) | **1.1x faster** | ~tied |
-| Zod input validation | **84µs** (11909/s) | 97µs (10319/s) | 112µs (8924/s) | **1.2x faster** | **1.3x faster** |
-| Guard + Zod validation | **71µs** (14173/s) | 87µs (11431/s) | 109µs (9183/s) | **1.2x faster** | **1.5x faster** |
+| Simple (no mw, no validation) | **81µs** (12354/s) | 89µs (11276/s) | 80µs (12417/s) | **1.1x faster** | ~tied |
+| Zod input validation | **94µs** (10683/s) | 103µs (9680/s) | 123µs (8105/s) | **1.1x faster** | **1.3x faster** |
+| Guard + Zod validation | **83µs** (12096/s) | 95µs (10524/s) | 120µs (8320/s) | **1.1x faster** | **1.4x faster** |
+
+## HTTP/2 vs HTTP/1.1
+
+Same Katman server, comparing protocols. HTTP/2 uses TLS.
+
+| Scenario | HTTP/1.1 | HTTP/2 | Improvement |
+|---|---|---|---|
+| Simple query | 67µs | 87µs | 30% slower |
+
+## WebSocket vs HTTP
+
+Katman WebSocket RPC (persistent connection) vs HTTP/1.1 (new connection per request).
+
+| Scenario | HTTP/1.1 | WebSocket | Improvement |
+|---|---|---|---|
+| Simple query (persistent conn) | 65µs | 39µs | 40% faster |
 
 ## How to run
 
@@ -39,6 +55,5 @@ pnpm bench           # run all benchmarks and update this file
 pnpm bench:orpc      # oRPC vs Katman pipeline (mitata)
 pnpm bench:h3        # Katman vs H3 v2 vs oRPC (HTTP)
 pnpm bench:http      # Katman vs oRPC (HTTP, detailed)
-pnpm bench:pipeline  # v1 vs v2 internal comparison
 pnpm bench:micro     # per-operation bottleneck analysis
 ```

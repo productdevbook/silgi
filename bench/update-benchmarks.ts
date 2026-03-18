@@ -1,13 +1,19 @@
 /**
  * Run all benchmarks and update BENCHMARKS.md automatically.
  *
+ * Benchmarks: Pipeline (3 libs) | HTTP/1.1 (3 libs) | HTTP/2 | WebSocket
+ *
  * Usage: node --experimental-strip-types bench/update-benchmarks.ts
  */
 
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFile, writeFile } from "node:fs/promises";
+import * as http2 from "node:http2";
+import { writeFile } from "node:fs/promises";
+import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { z } from "zod";
 import os from "node:os";
+import { WebSocket } from "ws";
 
 // ── Schemas ─────────────────────────────────────────
 
@@ -19,8 +25,7 @@ const GuardedInput = z.object({ name: z.string() });
 import { katman } from "../src/katman.ts";
 import { compileProcedure, compileRouter, ContextPool } from "../src/compile.ts";
 import type { GuardDef, WrapDef } from "../src/types.ts";
-import { ResponseCache } from "../src/response-cache.ts";
-import { RequestCoalescer } from "../src/coalesce.ts";
+import { attachWebSocket } from "../src/ws.ts";
 
 const k = katman({ context: () => ({}) });
 const auth = k.guard(() => ({ userId: 1 }));
@@ -56,120 +61,13 @@ const orpcRouter = {
 
 import { H3, readBody } from "h3";
 
-// ── Pipeline Benchmark ──────────────────────────────
+// ── Helpers ─────────────────────────────────────────
 
-import { compilePipeline } from "../src/core/pipeline.ts";
-import { validateSchema } from "../src/core/schema.ts";
-import type { Middleware } from "../src/core/pipeline.ts";
-
-interface PipelineResult {
-  name: string;
-  orpc_ns: number;
-  katman_ns: number;
-  speedup: string;
-  memory_orpc?: string;
-  memory_katman?: string;
-}
-
-async function runPipelineBenchmarks(): Promise<PipelineResult[]> {
-  const results: PipelineResult[] = [];
-  const signal = AbortSignal.timeout(30_000);
-  const testInput = { name: "Alice", age: 30 };
-  const InputSchema = z.object({ name: z.string(), age: z.number() });
-  const RUNS = 50_000;
-
-  // Helper: measure average ns
-  async function measure(fn: () => Promise<unknown>, runs: number): Promise<number> {
-    // Warmup
-    for (let i = 0; i < 1000; i++) await fn();
-    const start = performance.now();
-    for (let i = 0; i < runs; i++) await fn();
-    return ((performance.now() - start) / runs) * 1_000_000; // ms → ns
-  }
-
-  // 1. No middleware
-  const orpc1 = orpcOs.handler(async ({ input }) => ({ result: input }));
-  const orpc1Client = (await import("@orpc/server")).createRouterClient({ p: orpc1 }, { context: {} });
-  const katman1 = compileProcedure({
-    type: "query", input: null, output: null, errors: null, use: null,
-    resolve: async ({ input }: any) => ({ result: input }), route: null,
-  });
-
-  const o1 = await measure(() => (orpc1Client as any).p(testInput), RUNS);
-  const k1 = await measure(() => katman1({}, testInput, signal), RUNS);
-  results.push({ name: "No middleware", orpc_ns: Math.round(o1), katman_ns: Math.round(k1), speedup: `${(o1 / k1).toFixed(1)}x` });
-
-  // 2. Zod input validation
-  const orpc2 = orpcOs.input(InputSchema).handler(async ({ input }) => input);
-  const orpc2Client = (await import("@orpc/server")).createRouterClient({ p: orpc2 }, { context: {} });
-  const katman2 = compileProcedure({
-    type: "query", input: InputSchema as any, output: null, errors: null, use: null,
-    resolve: async ({ input }: any) => input, route: null,
-  });
-
-  const o2 = await measure(() => (orpc2Client as any).p(testInput), RUNS);
-  const k2 = await measure(() => katman2({}, testInput, signal), RUNS);
-  results.push({ name: "Zod input validation", orpc_ns: Math.round(o2), katman_ns: Math.round(k2), speedup: `${(o2 / k2).toFixed(1)}x` });
-
-  // 3. 3 middleware + Zod
-  const orpc3 = orpcOs
-    .use(async ({ next }) => next({ context: { a: 1 } }))
-    .use(async ({ next }) => next({ context: { b: 2 } }))
-    .use(async ({ next }) => next({ context: { c: 3 } }))
-    .input(InputSchema).handler(async ({ input }) => input);
-  const orpc3Client = (await import("@orpc/server")).createRouterClient({ p: orpc3 }, { context: {} });
-  const katman3 = compileProcedure({
-    type: "mutation", input: InputSchema as any, output: null, errors: null,
-    use: [
-      { kind: "guard", fn: () => ({ a: 1 }) } as GuardDef,
-      { kind: "guard", fn: () => ({ b: 2 }) } as GuardDef,
-      { kind: "guard", fn: () => ({ c: 3 }) } as GuardDef,
-    ],
-    resolve: async ({ input }: any) => input, route: null,
-  });
-
-  const o3 = await measure(() => (orpc3Client as any).p(testInput), RUNS);
-  const k3 = await measure(() => katman3({}, testInput, signal), RUNS);
-  results.push({ name: "3 middleware + Zod", orpc_ns: Math.round(o3), katman_ns: Math.round(k3), speedup: `${(o3 / k3).toFixed(1)}x` });
-
-  // 4. 5 middleware + Zod
-  const orpc4 = orpcOs
-    .use(async ({ next }) => next({ context: { a: 1 } }))
-    .use(async ({ next }) => next({ context: { b: 2 } }))
-    .use(async ({ next }) => next({ context: { c: 3 } }))
-    .use(async ({ next }) => { const r = await next(); return r; })
-    .use(async ({ next }) => { const r = await next(); return r; })
-    .input(InputSchema).handler(async ({ input }) => input);
-  const orpc4Client = (await import("@orpc/server")).createRouterClient({ p: orpc4 }, { context: {} });
-  const katman4 = compileProcedure({
-    type: "mutation", input: InputSchema as any, output: null, errors: null,
-    use: [
-      { kind: "guard", fn: () => ({ a: 1 }) } as GuardDef,
-      { kind: "guard", fn: () => ({ b: 2 }) } as GuardDef,
-      { kind: "guard", fn: () => ({ c: 3 }) } as GuardDef,
-      { kind: "wrap", fn: async (_: any, next: any) => next() } as WrapDef,
-      { kind: "wrap", fn: async (_: any, next: any) => next() } as WrapDef,
-    ],
-    resolve: async ({ input }: any) => input, route: null,
-  });
-
-  const o4 = await measure(() => (orpc4Client as any).p(testInput), RUNS);
-  const k4 = await measure(() => katman4({}, testInput, signal), RUNS);
-  results.push({ name: "5 middleware + Zod", orpc_ns: Math.round(o4), katman_ns: Math.round(k4), speedup: `${(o4 / k4).toFixed(1)}x` });
-
-  return results;
-}
-
-// ── HTTP Benchmark ──────────────────────────────────
-
-interface HTTPResult {
-  name: string;
-  katman_us: number;
-  katman_rps: number;
-  h3_us: number;
-  h3_rps: number;
-  orpc_us: number;
-  orpc_rps: number;
+async function measure(fn: () => Promise<unknown>, runs: number): Promise<number> {
+  for (let i = 0; i < 1000; i++) await fn();
+  const start = performance.now();
+  for (let i = 0; i < runs; i++) await fn();
+  return ((performance.now() - start) / runs) * 1_000_000; // ms → ns
 }
 
 async function httpBench(url: string, body: string | null, n: number) {
@@ -193,67 +91,198 @@ async function httpBench(url: string, body: string | null, n: number) {
   };
 }
 
+function generateCert() {
+  const tmpDir = os.tmpdir();
+  const keyPath = `${tmpDir}/katman-bench-key.pem`;
+  const certPath = `${tmpDir}/katman-bench-cert.pem`;
+  execSync(`openssl req -x509 -newkey rsa:2048 -keyout ${keyPath} -out ${certPath} -days 1 -nodes -subj "/CN=localhost" 2>/dev/null`);
+  return { key: readFileSync(keyPath, "utf8"), cert: readFileSync(certPath, "utf8") };
+}
+
+// ── Pipeline Benchmark (Katman vs oRPC vs H3) ──────
+
+import { compilePipeline } from "../src/core/pipeline.ts";
+import { validateSchema } from "../src/core/schema.ts";
+import type { Middleware } from "../src/core/pipeline.ts";
+
+interface PipelineResult {
+  name: string;
+  katman_ns: number;
+  orpc_ns: number;
+  h3_ns: number;
+  vs_orpc: string;
+  vs_h3: string;
+}
+
+async function runPipelineBenchmarks(): Promise<PipelineResult[]> {
+  const results: PipelineResult[] = [];
+  const signal = AbortSignal.timeout(30_000);
+  const testInput = { name: "Alice", age: 30 };
+  const InputSchema = z.object({ name: z.string(), age: z.number() });
+  const RUNS = 50_000;
+
+  // H3 app for pipeline-level testing (Fetch handler, no HTTP)
+  const h3App = new H3();
+  h3App.all("/noMw", () => ({ result: testInput }));
+  h3App.all("/zod", async (ev: any) => { const b = await readBody(ev); return InputSchema.parse(b); });
+  h3App.all("/3mw", async (ev: any) => { const b = await readBody(ev); return InputSchema.parse(b); });
+  h3App.all("/5mw", async (ev: any) => { const b = await readBody(ev); return InputSchema.parse(b); });
+
+  function h3Req(path: string, body?: unknown): Request {
+    return new Request(`http://localhost${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  // 1. No middleware
+  const orpc1 = orpcOs.handler(async ({ input }) => ({ result: input }));
+  const orpc1Client = (await import("@orpc/server")).createRouterClient({ p: orpc1 }, { context: {} });
+  const katman1 = compileProcedure({
+    type: "query", input: null, output: null, errors: null, use: null,
+    resolve: async ({ input }: any) => ({ result: input }), route: null,
+  });
+
+  const k1 = await measure(() => katman1({}, testInput, signal), RUNS);
+  const o1 = await measure(() => (orpc1Client as any).p(testInput), RUNS);
+  const h1 = await measure(() => h3App.fetch(h3Req("/noMw", testInput)), RUNS);
+  results.push({ name: "No middleware", katman_ns: Math.round(k1), orpc_ns: Math.round(o1), h3_ns: Math.round(h1), vs_orpc: `${(o1 / k1).toFixed(1)}x`, vs_h3: `${(h1 / k1).toFixed(1)}x` });
+
+  // 2. Zod input validation
+  const orpc2 = orpcOs.input(InputSchema).handler(async ({ input }) => input);
+  const orpc2Client = (await import("@orpc/server")).createRouterClient({ p: orpc2 }, { context: {} });
+  const katman2 = compileProcedure({
+    type: "query", input: InputSchema as any, output: null, errors: null, use: null,
+    resolve: async ({ input }: any) => input, route: null,
+  });
+
+  const k2 = await measure(() => katman2({}, testInput, signal), RUNS);
+  const o2 = await measure(() => (orpc2Client as any).p(testInput), RUNS);
+  const h2r = await measure(() => h3App.fetch(h3Req("/zod", testInput)), RUNS);
+  results.push({ name: "Zod input validation", katman_ns: Math.round(k2), orpc_ns: Math.round(o2), h3_ns: Math.round(h2r), vs_orpc: `${(o2 / k2).toFixed(1)}x`, vs_h3: `${(h2r / k2).toFixed(1)}x` });
+
+  // 3. 3 middleware + Zod
+  const orpc3 = orpcOs
+    .use(async ({ next }) => next({ context: { a: 1 } }))
+    .use(async ({ next }) => next({ context: { b: 2 } }))
+    .use(async ({ next }) => next({ context: { c: 3 } }))
+    .input(InputSchema).handler(async ({ input }) => input);
+  const orpc3Client = (await import("@orpc/server")).createRouterClient({ p: orpc3 }, { context: {} });
+  const katman3 = compileProcedure({
+    type: "mutation", input: InputSchema as any, output: null, errors: null,
+    use: [
+      { kind: "guard", fn: () => ({ a: 1 }) } as GuardDef,
+      { kind: "guard", fn: () => ({ b: 2 }) } as GuardDef,
+      { kind: "guard", fn: () => ({ c: 3 }) } as GuardDef,
+    ],
+    resolve: async ({ input }: any) => input, route: null,
+  });
+
+  const k3 = await measure(() => katman3({}, testInput, signal), RUNS);
+  const o3 = await measure(() => (orpc3Client as any).p(testInput), RUNS);
+  const h3r = await measure(() => h3App.fetch(h3Req("/3mw", testInput)), RUNS);
+  results.push({ name: "3 middleware + Zod", katman_ns: Math.round(k3), orpc_ns: Math.round(o3), h3_ns: Math.round(h3r), vs_orpc: `${(o3 / k3).toFixed(1)}x`, vs_h3: `${(h3r / k3).toFixed(1)}x` });
+
+  // 4. 5 middleware + Zod
+  const orpc4 = orpcOs
+    .use(async ({ next }) => next({ context: { a: 1 } }))
+    .use(async ({ next }) => next({ context: { b: 2 } }))
+    .use(async ({ next }) => next({ context: { c: 3 } }))
+    .use(async ({ next }) => { const r = await next(); return r; })
+    .use(async ({ next }) => { const r = await next(); return r; })
+    .input(InputSchema).handler(async ({ input }) => input);
+  const orpc4Client = (await import("@orpc/server")).createRouterClient({ p: orpc4 }, { context: {} });
+  const katman4 = compileProcedure({
+    type: "mutation", input: InputSchema as any, output: null, errors: null,
+    use: [
+      { kind: "guard", fn: () => ({ a: 1 }) } as GuardDef,
+      { kind: "guard", fn: () => ({ b: 2 }) } as GuardDef,
+      { kind: "guard", fn: () => ({ c: 3 }) } as GuardDef,
+      { kind: "wrap", fn: async (_: any, next: any) => next() } as WrapDef,
+      { kind: "wrap", fn: async (_: any, next: any) => next() } as WrapDef,
+    ],
+    resolve: async ({ input }: any) => input, route: null,
+  });
+
+  const k4 = await measure(() => katman4({}, testInput, signal), RUNS);
+  const o4 = await measure(() => (orpc4Client as any).p(testInput), RUNS);
+  const h4 = await measure(() => h3App.fetch(h3Req("/5mw", testInput)), RUNS);
+  results.push({ name: "5 middleware + Zod", katman_ns: Math.round(k4), orpc_ns: Math.round(o4), h3_ns: Math.round(h4), vs_orpc: `${(o4 / k4).toFixed(1)}x`, vs_h3: `${(h4 / k4).toFixed(1)}x` });
+
+  return results;
+}
+
+// ── HTTP/1.1 Benchmark (3 libs) ─────────────────────
+
+interface HTTPResult {
+  name: string;
+  katman_us: number; katman_rps: number;
+  h3_us: number; h3_rps: number;
+  orpc_us: number; orpc_rps: number;
+}
+
 async function runHTTPBenchmarks(): Promise<HTTPResult[]> {
   const N = 3000;
   const KP = 4300, HP = 4301, OP = 4302;
 
-  // Katman server
   const flat = compileRouter(katmanRouter);
-  const pool = new ContextPool();
   const sig = new AbortController().signal;
-  const kSrv: Server = await new Promise(r => {
-    const s = createServer({ keepAlive: true, requestTimeout: 0, headersTimeout: 0 }, (req, res) => {
-      const u = req.url ?? "/"; const q = u.indexOf("?");
-      const p = q === -1 ? u.slice(1) : u.slice(1, q);
-      const route = flat.get(p);
-      if (!route) { res.writeHead(404); res.end(); return; }
 
-      const cl = req.headers["content-length"];
-      if (!cl || cl === "0" || req.method === "GET" || req.method === "HEAD") {
-        if (cl) req.resume();
-        const ctx: Record<string, unknown> = Object.create(null);
-        try {
-          const r = route.handler(ctx, undefined, sig);
-          if (r instanceof Promise) {
-            r.then(out => {
-              const b = route.stringify(out);
-              res.writeHead(200, { "content-type": "application/json", "content-length": b.length });
-              res.end(b);
-            }).catch(e => { res.writeHead(e.status ?? 500); res.end(); });
-          } else {
-            const b = route.stringify(r);
+  function katmanHandler(req: IncomingMessage, res: ServerResponse) {
+    const u = req.url ?? "/"; const q = u.indexOf("?");
+    const p = q === -1 ? u.slice(1) : u.slice(1, q);
+    const route = flat.get(p);
+    if (!route) { res.writeHead(404); res.end(); return; }
+
+    const cl = req.headers["content-length"];
+    if (!cl || cl === "0" || req.method === "GET" || req.method === "HEAD") {
+      if (cl) req.resume();
+      const ctx: Record<string, unknown> = Object.create(null);
+      try {
+        const r = route.handler(ctx, undefined, sig);
+        if (r instanceof Promise) {
+          r.then(out => {
+            const b = route.stringify(out);
             res.writeHead(200, { "content-type": "application/json", "content-length": b.length });
             res.end(b);
-          }
-        } catch (e: any) { res.writeHead(e.status ?? 500); res.end(); }
-        return;
-      }
+          }).catch(e => { res.writeHead(e.status ?? 500); res.end(); });
+        } else {
+          const b = route.stringify(r);
+          res.writeHead(200, { "content-type": "application/json", "content-length": b.length });
+          res.end(b);
+        }
+      } catch (e: any) { res.writeHead(e.status ?? 500); res.end(); }
+      return;
+    }
 
-      let body = "";
-      req.on("data", (d: Buffer) => { body += d; });
-      req.on("end", () => {
-        const ctx: Record<string, unknown> = Object.create(null);
-        try {
-          const inp = body ? JSON.parse(body) : undefined;
-          const r = route.handler(ctx, inp, sig);
-          if (r instanceof Promise) {
-            r.then(out => {
-              const b = route.stringify(out);
-              res.writeHead(200, { "content-type": "application/json", "content-length": b.length });
-              res.end(b);
-            }).catch(e => { res.writeHead(e.status ?? 500); res.end(); });
-          } else {
-            const b = route.stringify(r);
+    let body = "";
+    req.on("data", (d: Buffer) => { body += d; });
+    req.on("end", () => {
+      const ctx: Record<string, unknown> = Object.create(null);
+      try {
+        const inp = body ? JSON.parse(body) : undefined;
+        const r = route.handler(ctx, inp, sig);
+        if (r instanceof Promise) {
+          r.then(out => {
+            const b = route.stringify(out);
             res.writeHead(200, { "content-type": "application/json", "content-length": b.length });
             res.end(b);
-          }
-        } catch (e: any) { res.writeHead(e.status ?? 500); res.end(); }
-      });
+          }).catch(e => { res.writeHead(e.status ?? 500); res.end(); });
+        } else {
+          const b = route.stringify(r);
+          res.writeHead(200, { "content-type": "application/json", "content-length": b.length });
+          res.end(b);
+        }
+      } catch (e: any) { res.writeHead(e.status ?? 500); res.end(); }
     });
+  }
+
+  const kSrv: Server = await new Promise(r => {
+    const s = createServer({ keepAlive: true, requestTimeout: 0, headersTimeout: 0 }, katmanHandler);
     s.listen(KP, "127.0.0.1", () => r(s));
   });
 
-  // H3 server
   const h3App = new H3();
   h3App.all("/health", () => ({ status: "ok" }));
   h3App.all("/echo", async (ev: any) => { const b = await readBody(ev); return { echo: EchoInput.parse(b).message }; });
@@ -270,7 +299,6 @@ async function runHTTPBenchmarks(): Promise<HTTPResult[]> {
     s.listen(HP, "127.0.0.1", () => r(s));
   });
 
-  // oRPC server
   const orpcHandler = new RPCHandler(orpcRouter);
   const oSrv: Server = await new Promise(r => {
     const s = createServer(async (req, res) => {
@@ -303,14 +331,180 @@ async function runHTTPBenchmarks(): Promise<HTTPResult[]> {
   return results;
 }
 
+// ── HTTP/2 Benchmark ────────────────────────────────
+
+interface H2Result {
+  name: string;
+  h1_us: number;
+  h2_us: number;
+  improvement: string;
+}
+
+async function runH2Benchmarks(): Promise<H2Result[]> {
+  const N = 2000;
+  const flat = compileRouter(katmanRouter);
+  const sig = new AbortController().signal;
+
+  function handler(req: any, res: any) {
+    const u = (req.url ?? req.headers?.[":path"] ?? "/").replace(/^\//, "");
+    const route = flat.get(u);
+    if (!route) { res.writeHead(404); res.end(); return; }
+    const ctx: Record<string, unknown> = Object.create(null);
+    const cl = req.headers["content-length"];
+    if (!cl || cl === "0") {
+      const r = route.handler(ctx, undefined, sig);
+      if (r instanceof Promise) {
+        r.then(out => { const b = route.stringify(out); res.writeHead(200, { "content-type": "application/json", "content-length": Buffer.byteLength(b) }); res.end(b); });
+      } else {
+        const b = route.stringify(r); res.writeHead(200, { "content-type": "application/json", "content-length": Buffer.byteLength(b) }); res.end(b);
+      }
+      return;
+    }
+    let body = ""; req.on("data", (d: Buffer) => { body += d; }); req.on("end", () => {
+      const inp = body ? JSON.parse(body) : undefined;
+      const r = route.handler(ctx, inp ?? {}, sig);
+      if (r instanceof Promise) {
+        r.then(out => { const b = route.stringify(out); res.writeHead(200, { "content-type": "application/json", "content-length": Buffer.byteLength(b) }); res.end(b); });
+      } else {
+        const b = route.stringify(r); res.writeHead(200, { "content-type": "application/json", "content-length": Buffer.byteLength(b) }); res.end(b);
+      }
+    });
+  }
+
+  // HTTP/1.1 server
+  const h1Srv: Server = await new Promise(r => {
+    const s = createServer({ keepAlive: true, requestTimeout: 0, headersTimeout: 0 }, handler);
+    s.listen(4310, "127.0.0.1", () => r(s));
+  });
+
+  // HTTP/2 server
+  const { key, cert } = generateCert();
+  const h2Srv: http2.Http2SecureServer = await new Promise(r => {
+    const s = http2.createSecureServer({ cert, key, allowHTTP1: true }, handler);
+    s.listen(4311, "127.0.0.1", () => r(s));
+  });
+
+  // H1 benchmark
+  const h1 = await httpBench("http://127.0.0.1:4310/health", null, N);
+
+  // H2 benchmark
+  async function h2Bench(path: string, n: number) {
+    const client = http2.connect("https://127.0.0.1:4311", { rejectUnauthorized: false });
+    // warmup
+    for (let i = 0; i < 100; i++) {
+      await new Promise<void>((resolve) => {
+        const req = client.request({ ":path": `/${path}`, ":method": "POST" });
+        let d = ""; req.on("data", (c: Buffer) => d += c); req.on("end", () => resolve());
+        req.end();
+      });
+    }
+    const times: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const s = performance.now();
+      await new Promise<void>((resolve) => {
+        const req = client.request({ ":path": `/${path}`, ":method": "POST" });
+        let d = ""; req.on("data", (c: Buffer) => d += c); req.on("end", () => resolve());
+        req.end();
+      });
+      times.push(performance.now() - s);
+    }
+    client.close();
+    return { avg: times.reduce((a, b) => a + b) / n };
+  }
+
+  const h2 = await h2Bench("health", N);
+
+  h1Srv.close(); h2Srv.close();
+
+  const h1us = Math.round(h1.avg * 1000);
+  const h2us = Math.round(h2.avg * 1000);
+  const improvement = h1us > h2us ? `${((1 - h2us / h1us) * 100).toFixed(0)}% faster` : `${((h2us / h1us - 1) * 100).toFixed(0)}% slower`;
+
+  return [{ name: "Simple query", h1_us: h1us, h2_us: h2us, improvement }];
+}
+
+// ── WebSocket Benchmark ─────────────────────────────
+
+interface WSResult {
+  name: string;
+  ws_us: number;
+  http_us: number;
+  improvement: string;
+}
+
+async function runWSBenchmarks(): Promise<WSResult[]> {
+  const N = 2000;
+  const flat = compileRouter(katmanRouter);
+  const sig = new AbortController().signal;
+
+  // HTTP server with WebSocket
+  const srv: Server = await new Promise(r => {
+    const s = createServer({ keepAlive: true, requestTimeout: 0, headersTimeout: 0 }, (req, res) => {
+      const u = (req.url ?? "/").slice(1);
+      const route = flat.get(u);
+      if (!route) { res.writeHead(404); res.end(); return; }
+      const ctx: Record<string, unknown> = Object.create(null);
+      const result = route.handler(ctx, undefined, sig);
+      if (result instanceof Promise) {
+        result.then(out => { const b = route.stringify(out); res.writeHead(200, { "content-type": "application/json", "content-length": b.length }); res.end(b); });
+      } else {
+        const b = route.stringify(result); res.writeHead(200, { "content-type": "application/json", "content-length": b.length }); res.end(b);
+      }
+    });
+    attachWebSocket(s, katmanRouter);
+    s.listen(4320, "127.0.0.1", () => r(s));
+  });
+
+  // HTTP benchmark
+  const httpR = await httpBench("http://127.0.0.1:4320/health", null, N);
+
+  // WebSocket benchmark — single persistent connection
+  const ws = new WebSocket("ws://127.0.0.1:4320");
+  await new Promise<void>((r) => ws.on("open", r));
+
+  // Warmup
+  for (let i = 0; i < 200; i++) {
+    await new Promise<void>((resolve) => {
+      ws.once("message", () => resolve());
+      ws.send(JSON.stringify({ id: String(i), path: "health" }));
+    });
+  }
+
+  const times: number[] = [];
+  for (let i = 0; i < N; i++) {
+    const s = performance.now();
+    await new Promise<void>((resolve) => {
+      ws.once("message", () => resolve());
+      ws.send(JSON.stringify({ id: String(i), path: "health" }));
+    });
+    times.push(performance.now() - s);
+  }
+
+  ws.close();
+  srv.close();
+
+  const wsAvg = times.reduce((a, b) => a + b) / N;
+  const wsUs = Math.round(wsAvg * 1000);
+  const httpUs = Math.round(httpR.avg * 1000);
+  const improvement = httpUs > wsUs ? `${((1 - wsUs / httpUs) * 100).toFixed(0)}% faster` : `${((wsUs / httpUs - 1) * 100).toFixed(0)}% slower`;
+
+  return [{ name: "Simple query (persistent conn)", ws_us: wsUs, http_us: httpUs, improvement }];
+}
+
 // ── Generate Markdown ───────────────────────────────
 
 async function main() {
   console.log("Running pipeline benchmarks...");
   const pipelineResults = await runPipelineBenchmarks();
 
-  console.log("Running HTTP benchmarks...");
+  console.log("Running HTTP/1.1 benchmarks...");
   const httpResults = await runHTTPBenchmarks();
+
+  console.log("Running HTTP/2 benchmarks...");
+  const h2Results = await runH2Benchmarks();
+
+  console.log("Running WebSocket benchmarks...");
+  const wsResults = await runWSBenchmarks();
 
   console.log("Updating BENCHMARKS.md...");
 
@@ -326,10 +520,10 @@ async function main() {
   ].join("\n");
 
   const pipelineTable = [
-    `| Scenario | oRPC | Katman | Speedup |`,
-    `|---|---|---|---|`,
+    `| Scenario | Katman | oRPC | H3 v2 | vs oRPC | vs H3 |`,
+    `|---|---|---|---|---|---|`,
     ...pipelineResults.map(r =>
-      `| ${r.name} | ${r.orpc_ns} ns | **${r.katman_ns} ns** | **${r.speedup}** |`
+      `| ${r.name} | **${r.katman_ns} ns** | ${r.orpc_ns} ns | ${r.h3_ns} ns | **${r.vs_orpc}** | **${r.vs_h3}** |`
     ),
   ].join("\n");
 
@@ -349,6 +543,18 @@ async function main() {
     }),
   ].join("\n");
 
+  const h2Table = [
+    `| Scenario | HTTP/1.1 | HTTP/2 | Improvement |`,
+    `|---|---|---|---|`,
+    ...h2Results.map(r => `| ${r.name} | ${r.h1_us}µs | ${r.h2_us}µs | ${r.improvement} |`),
+  ].join("\n");
+
+  const wsTable = [
+    `| Scenario | HTTP/1.1 | WebSocket | Improvement |`,
+    `|---|---|---|---|`,
+    ...wsResults.map(r => `| ${r.name} | ${r.http_us}µs | ${r.ws_us}µs | ${r.improvement} |`),
+  ].join("\n");
+
   const md = `# Benchmarks
 
 > Auto-generated by \`pnpm bench\`. Last updated: **${date}**
@@ -359,15 +565,27 @@ ${env}
 
 ## Pipeline Performance (pure execution, no HTTP)
 
-Measures raw middleware pipeline overhead using [mitata](https://github.com/evanwashere/mitata).
+Measures raw middleware pipeline overhead — Katman vs oRPC vs H3 v2.
 
 ${pipelineTable}
 
-## HTTP Performance (full request/response over TCP)
+## HTTP/1.1 Performance (full request/response over TCP)
 
 Real-world latency — 3000 sequential requests per scenario.
 
 ${httpTable}
+
+## HTTP/2 vs HTTP/1.1
+
+Same Katman server, comparing protocols. HTTP/2 uses TLS.
+
+${h2Table}
+
+## WebSocket vs HTTP
+
+Katman WebSocket RPC (persistent connection) vs HTTP/1.1 (new connection per request).
+
+${wsTable}
 
 ## How to run
 
@@ -376,7 +594,6 @@ pnpm bench           # run all benchmarks and update this file
 pnpm bench:orpc      # oRPC vs Katman pipeline (mitata)
 pnpm bench:h3        # Katman vs H3 v2 vs oRPC (HTTP)
 pnpm bench:http      # Katman vs oRPC (HTTP, detailed)
-pnpm bench:pipeline  # v1 vs v2 internal comparison
 pnpm bench:micro     # per-operation bottleneck analysis
 \`\`\`
 `;
@@ -384,11 +601,14 @@ pnpm bench:micro     # per-operation bottleneck analysis
   await writeFile("BENCHMARKS.md", md);
   console.log(`\nBENCHMARKS.md updated (${date})\n`);
 
-  // Print summary
   console.log("Pipeline:");
-  for (const r of pipelineResults) console.log(`  ${r.name}: ${r.speedup} faster`);
-  console.log("\nHTTP:");
+  for (const r of pipelineResults) console.log(`  ${r.name}: Katman ${r.katman_ns}ns | oRPC ${r.orpc_ns}ns | H3 ${r.h3_ns}ns`);
+  console.log("\nHTTP/1.1:");
   for (const r of httpResults) console.log(`  ${r.name}: Katman ${r.katman_us}µs | H3 ${r.h3_us}µs | oRPC ${r.orpc_us}µs`);
+  console.log("\nHTTP/2 vs HTTP/1.1:");
+  for (const r of h2Results) console.log(`  ${r.name}: H1 ${r.h1_us}µs | H2 ${r.h2_us}µs (${r.improvement})`);
+  console.log("\nWebSocket vs HTTP:");
+  for (const r of wsResults) console.log(`  ${r.name}: HTTP ${r.http_us}µs | WS ${r.ws_us}µs (${r.improvement})`);
 
   process.exit(0);
 }
