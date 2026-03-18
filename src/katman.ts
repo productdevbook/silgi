@@ -32,6 +32,7 @@ import { stringifyJSON, parseEmptyableJSON, once } from "./core/utils.ts";
 import { iteratorToEventStream } from "./core/sse.ts";
 import { generateOpenAPI, scalarHTML, type ScalarOptions } from "./scalar.ts";
 import { createHooks, type Hookable, type HookCallback } from "hookable";
+import { defu } from "defu";
 
 // ── Lifecycle Hooks ─────────────────────────────────
 
@@ -229,8 +230,9 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
         routerCache.set(routerDef, flatRouter);
       }
 
-      const port = options?.port ?? 3000;
-      const hostname = options?.hostname ?? "127.0.0.1";
+      const opts = defu(options ?? {}, { port: 3000, hostname: "127.0.0.1" });
+      const port = opts.port;
+      const hostname = opts.hostname;
       const fr = flatRouter;
       const sharedSignal = new AbortController().signal; // shared, no timer per request
 
