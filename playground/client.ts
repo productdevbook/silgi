@@ -1,11 +1,11 @@
 /**
- * Katman v2 Playground — Client
+ * Katman Playground — Client
  *
- * Run: node --experimental-strip-types playground/v2-client.ts
- * (Start server first: node --experimental-strip-types playground/v2-server.ts)
+ * Run: node --experimental-strip-types playground/client.ts
+ * (Start server first: pnpm --filter katman-playground dev)
  */
 
-import { KatmanError } from "../src/core/error.ts";
+import { KatmanError } from "katman";
 
 const BASE = "http://127.0.0.1:3456";
 const AUTH = { Authorization: "Bearer secret-token" };

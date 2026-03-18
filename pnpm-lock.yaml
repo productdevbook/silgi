@@ -70,9 +70,14 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
 
-  packages/katman: {}
-
-  packages/parser: {}
+  playground:
+    dependencies:
+      katman:
+        specifier: workspace:*
+        version: link:..
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
 
 packages:
 

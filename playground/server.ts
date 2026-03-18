@@ -4,8 +4,7 @@
  * Run: pnpm play
  */
 
-import { katman } from "../src/index.ts";
-import { KatmanError } from "../src/core/error.ts";
+import { katman, KatmanError } from "katman";
 import { z } from "zod";
 
 // ── Schemas ──────────────────────────────────────────
