@@ -16,7 +16,7 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./app/*"],
+      "@/*": ["./src/*"],
       "collections/*": [".source/*"]
     },
     "noEmit": true
