@@ -65,6 +65,13 @@ export type { EventMeta } from "./core/sse.ts";
 export { callable } from "./callable.ts";
 export type { CallableOptions } from "./callable.ts";
 
+// ── Lifecycle ──────────────────────────────────────
+export { lifecycleWrap } from "./lifecycle.ts";
+export type { LifecycleHooks } from "./lifecycle.ts";
+
+// ── Input Mapping ──────────────────────────────────
+export { mapInput } from "./map-input.ts";
+
 // ── Advanced ────────────────────────────────────────
 export { compileProcedure, compileRouter, ContextPool } from "./compile.ts";
 export { AsyncIteratorClass, mapAsyncIterator } from "./core/iterator.ts";

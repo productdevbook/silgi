@@ -1,4 +1,4 @@
 {
   "title": "Integrations",
-  "pages": ["index", "fastify", "react", "tanstack-query", "ai-sdk"]
+  "pages": ["index", "fastify", "h3", "hono", "express", "react", "tanstack-query", "ai-sdk"]
 }

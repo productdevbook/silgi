@@ -1,0 +1,64 @@
+---
+title: Hono
+description: Use Katman with Hono on any runtime — Node.js, Bun, Deno, Cloudflare Workers.
+---
+
+[Hono](https://hono.dev) is a fast web framework that runs everywhere. Katman's Hono adapter mounts your procedures as a Hono handler.
+
+## Setup
+
+```ts twoslash
+// @noErrors
+import { Hono } from "hono"
+import { katmanHono } from "katman/hono"
+
+const app = new Hono()
+
+// Existing routes
+app.get("/api/health", (c) => c.json({ status: "ok" }))
+
+// Katman RPC
+app.all("/rpc/*", katmanHono(appRouter, {
+  context: (c) => ({
+    db: getDB(),
+    user: c.get("user"),
+  }),
+}))
+
+export default app
+```
+
+## Context from Hono
+
+The `context` function receives Hono's `Context` object. Access middleware data via `c.get()`:
+
+```ts twoslash
+// @noErrors
+katmanHono(appRouter, {
+  context: (c) => ({
+    user: c.get("user"),           // from Hono middleware
+    requestId: c.get("requestId"),
+    env: c.env,                     // Cloudflare Workers bindings
+  }),
+})
+```
+
+## Cloudflare Workers
+
+```ts twoslash
+// @noErrors
+import { Hono } from "hono"
+import { katmanHono } from "katman/hono"
+
+const app = new Hono()
+app.all("/rpc/*", katmanHono(appRouter, {
+  context: (c) => ({ db: c.env.DB }),
+}))
+
+export default app
+```
+
+## What's next?
+
+- [Server](/docs/server) — standalone `serve()` as an alternative
+- [Integrations](/docs/integrations) — other available integrations

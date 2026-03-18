@@ -20,10 +20,10 @@ oRPC ile karsilastirildiginda Katman'da eksik olan ozellikler.
 - [ ] Nuxt
 - [ ] Remix
 - [ ] Astro
-- [ ] Hono
-- [ ] Express
+- [x] Hono
+- [x] Express
 - [ ] Elysia
-- [ ] H3
+- [x] H3 (v2)
 - [ ] SvelteKit
 - [ ] SolidStart
 - [ ] NestJS
@@ -61,8 +61,8 @@ oRPC ile karsilastirildiginda Katman'da eksik olan ozellikler.
 
 ## Middleware Gelistirmeleri
 
-- [ ] **Input Mapping** — `.mapInput()` ile middleware'de input shape donusturme
-- [ ] **Middleware Lifecycle Hooks** — `onStart`, `onSuccess`, `onError`, `onFinish`
+- [x] **Input Mapping** — `mapInput()` ile middleware'de input shape donusturme
+- [x] **Middleware Lifecycle Hooks** — `lifecycleWrap({ onStart, onSuccess, onError, onFinish })`
 
 ## Diger
 

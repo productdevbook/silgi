@@ -1,6 +1,6 @@
 ---
 title: Integrations
-description: Use Katman with Fastify, React Server Actions, TanStack Query, and Vercel AI SDK.
+description: Use Katman with Fastify, H3, Hono, Express, React Server Actions, TanStack Query, and AI SDK.
 ---
 
 import { Cards, Card } from 'fumadocs-ui/components/card';
@@ -9,6 +9,9 @@ Katman integrates with the tools you already use. Each integration is a separate
 
 <Cards>
   <Card title="Fastify" description="Mount Katman as a Fastify plugin alongside existing REST routes." href="/docs/integrations/fastify" />
+  <Card title="H3" description="Use Katman with H3 v2, Nitro, and Nuxt server routes." href="/docs/integrations/h3" />
+  <Card title="Hono" description="Run Katman on any runtime — Node.js, Bun, Deno, Cloudflare Workers." href="/docs/integrations/hono" />
+  <Card title="Express" description="Mount Katman as Express middleware alongside existing REST routes." href="/docs/integrations/express" />
   <Card title="React Server Actions" description="Call procedures as server actions with [error, data] tuples. Works with Next.js and TanStack Start." href="/docs/integrations/react" />
   <Card title="TanStack Query" description="Generate type-safe queryOptions and mutationOptions for React, Vue, Solid, and Svelte." href="/docs/integrations/tanstack-query" />
   <Card title="AI SDK" description="Turn your API procedures into AI tools — LLMs call your API through function calling." href="/docs/integrations/ai-sdk" />
@@ -18,9 +21,12 @@ Katman integrates with the tools you already use. Each integration is a separate
 
 | Scenario | Integration |
 |---|---|
-| You have an existing Fastify app and want to add RPC | [Fastify](/docs/integrations/fastify) |
-| You're building a Next.js or TanStack Start app with server actions | [React](/docs/integrations/react) |
-| You want to use React Query (or Vue/Solid/Svelte Query) for data fetching | [TanStack Query](/docs/integrations/tanstack-query) |
-| You want LLMs to call your API procedures as tools | [AI SDK](/docs/integrations/ai-sdk) |
+| You have an existing Fastify app | [Fastify](/docs/integrations/fastify) |
+| You use Nitro, Nuxt, or H3 | [H3](/docs/integrations/h3) |
+| You use Hono (any runtime) | [Hono](/docs/integrations/hono) |
+| You have an existing Express app | [Express](/docs/integrations/express) |
+| Next.js or TanStack Start with server actions | [React](/docs/integrations/react) |
+| React Query (or Vue/Solid/Svelte Query) | [TanStack Query](/docs/integrations/tanstack-query) |
+| LLMs calling your API as tools | [AI SDK](/docs/integrations/ai-sdk) |
 
 For standalone servers (no existing framework), you don't need any integration — just use `k.serve()` or `k.handler()` from the [Server](/docs/server) page.

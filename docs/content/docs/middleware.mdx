@@ -197,6 +197,58 @@ const deleteUser = mutation({
 })
 ```
 
+## Lifecycle hooks
+
+Instead of writing try/catch/finally in every wrap, use `lifecycleWrap` for a declarative approach:
+
+```ts twoslash
+// @noErrors
+import { lifecycleWrap } from "katman"
+
+const logging = lifecycleWrap({
+  onStart: ({ ctx }) => console.log("started"),
+  onSuccess: ({ output, durationMs }) => console.log(`done in ${durationMs}ms`),
+  onError: ({ error }) => reportToSentry(error),
+  onFinish: ({ durationMs }) => metrics.record(durationMs),
+})
+
+const listUsers = k.query({
+  use: [logging],
+  resolve: ({ ctx }) => ctx.db.users.findMany(),
+})
+```
+
+All four hooks are optional. They're purely for side effects — the procedure result is never modified.
+
+| Hook | When it fires |
+|---|---|
+| `onStart` | Before the procedure runs |
+| `onSuccess` | After a successful return |
+| `onError` | When the procedure throws (error is re-thrown after the hook) |
+| `onFinish` | Always — success or failure (like `finally`) |
+
+This is different from the global [lifecycle hooks](/docs/server#lifecycle-hooks) on the katman instance — `lifecycleWrap` applies per-procedure via the `use` array.
+
+## Input mapping
+
+Transform the input shape before a procedure runs with `mapInput`:
+
+```ts twoslash
+// @noErrors
+import { mapInput } from "katman"
+
+const renameUserId = mapInput((input: { userId: string }) => ({
+  id: input.userId,
+}))
+
+const getUser = k.query({
+  use: [renameUserId],
+  resolve: ({ input }) => db.users.find(input.id),
+})
+```
+
+Useful for adapting between client and server naming conventions, or pre-processing input in a reusable way.
+
 ## What's next?
 
 - [Typed Errors](/docs/errors) — define error maps and use `fail()` for type-safe error handling
