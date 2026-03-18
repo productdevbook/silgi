@@ -1,0 +1,94 @@
+---
+title: Nitro
+description: Use Katman with Nitro v3 server routes — file-system routing or catch-all handler.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+[Nitro](https://nitro.build) is the server engine behind Nuxt and TanStack Start. Katman's Nitro adapter creates a handler that dispatches to your procedures using Nitro's file-system routing.
+
+## File-system routing (recommended)
+
+Create a catch-all route file:
+
+```ts twoslash
+// @noErrors
+// server/routes/rpc/[...path].ts
+import { katmanNitro } from "katman/nitro"
+import { appRouter } from "~/server/rpc"
+
+export default katmanNitro(appRouter, {
+  context: (event) => ({
+    db: getDB(),
+    user: event.context.auth,
+  }),
+})
+```
+
+Nitro maps `[...path]` to the procedure path automatically:
+
+```
+POST /rpc/users/list     → users/list
+POST /rpc/users/create   → users/create
+GET  /rpc/health         → health
+```
+
+## Catch-all with prefix
+
+If you prefer a single entry handler instead of a dedicated directory:
+
+```ts twoslash
+// @noErrors
+// server/routes/[...].ts
+import { katmanNitro } from "katman/nitro"
+import { appRouter } from "~/server/rpc"
+
+export default katmanNitro(appRouter, {
+  prefix: "/rpc",
+  context: (event) => ({ db: getDB() }),
+})
+```
+
+## Context from Nitro middleware
+
+Nitro middleware sets data on `event.context`. Use it to pass auth, session, or tenant info:
+
+```ts twoslash
+// @noErrors
+// server/middleware/auth.ts
+import { defineMiddleware } from "nitro/h3"
+
+export default defineMiddleware((event) => {
+  const token = event.req.headers.get("authorization")
+  event.context.auth = verifyToken(token)
+})
+```
+
+```ts twoslash
+// @noErrors
+// server/routes/rpc/[...path].ts
+export default katmanNitro(appRouter, {
+  context: (event) => ({
+    user: event.context.auth,  // from middleware above
+    ip: event.req.headers.get("x-forwarded-for"),
+  }),
+})
+```
+
+## Input parsing
+
+- **POST/PUT/PATCH** — body is parsed as JSON via `event.req.json()`
+- **GET** — input from `?data=` query parameter (JSON-encoded)
+
+Content negotiation (MessagePack, devalue) is not automatic — Nitro serializes the return value as JSON. For full protocol support, use `k.handler()` instead.
+
+<Callout type="info">
+This adapter targets Nitro v3 which uses H3 v2 internally. For Nitro v2 (Nuxt 3), use the [H3 adapter](/docs/integrations/h3) instead.
+</Callout>
+
+## What's next?
+
+- [H3](/docs/integrations/h3) — lower-level H3 v2 adapter
+- [Server](/docs/server) — standalone `serve()` with full protocol support
+- [Integrations](/docs/integrations) — other available integrations

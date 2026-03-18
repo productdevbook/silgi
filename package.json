@@ -101,6 +101,10 @@
     "./express": {
       "import": "./dist/adapters/express.mjs",
       "types": "./dist/adapters/express.d.mts"
+    },
+    "./nitro": {
+      "import": "./dist/adapters/nitro.mjs",
+      "types": "./dist/adapters/nitro.d.mts"
     }
   },
   "files": [
