@@ -5,61 +5,92 @@ icon: Rocket
 ---
 
 import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
-**5.7x faster** than oRPC. **18x faster** than H3. Single package.
+**5.7x faster** than oRPC. **18x faster** than H3. One package. Every runtime.
 
-```bash
-npm install katman
-```
+<Tabs items={['npm', 'pnpm', 'bun']}>
+  <Tab value="npm">
+  ```bash
+  npm install katman
+  ```
+  </Tab>
+  <Tab value="pnpm">
+  ```bash
+  pnpm add katman
+  ```
+  </Tab>
+  <Tab value="bun">
+  ```bash
+  bun add katman
+  ```
+  </Tab>
+</Tabs>
 
-## Why Katman?
+<Callout type="info" title="Why Katman?">
+Katman compiles your middleware into a pre-linked chain at startup. No per-request closures. No runtime overhead. Just raw speed.
+</Callout>
 
-- **Fastest pipeline** — Compiled middleware chain, unrolled guard runners
-- **Single package** — No `@katman/server` + `@katman/client` + `@katman/contract`
-- **Standard Schema** — Works with Zod, Valibot, ArkType
-- **3 protocols** — JSON, MessagePack binary, devalue rich types
-- **Every runtime** — Node.js, Bun, Deno
-
-## Quick Example
-
-```ts
+```ts title="server.ts"
 import { katman, KatmanError } from "katman"
 import { z } from "zod"
 
-const k = katman({ context: (req) => ({ db: getDB() }) })
+const k = katman({
+  context: (req) => ({ db: getDB() }),
+})
+
 const { query, mutation, guard, router } = k
 
 const auth = guard(async (ctx) => {
   const user = await verify(ctx.headers.authorization)
   if (!user) throw new KatmanError("UNAUTHORIZED")
-  return { user }
+  return { user } // [!code highlight]
 })
 
 const listUsers = query(
   z.object({ limit: z.number().optional() }),
-  async ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
+  ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
 )
 
 const createUser = mutation({
   use: [auth],
   input: z.object({ name: z.string() }),
   errors: { CONFLICT: 409 },
-  resolve: async ({ input, ctx, fail }) => {
-    if (await ctx.db.users.exists(input.name)) fail("CONFLICT")
+  resolve: ({ input, ctx, fail }) => {
+    if (ctx.db.users.exists(input.name)) fail("CONFLICT") // [!code highlight]
     return ctx.db.users.create(input)
   },
 })
 
 k.serve(router({ users: { list: listUsers, create: createUser } }), {
   port: 3000,
-  scalar: true,
-  ws: true,
+  scalar: true, // API docs at /reference
+  ws: true,     // WebSocket on same port
 })
 ```
 
+## What's included
+
 <Cards>
-  <Card title="Getting Started" href="/docs/getting-started" />
-  <Card title="Core Concepts" href="/docs/concepts" />
-  <Card title="Client" href="/docs/client" />
-  <Card title="Plugins" href="/docs/plugins" />
+  <Card title="Getting Started" description="Install and build your first API in 5 minutes." href="/docs/getting-started" />
+  <Card title="Core Concepts" description="Guards, wraps, hooks, type inference." href="/docs/concepts" />
+  <Card title="Client" description="ofetch transport, binary mode, interceptors." href="/docs/client" />
+  <Card title="Protocols" description="JSON, MessagePack, devalue — pick your wire format." href="/docs/protocols" />
+  <Card title="Plugins" description="CORS, OTel, Pino, rate limiting." href="/docs/plugins" />
+  <Card title="Integrations" description="React, TanStack Query, AI SDK, Fastify." href="/docs/react" />
 </Cards>
+
+## Benchmarks
+
+| Scenario | Katman | oRPC | H3 | vs oRPC | vs H3 |
+|---|---|---|---|---|---|
+| No middleware | **112 ns** | 692 ns | 2161 ns | **6.2x** | **19.3x** |
+| 3 mw + Zod | **318 ns** | 1823 ns | 4291 ns | **5.7x** | **13.5x** |
+| HTTP Guard+Zod | **78 µs** | 131 µs | 103 µs | **1.7x** | **1.3x** |
+
+| Runtime | handler() latency |
+|---|---|
+| Node.js 22+ | 9 µs/req |
+| Bun | 2 µs/req |
+| Deno | Supported |

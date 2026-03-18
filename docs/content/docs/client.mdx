@@ -1,92 +1,133 @@
 ---
 title: Client
-description: Type-safe RPC client with ofetch, binary mode, interceptors.
+description: Type-safe client with ofetch, binary mode, interceptors, and plugins.
 icon: Globe
 ---
 
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
 ## Setup
+
+<Steps>
+<Step>
+
+### Create a link
+
+The link is the transport layer — how requests are sent to the server.
+
+<Tabs items={['ofetch (recommended)', 'native fetch']}>
+  <Tab value="ofetch (recommended)">
+  ```ts
+  import { createLink } from "katman/client/ofetch"
+
+  const link = createLink({
+    url: "http://localhost:3000",
+    timeout: 5000,
+    retry: 2,
+  })
+  ```
+  </Tab>
+  <Tab value="native fetch">
+  ```ts
+  import { RPCLink } from "katman/client/fetch"
+
+  const link = new RPCLink({ url: "http://localhost:3000" })
+  ```
+  </Tab>
+</Tabs>
+
+</Step>
+<Step>
+
+### Create the client
 
 ```ts
 import { createClient } from "katman/client"
-import { createLink } from "katman/client/ofetch"
 import type { InferClient } from "katman"
 import type { AppRouter } from "./router"
-
-const link = createLink({
-  url: "http://localhost:3000",
-  timeout: 5000,
-  retry: 2,
-  retryDelay: (ctx) => Math.min(1000 * 2 ** ctx.retryCount, 10000),
-  headers: () => ({ authorization: `Bearer ${getToken()}` }),
-})
 
 const client = createClient<InferClient<AppRouter>>(link)
 ```
 
-## Usage
+</Step>
+<Step>
+
+### Use it
 
 ```ts
-// Query
 const users = await client.users.list({ limit: 10 })
-
-// Mutation
 const user = await client.users.create({ name: "Alice", email: "a@test.com" })
-
-// Nested
 const result = await client.admin.settings.update({ theme: "dark" })
 ```
 
-## Binary Mode (MessagePack)
+</Step>
+</Steps>
 
-30% smaller payloads, native Date support:
-
-```ts
-const link = createLink({
-  url: "http://localhost:3000",
-  binary: true,  // MessagePack protocol
-})
-```
-
-## Interceptors
+## Link Options
 
 ```ts
 const link = createLink({
   url: "http://localhost:3000",
-  onRequest: ({ options }) => {
-    console.log("Sending:", options)
-  },
-  onResponse: ({ response }) => {
-    console.log("Status:", response?.status)
-  },
-  onRequestError: ({ error }) => {
-    console.error("Network error:", error)
-  },
+
+  // Auth
+  headers: () => ({
+    authorization: `Bearer ${getToken()}`,
+  }),
+
+  // Reliability
+  timeout: 5000,
+  retry: 2,
+  retryDelay: (ctx) => Math.min(1000 * 2 ** ctx.retryCount, 10000),
+
+  // Binary protocol (30% smaller payloads)
+  binary: true, // [!code highlight]
+
+  // Interceptors
+  onRequest: ({ options }) => { /* before send */ },
+  onResponse: ({ response }) => { /* after receive */ },
+  onRequestError: ({ error }) => { /* network failure */ },
 })
 ```
 
-## Client Plugins
+## Binary Mode
+
+Send `binary: true` to use MessagePack — 30% smaller payloads, native Date support:
+
+```ts
+const link = createLink({
+  url: "http://localhost:3000",
+  binary: true, // [!code highlight]
+})
+```
+
+<Callout>
+Binary mode is transparent to your code. The client encodes with MessagePack, the server detects the content type and responds in kind.
+</Callout>
+
+## Plugins
+
+Plugins wrap the link to add behavior:
 
 ```ts
 import { withRetry, withDedupe, withCSRF } from "katman/client/plugins"
 
-// Retry on failure
-const retryLink = withRetry(link, { maxRetries: 3, retryDelay: 1000 })
+const link = createLink({ url: "http://localhost:3000" })
 
-// Deduplicate concurrent identical requests
-const dedupeLink = withDedupe(retryLink)
+const enhanced = withCSRF(
+  withDedupe(
+    withRetry(link, { maxRetries: 3, retryDelay: 1000 })
+  ),
+  { headerName: "x-csrf-token", headerValue: "abc123" }
+)
 
-// CSRF protection
-const csrfLink = withCSRF(dedupeLink, { headerName: "x-csrf-token" })
-
-const client = createClient<InferClient<AppRouter>>(csrfLink)
+const client = createClient<InferClient<AppRouter>>(enhanced)
 ```
 
-## Fetch Transport (lightweight)
-
-No external deps, uses native `fetch`:
-
-```ts
-import { RPCLink } from "katman/client/fetch"
-
-const link = new RPCLink({ url: "http://localhost:3000" })
-```
+| Plugin | What it does |
+|---|---|
+| `withRetry` | Retry failed requests with backoff |
+| `withDedupe` | Collapse identical concurrent requests into one |
+| `withCSRF` | Inject CSRF token header |
+| `BatchLink` | Batch multiple calls into one HTTP request |

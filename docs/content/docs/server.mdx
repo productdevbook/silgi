@@ -1,55 +1,31 @@
 ---
 title: Server
-description: serve(), handler(), HTTP/2, Scalar API docs.
+description: serve(), handler(), HTTP/2, WebSocket, Scalar API docs.
 icon: Server
 ---
 
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
 ## serve()
 
-One-line Node.js HTTP server:
+One-line Node.js server with batteries included:
+
+```ts title="server.ts"
+k.serve(appRouter, {
+  port: 3000,          // auto-finds if busy (3000–3100)
+  hostname: "0.0.0.0",
+  scalar: true,        // API docs at /reference
+  ws: true,            // WebSocket RPC on same port
+})
+```
+
+All options:
 
 ```ts
 k.serve(appRouter, {
   port: 3000,
-  hostname: "0.0.0.0",
-  scalar: true,                           // /reference + /openapi.json
-  ws: true,                               // WebSocket RPC on same port
-  http2: { cert: "./cert.pem", key: "./key.pem" }, // HTTP/2 + TLS
-})
-```
-
-Features:
-- **Auto port finding** — if 3000 is busy, tries 3001-3100 (via `get-port-please`)
-- **Scalar UI** — OpenAPI 3.1.0 spec + interactive API docs at `/reference`
-- **WebSocket** — crossws bidirectional RPC on same port
-- **HTTP/2** — TLS with automatic HTTP/1.1 fallback
-- **Content negotiation** — JSON, MessagePack, devalue (based on Accept header)
-- **Lifecycle hooks** — request/response/error/serve:start
-
-## handler()
-
-Fetch API handler — works on Node.js, Bun, Deno, Cloudflare Workers:
-
-```ts
-const handle = k.handler(appRouter)
-
-// Node.js
-const server = createServer(async (req, res) => {
-  const response = await handle(toRequest(req))
-  // ...
-})
-
-// Bun
-Bun.serve({ fetch: handle })
-
-// Deno
-Deno.serve(handle)
-```
-
-## Scalar OpenAPI
-
-```ts
-k.serve(appRouter, {
+  hostname: "127.0.0.1",
   scalar: {
     title: "My API",
     version: "2.0.0",
@@ -57,11 +33,71 @@ k.serve(appRouter, {
     security: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
     servers: [{ url: "https://api.example.com" }],
     contact: { email: "dev@example.com" },
-    license: { name: "MIT" },
   },
+  ws: true,
+  http2: { cert: "./cert.pem", key: "./key.pem" },
 })
 ```
 
-Endpoints:
-- `GET /reference` — Scalar API Reference UI
-- `GET /openapi.json` — OpenAPI 3.1.0 JSON spec
+| Option | Description |
+|---|---|
+| `port` | Port number. Auto-finds next available if busy. |
+| `hostname` | Bind address. Default `"127.0.0.1"`. |
+| `scalar` | `true` or config object. Serves OpenAPI 3.1.0 + Scalar UI. |
+| `ws` | `true` to enable WebSocket RPC on same port. |
+| `http2` | `{ cert, key }` for HTTP/2 with TLS (HTTP/1.1 fallback). |
+
+## handler()
+
+Fetch API handler — works everywhere:
+
+<Tabs items={['Node.js', 'Bun', 'Deno', 'Cloudflare Workers']}>
+  <Tab value="Node.js">
+  ```ts
+  import { createServer } from "node:http"
+  const handle = k.handler(appRouter)
+  // Use with any Node.js HTTP adapter
+  ```
+  </Tab>
+  <Tab value="Bun">
+  ```ts
+  const handle = k.handler(appRouter)
+  Bun.serve({ fetch: handle, port: 3000 })
+  ```
+  </Tab>
+  <Tab value="Deno">
+  ```ts
+  const handle = k.handler(appRouter)
+  Deno.serve({ port: 3000 }, handle)
+  ```
+  </Tab>
+  <Tab value="Cloudflare Workers">
+  ```ts
+  const handle = k.handler(appRouter)
+  export default { fetch: handle }
+  ```
+  </Tab>
+</Tabs>
+
+## Content Negotiation
+
+The server automatically responds in the format the client requests:
+
+| Accept Header | Format | Use Case |
+|---|---|---|
+| `application/json` | JSON | Default |
+| `application/x-msgpack` | MessagePack | 30% smaller payloads |
+| `application/x-devalue+json` | devalue | Date, Map, Set, BigInt |
+
+<Callout>
+Content negotiation is automatic. Send the `Accept` header and the server responds accordingly. No configuration needed.
+</Callout>
+
+## Scalar API Reference
+
+When `scalar` is enabled:
+
+- **`/reference`** — Interactive API documentation UI
+- **`/openapi.json`** — OpenAPI 3.1.0 JSON specification
+
+The spec is generated at startup from your router — zero runtime cost per request.

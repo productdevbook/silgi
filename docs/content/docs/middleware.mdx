@@ -1,59 +1,67 @@
 ---
 title: Middleware
-description: Guards and wraps — the katman middleware system.
+description: Guards enrich context. Wraps add lifecycle logic. Both are compiled for speed.
 icon: Shield
 ---
+
+import { Callout } from 'fumadocs-ui/components/callout';
 
 ## Guards vs Wraps
 
 | | Guard | Wrap |
 |---|---|---|
-| Pattern | Flat — return context additions | Onion — before/after with `next()` |
-| Speed | ~47ns per guard | ~150ns per wrap (closure + await) |
-| Use case | Auth, context enrichment | Timing, logging, error handling |
-| Sync capable | Yes | No (always async) |
+| **Pattern** | Return context additions | Onion with `next()` |
+| **Speed** | ~47 ns | ~150 ns |
+| **Sync** | Yes | No (always async) |
+| **Use case** | Auth, enrichment, validation | Timing, logging, error capture |
 
 ## Guards
+
+A guard is a flat function that returns context additions:
 
 ```ts
 const auth = guard(async (ctx) => {
   const token = ctx.headers.authorization?.replace("Bearer ", "")
   const user = await verifyToken(token)
   if (!user) throw new KatmanError("UNAUTHORIZED")
-  return { user, permissions: user.permissions }
+  return { user, permissions: user.permissions } // [!code highlight]
 })
+```
 
-const rateLimit = guard(async (ctx) => {
-  // from katman/ratelimit
-  return { rateLimit: await limiter.check(ctx.ip) }
+Use in a procedure:
+
+```ts
+const me = query({
+  use: [auth],
+  resolve: ({ ctx }) => ctx.user, // ← typed as User [!code highlight]
 })
+```
 
-// Stack multiple guards
+<Callout type="info">
+Guards that return `void` act as pure validators — they throw on failure but don't add context.
+</Callout>
+
+```ts
 const adminOnly = guard((ctx) => {
   if (!ctx.permissions?.includes("admin"))
     throw new KatmanError("FORBIDDEN")
-})
-
-const proc = mutation({
-  use: [auth, rateLimit, adminOnly],
-  resolve: ({ ctx }) => {
-    // ctx.user, ctx.permissions, ctx.rateLimit all typed!
-  },
+  // no return — nothing added to ctx
 })
 ```
 
 ## Wraps
 
+A wrap runs code **before** and **after** the handler:
+
 ```ts
 const timing = wrap(async (ctx, next) => {
   const start = performance.now()
-  const result = await next()
-  const ms = performance.now() - start
-  logger.info({ duration: ms }, "procedure completed")
+  const result = await next() // [!code highlight]
+  logger.info({ ms: performance.now() - start })
   return result
 })
 
-const errorBoundary = wrap(async (ctx, next) => {
+const errorCapture = wrap(async (ctx, next) => {
   try {
     return await next()
   } catch (error) {
@@ -63,16 +71,25 @@ const errorBoundary = wrap(async (ctx, next) => {
 })
 ```
 
-## Execution Order
+## Stacking
+
+```ts
+const proc = mutation({
+  use: [auth, rateLimit, adminOnly, timing, errorCapture],
+  //    ───── guards ─────────────  ──── wraps ────────
+  resolve: ({ ctx, input }) => { ... },
+})
+```
+
+Execution:
 
 ```
-Request
-  → Guard 1 (auth)     → merges { user } into ctx
-  → Guard 2 (rateLimit) → merges { rateLimit } into ctx
-  → Wrap 1 (timing)    → before
-    → Wrap 2 (errorBoundary) → before
-      → resolve()      → handler runs
-    → Wrap 2            → after
-  → Wrap 1              → after
-Response
+→ auth         (guard)   ctx += { user, permissions }
+→ rateLimit    (guard)   ctx += { rateLimit }
+→ adminOnly    (guard)   throws if not admin
+→ timing       (wrap)    start timer
+  → errorCapture (wrap)  try/catch
+    → resolve()          your handler
+  ← errorCapture         catch errors
+← timing                 log duration
 ```

@@ -1,10 +1,15 @@
 ---
 title: Plugins
-description: CORS, OpenTelemetry, Pino logging, rate limiting.
+description: CORS, OpenTelemetry, Pino logging, rate limiting — all as v2 guards/wraps/hooks.
 icon: Plug
 ---
 
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
 ## CORS
+
+Generate CORS headers for your middleware or response:
 
 ```ts
 import { corsHeaders } from "katman/cors"
@@ -17,9 +22,17 @@ const headers = corsHeaders({
 })
 ```
 
+Dynamic origin:
+
+```ts
+corsHeaders({
+  origin: (requestOrigin) => requestOrigin.endsWith(".example.com"),
+})
+```
+
 ## OpenTelemetry
 
-Wrap middleware for distributed tracing:
+Wrap middleware — each procedure call becomes a span:
 
 ```ts
 import { otelWrap } from "katman/otel"
@@ -28,12 +41,18 @@ import { trace } from "@opentelemetry/api"
 const tracing = otelWrap(trace.getTracer("my-service"))
 
 const proc = query({
-  use: [tracing],
+  use: [tracing], // [!code highlight]
   resolve: ({ ctx }) => ctx.db.find(),
 })
 ```
 
+<Callout type="info">
+Zero OTel dependency in katman — we use a lightweight `Tracer` / `Span` interface. Bring your own `@opentelemetry/api`.
+</Callout>
+
 ## Pino Logging
+
+Hook-based structured logging:
 
 ```ts
 import pino from "pino"
@@ -41,35 +60,46 @@ import { loggingHooks } from "katman/pino"
 
 const k = katman({
   context: (req) => ({}),
-  hooks: loggingHooks({ logger: pino() }),
+  hooks: loggingHooks({ logger: pino() }), // [!code highlight]
 })
 ```
 
 ## Rate Limiting
 
-```ts
-import { rateLimitGuard, MemoryRateLimiter } from "katman/ratelimit"
+Guard middleware with pluggable backend:
 
-const rateLimit = rateLimitGuard({
-  limiter: new MemoryRateLimiter({ limit: 100, windowMs: 60_000 }),
-  keyFn: (ctx) => (ctx as any).ip ?? "anonymous",
-})
+<Tabs items={['In-memory', 'Custom (Redis)']}>
+  <Tab value="In-memory">
+  ```ts
+  import { rateLimitGuard, MemoryRateLimiter } from "katman/ratelimit"
 
-const proc = query({
-  use: [rateLimit],
-  resolve: () => ({ ok: true }),
-})
-```
+  const rateLimit = rateLimitGuard({
+    limiter: new MemoryRateLimiter({ limit: 100, windowMs: 60_000 }),
+    keyFn: (ctx) => ctx.ip ?? "anonymous", // [!code highlight]
+  })
 
-Custom backend (Redis, Upstash, etc.):
+  const proc = query({
+    use: [rateLimit],
+    resolve: () => ({ ok: true }),
+  })
+  ```
+  </Tab>
+  <Tab value="Custom (Redis)">
+  ```ts
+  import type { RateLimiter } from "katman/ratelimit"
 
-```ts
-import type { RateLimiter } from "katman/ratelimit"
-
-class RedisRateLimiter implements RateLimiter {
-  async limit(key: string) {
-    // your Redis logic
-    return { success: true, limit: 100, remaining: 99, reset: Date.now() + 60000 }
+  class RedisRateLimiter implements RateLimiter {
+    async limit(key: string) {
+      return { success: true, limit: 100, remaining: 99, reset: Date.now() + 60_000 }
+    }
   }
-}
-```
+
+  const rateLimit = rateLimitGuard({
+    limiter: new RedisRateLimiter(),
+    keyFn: (ctx) => ctx.ip ?? "anonymous",
+  })
+  ```
+  </Tab>
+</Tabs>
+
+When the limit is exceeded, a `TOO_MANY_REQUESTS` (429) error is thrown with `retryAfter` data.

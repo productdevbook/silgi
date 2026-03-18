@@ -4,64 +4,86 @@ description: Type-safe error handling with fail() and error maps.
 icon: AlertTriangle
 ---
 
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
 ## Error Maps
 
-Define errors per procedure — fully typed:
+Define possible errors per procedure. The `fail()` function is typed from this map.
 
 ```ts
-const createUser = mutation({
-  input: z.object({ email: z.string().email() }),
+const deleteUser = mutation({
+  input: z.object({ id: z.number() }),
   errors: {
-    CONFLICT: 409,                                    // status-only shorthand
-    VALIDATION: { status: 400, data: z.object({       // with typed data
-      field: z.string(),
-      message: z.string(),
-    })},
+    NOT_FOUND: 404,                         // status shorthand
+    FORBIDDEN: {                            // with typed data
+      status: 403,
+      data: z.object({ reason: z.string() }),
+    },
   },
-  resolve: ({ input, fail }) => {
-    if (exists(input.email)) fail("CONFLICT")         // no data needed
-    if (invalid(input)) fail("VALIDATION", {           // data required + typed
-      field: "email",
-      message: "Already taken",
-    })
-    return db.users.create(input)
+  resolve: ({ input, ctx, fail }) => {
+    const user = ctx.db.users.get(input.id)
+    if (!user) fail("NOT_FOUND")                              // [!code highlight]
+    if (user.ownerId !== ctx.user.id)
+      fail("FORBIDDEN", { reason: "Not the owner" })          // [!code highlight]
+    return ctx.db.users.delete(input.id)
   },
 })
 ```
 
+<Callout type="info">
+`fail()` is fully typed — it only accepts error codes defined in the `errors` map, and `data` is required only when the error defines a data schema.
+</Callout>
+
 ## KatmanError
 
-Throw manually with `KatmanError`:
+Throw errors manually anywhere:
 
 ```ts
 import { KatmanError } from "katman"
 
-throw new KatmanError("NOT_FOUND")              // auto status 404
-throw new KatmanError("CUSTOM", {
+// Auto-maps common codes to HTTP status
+throw new KatmanError("NOT_FOUND")           // → 404
+throw new KatmanError("UNAUTHORIZED")        // → 401
+throw new KatmanError("BAD_REQUEST")         // → 400
+
+// Custom
+throw new KatmanError("CUSTOM_ERROR", {
   status: 418,
   message: "I'm a teapot",
   data: { reason: "custom" },
 })
 ```
 
-## Client Error Handling
+## Client-Side Handling
 
-```ts
-import { safe } from "katman/client"
-
-// Option 1: try/catch
-try {
-  await client.users.create({ email: "taken@test.com" })
-} catch (error) {
-  if (error instanceof KatmanError) {
-    console.log(error.code)   // "CONFLICT"
-    console.log(error.status) // 409
+<Tabs items={['try/catch', 'safe() wrapper']}>
+  <Tab value="try/catch">
+  ```ts
+  try {
+    await client.users.delete({ id: 1 })
+  } catch (error) {
+    if (error instanceof KatmanError) {
+      error.code   // "FORBIDDEN"
+      error.status // 403
+      error.data   // { reason: "Not the owner" }
+    }
   }
-}
+  ```
+  </Tab>
+  <Tab value="safe() wrapper">
+  ```ts
+  import { safe } from "katman/client"
 
-// Option 2: safe() wrapper — [error, data] tuple
-const { error, data, isError } = await safe(
-  client.users.create({ email: "taken@test.com" })
-)
-if (isError) console.log(error.code) // "CONFLICT"
-```
+  const { error, data, isError } = await safe(
+    client.users.delete({ id: 1 })
+  )
+
+  if (isError) {
+    console.log(error.code) // "FORBIDDEN"
+  } else {
+    console.log(data) // success result
+  }
+  ```
+  </Tab>
+</Tabs>

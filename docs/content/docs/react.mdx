@@ -1,10 +1,15 @@
 ---
 title: React Server Actions
-description: Type-safe server actions from katman procedures.
+description: Type-safe server actions from katman procedures — Next.js and TanStack Start.
 icon: Atom
 ---
 
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
 ## createAction
+
+Wrap a single procedure as a server action. Returns `[error, data]` tuples.
 
 ```ts title="app/actions.ts"
 "use server"
@@ -16,44 +21,53 @@ export const createUser = createAction(appRouter.users.create)
 ```
 
 ```tsx title="app/page.tsx"
-import { listUsers, createUser } from "./actions"
+import { listUsers } from "./actions"
 
 export default async function Page() {
-  const [error, users] = await listUsers({ limit: 10 })
+  const [error, users] = await listUsers({ limit: 10 }) // [!code highlight]
   if (error) return <p>Error: {error.message}</p>
-  return <ul>{users.map(u => <li key={u.id}>{u.name}</li>)}</ul>
+
+  return (
+    <ul>
+      {users.map(u => <li key={u.id}>{u.name}</li>)}
+    </ul>
+  )
 }
 ```
 
 ## createActions
 
-Convert entire router at once:
+Convert an entire router at once:
 
 ```ts
 import { createActions } from "katman/react"
 
 const actions = createActions(appRouter)
 
-const [error, users] = await actions.users.list({ limit: 10 })
-const [error2, user] = await actions.users.create({ name: "Alice" })
+const [err, users] = await actions.users.list({ limit: 10 })
+const [err2, user] = await actions.users.create({ name: "Alice" })
 ```
 
 ## createFormAction
 
-```ts
+For `<form action={...}>`:
+
+```ts title="app/actions.ts"
+"use server"
 import { createFormAction } from "katman/react"
 
-export const submitForm = createFormAction(appRouter.users.create)
+export const submitUser = createFormAction(appRouter.users.create)
 ```
 
 ```tsx
-<form action={submitForm}>
+<form action={submitUser}>
   <input name="name" />
   <input name="email" type="email" />
   <button type="submit">Create</button>
 </form>
 ```
 
-Supports bracket notation: `user[name]` → `{ user: { name: value } }`.
-
-Next.js redirect/notFound errors and TanStack Router errors are automatically rethrown.
+<Callout>
+Supports bracket notation in form fields: `user[name]` becomes `{ user: { name: value } }`.
+Next.js redirect/notFound and TanStack Router errors are automatically rethrown.
+</Callout>

@@ -1,131 +1,173 @@
 ---
 title: Core Concepts
-description: Guards, wraps, hooks, type inference — how katman works.
+description: Procedures, guards, wraps, hooks, type inference — how katman works under the hood.
 icon: BookOpen
 ---
 
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
 ## Procedures
 
-Every API endpoint is a **procedure** — either a `query` (read), `mutation` (write), or `subscription` (stream).
+Every API endpoint is a **procedure**. Three kinds:
 
-```ts
-// Short form — just a resolve function
-const health = query(() => ({ status: "ok" }))
+| Kind | HTTP Method | Use Case |
+|---|---|---|
+| `query` | GET | Read data, cacheable |
+| `mutation` | POST | Write data, side effects |
+| `subscription` | SSE/WS | Real-time streaming |
 
-// Short form with input schema
-const getUser = query(z.object({ id: z.number() }), ({ input }) => {
-  return db.users.get(input.id)
-})
-
-// Full config form
-const createUser = mutation({
-  use: [auth, timing],
-  input: z.object({ name: z.string() }),
-  output: UserSchema,
-  errors: { CONFLICT: 409 },
-  resolve: ({ input, ctx, fail }) => {
-    if (exists(input.name)) fail("CONFLICT")
-    return db.users.create(input)
-  },
-})
-```
+<Tabs items={['Short form', 'Short + input', 'Full config']}>
+  <Tab value="Short form">
+  ```ts
+  const health = query(() => ({ status: "ok" }))
+  ```
+  </Tab>
+  <Tab value="Short + input">
+  ```ts
+  const getUser = query(
+    z.object({ id: z.number() }),
+    ({ input }) => db.users.get(input.id), // [!code highlight]
+  )
+  ```
+  </Tab>
+  <Tab value="Full config">
+  ```ts
+  const createUser = mutation({
+    use: [auth, timing],           // middleware
+    input: z.object({ name: z.string() }),
+    output: UserSchema,            // output validation
+    errors: { CONFLICT: 409 },     // typed errors
+    resolve: ({ input, ctx, fail }) => { // [!code highlight]
+      if (exists(input.name)) fail("CONFLICT")
+      return db.users.create(input)
+    },
+  })
+  ```
+  </Tab>
+</Tabs>
 
 ## Guards
 
-Guards enrich the context. They run before the handler, and their return value is merged into `ctx`.
+Guards run **before** the handler. Their return value merges into `ctx`.
 
 ```ts
 const auth = guard(async (ctx) => {
   const user = await verifyToken(ctx.headers.authorization)
   if (!user) throw new KatmanError("UNAUTHORIZED")
-  return { user }  // merged into ctx
-})
-
-// Now ctx.user is available in the handler
-const me = query({
-  use: [auth],
-  resolve: ({ ctx }) => ctx.user,  // typed!
+  return { user, permissions: user.permissions } // → ctx.user, ctx.permissions
 })
 ```
 
-Guards are **flat** — no `next()` callback, no closure per request. This is why katman is 5.7x faster than oRPC's onion middleware.
+<Callout type="info" title="Why guards are fast">
+Guards are **flat functions** — no `next()` callback, no closure per request. This is why katman's pipeline is 5.7x faster than oRPC's onion middleware.
+</Callout>
+
+Stack multiple guards — context accumulates:
+
+```ts
+const proc = mutation({
+  use: [auth, rateLimit, adminOnly],
+  resolve: ({ ctx }) => {
+    ctx.user        // from auth guard
+    ctx.rateLimit   // from rateLimit guard
+    // adminOnly throws if not admin — no return needed
+  },
+})
+```
 
 ## Wraps
 
-Wraps are onion-style middleware for before/after logic:
+Wraps are **onion-style** — they run code before and after the handler:
 
 ```ts
 const timing = wrap(async (ctx, next) => {
-  const start = Date.now()
-  const result = await next()
-  console.log(`Took ${Date.now() - start}ms`)
+  const start = performance.now()
+  const result = await next() // [!code highlight]
+  console.log(`${performance.now() - start}ms`)
   return result
 })
 ```
 
+### Execution order
+
+```
+Request
+  → Guard 1 (auth)          merges { user }
+  → Guard 2 (rateLimit)     merges { rateLimit }
+  → Wrap 1 (timing)         before ↓
+    → Wrap 2 (errorBoundary) before ↓
+      → resolve()            handler runs
+    → Wrap 2                  after ↑
+  → Wrap 1                    after ↑
+Response
+```
+
 ## Lifecycle Hooks
 
-Hooks are registered globally via `katman()` or dynamically via `k.hook()`:
+Global hooks — powered by [hookable](https://github.com/unjs/hookable):
 
 ```ts
 const k = katman({
   context: (req) => ({}),
   hooks: {
-    request: ({ path, input }) => console.log(`-> ${path}`),
-    response: ({ path, durationMs }) => console.log(`<- ${path} ${durationMs}ms`),
-    error: ({ path, error }) => console.error(`x ${path}`, error),
+    request: ({ path, input }) => console.log(`→ ${path}`),
+    response: ({ path, durationMs }) => console.log(`← ${path} ${durationMs.toFixed(1)}ms`),
+    error: ({ path, error }) => console.error(`✗ ${path}`, error),
     "serve:start": ({ url }) => console.log(`Server at ${url}`),
   },
 })
-
-// Dynamic hooks
-const unhook = k.hook("request", ({ path }) => metrics.inc(path))
-unhook() // remove later
 ```
 
-## Typed Errors
+Dynamic registration:
 
 ```ts
-const deleteUser = mutation({
-  errors: {
-    NOT_FOUND: 404,
-    FORBIDDEN: { status: 403, data: z.object({ reason: z.string() }) },
-  },
-  resolve: ({ input, fail }) => {
-    if (!user) fail("NOT_FOUND")                       // typed!
-    if (!owner) fail("FORBIDDEN", { reason: "Not owner" }) // data typed!
-  },
-})
+const unhook = k.hook("request", ({ path }) => metrics.inc(path))
+// later...
+unhook() // remove the hook
 ```
+
+<Callout>
+Hooks have a **sync fast-path** — when all hooks are synchronous, zero Promises are allocated. No performance cost when hooks aren't registered.
+</Callout>
 
 ## Type Inference
 
-Katman infers types end-to-end:
+Types flow end-to-end — no codegen needed:
 
 ```ts
-// Server defines the router
-const appRouter = router({ users: { list: listUsers, create: createUser } })
+// Server
+const appRouter = router({
+  users: { list: listUsers, create: createUser },
+})
 
-// Client gets full types — no codegen needed
+// Client — full types inferred
 type Client = InferClient<typeof appRouter>
-// Client.users.list: (input: { limit?: number }) => Promise<User[]>
-// Client.users.create: (input: { name: string }) => Promise<User>
+// Client.users.list:   (input: { limit?: number }) => Promise<User[]>
+// Client.users.create: (input: { name: string })   => Promise<User>
 ```
 
 ## Standard Schema
 
-Katman uses `@standard-schema/spec` — works with any validator:
+Katman uses `@standard-schema/spec` — any validator works:
 
-```ts
-// Zod
-import { z } from "zod"
-const schema = z.object({ name: z.string() })
-
-// Valibot
-import * as v from "valibot"
-const schema = v.object({ name: v.string() })
-
-// ArkType
-import { type } from "arktype"
-const schema = type({ name: "string" })
-```
+<Tabs items={['Zod', 'Valibot', 'ArkType']}>
+  <Tab value="Zod">
+  ```ts
+  import { z } from "zod"
+  const schema = z.object({ name: z.string() })
+  ```
+  </Tab>
+  <Tab value="Valibot">
+  ```ts
+  import * as v from "valibot"
+  const schema = v.object({ name: v.string() })
+  ```
+  </Tab>
+  <Tab value="ArkType">
+  ```ts
+  import { type } from "arktype"
+  const schema = type({ name: "string" })
+  ```
+  </Tab>
+</Tabs>

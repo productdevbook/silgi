@@ -1,42 +1,57 @@
 ---
 title: Protocols & Codecs
-description: JSON, MessagePack, devalue — choose your wire format.
+description: JSON, MessagePack, devalue — pick your wire format.
 icon: Layers
 ---
 
-Katman supports 3 wire formats via content negotiation. The server responds based on the client's `Accept` header.
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+Katman supports three wire formats. The server picks the format based on the client's `Accept` header — zero configuration.
+
+## Comparison
+
+| Format | Size | Speed | Rich Types | Binary |
+|---|---|---|---|---|
+| **JSON** | Baseline | Fastest | No | No |
+| **MessagePack** | 30% smaller | Fast | Date only | Yes |
+| **devalue** | ~Same as JSON | Fast | All | No |
 
 ## JSON (default)
 
-Standard JSON — fastest encode/decode, universal compatibility.
-
-```
-Content-Type: application/json
-```
-
-## MessagePack (binary)
-
-30% smaller payloads, native Date support. No competitor offers this.
+Standard JSON. Fastest encode/decode. Universal compatibility.
 
 ```ts
-// Client
-import { createLink } from "katman/client/ofetch"
-const link = createLink({ url: "http://localhost:3000", binary: true })
-
-// Manual
-import { encode, decode } from "katman/msgpack"
-const buf = encode({ name: "Alice", joined: new Date() })
-const data = decode(buf)
+// Nothing to configure — it's the default
+const link = createLink({ url: "http://localhost:3000" })
 ```
 
-```
-Content-Type: application/x-msgpack
-Accept: application/x-msgpack
-```
+## MessagePack
 
-## devalue (rich types)
+Binary protocol — 30% smaller payloads. No competitor offers this.
 
-Supports Date, Map, Set, BigInt, RegExp, undefined, circular references.
+<Tabs items={['Client', 'Direct']}>
+  <Tab value="Client">
+  ```ts
+  const link = createLink({
+    url: "http://localhost:3000",
+    binary: true, // [!code highlight]
+  })
+  ```
+  </Tab>
+  <Tab value="Direct">
+  ```ts
+  import { encode, decode } from "katman/msgpack"
+
+  const buf = encode({ name: "Alice", joined: new Date() })
+  const data = decode(buf) // Date preserved!
+  ```
+  </Tab>
+</Tabs>
+
+## devalue
+
+Handles every JavaScript type — Date, Map, Set, BigInt, RegExp, undefined, circular references:
 
 ```ts
 import { encode, decode } from "katman/devalue"
@@ -48,19 +63,18 @@ const data = {
   created: new Date(),
 }
 
-const str = encode(data)  // JSON string with type markers
-const back = decode(str)  // Map, Set, BigInt, Date all restored
+const str = encode(data) // JSON string with type markers
+const back = decode(str) // Map, Set, BigInt, Date all restored!
 ```
 
-```
-Content-Type: application/x-devalue+json
-Accept: application/x-devalue+json
-```
+<Callout type="info">
+To use devalue with the client, set the `Accept: application/x-devalue+json` header. The server responds with devalue-encoded JSON automatically.
+</Callout>
 
 ## Size Comparison
 
 | Payload | JSON | MessagePack | Savings |
 |---|---|---|---|
-| Small (1 object) | 33B | 22B | 33% |
-| Medium (10 objects) | 661B | 493B | 25% |
-| Large (100 objects) | 9.5KB | 6.7KB | 30% |
+| 1 object | 33 B | 22 B | **33%** |
+| 10 objects | 661 B | 493 B | **25%** |
+| 100 objects | 9.5 KB | 6.7 KB | **30%** |

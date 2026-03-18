@@ -1,33 +1,42 @@
 ---
 title: WebSocket
-description: Bidirectional RPC over WebSocket with crossws.
+description: Bidirectional RPC over WebSocket. Streaming subscriptions.
 icon: Radio
 ---
 
-## Enable in serve()
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+## Enable
 
 ```ts
-k.serve(appRouter, { port: 3000, ws: true })
+k.serve(appRouter, {
+  port: 3000,
+  ws: true, // [!code highlight]
+})
 ```
 
-HTTP and WebSocket run on the same port.
+HTTP and WebSocket share the same port. Powered by [crossws](https://github.com/unjs/crossws).
 
 ## Protocol
 
-```
-Client → Server: { id: "1", path: "users/list", input: { limit: 10 } }
-Server → Client: { id: "1", result: [{ id: 1, name: "Alice" }] }
+```json
+// Request
+{ "id": "1", "path": "users/list", "input": { "limit": 10 } }
 
-// Streaming (subscription)
-Server → Client: { id: "2", data: { count: 1 } }
-Server → Client: { id: "2", data: { count: 2 } }
-Server → Client: { id: "2", data: null, done: true }
+// Response
+{ "id": "1", "result": [{ "id": 1, "name": "Alice" }] }
 
 // Error
-Server → Client: { id: "3", error: { code: "NOT_FOUND", status: 404 } }
+{ "id": "2", "error": { "code": "NOT_FOUND", "status": 404 } }
+
+// Streaming (subscription)
+{ "id": "3", "data": { "count": 1 } }
+{ "id": "3", "data": { "count": 2 } }
+{ "id": "3", "data": null, "done": true }
 ```
 
-## Client Usage
+## Client Example
 
 ```ts
 const ws = new WebSocket("ws://localhost:3000")
@@ -40,31 +49,36 @@ ws.onopen = () => {
   }))
 }
 
-ws.onmessage = (event) => {
-  const { id, result, error, data, done } = JSON.parse(event.data)
-  if (error) console.error(error)
-  else if (data !== undefined) console.log("Stream:", data)
-  else console.log("Result:", result)
+ws.onmessage = ({ data }) => {
+  const msg = JSON.parse(data)
+  if (msg.error) console.error(msg.error)
+  else if (msg.done) console.log("Stream ended")
+  else if (msg.data) console.log("Stream:", msg.data)
+  else console.log("Result:", msg.result)
 }
 ```
 
 ## Standalone Attachment
 
-Attach to any existing Node.js HTTP server:
+Attach to any existing Node.js server:
 
 ```ts
 import { createServer } from "node:http"
 import { attachWebSocket } from "katman/ws"
 
 const server = createServer(httpHandler)
-attachWebSocket(server, appRouter, { binary: true }) // optional msgpack
+attachWebSocket(server, appRouter)
 server.listen(3000)
 ```
 
 ## Binary WebSocket
 
-MessagePack over WebSocket:
+Use MessagePack over WebSocket:
 
 ```ts
 attachWebSocket(server, appRouter, { binary: true })
 ```
+
+<Callout>
+WebSocket latency is **40% lower** than HTTP — persistent connections eliminate TCP handshake per request. Measured at 39 µs vs 65 µs.
+</Callout>

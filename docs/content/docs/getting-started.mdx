@@ -1,18 +1,62 @@
 ---
 title: Getting Started
-description: Install katman and create your first RPC API in 5 minutes.
+description: Install katman and build your first type-safe API in 5 minutes.
 icon: Play
 ---
 
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Callout } from 'fumadocs-ui/components/callout';
+import { File, Folder, Files } from 'fumadocs-ui/components/files';
+
 ## Installation
 
-```bash
-npm install katman zod
-```
+<Tabs items={['npm', 'pnpm', 'bun']}>
+  <Tab value="npm">
+  ```bash
+  npm install katman zod
+  ```
+  </Tab>
+  <Tab value="pnpm">
+  ```bash
+  pnpm add katman zod
+  ```
+  </Tab>
+  <Tab value="bun">
+  ```bash
+  bun add katman zod
+  ```
+  </Tab>
+</Tabs>
 
-## Create Your First API
+<Callout type="info">
+Katman uses [Standard Schema](https://standardschema.dev) — Zod, Valibot, and ArkType all work out of the box.
+</Callout>
 
-### 1. Define the Katman Instance
+## Project Structure
+
+<Files>
+  <Folder name="src" defaultOpen>
+    <File name="rpc.ts" />
+    <Folder name="routes" defaultOpen>
+      <File name="users.ts" />
+    </Folder>
+    <File name="router.ts" />
+    <File name="server.ts" />
+    <File name="client.ts" />
+  </Folder>
+  <File name="package.json" />
+  <File name="tsconfig.json" />
+</Files>
+
+## Step by Step
+
+<Steps>
+<Step>
+
+### Create the katman instance
+
+Define your context factory — this runs on every request and populates `ctx`.
 
 ```ts title="src/rpc.ts"
 import { katman } from "katman"
@@ -26,38 +70,49 @@ export const k = katman({
 export const { query, mutation, guard, wrap, router } = k
 ```
 
-### 2. Define Procedures
+</Step>
+<Step>
+
+### Define procedures
+
+Each endpoint is a **procedure** — a `query` (read) or `mutation` (write).
 
 ```ts title="src/routes/users.ts"
 import { z } from "zod"
 import { query, mutation, guard } from "../rpc"
 import { KatmanError } from "katman"
 
-const auth = guard(async (ctx) => {
+export const auth = guard(async (ctx) => {
   const token = ctx.headers.authorization?.replace("Bearer ", "")
   if (!token) throw new KatmanError("UNAUTHORIZED")
-  return { userId: 1 }
+  return { userId: 1 } // [!code highlight]
 })
 
 export const listUsers = query(
   z.object({ limit: z.number().min(1).max(100).optional() }),
-  ({ input }) => {
-    return db.users.findMany({ take: input.limit ?? 10 })
-  },
+  ({ input }) => db.users.findMany({ take: input.limit ?? 10 }),
 )
 
 export const createUser = mutation({
-  use: [auth],
-  input: z.object({ name: z.string().min(1), email: z.string().email() }),
+  use: [auth], // [!code highlight]
+  input: z.object({
+    name: z.string().min(1),
+    email: z.string().email(),
+  }),
   errors: { CONFLICT: 409 },
   resolve: ({ input, fail }) => {
-    if (db.users.exists(input.email)) fail("CONFLICT")
+    if (db.users.exists(input.email)) fail("CONFLICT") // [!code highlight]
     return db.users.create(input)
   },
 })
 ```
 
-### 3. Create the Router
+</Step>
+<Step>
+
+### Build the router
+
+Nest procedures into a tree. The structure becomes the API path.
 
 ```ts title="src/router.ts"
 import { router } from "./rpc"
@@ -65,15 +120,18 @@ import { listUsers, createUser } from "./routes/users"
 
 export const appRouter = router({
   users: {
-    list: listUsers,
-    create: createUser,
+    list: listUsers,   // → POST /users/list
+    create: createUser, // → POST /users/create
   },
 })
 
 export type AppRouter = typeof appRouter
 ```
 
-### 4. Start the Server
+</Step>
+<Step>
+
+### Start the server
 
 ```ts title="src/server.ts"
 import { k } from "./rpc"
@@ -81,30 +139,40 @@ import { appRouter } from "./router"
 
 k.serve(appRouter, {
   port: 3000,
-  scalar: true,  // API docs at /reference
-  ws: true,      // WebSocket RPC on same port
+  scalar: true,  // → /reference (API docs)
+  ws: true,      // → WebSocket RPC on same port
 })
 ```
 
-### 5. Create a Client
+```
+Katman server running at http://127.0.0.1:3000
+Scalar API Reference at http://127.0.0.1:3000/reference
+```
+
+</Step>
+<Step>
+
+### Create the client
 
 ```ts title="src/client.ts"
 import { createClient } from "katman/client"
 import { createLink } from "katman/client/ofetch"
-import type { AppRouter } from "./router"
 import type { InferClient } from "katman"
+import type { AppRouter } from "./router"
 
 const link = createLink({ url: "http://localhost:3000" })
-export const client = createClient<InferClient<AppRouter>>(link)
+export const client = createClient<InferClient<AppRouter>>(link) // [!code highlight]
 
-// Fully typed!
+// Fully typed — autocomplete works!
 const users = await client.users.list({ limit: 5 })
-const user = await client.users.create({ name: "Alice", email: "alice@test.com" })
+const user = await client.users.create({ name: "Alice", email: "a@test.com" })
 ```
 
-## What's Next?
+</Step>
+</Steps>
 
-- [Core Concepts](/docs/concepts) — Guards, wraps, hooks, type inference
-- [Server](/docs/server) — serve(), handler(), HTTP/2, Scalar
-- [Client](/docs/client) — ofetch transport, binary mode, interceptors
-- [Plugins](/docs/plugins) — CORS, OTel, rate limiting, logging
+## What's next?
+
+- [Core Concepts](/docs/concepts) — How guards, wraps, and hooks work
+- [Server](/docs/server) — HTTP/2, Scalar, serve() options
+- [Client](/docs/client) — Binary mode, interceptors, plugins
