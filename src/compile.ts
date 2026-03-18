@@ -16,6 +16,7 @@ import type { ProcedureDef, GuardDef, WrapDef, MiddlewareDef, ErrorDef } from ".
 import { validateSchema, type AnySchema } from "./core/schema.ts";
 import { KatmanError } from "./core/error.ts";
 import { compileStringify } from "./fast-stringify.ts";
+import { analyzeHandler } from "./analyze.ts";
 
 /**
  * Compiled pipeline — called per request.
@@ -208,25 +209,34 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
   const inputSchema = procedure.input;
   const outputSchema = procedure.output;
   const resolveFn = procedure.resolve;
-  const failFn = procedure.errors ? createFail(procedure.errors) : noopFail;
+
+  // Sucrose-style analysis: skip fail/signal allocation if handler doesn't use them
+  const analysis = analyzeHandler(resolveFn);
+  const failFn = analysis.usesFail && procedure.errors ? createFail(procedure.errors)
+    : analysis.usesFail ? noopFail
+    : noopFail; // always provide fail (safe fallback), but skip createFail overhead when unused
 
   // Pre-select the optimal guard runner (compiled once, used per-request)
   const runGuards = selectGuardRunner(guards);
 
+  // ── ULTRA-FAST: no guards, no wraps, no validation, no ctx/fail usage ──
+  // Handler only uses input or nothing — skip everything
+  if (guards.length === 0 && wraps.length === 0 && !inputSchema && !outputSchema && !analysis.usesContext && !analysis.usesFail) {
+    return (_ctx, rawInput, signal) =>
+      resolveFn({ input: rawInput, ctx: _ctx, fail: failFn, signal });
+  }
+
   // ── SYNC FAST PATH: no wraps, no validation, all sync guards ──
-  // Eliminates ALL async overhead (~94ns per await removed)
   if (wraps.length === 0 && !inputSchema && !outputSchema) {
     return (ctx, rawInput, signal) => {
       const guardResult = runGuards(ctx);
-      // If guards are sync, entire pipeline is sync — zero Promises
       if (guardResult && isThenable(guardResult)) {
         return (guardResult as Promise<void>).then(() =>
           resolveFn({ input: rawInput, ctx, fail: failFn, signal })
         );
       }
-      // SYNC PATH — no Promise created at all
       const output = resolveFn({ input: rawInput, ctx, fail: failFn, signal });
-      return output; // may be value or Promise depending on user's resolve fn
+      return output;
     };
   }
 

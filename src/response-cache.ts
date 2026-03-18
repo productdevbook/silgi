@@ -5,11 +5,10 @@
  * is cached by input hash. Subsequent identical requests skip the
  * entire pipeline + stringify — they return the cached string directly.
  *
- * This is the single biggest real-world optimization because:
- * - Most reads are repeated (same user listing, same config, etc.)
- * - Pipeline cost (50-400ns) + stringify cost (50-150ns) = 0ns on cache hit
- * - Even Node HTTP overhead (~70µs) can't be avoided, but everything else can
+ * Uses ohash for deterministic key generation on complex inputs.
  */
+
+import { hash } from "ohash";
 
 export interface CacheOptions {
   /** Max entries (default: 1000) */
@@ -33,6 +32,9 @@ export class ResponseCache {
     this.#ttlMs = options.ttlMs ?? 5000;
   }
 
+  /** Number of cached entries */
+  get size(): number { return this.#map.size; }
+
   get(key: string): string | undefined {
     const entry = this.#map.get(key);
     if (!entry) return undefined;
@@ -44,7 +46,6 @@ export class ResponseCache {
   }
 
   set(key: string, value: string): void {
-    // Evict oldest if at capacity
     if (this.#map.size >= this.#maxSize) {
       const firstKey = this.#map.keys().next().value;
       if (firstKey !== undefined) this.#map.delete(firstKey);
@@ -55,11 +56,35 @@ export class ResponseCache {
     });
   }
 
-  /** Generate a cache key from pathname + input */
+  /** Invalidate a specific key */
+  delete(key: string): boolean {
+    return this.#map.delete(key);
+  }
+
+  /** Clear all entries */
+  clear(): void {
+    this.#map.clear();
+  }
+
+  /** Invalidate all entries matching a path prefix */
+  invalidateByPrefix(prefix: string): number {
+    let count = 0;
+    for (const key of this.#map.keys()) {
+      if (key.startsWith(prefix)) {
+        this.#map.delete(key);
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /**
+   * Generate a deterministic cache key from pathname + input.
+   * Uses ohash for complex objects (Date, Map, Set, nested).
+   * Fast path for simple/no inputs.
+   */
   static key(pathname: string, input: unknown): string {
     if (input === undefined || input === null) return pathname;
-    // Fast hash: pathname + JSON.stringify(input)
-    // For small inputs (<100 chars) this is faster than a hash function
-    return pathname + "\0" + JSON.stringify(input);
+    return pathname + ":" + hash(input);
   }
 }
