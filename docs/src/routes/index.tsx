@@ -50,7 +50,7 @@ function Hero() {
         </p>
 
         <div className="k-reveal-3 flex flex-wrap items-center gap-4 mb-16">
-          <Link to="/docs/$" params={{ _splat: 'getting-started' }}
+          <Link to="/docs/$" params={{ _splat: '' }}
             className="px-7 py-3 text-sm font-semibold text-black rounded-full bg-[var(--k-accent)] shadow-[0_0_32px_rgba(240,198,116,.15)] transition-shadow hover:shadow-[0_0_48px_rgba(240,198,116,.25)]">
             Get started
           </Link>
@@ -253,7 +253,7 @@ function Closing() {
         <p className="text-[var(--k-warm)] mb-12 max-w-sm mx-auto">
           Follow the guide. Define a procedure. Start the server.
         </p>
-        <Link to="/docs/$" params={{ _splat: 'getting-started' }}
+        <Link to="/docs/$" params={{ _splat: '' }}
           className="inline-flex px-8 py-3.5 text-sm font-semibold text-black rounded-full bg-[var(--k-accent)] shadow-[0_0_40px_rgba(240,198,116,.12)] transition-shadow hover:shadow-[0_0_56px_rgba(240,198,116,.22)]">
           Read the documentation
         </Link>
