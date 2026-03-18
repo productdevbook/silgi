@@ -92,6 +92,10 @@ export interface KatmanInstance<TBaseCtx extends Record<string, unknown>> {
     hostname?: string;
     /** Enable Scalar API Reference UI at /reference and /openapi.json */
     scalar?: boolean | ScalarOptions;
+    /** Enable WebSocket RPC (requires crossws) */
+    ws?: boolean;
+    /** Enable HTTP/2 (requires cert + key for TLS) */
+    http2?: { cert: string; key: string };
   }) => void;
 }
 
@@ -240,11 +244,14 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
 
       const notFound = '{"code":"NOT_FOUND","status":404,"message":"Not found"}';
 
+      const useHttp2 = !!options?.http2;
+      const useWs = !!options?.ws;
+
       // Find available port, then start server
       Promise.all([
         getPort({ port: opts.port, host: hostname, alternativePortRange: [3000, 3100] }),
-        import("node:http"),
-      ]).then(([port, { createServer }]) => {
+        useHttp2 ? import("node:http2") : import("node:http"),
+      ]).then(async ([port, httpMod]) => {
         // Scalar API Reference (needs resolved port for URL)
         let specJson: string | undefined;
         let specHtml: string | undefined;
@@ -254,7 +261,7 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
           specJson = JSON.stringify(spec);
           specHtml = scalarHTML(`http://${hostname}:${port}/openapi.json`, scalarOpts);
         }
-        const server = createServer({ keepAlive: true, requestTimeout: 0, headersTimeout: 0 }, (req, res) => {
+        const handler = (req: any, res: any) => {
           const rawUrl = req.url ?? "/";
           const qIdx = rawUrl.indexOf("?");
           const pathname = qIdx === -1 ? rawUrl.slice(1) : rawUrl.slice(1, qIdx);
@@ -371,12 +378,36 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
             hooks.callHook("request", { path: pathname, input });
             runWithContext(input);
           });
-        });
+        };
 
+        // Create server (HTTP/1.1 or HTTP/2)
+        let server: any;
+        if (useHttp2 && options?.http2) {
+          const h2 = httpMod as typeof import("node:http2");
+          const fs = await import("node:fs");
+          server = h2.createSecureServer({
+            cert: fs.readFileSync(options.http2.cert),
+            key: fs.readFileSync(options.http2.key),
+            allowHTTP1: true, // fallback for non-h2 clients
+          }, handler);
+        } else {
+          const h1 = httpMod as typeof import("node:http");
+          server = h1.createServer({ keepAlive: true, requestTimeout: 0, headersTimeout: 0 }, handler);
+        }
+
+        // Attach WebSocket if enabled
+        if (useWs) {
+          const { attachWebSocket } = await import("./ws.ts");
+          attachWebSocket(server, routerDef);
+        }
+
+        const protocol = useHttp2 ? "https" : "http";
         server.listen(port, hostname, () => {
-          const url = `http://${hostname}:${port}`;
+          const url = `${protocol}://${hostname}:${port}`;
           console.log(`\nKatman server running at ${url}`);
-          if (scalarEnabled) console.log(`Scalar API Reference at ${url}/reference`);
+          if (useHttp2) console.log(`  HTTP/2 enabled (with HTTP/1.1 fallback)`);
+          if (useWs) console.log(`  WebSocket RPC at ws://${hostname}:${port}`);
+          if (scalarEnabled) console.log(`  Scalar API Reference at ${url}/reference`);
           console.log();
           hooks.callHook("serve:start", { url, port, hostname });
         });
