@@ -1,0 +1,46 @@
+---
+title: Compression
+description: Gzip/deflate response compression hints via a wrap middleware.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+The compression wrap attaches encoding hints to the context for transport-level compression. Most useful with `handler()` and custom servers where you control response encoding.
+
+## Usage
+
+```ts twoslash
+// @noErrors
+import { compressionWrap } from "katman/plugins"
+
+const listUsers = k.query({
+  use: [compressionWrap()],
+  resolve: ({ ctx }) => ctx.db.users.findMany(),
+})
+```
+
+## Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `threshold` | `number` | `1024` | Minimum response size in bytes before compressing |
+| `encoding` | `"gzip" \| "deflate"` | `"gzip"` | Preferred encoding |
+
+## Custom threshold
+
+```ts twoslash
+// @noErrors
+const compress = compressionWrap({
+  threshold: 512,     // compress responses > 512 bytes
+  encoding: "deflate",
+})
+```
+
+<Callout type="info">
+With `serve()`, Node.js handles compression at the HTTP level. This wrap is primarily for `handler()`-based deployments (Cloudflare Workers, Bun, Deno) where you manage response encoding yourself.
+</Callout>
+
+## What's next?
+
+- [Server](/docs/server) — `serve()` and `handler()` options
+- [Plugins](/docs/plugins) — other available plugins

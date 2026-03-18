@@ -1,0 +1,67 @@
+---
+title: Body Limit
+description: Reject oversized request bodies with a guard — returns 413 Payload Too Large.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+The body limit guard checks the `Content-Length` header before the procedure runs. If the body exceeds your threshold, the request is rejected with `413 Payload Too Large`. Zero overhead for GET requests.
+
+## Usage
+
+```ts twoslash
+// @noErrors
+import { bodyLimitGuard } from "katman/plugins"
+
+const upload = k.mutation({
+  use: [bodyLimitGuard({ maxBytes: 5 * 1024 * 1024 })], // 5 MB
+  input: z.object({ file: z.string() }),
+  resolve: ({ input, ctx }) => ctx.storage.upload(input),
+})
+```
+
+When exceeded, the client receives:
+
+```json
+{
+  "code": "PAYLOAD_TOO_LARGE",
+  "status": 413,
+  "message": "Request body too large",
+  "data": { "maxBytes": 5242880, "receivedBytes": 10485760 }
+}
+```
+
+## Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `maxBytes` | `number` | `1_048_576` (1 MB) | Maximum body size in bytes |
+| `message` | `string` | `"Request body too large"` | Custom error message |
+
+## Apply globally
+
+Add the guard to every mutation via a shared middleware array:
+
+```ts twoslash
+// @noErrors
+const limit = bodyLimitGuard({ maxBytes: 2 * 1024 * 1024 })
+
+const createUser = k.mutation({
+  use: [auth, limit],
+  resolve: ({ input, ctx }) => ctx.db.users.create(input),
+})
+
+const createPost = k.mutation({
+  use: [auth, limit],
+  resolve: ({ input, ctx }) => ctx.db.posts.create(input),
+})
+```
+
+<Callout>
+The guard only checks `Content-Length`. It does not buffer or measure the actual body stream. For streaming uploads, consider using a transport-level limit instead.
+</Callout>
+
+## What's next?
+
+- [Middleware](/docs/middleware) — how guards work
+- [Plugins](/docs/plugins) — other available plugins

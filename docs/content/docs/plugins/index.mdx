@@ -19,6 +19,10 @@ You can build your own plugins the same way. A guard that checks a feature flag,
   <Card title="OpenTelemetry" description="Distributed tracing — each procedure call becomes a span with error recording." href="/docs/plugins/otel" />
   <Card title="Pino Logging" description="Structured request logging — request received, response sent, errors caught." href="/docs/plugins/pino" />
   <Card title="Rate Limiting" description="Sliding window rate limiter — in-memory or pluggable backend (Redis, Upstash, etc.)." href="/docs/plugins/ratelimit" />
+  <Card title="Body Limit" description="Reject oversized request bodies — returns 413 Payload Too Large." href="/docs/plugins/body-limit" />
+  <Card title="Strict GET" description="Enforce GET-only access on query procedures — CSRF prevention." href="/docs/plugins/strict-get" />
+  <Card title="Cookies" description="Read, set, and delete cookies inside procedures — secure defaults." href="/docs/plugins/cookies" />
+  <Card title="Compression" description="Gzip/deflate response compression hints for custom servers." href="/docs/plugins/compression" />
 </Cards>
 
 ## Plugin types at a glance
@@ -33,78 +37,6 @@ You can build your own plugins the same way. A guard that checks a feature flag,
 | Strict GET | Guard (singleton) | Add `strictGetGuard` to enforce GET on queries |
 | Cookies | Helper functions | Use `getCookie()`, `setCookie()`, `deleteCookie()` |
 | Compression | Wrap middleware | Add `compressionWrap()` for gzip/deflate hints |
-
-## Body Limit
-
-Reject requests whose body exceeds a given size. Returns `413 Payload Too Large` before the handler runs.
-
-```ts twoslash
-// @noErrors
-import { bodyLimitGuard } from "katman/plugins"
-
-const createPost = k.mutation({
-  use: [bodyLimitGuard({ maxBytes: 512 * 1024 })], // 512 KB
-  input: z.object({ title: z.string(), body: z.string() }),
-  resolve: ({ input, ctx }) => ctx.db.posts.create(input),
-})
-```
-
-## Strict GET
-
-Enforce that query procedures only accept `GET` requests. A `POST` returns `405 Method Not Allowed`. Useful for CSRF prevention.
-
-```ts twoslash
-// @noErrors
-import { strictGetGuard } from "katman/plugins"
-
-const listUsers = k.query({
-  use: [strictGetGuard],
-  resolve: ({ ctx }) => ctx.db.users.findMany(),
-})
-```
-
-## Cookies
-
-Read and set cookies inside guards or procedures. Typed options with secure defaults (`HttpOnly`, `SameSite=Lax`, `Secure` in production).
-
-```ts twoslash
-// @noErrors
-import { getCookie, setCookie, deleteCookie } from "katman/cookies"
-
-const auth = k.guard((ctx) => {
-  const token = getCookie(ctx.headers, "session")
-  if (!token) throw new KatmanError("UNAUTHORIZED")
-  return { sessionToken: token }
-})
-
-// Set a cookie (returns a Set-Cookie header value)
-const header = setCookie("session", token, {
-  httpOnly: true,
-  maxAge: 60 * 60 * 24, // 1 day
-})
-
-// Delete a cookie
-const deleteHeader = deleteCookie("session")
-```
-
-## Compression
-
-Attach compression hints to the context for transport-level gzip/deflate. Most useful with `handler()` and custom servers.
-
-```ts twoslash
-// @noErrors
-import { compressionWrap } from "katman/plugins"
-
-const listUsers = k.query({
-  use: [compressionWrap({ threshold: 1024, encoding: "gzip" })],
-  resolve: ({ ctx }) => ctx.db.users.findMany(),
-})
-```
-
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `threshold` | `number` | `1024` | Minimum response size in bytes before compressing |
-| `encoding` | `"gzip" \| "deflate"` | `"gzip"` | Preferred encoding |
 
 ## What's next?
 
