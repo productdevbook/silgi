@@ -1,3 +1,71 @@
 @import 'tailwindcss';
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
+
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* Landing page custom styles */
+.landing-hero-title {
+  font-family: 'Syne', sans-serif;
+  letter-spacing: -0.03em;
+}
+
+.landing-body {
+  font-family: 'DM Sans', sans-serif;
+}
+
+.landing-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Stacked layers animation */
+@keyframes layer-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes layer-float-delayed {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
+.animate-layer-1 { animation: layer-float 6s ease-in-out infinite; }
+.animate-layer-2 { animation: layer-float-delayed 5s ease-in-out infinite 0.5s; }
+.animate-layer-3 { animation: layer-float 7s ease-in-out infinite 1s; }
+
+.animate-fade-up { animation: fade-up 0.8s ease-out both; }
+.animate-fade-up-1 { animation: fade-up 0.8s ease-out 0.1s both; }
+.animate-fade-up-2 { animation: fade-up 0.8s ease-out 0.2s both; }
+.animate-fade-up-3 { animation: fade-up 0.8s ease-out 0.3s both; }
+.animate-fade-up-4 { animation: fade-up 0.8s ease-out 0.4s both; }
+.animate-fade-up-5 { animation: fade-up 0.8s ease-out 0.5s both; }
+
+.animate-glow { animation: glow-pulse 4s ease-in-out infinite; }
+
+/* Grid pattern background */
+.grid-pattern {
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* Noise texture overlay */
+.noise-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.015;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
