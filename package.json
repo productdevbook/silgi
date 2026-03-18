@@ -19,6 +19,7 @@
     "./websocket": "./src/server/adapters/websocket/index.ts",
     "./plugins": "./src/server/plugins/index.ts",
     "./openapi": "./src/openapi/index.ts",
+    "./msgpack": "./src/codec/msgpack.ts",
     "./zod": "./src/integrations/zod/index.ts",
     "./tanstack-query": "./src/integrations/tanstack-query/index.ts",
     "./react": "./src/integrations/react/index.ts",
@@ -50,6 +51,7 @@
     "defu": "^6.1.4",
     "get-port-please": "^3.2.0",
     "hookable": "^6.1.0",
+    "msgpackr": "^1.11.9",
     "ofetch": "2.0.0-alpha.3",
     "ohash": "^2.0.11"
   },

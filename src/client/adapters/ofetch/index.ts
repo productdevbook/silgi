@@ -8,6 +8,7 @@
 import { ofetch, type FetchOptions, type FetchContext, FetchError } from "ofetch";
 import type { ClientLink, ClientContext, ClientOptions } from "../../types.ts";
 import { KatmanError, isKatmanErrorJSON, fromKatmanErrorJSON, isErrorStatus } from "../../../core/error.ts";
+import { encode as msgpackEncode, decode as msgpackDecode, MSGPACK_CONTENT_TYPE } from "../../../codec/msgpack.ts";
 
 export interface KatmanLinkOptions<TClientContext extends ClientContext = ClientContext> {
   /** Server base URL (e.g. "http://localhost:3000") */
@@ -24,6 +25,9 @@ export interface KatmanLinkOptions<TClientContext extends ClientContext = Client
 
   /** Timeout in ms (default: 30000) */
   timeout?: number;
+
+  /** Use MessagePack binary protocol (2-4x faster, ~50% smaller payloads) */
+  binary?: boolean;
 
   /** ofetch interceptors */
   onRequest?: FetchOptions["onRequest"];
@@ -52,6 +56,7 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
   const defaultTimeout = options.timeout ?? 30_000;
   const defaultRetry = options.retry;
   const defaultRetryDelay = options.retryDelay ?? 0;
+  const binary = options.binary ?? false;
 
   return {
     async call(path, input, callOptions) {
@@ -65,9 +70,15 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
           : options.headers),
       };
 
-      // Build request body (POST with JSON)
-      const hasInput = input !== undefined && input !== null;
-      const body = hasInput ? input : undefined;
+      // Binary mode: msgpack encode/decode
+      let body: any;
+      if (binary) {
+        headers["content-type"] = MSGPACK_CONTENT_TYPE;
+        headers["accept"] = MSGPACK_CONTENT_TYPE;
+        body = (input !== undefined && input !== null) ? msgpackEncode(input) : undefined;
+      } else {
+        body = (input !== undefined && input !== null) ? input : undefined;
+      }
 
       try {
         const data = await ofetch(url, {
@@ -78,27 +89,30 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
           timeout: defaultTimeout,
           retry: defaultRetry ?? 0,
           retryDelay: defaultRetryDelay,
-          // Don't throw on error status — we handle KatmanError ourselves
           ignoreResponseError: true,
-          // Interceptors
           onRequest: options.onRequest,
           onResponse: options.onResponse,
           onRequestError: options.onRequestError,
           onResponseError: options.onResponseError,
-          // Custom response handling
-          parseResponse(text) {
-            if (!text) return undefined;
-            try { return JSON.parse(text); } catch { return text; }
-          },
+          // Binary: get raw arrayBuffer, then decode. JSON: parse as usual.
+          ...(binary ? {
+            responseType: "arrayBuffer" as const,
+          } : {
+            parseResponse(text: string) {
+              if (!text) return undefined;
+              try { return JSON.parse(text); } catch { return text; }
+            },
+          }),
         });
 
-        // Check if the raw response was an error (we used ignoreResponseError)
-        // ofetch still parses the body, so we check the shape
-        if (isKatmanErrorJSON(data)) {
-          throw fromKatmanErrorJSON(data);
+        // Decode response
+        const decoded = binary ? msgpackDecode(new Uint8Array(data as ArrayBuffer)) : data;
+
+        if (isKatmanErrorJSON(decoded)) {
+          throw fromKatmanErrorJSON(decoded as any);
         }
 
-        return data;
+        return decoded;
       } catch (error) {
         // Re-throw KatmanError as-is
         if (error instanceof KatmanError) throw error;

@@ -34,6 +34,7 @@ import { generateOpenAPI, scalarHTML, type ScalarOptions } from "./scalar.ts";
 import { createHooks, type Hookable, type HookCallback } from "hookable";
 import { defu } from "defu";
 import { getPort } from "get-port-please";
+import { encode as msgpackEncode, decode as msgpackDecode, acceptsMsgpack, isMsgpack, MSGPACK_CONTENT_TYPE } from "./codec/msgpack.ts";
 
 // ── Lifecycle Hooks ─────────────────────────────────
 
@@ -434,6 +435,7 @@ function createFetchHandler(
 
   // Pre-allocate response headers (reused across requests)
   const jsonHeaders = { "content-type": "application/json" };
+  const msgpackHeaders = { "content-type": MSGPACK_CONTENT_TYPE };
   const sseHeaders = { "content-type": "text/event-stream", "cache-control": "no-cache" };
   const notFoundBody = JSON.stringify({ code: "NOT_FOUND", status: 404, message: "Procedure not found" });
 
@@ -474,7 +476,11 @@ function createFetchHandler(
         }
       } else {
         const ct = request.headers.get("content-type");
-        if (ct?.includes("json") && request.body) {
+        if (isMsgpack(ct) && request.body) {
+          // Binary protocol — decode msgpack
+          const buf = new Uint8Array(await request.arrayBuffer());
+          rawInput = msgpackDecode(buf);
+        } else if (ct?.includes("json") && request.body) {
           rawInput = await request.json();
         } else if (request.body) {
           const text = await request.text();
@@ -495,19 +501,26 @@ function createFetchHandler(
         return new Response(stream, { headers: sseHeaders });
       }
 
-      // JSON response — schema-compiled fast stringify
+      // Content negotiation — msgpack if client accepts it
       hooks?.callHook("response", { path: pathname, output, durationMs: performance.now() - t0 });
+      const wantsBinary = acceptsMsgpack(request.headers.get("accept"));
+      if (wantsBinary) {
+        return new Response(msgpackEncode(output), { status: 200, headers: msgpackHeaders });
+      }
       return new Response(route.stringify(output), { status: 200, headers: jsonHeaders });
     } catch (error) {
       hooks?.callHook("error", { path: pathname, error });
       if (error instanceof ValidationError) {
-        return new Response(
-          JSON.stringify({ code: "BAD_REQUEST", status: 400, message: error.message, data: { issues: error.issues } }),
-          { status: 400, headers: jsonHeaders },
-        );
+        const errBody = { code: "BAD_REQUEST", status: 400, message: error.message, data: { issues: error.issues } };
+        const wantsBinary = acceptsMsgpack(request.headers.get("accept"));
+        if (wantsBinary) return new Response(msgpackEncode(errBody), { status: 400, headers: msgpackHeaders });
+        return new Response(JSON.stringify(errBody), { status: 400, headers: jsonHeaders });
       }
       const e = error instanceof KatmanError ? error : toKatmanError(error);
-      return new Response(stringifyJSON(e.toJSON()), { status: e.status, headers: jsonHeaders });
+      const errJson = e.toJSON();
+      const wantsBinary = acceptsMsgpack(request.headers.get("accept"));
+      if (wantsBinary) return new Response(msgpackEncode(errJson), { status: e.status, headers: msgpackHeaders });
+      return new Response(stringifyJSON(errJson), { status: e.status, headers: jsonHeaders });
     } finally {
       ctxPool.release(ctx);
     }
