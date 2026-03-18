@@ -38,7 +38,7 @@
     "bench:http": "node --experimental-strip-types bench/http.ts",
     "bench:micro": "node --experimental-strip-types bench/micro.ts",
     "bench:pipeline": "node --experimental-strip-types bench/pipeline.ts",
-    "play": "node --experimental-strip-types playground/v2-server.ts",
+    "play": "node --experimental-strip-types playground/server.ts",
     "lint": "oxlint .",
     "fmt": "oxfmt .",
     "test": "vitest run",

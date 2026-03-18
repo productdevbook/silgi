@@ -1,7 +1,7 @@
 import { describe, it, expectTypeOf } from "vitest";
 import { z } from "zod";
-import { katman } from "../src/api/katman.ts";
-import type { ProcedureDef, InferClient } from "../src/api/types.ts";
+import { katman } from "../src/katman.ts";
+import type { ProcedureDef, InferClient } from "../src/types.ts";
 
 const k = katman({
   context: (req: Request) => ({

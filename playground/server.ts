@@ -1,13 +1,11 @@
 /**
  * Katman Playground — Server
  *
- * Run: node --experimental-strip-types playground/server.ts
+ * Run: pnpm play
  */
 
-import { createServer } from "node:http";
-import { ks, KatmanError, type Context } from "../src/index.ts";
-import { RPCHandler } from "../src/server/adapters/node/index.ts";
-import { CORSPlugin } from "../src/server/plugins/cors.ts";
+import { katman } from "../src/index.ts";
+import { KatmanError } from "../src/core/error.ts";
 import { z } from "zod";
 
 // ── Schemas ──────────────────────────────────────────
@@ -16,115 +14,125 @@ const UserSchema = z.object({
   id: z.number(),
   name: z.string(),
   email: z.string().email(),
-  createdAt: z.date(),
 });
-
-type User = z.infer<typeof UserSchema>;
 
 // ── In-memory DB ─────────────────────────────────────
 
-const db: User[] = [
-  { id: 1, name: "Alice", email: "alice@katman.dev", createdAt: new Date("2024-01-15") },
-  { id: 2, name: "Bob", email: "bob@katman.dev", createdAt: new Date("2024-03-22") },
-  { id: 3, name: "Charlie", email: "charlie@katman.dev", createdAt: new Date("2024-06-10") },
-];
+const db = {
+  users: [
+    { id: 1, name: "Alice", email: "alice@katman.dev" },
+    { id: 2, name: "Bob", email: "bob@katman.dev" },
+    { id: 3, name: "Charlie", email: "charlie@katman.dev" },
+  ],
+  nextId: 4,
+};
 
-let nextId = 4;
+// ── Katman Instance ──────────────────────────────────
 
-// ── Auth Middleware ──────────────────────────────────
+const k = katman({
+  context: (req: Request) => ({
+    headers: Object.fromEntries(req.headers) as Record<string, string>,
+    db,
+  }),
+});
 
-const withAuth = ks
-  .$context<{ headers: Record<string, string | string[] | undefined> }>()
-  .use(async ({ context, next, errors }) => {
-    const auth = context.headers["authorization"];
-    const token = typeof auth === "string" ? auth.replace("Bearer ", "") : undefined;
+// Destructure — use anywhere
+const { query, mutation, subscription, guard, wrap, router, handler } = k;
 
-    if (!token || token !== "secret-token") {
-      throw new KatmanError("UNAUTHORIZED", { message: "Invalid or missing token" });
-    }
+// ── Middleware ────────────────────────────────────────
 
-    return next({ context: { userId: 1, role: "admin" as const } });
-  });
+const auth = guard(async (ctx) => {
+  const token = ctx.headers.authorization?.replace("Bearer ", "");
+  if (token !== "secret-token") {
+    throw new KatmanError("UNAUTHORIZED", { message: "Invalid token" });
+  }
+  return { userId: 1, role: "admin" as const };
+});
 
-// ── Procedures ──────────────────────────────────────
+const timing = wrap(async (ctx, next) => {
+  const t0 = performance.now();
+  const result = await next();
+  const ms = (performance.now() - t0).toFixed(1);
+  console.log(`  [${ms}ms] ${JSON.stringify(result).slice(0, 80)}`);
+  return result;
+});
 
-const listUsers = ks
-  .input(z.object({
-    limit: z.number().min(1).max(100).optional(),
-    offset: z.number().min(0).optional(),
-  }))
-  .handler(async ({ input }) => {
+// ── Procedures ───────────────────────────────────────
+
+// Kısa form — 0 config overhead
+const health = query(async () => ({
+  status: "ok",
+  uptime: process.uptime(),
+  timestamp: new Date().toISOString(),
+}));
+
+// Kısa form — input + resolve
+const listUsers = query(
+  z.object({ limit: z.number().min(1).max(100).optional() }),
+  async ({ input, ctx }) => {
     const limit = input.limit ?? 10;
-    const offset = input.offset ?? 0;
     return {
-      users: db.slice(offset, offset + limit),
-      total: db.length,
+      users: ctx.db.users.slice(0, limit),
+      total: ctx.db.users.length,
     };
-  });
+  },
+);
 
-const getUser = ks
-  .input(z.object({ id: z.number() }))
-  .output(UserSchema)
-  .handler(async ({ input }) => {
-    const user = db.find((u) => u.id === input.id);
-    if (!user) {
-      throw new KatmanError("NOT_FOUND", { message: `User #${input.id} not found` });
-    }
+// Kısa form — tek parametre ile
+const getUser = query(
+  z.object({ id: z.number() }),
+  async ({ input, ctx }) => {
+    const user = ctx.db.users.find((u) => u.id === input.id);
+    if (!user) throw new KatmanError("NOT_FOUND", { message: `User #${input.id} not found` });
     return user;
-  });
+  },
+);
 
-const createUser = withAuth
-  .input(z.object({
+// Tam form — middleware + errors + validation
+const createUser = mutation({
+  use: [auth, timing],
+  input: z.object({
     name: z.string().min(1).max(100),
     email: z.string().email(),
-  }))
-  .errors({
-    CONFLICT: { status: 409, message: "Email already taken" },
-  })
-  .handler(async ({ input, context, errors }) => {
-    if (db.some((u) => u.email === input.email)) {
-      throw errors.CONFLICT({ data: { email: input.email } });
+  }),
+  output: UserSchema,
+  errors: { CONFLICT: 409 },
+  resolve: async ({ input, ctx, fail }) => {
+    if (ctx.db.users.some((u) => u.email === input.email)) {
+      fail("CONFLICT");
     }
-    const user: User = { id: nextId++, ...input, createdAt: new Date() };
-    db.push(user);
-    console.log(`  [db] Created user #${user.id} by userId=${context.userId}`);
+    const user = { id: ctx.db.nextId++, ...input };
+    ctx.db.users.push(user);
+    console.log(`  [db] Created user #${user.id} by userId=${ctx.userId}`);
     return user;
-  });
+  },
+});
 
-const deleteUser = withAuth
-  .input(z.object({ id: z.number() }))
-  .handler(async ({ input, context }) => {
-    const idx = db.findIndex((u) => u.id === input.id);
-    if (idx === -1) {
-      throw new KatmanError("NOT_FOUND", { message: `User #${input.id} not found` });
-    }
-    db.splice(idx, 1);
-    console.log(`  [db] Deleted user #${input.id} by userId=${context.userId}`);
+// Tam form — delete with auth
+const deleteUser = mutation({
+  use: [auth],
+  input: z.object({ id: z.number() }),
+  errors: { NOT_FOUND: 404 },
+  resolve: async ({ input, ctx, fail }) => {
+    const idx = ctx.db.users.findIndex((u) => u.id === input.id);
+    if (idx === -1) fail("NOT_FOUND");
+    ctx.db.users.splice(idx, 1);
+    console.log(`  [db] Deleted user #${input.id}`);
     return { deleted: true };
-  });
+  },
+});
 
-// ── SSE Streaming ───────────────────────────────────
-
-const streamUpdates = ks.handler(async function* () {
+// Subscription — SSE streaming
+const liveUpdates = subscription(async function* ({ ctx }) {
   for (let i = 0; i < 5; i++) {
     await new Promise((r) => setTimeout(r, 500));
-    yield { tick: i + 1, timestamp: new Date().toISOString(), users: db.length };
+    yield { tick: i + 1, users: ctx.db.users.length, time: new Date().toISOString() };
   }
 });
 
-// ── Health ──────────────────────────────────────────
+// ── Router ───────────────────────────────────────────
 
-const health = ks
-  .route({ method: "GET", path: "/health" })
-  .handler(async () => ({
-    status: "ok",
-    uptime: process.uptime(),
-    timestamp: new Date(),
-  }));
-
-// ── Router ──────────────────────────────────────────
-
-const router = {
+const appRouter = router({
   health,
   users: {
     list: listUsers,
@@ -133,39 +141,28 @@ const router = {
     delete: deleteUser,
   },
   stream: {
-    updates: streamUpdates,
+    updates: liveUpdates,
   },
-};
-
-export type AppRouter = typeof router;
-
-// ── HTTP Server ─────────────────────────────────────
-
-const handler = new RPCHandler(router, {
-  plugins: [new CORSPlugin()],
 });
 
-const server = createServer(async (req, res) => {
-  const result = await handler.handle(req, res, {
-    context: { headers: req.headers },
-  });
+export type AppRouter = typeof appRouter;
 
-  if (!result.matched) {
-    res.statusCode = 404;
-    res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify({ error: "Not found" }));
-  }
+// ── Serve ────────────────────────────────────────────
+
+k.serve(appRouter, {
+  port: 3456,
+  scalar: {
+    title: "Katman Playground API",
+    version: "0.1.0",
+    description: "Example API showcasing Katman v2 features",
+  },
 });
 
-const PORT = 3456;
-server.listen(PORT, "127.0.0.1", () => {
-  console.log(`\n🚀 Katman playground server running at http://127.0.0.1:${PORT}\n`);
-  console.log("Routes:");
-  console.log("  POST /health         — Health check");
-  console.log("  POST /users/list     — List users");
-  console.log("  POST /users/get      — Get user by id");
-  console.log("  POST /users/create   — Create user (requires auth)");
-  console.log("  POST /users/delete   — Delete user (requires auth)");
-  console.log("  POST /stream/updates — SSE stream (5 ticks)");
-  console.log("\nAuth token: Bearer secret-token\n");
-});
+console.log("Routes:");
+console.log("  /health              — Health check");
+console.log("  /users/list          — List users");
+console.log("  /users/get           — Get user by id");
+console.log("  /users/create        — Create user (auth required)");
+console.log("  /users/delete        — Delete user (auth required)");
+console.log("  /stream/updates      — SSE stream (5 ticks)");
+console.log("\nAuth: Bearer secret-token\n");

@@ -37,8 +37,8 @@
  */
 
 // ── Main API ────────────────────────────────────────
-export { katman } from "./api/katman.ts";
-export type { KatmanInstance, KatmanConfig } from "./api/katman.ts";
+export { katman } from "./katman.ts";
+export type { KatmanInstance, KatmanConfig } from "./katman.ts";
 
 // ── Types ───────────────────────────────────────────
 export type {
@@ -47,7 +47,7 @@ export type {
   GuardDef, WrapDef, GuardFn, WrapFn, MiddlewareDef,
   ResolveContext, RouterDef, InferClient,
   InferContextFromUse, InferGuardOutput,
-} from "./api/types.ts";
+} from "./types.ts";
 
 // ── Error ───────────────────────────────────────────
 export { KatmanError, isDefinedError, toKatmanError } from "./core/error.ts";
@@ -62,7 +62,7 @@ export { withEventMeta, getEventMeta } from "./core/sse.ts";
 export type { EventMeta } from "./core/sse.ts";
 
 // ── Advanced ────────────────────────────────────────
-export { compileProcedure, compileRouter, ContextPool } from "./api/compile.ts";
+export { compileProcedure, compileRouter, ContextPool } from "./compile.ts";
 export { AsyncIteratorClass, mapAsyncIterator } from "./core/iterator.ts";
 export { JsonSerializer } from "./core/codec.ts";
 

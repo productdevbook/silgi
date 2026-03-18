@@ -17,9 +17,9 @@ import { createRouterClient as orpcRouterClient } from "@orpc/server";
 
 // ── Katman v2 Setup ─────────────────────────────────
 
-import { katman } from "../src/api/katman.ts";
-import { compileProcedure } from "../src/api/compile.ts";
-import type { GuardDef, WrapDef } from "../src/api/types.ts";
+import { katman } from "../src/katman.ts";
+import { compileProcedure } from "../src/compile.ts";
+import type { GuardDef, WrapDef } from "../src/types.ts";
 
 // ── Shared Schema ───────────────────────────────────
 

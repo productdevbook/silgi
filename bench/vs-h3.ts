@@ -23,8 +23,8 @@ const GuardedInput = z.object({ name: z.string() });
 //  Katman Server
 // ═══════════════════════════════════════════════════
 
-import { katman } from "../src/api/katman.ts";
-import { compileRouter, ContextPool } from "../src/api/compile.ts";
+import { katman } from "../src/katman.ts";
+import { compileRouter, ContextPool } from "../src/compile.ts";
 
 const k = katman({ context: () => ({}) });
 const auth = k.guard(() => ({ userId: 1 }));

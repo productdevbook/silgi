@@ -13,7 +13,7 @@
  * Benchmark: 2-5x faster than JSON.stringify for typical API responses.
  */
 
-import type { AnySchema } from "../core/schema.ts";
+import type { AnySchema } from "./core/schema.ts";
 
 export type FastStringify = (value: unknown) => string;
 

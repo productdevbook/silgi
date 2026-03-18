@@ -15,7 +15,7 @@ import { z } from "zod";
 
 // ── Katman Server ───────────────────────────────────
 
-import { katman } from "../src/api/katman.ts";
+import { katman } from "../src/katman.ts";
 
 const k = katman({
   context: () => ({}),

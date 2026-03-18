@@ -9,8 +9,8 @@
 import { createServer, type Server } from "node:http";
 import { z } from "zod";
 
-import { katman } from "../src/api/katman.ts";
-import { compileRouter, ContextPool } from "../src/api/compile.ts";
+import { katman } from "../src/katman.ts";
+import { compileRouter, ContextPool } from "../src/compile.ts";
 import { os as orpcOs } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/node";
 

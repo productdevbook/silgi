@@ -17,8 +17,8 @@ import type { Middleware, Handler } from "../src/core/pipeline.ts";
 
 // ── Katman v2 (guard/wrap pipeline) ─────────────────
 
-import { compileProcedure as v2Compile } from "../src/api/compile.ts";
-import type { ProcedureDef, GuardDef, WrapDef } from "../src/api/types.ts";
+import { compileProcedure as v2Compile } from "../src/compile.ts";
+import type { ProcedureDef, GuardDef, WrapDef } from "../src/types.ts";
 
 // ── Shared schema ───────────────────────────────────
 

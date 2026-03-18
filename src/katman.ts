@@ -24,12 +24,12 @@ import type {
   RouterDef,
   InferContextFromUse,
 } from "./types.ts";
-import type { AnySchema, InferSchemaInput, InferSchemaOutput } from "../core/schema.ts";
+import type { AnySchema, InferSchemaInput, InferSchemaOutput } from "./core/schema.ts";
 import { compileProcedure, compileRouter, ContextPool, type CompiledHandler, type FlatRouter } from "./compile.ts";
-import { KatmanError, toKatmanError, isErrorStatus } from "../core/error.ts";
-import { ValidationError, validateSchema } from "../core/schema.ts";
-import { stringifyJSON, parseEmptyableJSON, once } from "../core/utils.ts";
-import { iteratorToEventStream } from "../core/sse.ts";
+import { KatmanError, toKatmanError, isErrorStatus } from "./core/error.ts";
+import { ValidationError, validateSchema } from "./core/schema.ts";
+import { stringifyJSON, parseEmptyableJSON, once } from "./core/utils.ts";
+import { iteratorToEventStream } from "./core/sse.ts";
 import { generateOpenAPI, scalarHTML, type ScalarOptions } from "./scalar.ts";
 
 // ── Katman Instance ─────────────────────────────────
@@ -463,5 +463,5 @@ function createFetchHandler(
 
 // ── Re-exports ──────────────────────────────────────
 
-export { KatmanError, toKatmanError, isErrorStatus } from "../core/error.ts";
-export { type, validateSchema, ValidationError } from "../core/schema.ts";
+export { KatmanError, toKatmanError, isErrorStatus } from "./core/error.ts";
+export { type, validateSchema, ValidationError } from "./core/schema.ts";

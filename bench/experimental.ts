@@ -6,8 +6,8 @@
  */
 import { bench, run, summary } from "mitata";
 import { z } from "zod";
-import { compileProcedure } from "../src/api/compile.ts";
-import type { GuardDef } from "../src/api/types.ts";
+import { compileProcedure } from "../src/compile.ts";
+import type { GuardDef } from "../src/types.ts";
 
 const signal = AbortSignal.timeout(30_000);
 

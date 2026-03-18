@@ -16,11 +16,11 @@ const GuardedInput = z.object({ name: z.string() });
 
 // ── Katman Setup ────────────────────────────────────
 
-import { katman } from "../src/api/katman.ts";
-import { compileProcedure, compileRouter, ContextPool } from "../src/api/compile.ts";
-import type { GuardDef, WrapDef } from "../src/api/types.ts";
-import { ResponseCache } from "../src/api/response-cache.ts";
-import { RequestCoalescer } from "../src/api/coalesce.ts";
+import { katman } from "../src/katman.ts";
+import { compileProcedure, compileRouter, ContextPool } from "../src/compile.ts";
+import type { GuardDef, WrapDef } from "../src/types.ts";
+import { ResponseCache } from "../src/response-cache.ts";
+import { RequestCoalescer } from "../src/coalesce.ts";
 
 const k = katman({ context: () => ({}) });
 const auth = k.guard(() => ({ userId: 1 }));

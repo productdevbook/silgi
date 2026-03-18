@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { z } from "zod";
-import { katman } from "../src/api/katman.ts";
-import { compileProcedure } from "../src/api/compile.ts";
+import { katman } from "../src/katman.ts";
+import { compileProcedure } from "../src/compile.ts";
 import { KatmanError } from "../src/core/error.ts";
 
 // ── Setup ───────────────────────────────────────────

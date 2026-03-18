@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { z } from "zod";
-import { katman } from "../src/api/katman.ts";
+import { katman } from "../src/katman.ts";
 import { createServer, type Server } from "node:http";
 
 // ── Setup ──────────────────────────────────────────

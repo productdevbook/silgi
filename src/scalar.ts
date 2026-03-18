@@ -6,7 +6,7 @@
  */
 
 import type { ProcedureDef, RouterDef, ErrorDefItem } from "./types.ts";
-import type { AnySchema } from "../core/schema.ts";
+import type { AnySchema } from "./core/schema.ts";
 
 // ── OpenAPI Spec Generation ─────────────────────────
 

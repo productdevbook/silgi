@@ -5,9 +5,9 @@
  * → V8 assigns ONE hidden class → monomorphic inline caches.
  */
 
-import type { AnySchema, InferSchemaInput, InferSchemaOutput } from "../core/schema.ts";
-import type { Route } from "../contract/route.ts";
-import type { Meta } from "../contract/meta.ts";
+import type { AnySchema, InferSchemaInput, InferSchemaOutput } from "./core/schema.ts";
+import type { Route } from "./contract/route.ts";
+import type { Meta } from "./contract/meta.ts";
 
 // ── Procedure Types ────────────────────────────────
 

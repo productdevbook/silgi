@@ -11,9 +11,9 @@
 import { createServer, type Server } from "node:http";
 import { z } from "zod";
 
-import { katman } from "../src/api/katman.ts";
-import { compileRouter, ContextPool, type CompiledRoute } from "../src/api/compile.ts";
-import { ResponseCache } from "../src/api/response-cache.ts";
+import { katman } from "../src/katman.ts";
+import { compileRouter, ContextPool, type CompiledRoute } from "../src/compile.ts";
+import { ResponseCache } from "../src/response-cache.ts";
 
 import { os as orpcOs } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/node";

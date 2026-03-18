@@ -11,10 +11,10 @@
 import { createServer, type Server } from "node:http";
 import { z } from "zod";
 
-import { katman } from "../src/api/katman.ts";
-import { compileRouter, ContextPool } from "../src/api/compile.ts";
-import { ResponseCache } from "../src/api/response-cache.ts";
-import { RequestCoalescer } from "../src/api/coalesce.ts";
+import { katman } from "../src/katman.ts";
+import { compileRouter, ContextPool } from "../src/compile.ts";
+import { ResponseCache } from "../src/response-cache.ts";
+import { RequestCoalescer } from "../src/coalesce.ts";
 
 import { os as orpcOs } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/node";
