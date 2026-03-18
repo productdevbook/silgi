@@ -4,6 +4,36 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@400;500&family=Outfit:wght@400;500;600&display=swap');
 
+/* ─── Fumadocs theme — Katman brand colors ────────── */
+
+@theme {
+  --color-fd-primary: oklch(0.75 0.12 75);
+  --color-fd-primary-foreground: oklch(0.15 0.02 75);
+  --color-fd-ring: oklch(0.75 0.12 75);
+}
+
+.dark {
+  --color-fd-background: oklch(0.13 0.01 60);
+  --color-fd-foreground: oklch(0.9 0.02 75);
+  --color-fd-muted: oklch(0.18 0.01 60);
+  --color-fd-muted-foreground: oklch(0.6 0.03 60);
+  --color-fd-card: oklch(0.15 0.01 60);
+  --color-fd-border: oklch(0.22 0.01 60);
+  --color-fd-accent: oklch(0.2 0.01 60);
+  --color-fd-accent-foreground: oklch(0.85 0.03 75);
+}
+
+.light, :root:not(.dark) {
+  --color-fd-background: oklch(0.98 0.005 75);
+  --color-fd-foreground: oklch(0.15 0.02 60);
+  --color-fd-muted: oklch(0.94 0.008 75);
+  --color-fd-muted-foreground: oklch(0.45 0.03 60);
+  --color-fd-card: oklch(0.97 0.005 75);
+  --color-fd-border: oklch(0.88 0.01 75);
+  --color-fd-accent: oklch(0.93 0.01 75);
+  --color-fd-accent-foreground: oklch(0.25 0.03 60);
+}
+
 /* ─── Dark mode (default) ─────────────────────────── */
 
 :root {
