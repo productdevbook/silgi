@@ -46,6 +46,26 @@
       "import": "./dist/integrations/tanstack-query/index.mjs",
       "types": "./dist/integrations/tanstack-query/index.d.mts"
     },
+    "./plugins": {
+      "import": "./dist/plugins/index.mjs",
+      "types": "./dist/plugins/index.d.mts"
+    },
+    "./cors": {
+      "import": "./dist/plugins/cors.mjs",
+      "types": "./dist/plugins/cors.d.mts"
+    },
+    "./otel": {
+      "import": "./dist/plugins/otel.mjs",
+      "types": "./dist/plugins/otel.d.mts"
+    },
+    "./pino": {
+      "import": "./dist/plugins/pino.mjs",
+      "types": "./dist/plugins/pino.d.mts"
+    },
+    "./ratelimit": {
+      "import": "./dist/plugins/ratelimit.mjs",
+      "types": "./dist/plugins/ratelimit.d.mts"
+    },
     "./react": {
       "import": "./dist/integrations/react/index.mjs",
       "types": "./dist/integrations/react/index.d.mts"
