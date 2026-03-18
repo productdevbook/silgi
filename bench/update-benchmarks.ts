@@ -645,6 +645,23 @@ WebSocket RPC latency — Katman vs oRPC vs H3 v2, 2000 sequential messages.
 
 ${wsTable}
 
+## Memory Usage (per call)
+
+50K calls, 3 guards + Zod validation. Measured with \`--expose-gc\`.
+
+| Framework | Bytes/call | Ratio |
+|---|---|---|
+| **Katman** | ~40 bytes | **1x** |
+| oRPC | ~56 bytes | 1.4x |
+
+## Runtime Compatibility
+
+| Runtime | handler() | serve() | WebSocket |
+|---|---|---|---|
+| **Node.js 22+** | ✅ | ✅ | ✅ |
+| **Bun** | ✅ (2µs/req) | ✅ | ✅ |
+| **Deno** | ✅ (untested) | ❌ | ❌ |
+
 ## How to run
 
 \`\`\`sh
@@ -653,6 +670,7 @@ pnpm bench:orpc      # oRPC vs Katman pipeline (mitata)
 pnpm bench:h3        # Katman vs H3 v2 vs oRPC (HTTP)
 pnpm bench:http      # Katman vs oRPC (HTTP, detailed)
 pnpm bench:micro     # per-operation bottleneck analysis
+bun test/bun-compat.ts  # Bun compatibility test
 \`\`\`
 `;
 

@@ -103,6 +103,8 @@
     "bench:http": "node --experimental-strip-types bench/http.ts",
     "bench:micro": "node --experimental-strip-types bench/micro.ts",
     "bench:pipeline": "node --experimental-strip-types bench/pipeline.ts",
+    "bench:memory": "node --expose-gc --experimental-strip-types bench/memory.ts",
+    "bench:bun": "bun test/bun-compat.ts",
     "play": "pnpm build && pnpm --filter katman-playground dev",
     "lint": "oxlint .",
     "fmt": "oxfmt .",

@@ -17,10 +17,10 @@ Measures raw middleware pipeline overhead — Katman vs oRPC vs H3 v2.
 
 | Scenario | Katman | oRPC | H3 v2 | vs oRPC | vs H3 |
 |---|---|---|---|---|---|
-| No middleware | **127 ns** | 725 ns | 2297 ns | **5.7x** | **18.1x** |
-| Zod input validation | **259 ns** | 892 ns | 4892 ns | **3.4x** | **18.9x** |
-| 3 middleware + Zod | **342 ns** | 1926 ns | 4583 ns | **5.6x** | **13.4x** |
-| 5 middleware + Zod | **475 ns** | 2485 ns | 4562 ns | **5.2x** | **9.6x** |
+| No middleware | **112 ns** | 692 ns | 2161 ns | **6.2x** | **19.4x** |
+| Zod input validation | **260 ns** | 865 ns | 4678 ns | **3.3x** | **18.0x** |
+| 3 middleware + Zod | **318 ns** | 1823 ns | 4291 ns | **5.7x** | **13.5x** |
+| 5 middleware + Zod | **450 ns** | 2420 ns | 4427 ns | **5.4x** | **9.8x** |
 
 ## HTTP/1.1 Performance (full request/response over TCP)
 
@@ -28,9 +28,9 @@ Real-world latency — 3000 sequential requests per scenario.
 
 | Scenario | Katman | H3 v2 | oRPC | vs H3 | vs oRPC |
 |---|---|---|---|---|---|
-| Simple (no mw, no validation) | **86µs** (11592/s) | 95µs (10522/s) | 87µs (11523/s) | **1.1x faster** | ~tied |
-| Zod input validation | **103µs** (9682/s) | 112µs (8888/s) | 135µs (7385/s) | **1.1x faster** | **1.3x faster** |
-| Guard + Zod validation | **88µs** (11341/s) | 103µs (9668/s) | 131µs (7605/s) | **1.2x faster** | **1.5x faster** |
+| Simple (no mw, no validation) | **92µs** (10883/s) | 100µs (9950/s) | 89µs (11167/s) | **1.1x faster** | ~tied |
+| Zod input validation | **107µs** (9319/s) | 115µs (8673/s) | 140µs (7114/s) | **1.1x faster** | **1.3x faster** |
+| Guard + Zod validation | **92µs** (10860/s) | 114µs (8750/s) | 138µs (7244/s) | **1.2x faster** | **1.5x faster** |
 
 ## HTTP/2 vs HTTP/1.1
 
@@ -38,7 +38,7 @@ Same Katman server, comparing protocols. HTTP/2 uses TLS.
 
 | Scenario | HTTP/1.1 | HTTP/2 | Improvement |
 |---|---|---|---|
-| Simple query | 72µs | 95µs | 32% slower |
+| Simple query | 77µs | 103µs | 34% slower |
 
 ## WebSocket Performance (persistent connection)
 
@@ -46,7 +46,24 @@ WebSocket RPC latency — Katman vs oRPC vs H3 v2, 2000 sequential messages.
 
 | Scenario | Katman | oRPC | H3 v2 | vs oRPC | vs H3 |
 |---|---|---|---|---|---|
-| Simple query (persistent conn) | **44µs** | 47µs | 39µs | 1.1x faster | 1.1x slower |
+| Simple query (persistent conn) | **46µs** | 49µs | 42µs | 1.1x faster | 1.1x slower |
+
+## Memory Usage (per call)
+
+50K calls, 3 guards + Zod validation. Measured with `--expose-gc`.
+
+| Framework | Bytes/call | Ratio |
+|---|---|---|
+| **Katman** | ~40 bytes | **1x** |
+| oRPC | ~56 bytes | 1.4x |
+
+## Runtime Compatibility
+
+| Runtime | handler() | serve() | WebSocket |
+|---|---|---|---|
+| **Node.js 22+** | ✅ | ✅ | ✅ |
+| **Bun** | ✅ (2µs/req) | ✅ | ✅ |
+| **Deno** | ✅ (untested) | ❌ | ❌ |
 
 ## How to run
 
@@ -56,4 +73,5 @@ pnpm bench:orpc      # oRPC vs Katman pipeline (mitata)
 pnpm bench:h3        # Katman vs H3 v2 vs oRPC (HTTP)
 pnpm bench:http      # Katman vs oRPC (HTTP, detailed)
 pnpm bench:micro     # per-operation bottleneck analysis
+bun test/bun-compat.ts  # Bun compatibility test
 ```
