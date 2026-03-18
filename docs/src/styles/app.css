@@ -2,7 +2,7 @@
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@400;500&family=Outfit:wght@400;500;600&display=swap');
 
 /* ─── Dark mode (default) ─────────────────────────── */
 
@@ -11,7 +11,7 @@
   --k-text: #b5a892;
   --k-accent: #edc462;
   --k-accent-hover: #f5d47a;
-  --k-dim: #5e5549;
+  --k-dim: #7a6e60;
   --k-surface: #0a0908;
   --k-raised: #100f0c;
   --k-line: rgba(255, 255, 255, 0.06);
@@ -30,7 +30,7 @@
   --k-text: #5e5549;
   --k-accent: #c9890a;
   --k-accent-hover: #b07a08;
-  --k-dim: #9a8e80;
+  --k-dim: #6b6058;
   --k-surface: #faf8f5;
   --k-raised: #f0ede8;
   --k-line: rgba(0, 0, 0, 0.08);
@@ -47,7 +47,7 @@ html.light {
   --k-text: #5e5549;
   --k-accent: #c9890a;
   --k-accent-hover: #b07a08;
-  --k-dim: #9a8e80;
+  --k-dim: #6b6058;
   --k-surface: #faf8f5;
   --k-raised: #f0ede8;
   --k-line: rgba(0, 0, 0, 0.08);

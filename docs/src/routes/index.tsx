@@ -43,11 +43,11 @@ function Hero() {
         <div className="grid md:grid-cols-2">
           <div className="flex flex-col justify-between gap-16 p-6 sm:p-10">
             <div className="flex flex-col gap-5 items-center md:items-start text-center md:text-left">
-              <span className="k-mono text-[10px] uppercase tracking-[.3em] text-[var(--k-dim)]">Type-safe RPC for TypeScript</span>
+              <span className="k-mono text-xs uppercase tracking-[.3em] text-[var(--k-dim)]">Type-safe RPC for TypeScript</span>
               <h1 className="k-serif text-[clamp(2.5rem,6vw,4.5rem)] leading-[0.95] tracking-[-0.02em] max-w-[22rem] k-shine">
                 The RPC Framework for the Web
               </h1>
-              <p className="text-[var(--k-text)] md:text-lg max-w-[27rem] text-pretty font-light leading-relaxed">
+              <p className="text-[var(--k-text)] md:text-lg max-w-[27rem] text-pretty font-normal leading-relaxed">
                 Katman is a type-safe RPC framework with compiled pipelines powering the next generation of TypeScript APIs.
               </p>
               <div className="flex items-center gap-4 mt-6">
@@ -61,14 +61,14 @@ function Hero() {
                 <div className="flex border-b border-[var(--k-line)]">
                   {(Object.keys(cmd) as Array<keyof typeof cmd>).map((k) => (
                     <button key={k} onClick={() => setPm(k)}
-                      className={`k-mono flex-1 px-4 py-2 text-[10px] uppercase tracking-[.12em] transition-colors ${pm === k ? 'text-[var(--k-accent)] bg-[var(--k-line)]' : 'text-[var(--k-dim)] hover:text-[var(--k-text)]'}`}>
+                      className={`k-mono flex-1 px-4 py-2 text-xs uppercase tracking-[.12em] transition-colors ${pm === k ? 'text-[var(--k-accent)] bg-[var(--k-line)]' : 'text-[var(--k-dim)] hover:text-[var(--k-text)]'}`}>
                       {k}
                     </button>
                   ))}
                 </div>
-                <div className="px-4 py-3 k-mono text-[13px] flex items-center justify-between text-[var(--k-fg)]">
+                <div className="px-4 py-3 k-mono text-sm flex items-center justify-between text-[var(--k-fg)]">
                   <span><span className="text-[var(--k-dim)]">$ </span>{cmd[pm]}</span>
-                  <span className="text-[var(--k-dim)] text-[10px]">bash</span>
+                  <span className="text-[var(--k-dim)] text-xs">bash</span>
                 </div>
               </div>
             </div>
@@ -117,15 +117,15 @@ function SponsorBanner() {
       <W>
         <div className="grid lg:grid-cols-[1fr,auto] divide-y lg:divide-y-0 lg:divide-x divide-[var(--k-line)]">
           <div className="p-6 sm:p-10 flex flex-col sm:flex-row items-center gap-6 sm:gap-10">
-            <span className="k-mono text-[10px] uppercase tracking-[.2em] text-[var(--k-dim)] shrink-0">Special Sponsor</span>
+            <span className="k-mono text-xs uppercase tracking-[.2em] text-[var(--k-dim)] shrink-0">Special Sponsor</span>
             <a href="https://github.com/sponsors/productdevbook" target="_blank" rel="noopener noreferrer"
-              className="flex items-center justify-center h-10 px-8 rounded-lg border border-dashed border-[var(--k-line)] text-[var(--k-dim)] text-[13px] hover:border-[var(--k-accent)]/30 hover:text-[var(--k-accent)] transition-colors">
+              className="flex items-center justify-center h-10 px-8 rounded-lg border border-dashed border-[var(--k-line)] text-[var(--k-dim)] text-sm hover:border-[var(--k-accent)]/30 hover:text-[var(--k-accent)] transition-colors">
               Your Company
             </a>
           </div>
           <a href="https://github.com/sponsors/productdevbook" target="_blank" rel="noopener noreferrer"
             className="p-6 sm:px-10 flex items-center gap-3 text-[var(--k-dim)] hover:text-[var(--k-accent)] transition-colors">
-            <span className="text-[13px] font-light">Become a sponsor</span>
+            <span className="text-sm font-normal">Become a sponsor</span>
             <span className="text-[var(--k-accent)]">→</span>
           </a>
         </div>
@@ -140,7 +140,7 @@ function Heading({ label, title }: { label: string; title: string }) {
   return (
     <section className="k-wrapper">
       <W className="px-6 sm:px-10 py-16 lg:py-20">
-        <span className="k-mono text-[10px] uppercase tracking-[.3em] text-[var(--k-dim)] block mb-4">{label}</span>
+        <span className="k-mono text-xs uppercase tracking-[.3em] text-[var(--k-dim)] block mb-4">{label}</span>
         <h2 className="k-serif text-[clamp(1.8rem,4vw,2.8rem)] leading-[1.1] tracking-[-0.015em] text-[var(--k-fg)]">{title}</h2>
       </W>
     </section>
@@ -187,15 +187,15 @@ function ProtocolGrid() {
       <W className="grid md:grid-cols-3">
         <Cell>
           <Badge c="var(--k-code-st)" t="JSON" b="default" />
-          <p className="text-[13px] text-[var(--k-dim)] font-light leading-relaxed mt-3">Universal. Fastest encode/decode. Works everywhere. Zero config.</p>
+          <p className="text-sm text-[var(--k-dim)] font-normal leading-relaxed mt-3">Universal. Fastest encode/decode. Works everywhere. Zero config.</p>
         </Cell>
         <Cell bl>
           <Badge c="var(--k-accent)" t="MessagePack" b="binary" />
-          <p className="text-[13px] text-[var(--k-dim)] font-light leading-relaxed mt-3">30% smaller payloads. Native Date. One flag: <code className="k-mono text-[var(--k-text)]">binary: true</code></p>
+          <p className="text-sm text-[var(--k-dim)] font-normal leading-relaxed mt-3">30% smaller payloads. Native Date. One flag: <code className="k-mono text-[var(--k-text)]">binary: true</code></p>
         </Cell>
         <Cell bl>
           <Badge c="var(--k-code-kw)" t="devalue" b="rich types" />
-          <p className="text-[13px] text-[var(--k-dim)] font-light leading-relaxed mt-3">Date, Map, Set, BigInt, RegExp, circular refs. Automatic round-trip.</p>
+          <p className="text-sm text-[var(--k-dim)] font-normal leading-relaxed mt-3">Date, Map, Set, BigInt, RegExp, circular refs. Automatic round-trip.</p>
         </Cell>
       </W>
     </section>
@@ -224,15 +224,15 @@ function SponsorsInline() {
     <section className="k-wrapper">
       <W className="grid md:grid-cols-[1fr,1.2fr] divide-y md:divide-y-0 md:divide-x divide-[var(--k-line)]">
         <div className="p-6 sm:p-10">
-          <span className="k-mono text-[10px] uppercase tracking-[.3em] text-[var(--k-dim)] block mb-4">Gold Sponsors</span>
-          <p className="text-[13px] text-[var(--k-dim)] font-light leading-relaxed">
+          <span className="k-mono text-xs uppercase tracking-[.3em] text-[var(--k-dim)] block mb-4">Gold Sponsors</span>
+          <p className="text-sm text-[var(--k-dim)] font-normal leading-relaxed">
             Support Katman development and get your logo on the homepage, README, and docs.
           </p>
         </div>
         <div className="p-6 sm:p-10 grid grid-cols-3 gap-3">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <a key={i} href="https://github.com/sponsors/productdevbook" target="_blank" rel="noopener noreferrer"
-              className="flex items-center justify-center h-16 rounded-lg border border-dashed border-[var(--k-line)] text-[var(--k-dim)] text-[11px] k-mono hover:border-[var(--k-accent)]/30 hover:text-[var(--k-accent)] transition-colors">
+              className="flex items-center justify-center h-16 rounded-lg border border-dashed border-[var(--k-line)] text-[var(--k-dim)] text-xs k-mono hover:border-[var(--k-accent)]/30 hover:text-[var(--k-accent)] transition-colors">
               Sponsor
             </a>
           ))}
@@ -264,7 +264,7 @@ function ServerGrid() {
           <div className="mt-5 grid grid-cols-2 gap-3">
             {['Node.js', 'Bun', 'Deno', 'Cloudflare'].map((r) => (
               <div key={r} className="rounded-lg border border-[var(--k-line)] px-4 py-2.5 text-center">
-                <span className="text-[13px] text-[var(--k-text)] font-light">{r}</span>
+                <span className="text-sm text-[var(--k-text)] font-normal">{r}</span>
               </div>
             ))}
           </div>
@@ -297,14 +297,14 @@ function SponsorsSection() {
       <W className="px-6 sm:px-10 py-16 lg:py-24">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-8 mb-12">
           <div>
-            <span className="k-mono text-[10px] uppercase tracking-[.3em] text-[var(--k-dim)] block mb-4">Sponsors</span>
+            <span className="k-mono text-xs uppercase tracking-[.3em] text-[var(--k-dim)] block mb-4">Sponsors</span>
             <h2 className="k-serif text-[clamp(1.6rem,3vw,2.2rem)] leading-[1.1] text-[var(--k-fg)]">Backed by the community</h2>
           </div>
           <a href="https://github.com/sponsors/productdevbook" target="_blank" rel="noopener noreferrer" className="k-btn k-btn--ghost">Become a Sponsor</a>
         </div>
 
         <div className="mb-8">
-          <span className="k-mono text-[9px] uppercase tracking-[.25em] text-[var(--k-dim)] block mb-4">Platinum</span>
+          <span className="k-mono text-[11px] uppercase tracking-[.25em] text-[var(--k-dim)] block mb-4">Platinum</span>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
               <a key={i} href="https://github.com/sponsors/productdevbook" target="_blank" rel="noopener noreferrer"
@@ -316,7 +316,7 @@ function SponsorsSection() {
         </div>
 
         <div className="mb-8">
-          <span className="k-mono text-[9px] uppercase tracking-[.25em] text-[var(--k-dim)] block mb-4">Gold</span>
+          <span className="k-mono text-[11px] uppercase tracking-[.25em] text-[var(--k-dim)] block mb-4">Gold</span>
           <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
             {[1, 2, 3, 4, 5].map((i) => (
               <a key={i} href="https://github.com/sponsors/productdevbook" target="_blank" rel="noopener noreferrer"
@@ -328,11 +328,11 @@ function SponsorsSection() {
         </div>
 
         <div>
-          <span className="k-mono text-[9px] uppercase tracking-[.25em] text-[var(--k-dim)] block mb-4">Silver</span>
+          <span className="k-mono text-[11px] uppercase tracking-[.25em] text-[var(--k-dim)] block mb-4">Silver</span>
           <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
             {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
               <a key={i} href="https://github.com/sponsors/productdevbook" target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-center h-12 rounded-lg border border-dashed border-[var(--k-line)] text-[var(--k-dim)] text-[10px] hover:border-[var(--k-accent)]/30 hover:text-[var(--k-accent)] transition-colors">
+                className="flex items-center justify-center h-12 rounded-lg border border-dashed border-[var(--k-line)] text-[var(--k-dim)] text-xs hover:border-[var(--k-accent)]/30 hover:text-[var(--k-accent)] transition-colors">
                 ♡
               </a>
             ))}
@@ -352,7 +352,7 @@ function FooterCTA() {
         <h2 className="k-serif text-[clamp(2rem,4.5vw,3.2rem)] leading-[1.05] tracking-[-0.015em] mb-4 text-[var(--k-fg)]">
           Start building with Katman
         </h2>
-        <p className="text-[var(--k-text)] max-w-sm mb-10 font-light leading-relaxed">
+        <p className="text-[var(--k-text)] max-w-sm mb-10 font-normal leading-relaxed">
           Prepare for a development environment that can finally keep pace with the speed of your mind.
         </p>
         <Link to="/docs/$" params={{ _splat: '' }} className="k-btn k-btn--primary">Get Started</Link>
@@ -375,7 +375,7 @@ function CT({ t, d }: { t: string; d: string }) {
   return (
     <div className="flex flex-col gap-2">
       <h5 className="font-medium text-[var(--k-fg)]">{t}</h5>
-      <p className="text-[13px] text-[var(--k-dim)] font-light leading-relaxed max-w-[28rem] text-pretty">{d}</p>
+      <p className="text-sm text-[var(--k-dim)] font-normal leading-relaxed max-w-[28rem] text-pretty">{d}</p>
     </div>
   );
 }
@@ -385,7 +385,7 @@ function Badge({ c, t, b }: { c: string; t: string; b: string }) {
     <div className="flex items-center gap-2.5">
       <span className="w-[6px] h-[6px] rounded-full" style={{ backgroundColor: c }} />
       <h5 className="font-medium text-[var(--k-fg)]">{t}</h5>
-      <span className="k-mono text-[9px] uppercase tracking-[.15em] ml-auto" style={{ color: c }}>{b}</span>
+      <span className="k-mono text-[11px] uppercase tracking-[.15em] ml-auto" style={{ color: c }}>{b}</span>
     </div>
   );
 }
