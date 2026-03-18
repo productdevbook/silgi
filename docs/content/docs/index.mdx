@@ -8,7 +8,7 @@ import { Cards, Card } from 'fumadocs-ui/components/card';
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
-**5.7x faster** than oRPC. **18x faster** than H3. One package. Every runtime.
+End-to-end type-safe RPC for TypeScript. Single package. Every runtime.
 
 <Tabs items={['npm', 'pnpm', 'bun']}>
   <Tab value="npm">
@@ -81,15 +81,15 @@ k.serve(router({ users: { list: listUsers, create: createUser } }), {
   <Card title="Integrations" description="React, TanStack Query, AI SDK, Fastify." href="/docs/react" />
 </Cards>
 
-## Benchmarks
+## Performance
 
-| Scenario | Katman | oRPC | H3 | vs oRPC | vs H3 |
-|---|---|---|---|---|---|
-| No middleware | **112 ns** | 692 ns | 2161 ns | **6.2x** | **19.3x** |
-| 3 mw + Zod | **318 ns** | 1823 ns | 4291 ns | **5.7x** | **13.5x** |
-| HTTP Guard+Zod | **78 µs** | 131 µs | 103 µs | **1.7x** | **1.3x** |
+| Scenario | Pipeline | HTTP |
+|---|---|---|
+| No middleware | 112 ns | 86 µs |
+| Guard + Zod validation | 318 ns | 78 µs |
+| WebSocket (persistent) | — | 39 µs |
 
-| Runtime | handler() latency |
+| Runtime | handler() |
 |---|---|
 | Node.js 22+ | 9 µs/req |
 | Bun | 2 µs/req |
