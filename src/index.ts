@@ -64,10 +64,10 @@ export type { EventMeta } from "./core/sse.ts";
 // ── Advanced ────────────────────────────────────────
 export { compileProcedure, compileRouter, ContextPool } from "./compile.ts";
 export { AsyncIteratorClass, mapAsyncIterator } from "./core/iterator.ts";
-export { JsonSerializer } from "./core/codec.ts";
 
-// ── v1 API (legacy, will be removed) ────────────────
-export { ks } from "./server/builder.ts";
-export { kc } from "./contract/builder.ts";
+// ── Client (re-export for convenience) ──────────────
 export { createClient, safe } from "./client/client.ts";
-export { implement } from "./server/implementer.ts";
+
+// ── OpenAPI / Scalar ────────────────────────────────
+export { generateOpenAPI, scalarHTML } from "./scalar.ts";
+export type { ScalarOptions } from "./scalar.ts";

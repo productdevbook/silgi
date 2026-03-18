@@ -6,9 +6,21 @@
  */
 
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from "./core/schema.ts";
-import type { Route } from "./contract/route.ts";
-export type { Route } from "./contract/route.ts";
-import type { Meta } from "./contract/meta.ts";
+
+/** HTTP route metadata */
+export interface Route {
+  method?: string;
+  path?: string;
+  summary?: string;
+  description?: string;
+  tags?: string[];
+  deprecated?: boolean;
+  successStatus?: number;
+  successDescription?: string;
+}
+
+/** Procedure metadata */
+export type Meta = Record<string, unknown>;
 
 // ── Procedure Types ────────────────────────────────
 

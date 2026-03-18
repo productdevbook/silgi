@@ -10,10 +10,6 @@
       "import": "./dist/index.mjs",
       "types": "./dist/index.d.mts"
     },
-    "./server": {
-      "import": "./dist/server/index.mjs",
-      "types": "./dist/server/index.d.mts"
-    },
     "./client": {
       "import": "./dist/client/index.mjs",
       "types": "./dist/client/index.d.mts"
@@ -30,37 +26,13 @@
       "import": "./dist/client/plugins/index.mjs",
       "types": "./dist/client/plugins/index.d.mts"
     },
-    "./contract": {
-      "import": "./dist/contract/index.mjs",
-      "types": "./dist/contract/index.d.mts"
-    },
-    "./node": {
-      "import": "./dist/server/adapters/node/index.mjs",
-      "types": "./dist/server/adapters/node/index.d.mts"
-    },
-    "./fetch": {
-      "import": "./dist/server/adapters/fetch/index.mjs",
-      "types": "./dist/server/adapters/fetch/index.d.mts"
-    },
-    "./fastify": {
-      "import": "./dist/server/adapters/fastify/index.mjs",
-      "types": "./dist/server/adapters/fastify/index.d.mts"
-    },
-    "./websocket": {
-      "import": "./dist/server/adapters/websocket/index.mjs",
-      "types": "./dist/server/adapters/websocket/index.d.mts"
-    },
-    "./plugins": {
-      "import": "./dist/server/plugins/index.mjs",
-      "types": "./dist/server/plugins/index.d.mts"
-    },
-    "./openapi": {
-      "import": "./dist/openapi/index.mjs",
-      "types": "./dist/openapi/index.d.mts"
-    },
     "./msgpack": {
       "import": "./dist/codec/msgpack.mjs",
       "types": "./dist/codec/msgpack.d.mts"
+    },
+    "./devalue": {
+      "import": "./dist/codec/devalue.mjs",
+      "types": "./dist/codec/devalue.d.mts"
     },
     "./ws": {
       "import": "./dist/ws.mjs",
@@ -75,34 +47,17 @@
       "types": "./dist/integrations/tanstack-query/index.d.mts"
     },
     "./react": {
-      "import": "./dist/integrations/react/v2.mjs",
-      "types": "./dist/integrations/react/v2.d.mts"
-    },
-    "./otel": {
-      "import": "./dist/plugins/otel/index.mjs",
-      "types": "./dist/plugins/otel/index.d.mts"
-    },
-    "./pino": {
-      "import": "./dist/plugins/pino/index.mjs",
-      "types": "./dist/plugins/pino/index.d.mts"
-    },
-    "./ratelimit": {
-      "import": "./dist/plugins/ratelimit/index.mjs",
-      "types": "./dist/plugins/ratelimit/index.d.mts"
+      "import": "./dist/integrations/react/index.mjs",
+      "types": "./dist/integrations/react/index.d.mts"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "obuild src/index.ts src/server/index.ts src/client/index.ts src/client/adapters/fetch/index.ts src/client/adapters/ofetch/index.ts src/client/plugins/index.ts src/contract/index.ts src/server/adapters/node/index.ts src/server/adapters/fetch/index.ts src/server/adapters/fastify/index.ts src/server/adapters/websocket/index.ts src/server/plugins/index.ts src/openapi/index.ts src/codec/msgpack.ts src/ws.ts src/integrations/zod/index.ts src/integrations/tanstack-query/index.ts src/integrations/react/v2.ts src/plugins/otel/index.ts src/plugins/pino/index.ts src/plugins/ratelimit/index.ts",
+    "build": "obuild",
     "dev": "vitest",
     "bench": "node --experimental-strip-types bench/update-benchmarks.ts",
-    "bench:orpc": "node --experimental-strip-types bench/vs-orpc.ts",
-    "bench:h3": "node --experimental-strip-types bench/vs-h3.ts",
-    "bench:http": "node --experimental-strip-types bench/http.ts",
-    "bench:micro": "node --experimental-strip-types bench/micro.ts",
-    "bench:pipeline": "node --experimental-strip-types bench/pipeline.ts",
     "bench:memory": "node --expose-gc --experimental-strip-types bench/memory.ts",
     "bench:bun": "bun test/bun-compat.ts",
     "play": "pnpm build && pnpm --filter katman-playground dev",

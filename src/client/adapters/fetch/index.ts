@@ -3,10 +3,8 @@
  */
 
 import type { ClientLink, ClientContext, ClientOptions } from "../../types.ts";
-import type { StandardLazyResponse } from "../../../core/types.ts";
 import { KatmanError, isKatmanErrorJSON, fromKatmanErrorJSON, isErrorStatus } from "../../../core/error.ts";
-import { stringifyJSON, parseEmptyableJSON, once } from "../../../core/utils.ts";
-import { JsonSerializer } from "../../../core/codec.ts";
+import { stringifyJSON, parseEmptyableJSON } from "../../../core/utils.ts";
 
 export interface RPCLinkOptions<TClientContext extends ClientContext = ClientContext> {
   url: string | URL;
@@ -24,7 +22,6 @@ export class RPCLink<TClientContext extends ClientContext = ClientContext>
   #fetch: typeof globalThis.fetch;
   #method: "GET" | "POST";
   #maxUrlLength: number;
-  #serializer = new JsonSerializer();
 
   constructor(options: RPCLinkOptions<TClientContext>) {
     this.#baseUrl = typeof options.url === "string" ? options.url : options.url.href;
@@ -53,47 +50,32 @@ export class RPCLink<TClientContext extends ClientContext = ClientContext>
         : this.#headers),
     };
 
-    // Serialize input
-    const { json, meta, maps, blobs } = this.#serializer.serialize(input);
-
     let method = this.#method;
     let body: BodyInit | undefined;
+    const hasInput = input !== undefined && input !== null;
 
-    if (method === "GET" && blobs.length === 0) {
-      // Try to put input in query string
-      const data = stringifyJSON({ json, meta });
+    if (method === "GET" && hasInput) {
+      const data = stringifyJSON(input);
       const candidateUrl = `${url}?data=${encodeURIComponent(data)}`;
       if (candidateUrl.length <= this.#maxUrlLength) {
         url = candidateUrl;
-        body = undefined;
       } else {
-        // Fall back to POST
         method = "POST";
         headers["content-type"] = "application/json";
-        body = stringifyJSON({ json, meta });
+        body = data;
       }
-    } else if (blobs.length > 0) {
-      // Use FormData for blobs
-      method = "POST";
-      const formData = new FormData();
-      formData.set("data", stringifyJSON({ json, meta, maps }));
-      blobs.forEach((blob, i) => formData.set(String(i), blob));
-      body = formData;
-    } else {
+    } else if (hasInput) {
       headers["content-type"] = "application/json";
-      body = stringifyJSON({ json, meta });
+      body = stringifyJSON(input);
     }
 
-    // Send request
     const response = await this.#fetch(url, {
       method,
       headers,
       body,
       signal: options.signal,
-      redirect: "manual",
     });
 
-    // Decode response
     const responseText = await response.text();
     const responseBody = responseText ? parseEmptyableJSON(responseText) : undefined;
 
@@ -106,17 +88,6 @@ export class RPCLink<TClientContext extends ClientContext = ClientContext>
         message: `HTTP ${response.status}`,
         data: responseBody,
       });
-    }
-
-    // Deserialize with meta
-    if (
-      typeof responseBody === "object" &&
-      responseBody !== null &&
-      "json" in responseBody &&
-      "meta" in responseBody
-    ) {
-      const { json: rJson, meta: rMeta } = responseBody as { json: unknown; meta: any[] };
-      return this.#serializer.deserialize(rJson, rMeta);
     }
 
     return responseBody;

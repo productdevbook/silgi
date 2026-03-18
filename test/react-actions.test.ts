@@ -5,7 +5,7 @@
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
 import { katman } from "../src/katman.ts";
-import { createAction, createActions, createFormAction } from "../src/integrations/react/v2.ts";
+import { createAction, createActions, createFormAction } from "../src/integrations/react/index.ts";
 
 const k = katman({ context: () => ({}) });
 
