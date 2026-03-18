@@ -10,8 +10,8 @@
     "errors",
     "client",
     "---",
-    "...protocols",
-    "...plugins",
-    "...integrations"
+    "protocols",
+    "plugins",
+    "integrations"
   ]
 }
