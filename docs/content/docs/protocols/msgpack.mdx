@@ -25,7 +25,8 @@ Neither oRPC, tRPC, nor Hono offer a binary wire format. This is a katman exclus
 
 One flag:
 
-```ts
+```ts twoslash
+// @noErrors
 import { createLink } from "katman/client/ofetch"
 
 const link = createLink({
@@ -38,7 +39,8 @@ Everything else stays the same. The client encodes with MessagePack, the server 
 
 ## Direct API
 
-```ts
+```ts twoslash
+// @noErrors
 import { encode, decode } from "katman/msgpack"
 
 const buf = encode({ name: "Alice", joined: new Date() })
@@ -75,7 +77,8 @@ Request bodies with `Content-Type: application/x-msgpack` are automatically deco
 
 Binary MessagePack over WebSocket:
 
-```ts
+```ts twoslash
+// @noErrors
 import { attachWebSocket } from "katman/ws"
 
 attachWebSocket(server, appRouter, { binary: true })

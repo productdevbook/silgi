@@ -24,7 +24,8 @@ npm install ai @ai-sdk/openai
 
 ### Convert your router to tools
 
-```ts
+```ts twoslash
+// @noErrors
 import { routerToTools } from "katman/ai"
 
 const tools = routerToTools(appRouter) // [!code highlight]
@@ -37,7 +38,8 @@ This creates one tool per procedure. Nested routers are flattened: `users.list` 
 
 ### Use with any model
 
-```ts
+```ts twoslash
+// @noErrors
 import { generateText } from "ai"
 import { openai } from "@ai-sdk/openai"
 
@@ -57,7 +59,8 @@ The model sees your procedures as callable functions. Input schemas are sent as 
 
 For more control, convert individual procedures:
 
-```ts
+```ts twoslash
+// @noErrors
 import { procedureToTool } from "katman/ai"
 
 const searchTool = procedureToTool("search", appRouter.search, {
@@ -69,7 +72,8 @@ const searchTool = procedureToTool("search", appRouter.search, {
 
 Expose only specific procedures:
 
-```ts
+```ts twoslash
+// @noErrors
 const tools = routerToTools(appRouter, {
   filter: (path) => !path.startsWith("admin_"), // [!code highlight]
   descriptions: {

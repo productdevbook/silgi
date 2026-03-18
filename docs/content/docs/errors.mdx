@@ -11,7 +11,8 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 Define possible errors per procedure. The `fail()` function is typed from this map.
 
-```ts
+```ts twoslash
+// @noErrors
 const deleteUser = mutation({
   input: z.object({ id: z.number() }),
   errors: {
@@ -39,7 +40,8 @@ const deleteUser = mutation({
 
 Throw errors manually anywhere:
 
-```ts
+```ts twoslash
+// @noErrors
 import { KatmanError } from "katman"
 
 // Auto-maps common codes to HTTP status
@@ -59,7 +61,8 @@ throw new KatmanError("CUSTOM_ERROR", {
 
 <Tabs items={['try/catch', 'safe() wrapper']}>
   <Tab value="try/catch">
-  ```ts
+  ```ts twoslash
+// @noErrors
   try {
     await client.users.delete({ id: 1 })
   } catch (error) {
@@ -72,7 +75,8 @@ throw new KatmanError("CUSTOM_ERROR", {
   ```
   </Tab>
   <Tab value="safe() wrapper">
-  ```ts
+  ```ts twoslash
+// @noErrors
   import { safe } from "katman/client"
 
   const { error, data, isError } = await safe(

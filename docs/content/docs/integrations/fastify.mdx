@@ -32,7 +32,8 @@ npm install fastify
 
 ### Register the Plugin
 
-```ts title="server.ts"
+```ts twoslash title="server.ts"
+// @noErrors
 import Fastify from "fastify"
 import { katmanFastify } from "katman/fastify"
 import { appRouter } from "./router"
@@ -65,7 +66,8 @@ POST /rpc/users/create
 
 The `context` option receives the Fastify request — use it to pass auth, IP, etc. into katman procedures:
 
-```ts
+```ts twoslash
+// @noErrors
 katmanFastify(appRouter, {
   context: (req) => ({
     user: req.user,             // from Fastify auth plugin

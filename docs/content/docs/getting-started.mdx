@@ -58,7 +58,8 @@ Katman uses [Standard Schema](https://standardschema.dev) — Zod, Valibot, and 
 
 Define your context factory — this runs on every request and populates `ctx`.
 
-```ts title="src/rpc.ts"
+```ts twoslash title="src/rpc.ts"
+// @noErrors
 import { katman } from "katman"
 
 export const k = katman({
@@ -77,7 +78,8 @@ export const { query, mutation, guard, wrap, router } = k
 
 Each endpoint is a **procedure** — a `query` (read) or `mutation` (write).
 
-```ts title="src/routes/users.ts"
+```ts twoslash title="src/routes/users.ts"
+// @noErrors
 import { z } from "zod"
 import { query, mutation, guard } from "../rpc"
 import { KatmanError } from "katman"
@@ -114,7 +116,8 @@ export const createUser = mutation({
 
 Nest procedures into a tree. The structure becomes the API path.
 
-```ts title="src/router.ts"
+```ts twoslash title="src/router.ts"
+// @noErrors
 import { router } from "./rpc"
 import { listUsers, createUser } from "./routes/users"
 
@@ -133,7 +136,8 @@ export type AppRouter = typeof appRouter
 
 ### Start the server
 
-```ts title="src/server.ts"
+```ts twoslash title="src/server.ts"
+// @noErrors
 import { k } from "./rpc"
 import { appRouter } from "./router"
 
@@ -154,7 +158,8 @@ Scalar API Reference at http://127.0.0.1:3000/reference
 
 ### Create the client
 
-```ts title="src/client.ts"
+```ts twoslash title="src/client.ts"
+// @noErrors
 import { createClient } from "katman/client"
 import { createLink } from "katman/client/ofetch"
 import type { InferClient } from "katman"

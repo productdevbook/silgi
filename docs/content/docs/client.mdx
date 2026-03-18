@@ -19,7 +19,8 @@ The link is the transport layer — how requests are sent to the server.
 
 <Tabs items={['ofetch (recommended)', 'native fetch']}>
   <Tab value="ofetch (recommended)">
-  ```ts
+  ```ts twoslash
+// @noErrors
   import { createLink } from "katman/client/ofetch"
 
   const link = createLink({
@@ -30,7 +31,8 @@ The link is the transport layer — how requests are sent to the server.
   ```
   </Tab>
   <Tab value="native fetch">
-  ```ts
+  ```ts twoslash
+// @noErrors
   import { RPCLink } from "katman/client/fetch"
 
   const link = new RPCLink({ url: "http://localhost:3000" })
@@ -43,7 +45,8 @@ The link is the transport layer — how requests are sent to the server.
 
 ### Create the client
 
-```ts
+```ts twoslash
+// @noErrors
 import { createClient } from "katman/client"
 import type { InferClient } from "katman"
 import type { AppRouter } from "./router"
@@ -56,7 +59,8 @@ const client = createClient<InferClient<AppRouter>>(link)
 
 ### Use it
 
-```ts
+```ts twoslash
+// @noErrors
 const users = await client.users.list({ limit: 10 })
 const user = await client.users.create({ name: "Alice", email: "a@test.com" })
 const result = await client.admin.settings.update({ theme: "dark" })
@@ -67,7 +71,8 @@ const result = await client.admin.settings.update({ theme: "dark" })
 
 ## Link Options
 
-```ts
+```ts twoslash
+// @noErrors
 const link = createLink({
   url: "http://localhost:3000",
 
@@ -95,7 +100,8 @@ const link = createLink({
 
 Send `binary: true` to use MessagePack — 30% smaller payloads, native Date support:
 
-```ts
+```ts twoslash
+// @noErrors
 const link = createLink({
   url: "http://localhost:3000",
   binary: true, // [!code highlight]
@@ -110,7 +116,8 @@ Binary mode is transparent to your code. The client encodes with MessagePack, th
 
 Plugins wrap the link to add behavior:
 
-```ts
+```ts twoslash
+// @noErrors
 import { withRetry, withDedupe, withCSRF } from "katman/client/plugins"
 
 const link = createLink({ url: "http://localhost:3000" })

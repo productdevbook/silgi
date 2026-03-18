@@ -32,7 +32,8 @@ End-to-end type-safe RPC for TypeScript. Single package. Every runtime.
 Katman compiles your middleware into a pre-linked chain at startup. No per-request closures. No runtime overhead. Just raw speed.
 </Callout>
 
-```ts title="server.ts"
+```ts twoslash title="server.ts"
+// @noErrors
 import { katman, KatmanError } from "katman"
 import { z } from "zod"
 

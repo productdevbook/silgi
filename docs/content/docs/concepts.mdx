@@ -19,12 +19,14 @@ Every API endpoint is a **procedure**. Three kinds:
 
 <Tabs items={['Short form', 'Short + input', 'Full config']}>
   <Tab value="Short form">
-  ```ts
+  ```ts twoslash
+// @noErrors
   const health = query(() => ({ status: "ok" }))
   ```
   </Tab>
   <Tab value="Short + input">
-  ```ts
+  ```ts twoslash
+// @noErrors
   const getUser = query(
     z.object({ id: z.number() }),
     ({ input }) => db.users.get(input.id), // [!code highlight]
@@ -32,7 +34,8 @@ Every API endpoint is a **procedure**. Three kinds:
   ```
   </Tab>
   <Tab value="Full config">
-  ```ts
+  ```ts twoslash
+// @noErrors
   const createUser = mutation({
     use: [auth, timing],           // middleware
     input: z.object({ name: z.string() }),
@@ -51,7 +54,8 @@ Every API endpoint is a **procedure**. Three kinds:
 
 Guards run **before** the handler. Their return value merges into `ctx`.
 
-```ts
+```ts twoslash
+// @noErrors
 const auth = guard(async (ctx) => {
   const user = await verifyToken(ctx.headers.authorization)
   if (!user) throw new KatmanError("UNAUTHORIZED")
@@ -65,7 +69,8 @@ Guards are **flat functions** — no `next()` callback, no closure per request. 
 
 Stack multiple guards — context accumulates:
 
-```ts
+```ts twoslash
+// @noErrors
 const proc = mutation({
   use: [auth, rateLimit, adminOnly],
   resolve: ({ ctx }) => {
@@ -80,7 +85,8 @@ const proc = mutation({
 
 Wraps are **onion-style** — they run code before and after the handler:
 
-```ts
+```ts twoslash
+// @noErrors
 const timing = wrap(async (ctx, next) => {
   const start = performance.now()
   const result = await next() // [!code highlight]
@@ -107,7 +113,8 @@ Response
 
 Global hooks — powered by [hookable](https://github.com/unjs/hookable):
 
-```ts
+```ts twoslash
+// @noErrors
 const k = katman({
   context: (req) => ({}),
   hooks: {
@@ -121,7 +128,8 @@ const k = katman({
 
 Dynamic registration:
 
-```ts
+```ts twoslash
+// @noErrors
 const unhook = k.hook("request", ({ path }) => metrics.inc(path))
 // later...
 unhook() // remove the hook
@@ -136,6 +144,7 @@ Hooks have a **sync fast-path** — when all hooks are synchronous, zero Promise
 Types flow end-to-end — no codegen needed:
 
 ```ts twoslash
+// @noErrors
 import { katman } from "katman"
 import { z } from "zod"
 
@@ -161,19 +170,22 @@ Katman uses `@standard-schema/spec` — any validator works:
 
 <Tabs items={['Zod', 'Valibot', 'ArkType']}>
   <Tab value="Zod">
-  ```ts
+  ```ts twoslash
+// @noErrors
   import { z } from "zod"
   const schema = z.object({ name: z.string() })
   ```
   </Tab>
   <Tab value="Valibot">
-  ```ts
+  ```ts twoslash
+// @noErrors
   import * as v from "valibot"
   const schema = v.object({ name: v.string() })
   ```
   </Tab>
   <Tab value="ArkType">
-  ```ts
+  ```ts twoslash
+// @noErrors
   import { type } from "arktype"
   const schema = type({ name: "string" })
   ```

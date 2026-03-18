@@ -17,7 +17,8 @@ You need a katman router defined on the server side. If you haven't set one up y
 
 Wraps a single procedure. Returns `[error, data]` instead of throwing.
 
-```ts title="app/actions.ts"
+```ts twoslash title="app/actions.ts"
+// @noErrors
 "use server"
 import { createAction } from "katman/react"
 import { appRouter } from "./router"
@@ -48,7 +49,8 @@ export default async function Page() {
 
 Convert an entire router at once — mirrors the router structure:
 
-```ts
+```ts twoslash
+// @noErrors
 import { createActions } from "katman/react"
 
 const actions = createActions(appRouter)
@@ -62,7 +64,8 @@ const [err2, user] = await actions.users.create({ name: "Alice" })
 
 For HTML `<form>` submissions with FormData:
 
-```ts title="app/actions.ts"
+```ts twoslash title="app/actions.ts"
+// @noErrors
 "use server"
 import { createFormAction } from "katman/react"
 

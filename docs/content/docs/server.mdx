@@ -11,7 +11,8 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 One-line Node.js server with batteries included. `k` is the instance returned by `katman()` — see [Getting Started](/docs/getting-started).
 
-```ts title="server.ts"
+```ts twoslash title="server.ts"
+// @noErrors
 // k = katman({ context: (req) => ({ ... }) })
 k.serve(appRouter, {
   port: 3000,          // auto-finds if busy (3000–3100)
@@ -23,7 +24,8 @@ k.serve(appRouter, {
 
 All options:
 
-```ts
+```ts twoslash
+// @noErrors
 k.serve(appRouter, {
   port: 3000,
   hostname: "127.0.0.1",
@@ -54,26 +56,30 @@ Fetch API handler — works everywhere:
 
 <Tabs items={['Node.js', 'Bun', 'Deno', 'Cloudflare Workers']}>
   <Tab value="Node.js">
-  ```ts
+  ```ts twoslash
+// @noErrors
   import { createServer } from "node:http"
   const handle = k.handler(appRouter)
   // Use with any Node.js HTTP adapter
   ```
   </Tab>
   <Tab value="Bun">
-  ```ts
+  ```ts twoslash
+// @noErrors
   const handle = k.handler(appRouter)
   Bun.serve({ fetch: handle, port: 3000 })
   ```
   </Tab>
   <Tab value="Deno">
-  ```ts
+  ```ts twoslash
+// @noErrors
   const handle = k.handler(appRouter)
   Deno.serve({ port: 3000 }, handle)
   ```
   </Tab>
   <Tab value="Cloudflare Workers">
-  ```ts
+  ```ts twoslash
+// @noErrors
   const handle = k.handler(appRouter)
   export default { fetch: handle }
   ```

@@ -6,13 +6,15 @@ icon: Shield
 
 import { Callout } from 'fumadocs-ui/components/callout';
 
-```ts
+```ts twoslash
+// @noErrors
 import { corsHeaders } from "katman/cors"
 ```
 
 ## Basic Usage
 
-```ts
+```ts twoslash
+// @noErrors
 const headers = corsHeaders({
   origin: "https://app.example.com",
   credentials: true,
@@ -29,7 +31,8 @@ const headers = corsHeaders({
 
 Match origins with a function:
 
-```ts
+```ts twoslash
+// @noErrors
 const headers = corsHeaders({
   origin: (requestOrigin) => requestOrigin.endsWith(".example.com"),
 }, req.headers.get("origin"))
@@ -37,7 +40,8 @@ const headers = corsHeaders({
 
 Or allow a list:
 
-```ts
+```ts twoslash
+// @noErrors
 const headers = corsHeaders({
   origin: ["https://app.example.com", "https://admin.example.com"],
 }, req.headers.get("origin"))

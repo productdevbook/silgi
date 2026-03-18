@@ -7,13 +7,15 @@ icon: Timer
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
-```ts
+```ts twoslash
+// @noErrors
 import { rateLimitGuard, MemoryRateLimiter } from "katman/ratelimit"
 ```
 
 ## Quick Start
 
-```ts
+```ts twoslash
+// @noErrors
 const rateLimit = rateLimitGuard({
   limiter: new MemoryRateLimiter({
     limit: 100,        // max requests
@@ -49,7 +51,8 @@ Implement the `RateLimiter` interface for Redis, Upstash, DynamoDB, etc.:
 
 <Tabs items={['Interface', 'Redis example']}>
   <Tab value="Interface">
-  ```ts
+  ```ts twoslash
+// @noErrors
   import type { RateLimiter, RateLimitResult } from "katman/ratelimit"
 
   interface RateLimiter {
@@ -65,7 +68,8 @@ Implement the `RateLimiter` interface for Redis, Upstash, DynamoDB, etc.:
   ```
   </Tab>
   <Tab value="Redis example">
-  ```ts
+  ```ts twoslash
+// @noErrors
   import type { RateLimiter } from "katman/ratelimit"
   import Redis from "ioredis"
 

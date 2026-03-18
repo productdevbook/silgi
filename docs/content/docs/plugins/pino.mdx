@@ -6,13 +6,15 @@ icon: FileText
 
 import { Callout } from 'fumadocs-ui/components/callout';
 
-```ts
+```ts twoslash
+// @noErrors
 import { loggingHooks } from "katman/pino"
 ```
 
 ## Setup
 
-```ts
+```ts twoslash
+// @noErrors
 import pino from "pino"
 
 const k = katman({
@@ -42,7 +44,8 @@ That's it. Every request, response, and error is logged.
 
 ## Options
 
-```ts
+```ts twoslash
+// @noErrors
 loggingHooks({
   logger: pino(),
   logRequests: true,   // default: true

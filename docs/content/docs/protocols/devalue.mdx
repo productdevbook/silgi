@@ -10,7 +10,8 @@ import { Callout } from 'fumadocs-ui/components/callout';
 
 `JSON.stringify` loses type information:
 
-```ts
+```ts twoslash
+// @noErrors
 JSON.stringify(new Date())     // → "2026-03-18T..." (string, not Date)
 JSON.stringify(new Map())      // → "{}"
 JSON.stringify(new Set([1,2])) // → "{}"
@@ -21,7 +22,8 @@ JSON.stringify(42n)            // → throws TypeError
 
 devalue preserves every JavaScript type:
 
-```ts
+```ts twoslash
+// @noErrors
 import { encode, decode } from "katman/devalue"
 
 const data = {

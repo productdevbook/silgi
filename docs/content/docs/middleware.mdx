@@ -19,7 +19,8 @@ import { Callout } from 'fumadocs-ui/components/callout';
 
 A guard is a flat function that returns context additions:
 
-```ts
+```ts twoslash
+// @noErrors
 const auth = guard(async (ctx) => {
   const token = ctx.headers.authorization?.replace("Bearer ", "")
   const user = await verifyToken(token)
@@ -30,7 +31,8 @@ const auth = guard(async (ctx) => {
 
 Use in a procedure:
 
-```ts
+```ts twoslash
+// @noErrors
 const me = query({
   use: [auth],
   resolve: ({ ctx }) => ctx.user, // ← typed as User [!code highlight]
@@ -41,7 +43,8 @@ const me = query({
 Guards that return `void` act as pure validators — they throw on failure but don't add context.
 </Callout>
 
-```ts
+```ts twoslash
+// @noErrors
 const adminOnly = guard((ctx) => {
   if (!ctx.permissions?.includes("admin"))
     throw new KatmanError("FORBIDDEN")
@@ -53,7 +56,8 @@ const adminOnly = guard((ctx) => {
 
 A wrap runs code **before** and **after** the handler:
 
-```ts
+```ts twoslash
+// @noErrors
 const timing = wrap(async (ctx, next) => {
   const start = performance.now()
   const result = await next() // [!code highlight]
@@ -73,7 +77,8 @@ const errorCapture = wrap(async (ctx, next) => {
 
 ## Stacking
 
-```ts
+```ts twoslash
+// @noErrors
 const proc = mutation({
   use: [auth, rateLimit, adminOnly, timing, errorCapture],
   //    ───── guards ─────────────  ──── wraps ────────

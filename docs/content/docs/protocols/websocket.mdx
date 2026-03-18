@@ -22,7 +22,8 @@ While katman's default transport is HTTP (see [Server](/docs/server)), you can a
 
 If you're using katman's built-in [`serve()`](/docs/server), add `ws: true`. The `k` instance comes from `katman()` — see [Getting Started](/docs/getting-started) for the full setup.
 
-```ts
+```ts twoslash
+// @noErrors
 import { katman } from "katman"
 
 const k = katman({ context: (req) => ({}) })
@@ -44,7 +45,8 @@ HTTP and WebSocket share the same port. Powered by [crossws](https://github.com/
 
 If you have your own HTTP server (or a [Fastify](/docs/integrations/fastify) app), attach WebSocket separately:
 
-```ts
+```ts twoslash
+// @noErrors
 import { createServer } from "node:http"
 import { attachWebSocket } from "katman/ws"
 
@@ -85,7 +87,8 @@ For procedures defined with `k.subscription()`, the server sends multiple `data`
 
 ## Client Example
 
-```ts
+```ts twoslash
+// @noErrors
 const ws = new WebSocket("ws://localhost:3000")
 
 ws.onopen = () => {
@@ -109,7 +112,8 @@ ws.onmessage = ({ data }) => {
 
 Combine with [MessagePack](/docs/protocols/msgpack) for smaller messages:
 
-```ts
+```ts twoslash
+// @noErrors
 attachWebSocket(server, appRouter, { binary: true })
 ```
 

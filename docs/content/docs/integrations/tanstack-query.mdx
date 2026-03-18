@@ -18,7 +18,8 @@ npm install @tanstack/react-query
 
 ## Setup
 
-```ts
+```ts twoslash
+// @noErrors
 import { createQueryUtils } from "katman/tanstack-query"
 import { client } from "./client" // your katman client
 
@@ -71,7 +72,8 @@ function CreateUser() {
 
 Server-side or in loaders:
 
-```ts
+```ts twoslash
+// @noErrors
 await queryClient.prefetchQuery(
   utils.users.list.queryOptions({ input: { limit: 10 } })
 )
@@ -79,7 +81,8 @@ await queryClient.prefetchQuery(
 
 ## Cache Invalidation
 
-```ts
+```ts twoslash
+// @noErrors
 // Invalidate all queries under "users" namespace
 queryClient.invalidateQueries({ queryKey: utils.users.key() })
 

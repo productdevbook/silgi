@@ -6,13 +6,15 @@ icon: Activity
 
 import { Callout } from 'fumadocs-ui/components/callout';
 
-```ts
+```ts twoslash
+// @noErrors
 import { otelWrap } from "katman/otel"
 ```
 
 ## Setup
 
-```ts
+```ts twoslash
+// @noErrors
 import { trace } from "@opentelemetry/api"
 
 const tracing = otelWrap(trace.getTracer("my-service"))
@@ -22,7 +24,8 @@ const tracing = otelWrap(trace.getTracer("my-service"))
 
 Add as a wrap middleware to any procedure:
 
-```ts
+```ts twoslash
+// @noErrors
 const proc = query({
   use: [tracing], // [!code highlight]
   resolve: ({ ctx }) => ctx.db.users.findMany(),
@@ -38,7 +41,8 @@ Every call creates a span with:
 
 Errors are automatically captured:
 
-```ts
+```ts twoslash
+// @noErrors
 // On success:
 // span.setStatus({ code: 0 })
 
@@ -53,6 +57,7 @@ Katman has zero OpenTelemetry dependency — we define a lightweight `Tracer` / 
 
 ## Custom Span Name
 
-```ts
+```ts twoslash
+// @noErrors
 const tracing = otelWrap(tracer, "api.call") // default: "rpc.call"
 ```
