@@ -67,9 +67,12 @@ html.light {
 
 /* ─── Wrapper ─────────────────────────────────────── */
 
-.k-wrapper { border-top: 1px solid var(--k-line); }
+.k-border {
+  border-top: 1px solid var(--k-line);
+}
 
-.k-wrapper--ticks {
+.k-ticks {
+  border-top: 1px solid var(--k-line);
   background-image:
     linear-gradient(to right, var(--k-line) 1px, transparent 1px),
     linear-gradient(to right, var(--k-line) 1px, transparent 1px);

@@ -38,8 +38,8 @@ function Hero() {
   const cmd = { npm: 'npm i katman', pnpm: 'pnpm add katman', bun: 'bun add katman' };
 
   return (
-    <section className="k-wrapper k-wrapper--ticks relative overflow-hidden k-grain">
-      <W>
+    <section className="relative overflow-hidden k-grain">
+      <W ticks>
         <div className="grid md:grid-cols-2">
           <div className="flex flex-col justify-between gap-16 p-6 sm:p-10">
             <div className="flex flex-col gap-5 items-center md:items-start text-center md:text-left">
@@ -113,8 +113,8 @@ const CODE = [
 
 function SponsorBanner() {
   return (
-    <section className="k-wrapper k-wrapper--ticks">
-      <W>
+    <section>
+      <W ticks>
         <div className="grid lg:grid-cols-[1fr,auto] divide-y lg:divide-y-0 lg:divide-x divide-[var(--k-line)]">
           <div className="p-6 sm:p-10 flex flex-col sm:flex-row items-center gap-6 sm:gap-10">
             <span className="k-mono text-xs uppercase tracking-[.2em] text-[var(--k-dim)] shrink-0">Special Sponsor</span>
@@ -138,8 +138,8 @@ function SponsorBanner() {
 
 function Heading({ label, title }: { label: string; title: string }) {
   return (
-    <section className="k-wrapper">
-      <W className="px-6 sm:px-10 py-16 lg:py-20">
+    <section>
+      <W border className="px-6 sm:px-10 py-16 lg:py-20">
         <span className="k-mono text-xs uppercase tracking-[.3em] text-[var(--k-dim)] block mb-4">{label}</span>
         <h2 className="k-serif text-[clamp(1.8rem,4vw,2.8rem)] leading-[1.1] tracking-[-0.015em] text-[var(--k-fg)]">{title}</h2>
       </W>
@@ -151,8 +151,8 @@ function Heading({ label, title }: { label: string; title: string }) {
 
 function ArchitectureGrid() {
   return (
-    <section className="k-wrapper k-wrapper--ticks">
-      <W className="grid md:grid-cols-2">
+    <section>
+      <W ticks className="grid md:grid-cols-2">
         <Cell><CT t="Guards enrich context" d="Return { user }, { permissions } from a flat function. No onion callbacks. Types accumulate automatically." /></Cell>
         <Cell bl><CT t="Compiled at startup" d="Guards are unrolled, wraps are pre-linked. The pipeline is a direct function chain — zero closures per request." /></Cell>
         <Cell bt><CT t="Types flow end-to-end" d="Input, output, context, errors — fully typed from server to client. Inferred from your code, never generated." /></Cell>
@@ -166,8 +166,8 @@ function ArchitectureGrid() {
 
 function DXGrid() {
   return (
-    <section className="k-wrapper k-wrapper--ticks">
-      <W className="grid sm:grid-cols-2 lg:grid-cols-3">
+    <section>
+      <W ticks className="grid sm:grid-cols-2 lg:grid-cols-3">
         <Cell><CT t="Single package" d="Server, client, plugins, codecs. One npm install. No monorepo of scoped packages." /></Cell>
         <Cell bl><CT t="Typed errors" d="Define error maps per procedure. fail() is typed — the compiler catches wrong codes." /></Cell>
         <Cell bl><CT t="Lifecycle hooks" d="request, response, error, serve:start — powered by hookable. Sync fast-path when unused." /></Cell>
@@ -183,8 +183,8 @@ function DXGrid() {
 
 function ProtocolGrid() {
   return (
-    <section className="k-wrapper k-wrapper--ticks">
-      <W className="grid md:grid-cols-3">
+    <section>
+      <W ticks className="grid md:grid-cols-3">
         <Cell>
           <Badge c="var(--k-code-st)" t="JSON" b="default" />
           <p className="text-sm text-[var(--k-dim)] font-normal leading-relaxed mt-3">Universal. Fastest encode/decode. Works everywhere. Zero config.</p>
@@ -206,8 +206,8 @@ function ProtocolGrid() {
 
 function IntegrationGrid() {
   return (
-    <section className="k-wrapper k-wrapper--ticks">
-      <W className="grid sm:grid-cols-2 lg:grid-cols-4">
+    <section>
+      <W ticks className="grid sm:grid-cols-2 lg:grid-cols-4">
         <Cell><CT t="React Actions" d="createAction() returns [error, data] tuples. FormData with bracket notation." /></Cell>
         <Cell bl><CT t="TanStack Query" d="queryOptions, mutationOptions, queryKey. React, Vue, Solid, Svelte." /></Cell>
         <Cell bl><CT t="AI SDK" d="routerToTools() — LLMs call your procedures through function calling." /></Cell>
@@ -221,8 +221,8 @@ function IntegrationGrid() {
 
 function SponsorsInline() {
   return (
-    <section className="k-wrapper">
-      <W className="grid md:grid-cols-[1fr,1.2fr] divide-y md:divide-y-0 md:divide-x divide-[var(--k-line)]">
+    <section>
+      <W border className="grid md:grid-cols-[1fr,1.2fr] divide-y md:divide-y-0 md:divide-x divide-[var(--k-line)]">
         <div className="p-6 sm:p-10">
           <span className="k-mono text-xs uppercase tracking-[.3em] text-[var(--k-dim)] block mb-4">Gold Sponsors</span>
           <p className="text-sm text-[var(--k-dim)] font-normal leading-relaxed">
@@ -246,8 +246,8 @@ function SponsorsInline() {
 
 function ServerGrid() {
   return (
-    <section className="k-wrapper k-wrapper--ticks">
-      <W className="grid md:grid-cols-2">
+    <section>
+      <W ticks className="grid md:grid-cols-2">
         <Cell>
           <CT t="serve()" d="One-line Node.js server. Auto port finding, HTTP/2 with TLS, WebSocket on same port." />
           <div className="mt-5 rounded-lg border border-[var(--k-line)] bg-[var(--k-raised)] p-4 k-mono text-[12px] text-[var(--k-dim)]">
@@ -278,8 +278,8 @@ function ServerGrid() {
 
 function PluginGrid() {
   return (
-    <section className="k-wrapper k-wrapper--ticks">
-      <W className="grid sm:grid-cols-2 lg:grid-cols-4">
+    <section>
+      <W ticks className="grid sm:grid-cols-2 lg:grid-cols-4">
         <Cell><CT t="CORS" d="corsHeaders() — string, array, or dynamic origin matching." /></Cell>
         <Cell bl><CT t="OpenTelemetry" d="otelWrap(tracer) — each procedure call becomes a span." /></Cell>
         <Cell bl><CT t="Pino" d="loggingHooks() — structured request/response/error logging." /></Cell>
@@ -293,8 +293,8 @@ function PluginGrid() {
 
 function SponsorsSection() {
   return (
-    <section className="k-wrapper">
-      <W className="px-6 sm:px-10 py-16 lg:py-24">
+    <section>
+      <W border className="px-6 sm:px-10 py-16 lg:py-24">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-8 mb-12">
           <div>
             <span className="k-mono text-xs uppercase tracking-[.3em] text-[var(--k-dim)] block mb-4">Sponsors</span>
@@ -347,8 +347,8 @@ function SponsorsSection() {
 
 function FooterCTA() {
   return (
-    <section className="k-wrapper relative k-grain overflow-hidden">
-      <W className="relative px-6 sm:px-10 py-24 lg:py-32 text-center flex flex-col items-center">
+    <section className="relative k-grain overflow-hidden">
+      <W border className="relative px-6 sm:px-10 py-24 lg:py-32 text-center flex flex-col items-center">
         <h2 className="k-serif text-[clamp(2rem,4.5vw,3.2rem)] leading-[1.05] tracking-[-0.015em] mb-4 text-[var(--k-fg)]">
           Start building with Katman
         </h2>
@@ -363,8 +363,9 @@ function FooterCTA() {
 
 /* ═══ SHARED ════════════════════════════════════════ */
 
-function W({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <div className={`mx-auto max-w-6xl ${className}`}>{children}</div>;
+function W({ children, className = '', ticks, border }: { children: React.ReactNode; className?: string; ticks?: boolean; border?: boolean }) {
+  const cls = ticks ? 'k-ticks' : border ? 'k-border' : '';
+  return <div className={`mx-auto max-w-6xl ${cls} ${className}`}>{children}</div>;
 }
 
 function Cell({ children, bl, bt }: { children: React.ReactNode; bl?: boolean; bt?: boolean }) {
