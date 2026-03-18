@@ -110,7 +110,7 @@ export interface ProcedureConfig<
     opts: ResolveContext<
       InferContextFromUse<TUse, TCtx>,
       TInputSchema extends AnySchema ? InferSchemaOutput<TInputSchema> : undefined,
-      TErrors
+      NoInfer<TErrors>
     >,
   ) => Promise<TOutput> | TOutput;
   route?: Route;

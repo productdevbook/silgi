@@ -35,6 +35,7 @@ import { createHooks, type Hookable, type HookCallback } from "hookable";
 import { defu } from "defu";
 import { getPort } from "get-port-please";
 import { encode as msgpackEncode, decode as msgpackDecode, acceptsMsgpack, isMsgpack, MSGPACK_CONTENT_TYPE } from "./codec/msgpack.ts";
+import { encode as devalueEncode, decode as devalueDecode, acceptsDevalue, isDevalue, DEVALUE_CONTENT_TYPE } from "./codec/devalue.ts";
 
 // ── Lifecycle Hooks ─────────────────────────────────
 
@@ -447,6 +448,26 @@ function assignPaths(def: RouterDef, prefix: string[] = []): void {
   }
 }
 
+// ── Response Encoding Helper ────────────────────────
+
+type ResponseFormat = "json" | "msgpack" | "devalue";
+
+function encodeResponse(
+  data: unknown,
+  status: number,
+  format: ResponseFormat,
+  jsonStringify?: (v: unknown) => string,
+): Response {
+  switch (format) {
+    case "msgpack":
+      return new Response(msgpackEncode(data), { status, headers: { "content-type": MSGPACK_CONTENT_TYPE } });
+    case "devalue":
+      return new Response(devalueEncode(data), { status, headers: { "content-type": DEVALUE_CONTENT_TYPE } });
+    default:
+      return new Response(jsonStringify ? jsonStringify(data) : stringifyJSON(data), { status, headers: { "content-type": "application/json" } });
+  }
+}
+
 // ── Fetch Handler ───────────────────────────────────
 
 function createFetchHandler(
@@ -467,6 +488,7 @@ function createFetchHandler(
   // Pre-allocate response headers (reused across requests)
   const jsonHeaders = { "content-type": "application/json" };
   const msgpackHeaders = { "content-type": MSGPACK_CONTENT_TYPE };
+  const devalueHeaders = { "content-type": DEVALUE_CONTENT_TYPE };
   const sseHeaders = { "content-type": "text/event-stream", "cache-control": "no-cache" };
   const notFoundBody = JSON.stringify({ code: "NOT_FOUND", status: 404, message: "Procedure not found" });
 
@@ -508,9 +530,10 @@ function createFetchHandler(
       } else {
         const ct = request.headers.get("content-type");
         if (isMsgpack(ct) && request.body) {
-          // Binary protocol — decode msgpack
           const buf = new Uint8Array(await request.arrayBuffer());
           rawInput = msgpackDecode(buf);
+        } else if (isDevalue(ct) && request.body) {
+          rawInput = devalueDecode(await request.text());
         } else if (ct?.includes("json") && request.body) {
           rawInput = await request.json();
         } else if (request.body) {
@@ -532,26 +555,21 @@ function createFetchHandler(
         return new Response(stream, { headers: sseHeaders });
       }
 
-      // Content negotiation — msgpack if client accepts it
+      // Content negotiation: msgpack > devalue > json
       hooks?.callHook("response", { path: pathname, output, durationMs: performance.now() - t0 });
-      const wantsBinary = acceptsMsgpack(request.headers.get("accept"));
-      if (wantsBinary) {
-        return new Response(msgpackEncode(output), { status: 200, headers: msgpackHeaders });
-      }
-      return new Response(route.stringify(output), { status: 200, headers: jsonHeaders });
+      const accept = request.headers.get("accept");
+      const fmt = acceptsMsgpack(accept) ? "msgpack" : acceptsDevalue(accept) ? "devalue" : "json";
+      return encodeResponse(output, 200, fmt, route.stringify);
     } catch (error) {
       hooks?.callHook("error", { path: pathname, error });
+      const accept = request.headers.get("accept");
+      const fmt = acceptsMsgpack(accept) ? "msgpack" : acceptsDevalue(accept) ? "devalue" : "json";
       if (error instanceof ValidationError) {
         const errBody = { code: "BAD_REQUEST", status: 400, message: error.message, data: { issues: error.issues } };
-        const wantsBinary = acceptsMsgpack(request.headers.get("accept"));
-        if (wantsBinary) return new Response(msgpackEncode(errBody), { status: 400, headers: msgpackHeaders });
-        return new Response(JSON.stringify(errBody), { status: 400, headers: jsonHeaders });
+        return encodeResponse(errBody, 400, fmt);
       }
       const e = error instanceof KatmanError ? error : toKatmanError(error);
-      const errJson = e.toJSON();
-      const wantsBinary = acceptsMsgpack(request.headers.get("accept"));
-      if (wantsBinary) return new Response(msgpackEncode(errJson), { status: e.status, headers: msgpackHeaders });
-      return new Response(stringifyJSON(errJson), { status: e.status, headers: jsonHeaders });
+      return encodeResponse(e.toJSON(), e.status, fmt);
     } finally {
       ctxPool.release(ctx);
     }
