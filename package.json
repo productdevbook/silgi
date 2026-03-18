@@ -66,6 +66,10 @@
       "import": "./dist/plugins/ratelimit.mjs",
       "types": "./dist/plugins/ratelimit.d.mts"
     },
+    "./ai": {
+      "import": "./dist/integrations/ai/index.mjs",
+      "types": "./dist/integrations/ai/index.d.mts"
+    },
     "./fastify": {
       "import": "./dist/adapters/fastify.mjs",
       "types": "./dist/adapters/fastify.d.mts"
@@ -113,6 +117,7 @@
     "@types/node": "^25.5.0",
     "@types/ws": "^8.18.1",
     "@typescript/native-preview": "7.0.0-dev.20260316.1",
+    "ai": "^6.0.116",
     "fastify": "^5.8.2",
     "h3": "2.0.1-rc.16",
     "mitata": "^1.0.34",

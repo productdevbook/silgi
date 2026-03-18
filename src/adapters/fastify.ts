@@ -45,8 +45,7 @@ export function katmanFastify(
         const ctx: Record<string, unknown> = Object.create(null);
         try {
           const baseCtx = await contextFactory(req);
-          const keys = Object.keys(baseCtx);
-          for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = baseCtx[keys[i]!];
+          Object.assign(ctx, baseCtx);
         } catch (err) {
           const e = err instanceof KatmanError ? err : toKatmanError(err);
           return reply.status(e.status).send(e.toJSON());

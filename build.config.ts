@@ -23,6 +23,7 @@ export default defineBuildConfig({
         "./src/plugins/ratelimit.ts",
         "./src/adapters/fastify.ts",
         "./src/contract.ts",
+        "./src/integrations/ai/index.ts",
       ],
     },
   ],
