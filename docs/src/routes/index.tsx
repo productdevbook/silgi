@@ -292,48 +292,48 @@ function PluginGrid() {
 /* ═══ SPONSORS SECTION ══════════════════════════════ */
 
 function SponsorsSection() {
+  const link = "https://github.com/sponsors/productdevbook";
   return (
     <section>
-      <W border className="px-6 sm:px-10 py-16 lg:py-24">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-8 mb-12">
+      <W border className="p-6 sm:p-10">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10">
           <div>
-            <span className="k-mono text-xs uppercase tracking-[.3em] text-[var(--k-dim)] block mb-4">Sponsors</span>
+            <span className="k-mono text-xs uppercase tracking-[.3em] text-[var(--k-dim)] block mb-3">Sponsors</span>
             <h2 className="k-serif text-[clamp(1.6rem,3vw,2.2rem)] leading-[1.1] text-[var(--k-fg)]">Backed by the community</h2>
           </div>
-          <a href="https://github.com/sponsors/productdevbook" target="_blank" rel="noopener noreferrer" className="k-btn k-btn--ghost">Become a Sponsor</a>
+          <a href={link} target="_blank" rel="noopener noreferrer" className="k-btn k-btn--ghost">Become a Sponsor</a>
         </div>
 
-        <div className="mb-8">
-          <span className="k-mono text-[11px] uppercase tracking-[.25em] text-[var(--k-dim)] block mb-4">Platinum</span>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        {/* Platinum — large, prominent */}
+        <div className="mb-6">
+          <span className="k-mono text-[11px] uppercase tracking-[.25em] text-[var(--k-dim)] block mb-3">Platinum</span>
+          <a href={link} target="_blank" rel="noopener noreferrer"
+            className="flex items-center justify-center h-28 rounded-xl border border-dashed border-[var(--k-line)] text-[var(--k-dim)] text-sm hover:border-[var(--k-accent)]/40 hover:text-[var(--k-accent)] transition-colors">
+            Your logo here
+          </a>
+        </div>
+
+        {/* Gold */}
+        <div className="mb-6">
+          <span className="k-mono text-[11px] uppercase tracking-[.25em] text-[var(--k-dim)] block mb-3">Gold</span>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {[1, 2, 3].map((i) => (
-              <a key={i} href="https://github.com/sponsors/productdevbook" target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-center h-24 rounded-xl border border-dashed border-[var(--k-line)] text-[var(--k-dim)] text-sm hover:border-[var(--k-accent)]/30 hover:text-[var(--k-accent)] transition-colors">
-                Your logo here
-              </a>
-            ))}
-          </div>
-        </div>
-
-        <div className="mb-8">
-          <span className="k-mono text-[11px] uppercase tracking-[.25em] text-[var(--k-dim)] block mb-4">Gold</span>
-          <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <a key={i} href="https://github.com/sponsors/productdevbook" target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-center h-16 rounded-lg border border-dashed border-[var(--k-line)] text-[var(--k-dim)] text-xs hover:border-[var(--k-accent)]/30 hover:text-[var(--k-accent)] transition-colors">
+              <a key={i} href={link} target="_blank" rel="noopener noreferrer"
+                className="flex items-center justify-center h-20 rounded-lg border border-dashed border-[var(--k-line)] text-[var(--k-dim)] text-sm hover:border-[var(--k-accent)]/40 hover:text-[var(--k-accent)] transition-colors">
                 Sponsor
               </a>
             ))}
           </div>
         </div>
 
+        {/* Silver */}
         <div>
-          <span className="k-mono text-[11px] uppercase tracking-[.25em] text-[var(--k-dim)] block mb-4">Silver</span>
-          <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
-            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-              <a key={i} href="https://github.com/sponsors/productdevbook" target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-center h-12 rounded-lg border border-dashed border-[var(--k-line)] text-[var(--k-dim)] text-xs hover:border-[var(--k-accent)]/30 hover:text-[var(--k-accent)] transition-colors">
-                ♡
+          <span className="k-mono text-[11px] uppercase tracking-[.25em] text-[var(--k-dim)] block mb-3">Silver</span>
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <a key={i} href={link} target="_blank" rel="noopener noreferrer"
+                className="flex items-center justify-center h-14 rounded-lg border border-dashed border-[var(--k-line)] text-[var(--k-dim)] text-sm hover:border-[var(--k-accent)]/40 hover:text-[var(--k-accent)] transition-colors">
+                Sponsor
               </a>
             ))}
           </div>
