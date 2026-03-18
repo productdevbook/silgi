@@ -1,11 +1,9 @@
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { Link } from 'react-router';
 import { HomeLayout } from 'fumadocs-ui/layouts/home';
 import { baseOptions } from '@/lib/layout.shared';
 import { useState } from 'react';
 
-export const Route = createFileRoute('/')({ component: Home });
-
-function Home() {
+export default function Home() {
   return (
     <HomeLayout {...baseOptions()}>
       <div className="k-sans max-w-6xl mx-auto k-landing">
@@ -51,7 +49,7 @@ function Hero() {
                 Katman is a type-safe RPC framework with compiled pipelines powering the next generation of TypeScript APIs.
               </p>
               <div className="flex items-center gap-4 mt-6">
-                <Link to="/docs/$" params={{ _splat: '' }} className="k-btn k-btn--primary">Get Started</Link>
+                <Link to="/docs" className="k-btn k-btn--primary">Get Started</Link>
                 <a href="https://github.com/productdevbook/katman" target="_blank" rel="noopener noreferrer" className="k-btn k-btn--ghost">View on GitHub</a>
               </div>
             </div>
@@ -345,7 +343,7 @@ function FooterCTA() {
         <p className="text-[var(--k-text)] max-w-sm mb-10 font-normal leading-relaxed">
           Prepare for a development environment that can finally keep pace with the speed of your mind.
         </p>
-        <Link to="/docs/$" params={{ _splat: '' }} className="k-btn k-btn--primary">Get Started</Link>
+        <Link to="/docs" className="k-btn k-btn--primary">Get Started</Link>
       </W>
     </section>
   );
