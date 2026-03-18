@@ -16,13 +16,13 @@ export const Route = createRootRoute({
       { property: 'og:type', content: 'website' },
       { property: 'og:title', content: 'Katman — Type-safe RPC for TypeScript' },
       { property: 'og:description', content: 'Type-safe RPC framework for TypeScript. Compiled pipelines, single package, every runtime.' },
-      { property: 'og:image', content: '/og.svg' },
+      { property: 'og:image', content: '/og.png' },
       { property: 'og:site_name', content: 'Katman' },
       // Twitter
       { name: 'twitter:card', content: 'summary_large_image' },
       { name: 'twitter:title', content: 'Katman — Type-safe RPC for TypeScript' },
       { name: 'twitter:description', content: 'Type-safe RPC framework for TypeScript. Compiled pipelines, single package, every runtime.' },
-      { name: 'twitter:image', content: '/og.svg' },
+      { name: 'twitter:image', content: '/og.png' },
     ],
     links: [
       { rel: 'stylesheet', href: appCss },
