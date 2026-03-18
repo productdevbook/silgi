@@ -1,109 +1,147 @@
 /**
- * Fastify adapter tests.
- *
- * Tests katmanFastify plugin registration and RPC execution.
- * Note: Uses a minimal Fastify mock since fastify is not a dependency.
+ * Fastify adapter — real Fastify integration tests.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { z } from "zod";
+import Fastify, { type FastifyInstance } from "fastify";
 import { katman } from "../src/katman.ts";
 import { katmanFastify } from "../src/adapters/fastify.ts";
+import { MSGPACK_CONTENT_TYPE } from "../src/codec/msgpack.ts";
 
-const k = katman({ context: () => ({}) });
+const k = katman({ context: () => ({ db: true }) });
+
 const appRouter = k.router({
   health: k.query(() => ({ status: "ok" })),
   echo: k.query(z.object({ msg: z.string() }), ({ input }) => ({ echo: input.msg })),
+  add: k.mutation(z.object({ a: z.number(), b: z.number() }), ({ input }) => ({ sum: input.a + input.b })),
+  users: {
+    list: k.query(() => [{ id: 1, name: "Alice" }]),
+  },
 });
 
-// Minimal Fastify mock
-function createMockFastify() {
-  const routes: { method: string; path: string; handler: Function }[] = [];
+let app: FastifyInstance;
 
-  return {
-    routes,
-    all(path: string, handler: Function) {
-      routes.push({ method: "ALL", path, handler });
-    },
-    async simulateRequest(url: string, body?: unknown) {
-      const route = routes[0]; // catch-all
-      if (!route) throw new Error("No route registered");
+beforeAll(async () => {
+  app = Fastify();
+  app.register(katmanFastify(appRouter));
+  await app.ready();
+});
 
-      let replyStatus = 200;
-      let replyHeaders: Record<string, string> = {};
-      let replyBody: unknown;
+afterAll(() => app?.close());
 
-      const req = {
-        url,
-        method: "POST",
-        headers: { "content-type": body ? "application/json" : "" },
-        body,
-      };
-
-      const reply = {
-        status(code: number) { replyStatus = code; return reply; },
-        header(k: string, v: string) { replyHeaders[k] = v; return reply; },
-        send(data: unknown) { replyBody = data; return reply; },
-      };
-
-      await route.handler(req, reply);
-      return { status: replyStatus, headers: replyHeaders, body: replyBody };
-    },
-  };
-}
-
-describe("katmanFastify", () => {
-  it("registers a catch-all route", async () => {
-    const fastify = createMockFastify();
-    const plugin = katmanFastify(appRouter);
-    await plugin(fastify);
-
-    expect(fastify.routes).toHaveLength(1);
-    expect(fastify.routes[0]!.path).toBe("/*");
+describe("katmanFastify (real Fastify)", () => {
+  it("registers routes for each procedure", () => {
+    const routes = app.printRoutes();
+    expect(routes).toContain("health");
+    expect(routes).toContain("echo");
+    expect(routes).toContain("add");
   });
 
-  it("handles health query", async () => {
-    const fastify = createMockFastify();
-    await katmanFastify(appRouter)(fastify);
-
-    const res = await fastify.simulateRequest("/health");
-    expect(typeof res.body).toBe("string");
-    const data = JSON.parse(res.body as string);
+  it("handles no-input query", async () => {
+    const res = await app.inject({ method: "POST", url: "/health" });
+    expect(res.statusCode).toBe(200);
+    const data = res.json();
     expect(data.status).toBe("ok");
   });
 
-  it("handles query with input", async () => {
-    const fastify = createMockFastify();
-    await katmanFastify(appRouter)(fastify);
+  it("handles query with JSON input", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/echo",
+      payload: { msg: "fastify test" },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().echo).toBe("fastify test");
+  });
 
-    const res = await fastify.simulateRequest("/echo", { msg: "fastify" });
-    const data = JSON.parse(res.body as string);
-    expect(data.echo).toBe("fastify");
+  it("handles mutation", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/add",
+      payload: { a: 10, b: 32 },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().sum).toBe(42);
+  });
+
+  it("handles nested routes", async () => {
+    const res = await app.inject({ method: "POST", url: "/users/list" });
+    expect(res.statusCode).toBe(200);
+    const data = res.json();
+    expect(data).toHaveLength(1);
+    expect(data[0].name).toBe("Alice");
+  });
+
+  it("returns validation error for invalid input", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/echo",
+      payload: { wrong: "field" },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().code).toBe("BAD_REQUEST");
   });
 
   it("returns 404 for unknown routes", async () => {
-    const fastify = createMockFastify();
-    await katmanFastify(appRouter)(fastify);
-
-    const res = await fastify.simulateRequest("/unknown");
-    expect(res.status).toBe(404);
+    const res = await app.inject({ method: "POST", url: "/nonexistent" });
+    expect(res.statusCode).toBe(404);
   });
 
-  it("supports prefix option", async () => {
-    const fastify = createMockFastify();
-    await katmanFastify(appRouter, { prefix: "/rpc" })(fastify);
+  it("supports prefix via Fastify register", async () => {
+    const prefixed = Fastify();
+    prefixed.register(katmanFastify(appRouter), { prefix: "/api" });
+    await prefixed.ready();
 
-    expect(fastify.routes[0]!.path).toBe("/rpc/*");
+    const res = await prefixed.inject({ method: "POST", url: "/api/health" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().status).toBe("ok");
+
+    // Without prefix should 404
+    const res2 = await prefixed.inject({ method: "POST", url: "/health" });
+    expect(res2.statusCode).toBe(404);
+
+    await prefixed.close();
   });
 
   it("supports context factory", async () => {
-    const fastify = createMockFastify();
-    await katmanFastify(appRouter, {
-      context: (req) => ({ fromFastify: true }),
-    })(fastify);
+    const withCtx = Fastify();
+    withCtx.register(katmanFastify(
+      k.router({ whoami: k.query(({ ctx }: any) => ({ fromCtx: ctx.userId })) }),
+      { context: () => ({ userId: 42 }) },
+    ));
+    await withCtx.ready();
 
-    const res = await fastify.simulateRequest("/health");
-    const data = JSON.parse(res.body as string);
-    expect(data.status).toBe("ok");
+    const res = await withCtx.inject({ method: "POST", url: "/whoami" });
+    expect(res.json().fromCtx).toBe(42);
+
+    await withCtx.close();
+  });
+
+  it("coexists with native Fastify routes", async () => {
+    const mixed = Fastify();
+    mixed.get("/legacy", async () => ({ type: "rest" }));
+    mixed.register(katmanFastify(appRouter), { prefix: "/rpc" });
+    await mixed.ready();
+
+    // Native route
+    const r1 = await mixed.inject({ method: "GET", url: "/legacy" });
+    expect(r1.json().type).toBe("rest");
+
+    // Katman route
+    const r2 = await mixed.inject({ method: "POST", url: "/rpc/health" });
+    expect(r2.json().status).toBe("ok");
+
+    await mixed.close();
+  });
+
+  it("responds with msgpack when Accept header set", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/health",
+      headers: { accept: MSGPACK_CONTENT_TYPE },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toBe(MSGPACK_CONTENT_TYPE);
   });
 });
