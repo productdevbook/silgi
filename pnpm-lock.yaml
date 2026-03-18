@@ -11,6 +11,9 @@ importers:
       '@standard-schema/spec':
         specifier: ^1.0.0
         version: 1.1.0
+      crossws:
+        specifier: ^0.4.4
+        version: 0.4.4(srvx@0.11.12)
       defu:
         specifier: ^6.1.4
         version: 6.1.4
@@ -38,16 +41,19 @@ importers:
         version: 1.13.7
       '@orpc/server':
         specifier: ^1.13.7
-        version: 1.13.7
+        version: 1.13.7(crossws@0.4.4(srvx@0.11.12))(ws@8.19.0)
       '@types/node':
         specifier: ^25.5.0
         version: 25.5.0
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20260316.1
         version: 7.0.0-dev.20260316.1
       h3:
         specifier: 2.0.1-rc.16
-        version: 2.0.1-rc.16
+        version: 2.0.1-rc.16(crossws@0.4.4(srvx@0.11.12))
       mitata:
         specifier: ^1.0.34
         version: 1.0.34
@@ -66,6 +72,9 @@ importers:
       vitest:
         specifier: ^4.1.0
         version: 4.1.0(@types/node@25.5.0)(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1))
+      ws:
+        specifier: ^8.19.0
+        version: 8.19.0
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -868,6 +877,9 @@ packages:
   '@types/node@25.5.0':
     resolution: {integrity: sha512-jp2P3tQMSxWugkCUKLRPVUpGaL5MVFwF8RDuSRztfwgN1wmqJeMSbKlnEtQqU8UrhTmzEmZdu2I6v2dpp7XIxw==}
 
+  '@types/ws@8.18.1':
+    resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
+
   '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260316.1':
     resolution: {integrity: sha512-TjeMEMabLsc5VNYy8WVlu1oHBVqibwSbkIRSyqANFxyD6iWnCFquDvliwErVo8TFIu0c8C+C+tgFSvYkhVZMMw==}
     cpu: [arm64]
@@ -991,6 +1003,14 @@ packages:
   cookie@1.1.1:
     resolution: {integrity: sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==}
     engines: {node: '>=18'}
+
+  crossws@0.4.4:
+    resolution: {integrity: sha512-w6c4OdpRNnudVmcgr7brb/+/HmYjMQvYToO/oTrprTwxRUiom3LYWU1PMWuD006okbUWpII1Ea9/+kwpUfmyRg==}
+    peerDependencies:
+      srvx: '>=0.7.1'
+    peerDependenciesMeta:
+      srvx:
+        optional: true
 
   defu@6.1.4:
     resolution: {integrity: sha512-mEQCMmwJu317oSz8CwdIOdwf3xMif1ttiM8LTufzc3g6kR+9Pe236twL8j3IYT1F7GfRgGcW6MWxzZjLIkuHIg==}
@@ -1360,6 +1380,18 @@ packages:
     engines: {node: '>=8'}
     hasBin: true
 
+  ws@8.19.0:
+    resolution: {integrity: sha512-blAT2mjOEIi0ZzruJfIhb3nps74PRWTCz1IjglWEEpQl5XS/UNama6u2/rjFkDDouqr4L67ry+1aGIALViWjDg==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
   zod@4.3.6:
     resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
 
@@ -1540,7 +1572,7 @@ snapshots:
 
   '@orpc/interop@1.13.7': {}
 
-  '@orpc/server@1.13.7':
+  '@orpc/server@1.13.7(crossws@0.4.4(srvx@0.11.12))(ws@8.19.0)':
     dependencies:
       '@orpc/client': 1.13.7
       '@orpc/contract': 1.13.7
@@ -1553,6 +1585,9 @@ snapshots:
       '@orpc/standard-server-node': 1.13.7
       '@orpc/standard-server-peer': 1.13.7
       cookie: 1.1.1
+    optionalDependencies:
+      crossws: 0.4.4(srvx@0.11.12)
+      ws: 8.19.0
     transitivePeerDependencies:
       - '@opentelemetry/api'
       - fastify
@@ -1869,6 +1904,10 @@ snapshots:
     dependencies:
       undici-types: 7.18.2
 
+  '@types/ws@8.18.1':
+    dependencies:
+      '@types/node': 25.5.0
+
   '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260316.1':
     optional: true
 
@@ -1976,6 +2015,10 @@ snapshots:
 
   cookie@1.1.1: {}
 
+  crossws@0.4.4(srvx@0.11.12):
+    optionalDependencies:
+      srvx: 0.11.12
+
   defu@6.1.4: {}
 
   destr@2.0.5: {}
@@ -2037,10 +2080,12 @@ snapshots:
     dependencies:
       resolve-pkg-maps: 1.0.0
 
-  h3@2.0.1-rc.16:
+  h3@2.0.1-rc.16(crossws@0.4.4(srvx@0.11.12)):
     dependencies:
       rou3: 0.8.1
       srvx: 0.11.12
+    optionalDependencies:
+      crossws: 0.4.4(srvx@0.11.12)
 
   hookable@6.1.0: {}
 
@@ -2387,5 +2432,7 @@ snapshots:
     dependencies:
       siginfo: 2.0.0
       stackback: 0.0.2
+
+  ws@8.19.0: {}
 
   zod@4.3.6: {}

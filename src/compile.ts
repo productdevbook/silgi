@@ -345,4 +345,11 @@ export class ContextPool {
       this.#pool[--this.#index] = ctx;
     }
   }
+
+  /** Borrow a context that auto-releases when disposed (Node 24+ / `using` keyword) */
+  borrowDisposable(): Record<string, unknown> & Disposable {
+    const ctx = this.borrow() as Record<string, unknown> & Disposable;
+    ctx[Symbol.dispose] = () => this.release(ctx);
+    return ctx;
+  }
 }

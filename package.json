@@ -62,6 +62,10 @@
       "import": "./dist/codec/msgpack.mjs",
       "types": "./dist/codec/msgpack.d.mts"
     },
+    "./ws": {
+      "import": "./dist/ws.mjs",
+      "types": "./dist/ws.d.mts"
+    },
     "./zod": {
       "import": "./dist/integrations/zod/index.mjs",
       "types": "./dist/integrations/zod/index.d.mts"
@@ -91,7 +95,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "obuild src/index.ts src/server/index.ts src/client/index.ts src/client/adapters/fetch/index.ts src/client/adapters/ofetch/index.ts src/client/plugins/index.ts src/contract/index.ts src/server/adapters/node/index.ts src/server/adapters/fetch/index.ts src/server/adapters/fastify/index.ts src/server/adapters/websocket/index.ts src/server/plugins/index.ts src/openapi/index.ts src/codec/msgpack.ts src/integrations/zod/index.ts src/integrations/tanstack-query/index.ts src/integrations/react/index.ts src/plugins/otel/index.ts src/plugins/pino/index.ts src/plugins/ratelimit/index.ts",
+    "build": "obuild src/index.ts src/server/index.ts src/client/index.ts src/client/adapters/fetch/index.ts src/client/adapters/ofetch/index.ts src/client/plugins/index.ts src/contract/index.ts src/server/adapters/node/index.ts src/server/adapters/fetch/index.ts src/server/adapters/fastify/index.ts src/server/adapters/websocket/index.ts src/server/plugins/index.ts src/openapi/index.ts src/codec/msgpack.ts src/ws.ts src/integrations/zod/index.ts src/integrations/tanstack-query/index.ts src/integrations/react/index.ts src/plugins/otel/index.ts src/plugins/pino/index.ts src/plugins/ratelimit/index.ts",
     "dev": "vitest",
     "bench": "node --experimental-strip-types bench/update-benchmarks.ts",
     "bench:orpc": "node --experimental-strip-types bench/vs-orpc.ts",
@@ -108,6 +112,7 @@
   },
   "dependencies": {
     "@standard-schema/spec": "^1.0.0",
+    "crossws": "^0.4.4",
     "defu": "^6.1.4",
     "get-port-please": "^3.2.0",
     "hookable": "^6.1.0",
@@ -120,6 +125,7 @@
     "@orpc/contract": "^1.13.7",
     "@orpc/server": "^1.13.7",
     "@types/node": "^25.5.0",
+    "@types/ws": "^8.18.1",
     "@typescript/native-preview": "7.0.0-dev.20260316.1",
     "h3": "2.0.1-rc.16",
     "mitata": "^1.0.34",
@@ -128,6 +134,7 @@
     "oxlint": "^1.56.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.0",
+    "ws": "^8.19.0",
     "zod": "^4.3.6"
   },
   "engines": {
