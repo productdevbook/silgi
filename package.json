@@ -75,8 +75,8 @@
       "types": "./dist/integrations/tanstack-query/index.d.mts"
     },
     "./react": {
-      "import": "./dist/integrations/react/index.mjs",
-      "types": "./dist/integrations/react/index.d.mts"
+      "import": "./dist/integrations/react/v2.mjs",
+      "types": "./dist/integrations/react/v2.d.mts"
     },
     "./otel": {
       "import": "./dist/plugins/otel/index.mjs",
@@ -95,7 +95,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "obuild src/index.ts src/server/index.ts src/client/index.ts src/client/adapters/fetch/index.ts src/client/adapters/ofetch/index.ts src/client/plugins/index.ts src/contract/index.ts src/server/adapters/node/index.ts src/server/adapters/fetch/index.ts src/server/adapters/fastify/index.ts src/server/adapters/websocket/index.ts src/server/plugins/index.ts src/openapi/index.ts src/codec/msgpack.ts src/ws.ts src/integrations/zod/index.ts src/integrations/tanstack-query/index.ts src/integrations/react/index.ts src/plugins/otel/index.ts src/plugins/pino/index.ts src/plugins/ratelimit/index.ts",
+    "build": "obuild src/index.ts src/server/index.ts src/client/index.ts src/client/adapters/fetch/index.ts src/client/adapters/ofetch/index.ts src/client/plugins/index.ts src/contract/index.ts src/server/adapters/node/index.ts src/server/adapters/fetch/index.ts src/server/adapters/fastify/index.ts src/server/adapters/websocket/index.ts src/server/plugins/index.ts src/openapi/index.ts src/codec/msgpack.ts src/ws.ts src/integrations/zod/index.ts src/integrations/tanstack-query/index.ts src/integrations/react/v2.ts src/plugins/otel/index.ts src/plugins/pino/index.ts src/plugins/ratelimit/index.ts",
     "dev": "vitest",
     "bench": "node --experimental-strip-types bench/update-benchmarks.ts",
     "bench:orpc": "node --experimental-strip-types bench/vs-orpc.ts",
