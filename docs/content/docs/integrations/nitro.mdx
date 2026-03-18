@@ -1,16 +1,59 @@
 ---
 title: Nitro
-description: Use Katman with Nitro v3 server routes — file-system routing or catch-all handler.
+description: Use Katman with Nitro v3 — as the server framework (like Hono) or alongside H3 routes.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
-[Nitro](https://nitro.build) is the server engine behind Nuxt and TanStack Start. Katman's Nitro adapter creates a handler that dispatches to your procedures using Nitro's file-system routing.
+[Nitro](https://nitro.build) is the server engine behind Nuxt and TanStack Start. Katman integrates with Nitro in two ways: as the **server framework** (replacing H3, like Hono does) or alongside **H3 file-system routes**.
 
-## File-system routing (recommended)
+## Direct mode (recommended)
 
-Create a catch-all route file:
+Just like [Hono with Nitro](https://github.com/nitrojs/nitro/tree/main/examples/hono), export an object with a `fetch` method from `server.ts`. Nitro detects it and uses Katman as the server framework:
+
+```ts twoslash
+// @noErrors
+// server.ts
+import { katman, KatmanError } from "katman"
+import { z } from "zod"
+
+const k = katman({
+  context: (req) => ({
+    db: getDB(),
+    headers: Object.fromEntries(req.headers),
+  }),
+})
+
+const { query, mutation, guard, router, handler } = k
+
+const health = query(() => ({ status: "ok" }))
+
+const listUsers = query(
+  z.object({ limit: z.number().optional() }),
+  ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
+)
+
+const appRouter = router({ health, users: { list: listUsers } })
+
+// Export with fetch — Nitro uses it directly
+export default { fetch: handler(appRouter) }
+```
+
+No H3, no file-system routing, no `katmanNitro` adapter — Katman IS the framework. Full content negotiation (JSON, MessagePack, devalue) works out of the box.
+
+```
+POST /health          → { status: "ok" }
+POST /users/list      → [{ id: 1, name: "Alice" }, ...]
+```
+
+<Callout>
+This is the same pattern Hono uses with Nitro. Nitro detects the `fetch` method on the default export and routes all requests through it.
+</Callout>
+
+## H3 mode
+
+If you need Nitro's file-system routing or want to mix Katman with H3 routes, use the `katmanNitro` adapter:
 
 ```ts twoslash
 // @noErrors
@@ -26,33 +69,14 @@ export default katmanNitro(appRouter, {
 })
 ```
 
-Nitro maps `[...path]` to the procedure path automatically:
+Nitro maps `[...path]` to the procedure path:
 
 ```
 POST /rpc/users/list     → users/list
 POST /rpc/users/create   → users/create
-GET  /rpc/health         → health
 ```
 
-## Catch-all with prefix
-
-If you prefer a single entry handler instead of a dedicated directory:
-
-```ts twoslash
-// @noErrors
-// server/routes/[...].ts
-import { katmanNitro } from "katman/nitro"
-import { appRouter } from "~/server/rpc"
-
-export default katmanNitro(appRouter, {
-  prefix: "/rpc",
-  context: (event) => ({ db: getDB() }),
-})
-```
-
-## Context from Nitro middleware
-
-Nitro middleware sets data on `event.context`. Use it to pass auth, session, or tenant info:
+### Context from Nitro middleware
 
 ```ts twoslash
 // @noErrors
@@ -60,8 +84,7 @@ Nitro middleware sets data on `event.context`. Use it to pass auth, session, or 
 import { defineMiddleware } from "nitro/h3"
 
 export default defineMiddleware((event) => {
-  const token = event.req.headers.get("authorization")
-  event.context.auth = verifyToken(token)
+  event.context.auth = verifyToken(event.req.headers.get("authorization"))
 })
 ```
 
@@ -70,22 +93,30 @@ export default defineMiddleware((event) => {
 // server/routes/rpc/[...path].ts
 export default katmanNitro(appRouter, {
   context: (event) => ({
-    user: event.context.auth,  // from middleware above
-    ip: event.req.headers.get("x-forwarded-for"),
+    user: event.context.auth,
   }),
 })
 ```
 
-## Input parsing
+## Which mode to choose?
 
-- **POST/PUT/PATCH** — body is parsed as JSON via `event.req.json()`
-- **GET** — input from `?data=` query parameter (JSON-encoded)
-
-Content negotiation (MessagePack, devalue) is not automatic — Nitro serializes the return value as JSON. For full protocol support, use `k.handler()` instead.
+| Scenario | Mode |
+|---|---|
+| New project, Katman is the only framework | **Direct** (`{ fetch: handler() }`) |
+| Existing Nitro/Nuxt app, adding RPC | **H3** (`katmanNitro()`) |
+| Need H3 middleware (auth, session, etc.) | **H3** |
+| Want full protocol support (msgpack, devalue, SSE) | **Direct** |
 
 <Callout type="info">
-This adapter targets Nitro v3 which uses H3 v2 internally. For Nitro v2 (Nuxt 3), use the [H3 adapter](/docs/integrations/h3) instead.
+Both modes target Nitro v3 (H3 v2). For Nitro v2 (Nuxt 3), use the [H3 adapter](/docs/integrations/h3) instead.
 </Callout>
+
+## Examples
+
+Working examples in the repo:
+
+- [`examples/nitro`](https://github.com/productdevbook/katman/tree/main/examples/nitro) — direct mode
+- [`examples/nitro-h3`](https://github.com/productdevbook/katman/tree/main/examples/nitro-h3) — H3 file-system routing
 
 ## What's next?
 
