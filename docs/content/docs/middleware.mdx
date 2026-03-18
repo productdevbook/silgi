@@ -1,0 +1,78 @@
+---
+title: Middleware
+description: Guards and wraps — the katman middleware system.
+icon: Shield
+---
+
+## Guards vs Wraps
+
+| | Guard | Wrap |
+|---|---|---|
+| Pattern | Flat — return context additions | Onion — before/after with `next()` |
+| Speed | ~47ns per guard | ~150ns per wrap (closure + await) |
+| Use case | Auth, context enrichment | Timing, logging, error handling |
+| Sync capable | Yes | No (always async) |
+
+## Guards
+
+```ts
+const auth = guard(async (ctx) => {
+  const token = ctx.headers.authorization?.replace("Bearer ", "")
+  const user = await verifyToken(token)
+  if (!user) throw new KatmanError("UNAUTHORIZED")
+  return { user, permissions: user.permissions }
+})
+
+const rateLimit = guard(async (ctx) => {
+  // from katman/ratelimit
+  return { rateLimit: await limiter.check(ctx.ip) }
+})
+
+// Stack multiple guards
+const adminOnly = guard((ctx) => {
+  if (!ctx.permissions?.includes("admin"))
+    throw new KatmanError("FORBIDDEN")
+})
+
+const proc = mutation({
+  use: [auth, rateLimit, adminOnly],
+  resolve: ({ ctx }) => {
+    // ctx.user, ctx.permissions, ctx.rateLimit all typed!
+  },
+})
+```
+
+## Wraps
+
+```ts
+const timing = wrap(async (ctx, next) => {
+  const start = performance.now()
+  const result = await next()
+  const ms = performance.now() - start
+  logger.info({ duration: ms }, "procedure completed")
+  return result
+})
+
+const errorBoundary = wrap(async (ctx, next) => {
+  try {
+    return await next()
+  } catch (error) {
+    Sentry.captureException(error)
+    throw error
+  }
+})
+```
+
+## Execution Order
+
+```
+Request
+  → Guard 1 (auth)     → merges { user } into ctx
+  → Guard 2 (rateLimit) → merges { rateLimit } into ctx
+  → Wrap 1 (timing)    → before
+    → Wrap 2 (errorBoundary) → before
+      → resolve()      → handler runs
+    → Wrap 2            → after
+  → Wrap 1              → after
+Response
+```

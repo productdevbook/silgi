@@ -1,0 +1,110 @@
+---
+title: Getting Started
+description: Install katman and create your first RPC API in 5 minutes.
+icon: Play
+---
+
+## Installation
+
+```bash
+npm install katman zod
+```
+
+## Create Your First API
+
+### 1. Define the Katman Instance
+
+```ts title="src/rpc.ts"
+import { katman } from "katman"
+
+export const k = katman({
+  context: (req) => ({
+    headers: Object.fromEntries(req.headers) as Record<string, string>,
+  }),
+})
+
+export const { query, mutation, guard, wrap, router } = k
+```
+
+### 2. Define Procedures
+
+```ts title="src/routes/users.ts"
+import { z } from "zod"
+import { query, mutation, guard } from "../rpc"
+import { KatmanError } from "katman"
+
+const auth = guard(async (ctx) => {
+  const token = ctx.headers.authorization?.replace("Bearer ", "")
+  if (!token) throw new KatmanError("UNAUTHORIZED")
+  return { userId: 1 }
+})
+
+export const listUsers = query(
+  z.object({ limit: z.number().min(1).max(100).optional() }),
+  ({ input }) => {
+    return db.users.findMany({ take: input.limit ?? 10 })
+  },
+)
+
+export const createUser = mutation({
+  use: [auth],
+  input: z.object({ name: z.string().min(1), email: z.string().email() }),
+  errors: { CONFLICT: 409 },
+  resolve: ({ input, fail }) => {
+    if (db.users.exists(input.email)) fail("CONFLICT")
+    return db.users.create(input)
+  },
+})
+```
+
+### 3. Create the Router
+
+```ts title="src/router.ts"
+import { router } from "./rpc"
+import { listUsers, createUser } from "./routes/users"
+
+export const appRouter = router({
+  users: {
+    list: listUsers,
+    create: createUser,
+  },
+})
+
+export type AppRouter = typeof appRouter
+```
+
+### 4. Start the Server
+
+```ts title="src/server.ts"
+import { k } from "./rpc"
+import { appRouter } from "./router"
+
+k.serve(appRouter, {
+  port: 3000,
+  scalar: true,  // API docs at /reference
+  ws: true,      // WebSocket RPC on same port
+})
+```
+
+### 5. Create a Client
+
+```ts title="src/client.ts"
+import { createClient } from "katman/client"
+import { createLink } from "katman/client/ofetch"
+import type { AppRouter } from "./router"
+import type { InferClient } from "katman"
+
+const link = createLink({ url: "http://localhost:3000" })
+export const client = createClient<InferClient<AppRouter>>(link)
+
+// Fully typed!
+const users = await client.users.list({ limit: 5 })
+const user = await client.users.create({ name: "Alice", email: "alice@test.com" })
+```
+
+## What's Next?
+
+- [Core Concepts](/docs/concepts) — Guards, wraps, hooks, type inference
+- [Server](/docs/server) — serve(), handler(), HTTP/2, Scalar
+- [Client](/docs/client) — ofetch transport, binary mode, interceptors
+- [Plugins](/docs/plugins) — CORS, OTel, rate limiting, logging

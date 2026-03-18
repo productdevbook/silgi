@@ -1,0 +1,33 @@
+---
+title: TanStack Query
+description: queryOptions, mutationOptions, queryKey — works with React, Vue, Solid, Svelte.
+icon: Database
+---
+
+```ts
+import { createQueryUtils } from "katman/tanstack-query"
+
+const utils = createQueryUtils(client)
+
+// useQuery
+const { data } = useQuery(
+  utils.users.list.queryOptions({ input: { limit: 10 } })
+)
+
+// useMutation
+const mutation = useMutation(
+  utils.users.create.mutationOptions({
+    onSuccess: (user) => {
+      queryClient.invalidateQueries({ queryKey: utils.users.key() })
+    },
+  })
+)
+
+// Prefetch
+await queryClient.prefetchQuery(
+  utils.users.list.queryOptions({ input: { limit: 10 } })
+)
+
+// Invalidate all user queries
+queryClient.invalidateQueries({ queryKey: utils.users.key() })
+```

@@ -1,0 +1,67 @@
+---
+title: Server
+description: serve(), handler(), HTTP/2, Scalar API docs.
+icon: Server
+---
+
+## serve()
+
+One-line Node.js HTTP server:
+
+```ts
+k.serve(appRouter, {
+  port: 3000,
+  hostname: "0.0.0.0",
+  scalar: true,                           // /reference + /openapi.json
+  ws: true,                               // WebSocket RPC on same port
+  http2: { cert: "./cert.pem", key: "./key.pem" }, // HTTP/2 + TLS
+})
+```
+
+Features:
+- **Auto port finding** — if 3000 is busy, tries 3001-3100 (via `get-port-please`)
+- **Scalar UI** — OpenAPI 3.1.0 spec + interactive API docs at `/reference`
+- **WebSocket** — crossws bidirectional RPC on same port
+- **HTTP/2** — TLS with automatic HTTP/1.1 fallback
+- **Content negotiation** — JSON, MessagePack, devalue (based on Accept header)
+- **Lifecycle hooks** — request/response/error/serve:start
+
+## handler()
+
+Fetch API handler — works on Node.js, Bun, Deno, Cloudflare Workers:
+
+```ts
+const handle = k.handler(appRouter)
+
+// Node.js
+const server = createServer(async (req, res) => {
+  const response = await handle(toRequest(req))
+  // ...
+})
+
+// Bun
+Bun.serve({ fetch: handle })
+
+// Deno
+Deno.serve(handle)
+```
+
+## Scalar OpenAPI
+
+```ts
+k.serve(appRouter, {
+  scalar: {
+    title: "My API",
+    version: "2.0.0",
+    description: "Production API",
+    security: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+    servers: [{ url: "https://api.example.com" }],
+    contact: { email: "dev@example.com" },
+    license: { name: "MIT" },
+  },
+})
+```
+
+Endpoints:
+- `GET /reference` — Scalar API Reference UI
+- `GET /openapi.json` — OpenAPI 3.1.0 JSON spec

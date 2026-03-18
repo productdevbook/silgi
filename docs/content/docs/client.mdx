@@ -1,0 +1,92 @@
+---
+title: Client
+description: Type-safe RPC client with ofetch, binary mode, interceptors.
+icon: Globe
+---
+
+## Setup
+
+```ts
+import { createClient } from "katman/client"
+import { createLink } from "katman/client/ofetch"
+import type { InferClient } from "katman"
+import type { AppRouter } from "./router"
+
+const link = createLink({
+  url: "http://localhost:3000",
+  timeout: 5000,
+  retry: 2,
+  retryDelay: (ctx) => Math.min(1000 * 2 ** ctx.retryCount, 10000),
+  headers: () => ({ authorization: `Bearer ${getToken()}` }),
+})
+
+const client = createClient<InferClient<AppRouter>>(link)
+```
+
+## Usage
+
+```ts
+// Query
+const users = await client.users.list({ limit: 10 })
+
+// Mutation
+const user = await client.users.create({ name: "Alice", email: "a@test.com" })
+
+// Nested
+const result = await client.admin.settings.update({ theme: "dark" })
+```
+
+## Binary Mode (MessagePack)
+
+30% smaller payloads, native Date support:
+
+```ts
+const link = createLink({
+  url: "http://localhost:3000",
+  binary: true,  // MessagePack protocol
+})
+```
+
+## Interceptors
+
+```ts
+const link = createLink({
+  url: "http://localhost:3000",
+  onRequest: ({ options }) => {
+    console.log("Sending:", options)
+  },
+  onResponse: ({ response }) => {
+    console.log("Status:", response?.status)
+  },
+  onRequestError: ({ error }) => {
+    console.error("Network error:", error)
+  },
+})
+```
+
+## Client Plugins
+
+```ts
+import { withRetry, withDedupe, withCSRF } from "katman/client/plugins"
+
+// Retry on failure
+const retryLink = withRetry(link, { maxRetries: 3, retryDelay: 1000 })
+
+// Deduplicate concurrent identical requests
+const dedupeLink = withDedupe(retryLink)
+
+// CSRF protection
+const csrfLink = withCSRF(dedupeLink, { headerName: "x-csrf-token" })
+
+const client = createClient<InferClient<AppRouter>>(csrfLink)
+```
+
+## Fetch Transport (lightweight)
+
+No external deps, uses native `fetch`:
+
+```ts
+import { RPCLink } from "katman/client/fetch"
+
+const link = new RPCLink({ url: "http://localhost:3000" })
+```

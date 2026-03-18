@@ -1,0 +1,25 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "index",
+    "---Getting Started---",
+    "getting-started",
+    "concepts",
+    "---Server---",
+    "server",
+    "middleware",
+    "errors",
+    "---Client---",
+    "client",
+    "---Protocols---",
+    "protocols",
+    "websocket",
+    "---Integrations---",
+    "fastify",
+    "react",
+    "tanstack-query",
+    "ai-sdk",
+    "---Plugins---",
+    "plugins"
+  ]
+}

@@ -1,0 +1,75 @@
+---
+title: Plugins
+description: CORS, OpenTelemetry, Pino logging, rate limiting.
+icon: Plug
+---
+
+## CORS
+
+```ts
+import { corsHeaders } from "katman/cors"
+
+const headers = corsHeaders({
+  origin: "https://app.example.com",
+  credentials: true,
+  methods: ["GET", "POST"],
+  maxAge: 86400,
+})
+```
+
+## OpenTelemetry
+
+Wrap middleware for distributed tracing:
+
+```ts
+import { otelWrap } from "katman/otel"
+import { trace } from "@opentelemetry/api"
+
+const tracing = otelWrap(trace.getTracer("my-service"))
+
+const proc = query({
+  use: [tracing],
+  resolve: ({ ctx }) => ctx.db.find(),
+})
+```
+
+## Pino Logging
+
+```ts
+import pino from "pino"
+import { loggingHooks } from "katman/pino"
+
+const k = katman({
+  context: (req) => ({}),
+  hooks: loggingHooks({ logger: pino() }),
+})
+```
+
+## Rate Limiting
+
+```ts
+import { rateLimitGuard, MemoryRateLimiter } from "katman/ratelimit"
+
+const rateLimit = rateLimitGuard({
+  limiter: new MemoryRateLimiter({ limit: 100, windowMs: 60_000 }),
+  keyFn: (ctx) => (ctx as any).ip ?? "anonymous",
+})
+
+const proc = query({
+  use: [rateLimit],
+  resolve: () => ({ ok: true }),
+})
+```
+
+Custom backend (Redis, Upstash, etc.):
+
+```ts
+import type { RateLimiter } from "katman/ratelimit"
+
+class RedisRateLimiter implements RateLimiter {
+  async limit(key: string) {
+    // your Redis logic
+    return { success: true, limit: 100, remaining: 99, reset: Date.now() + 60000 }
+  }
+}
+```

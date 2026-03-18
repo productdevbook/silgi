@@ -1,0 +1,67 @@
+---
+title: Typed Errors
+description: Type-safe error handling with fail() and error maps.
+icon: AlertTriangle
+---
+
+## Error Maps
+
+Define errors per procedure — fully typed:
+
+```ts
+const createUser = mutation({
+  input: z.object({ email: z.string().email() }),
+  errors: {
+    CONFLICT: 409,                                    // status-only shorthand
+    VALIDATION: { status: 400, data: z.object({       // with typed data
+      field: z.string(),
+      message: z.string(),
+    })},
+  },
+  resolve: ({ input, fail }) => {
+    if (exists(input.email)) fail("CONFLICT")         // no data needed
+    if (invalid(input)) fail("VALIDATION", {           // data required + typed
+      field: "email",
+      message: "Already taken",
+    })
+    return db.users.create(input)
+  },
+})
+```
+
+## KatmanError
+
+Throw manually with `KatmanError`:
+
+```ts
+import { KatmanError } from "katman"
+
+throw new KatmanError("NOT_FOUND")              // auto status 404
+throw new KatmanError("CUSTOM", {
+  status: 418,
+  message: "I'm a teapot",
+  data: { reason: "custom" },
+})
+```
+
+## Client Error Handling
+
+```ts
+import { safe } from "katman/client"
+
+// Option 1: try/catch
+try {
+  await client.users.create({ email: "taken@test.com" })
+} catch (error) {
+  if (error instanceof KatmanError) {
+    console.log(error.code)   // "CONFLICT"
+    console.log(error.status) // 409
+  }
+}
+
+// Option 2: safe() wrapper — [error, data] tuple
+const { error, data, isError } = await safe(
+  client.users.create({ email: "taken@test.com" })
+)
+if (isError) console.log(error.code) // "CONFLICT"
+```

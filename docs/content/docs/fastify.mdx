@@ -1,0 +1,32 @@
+---
+title: Fastify Adapter
+description: Register katman router as a Fastify plugin.
+icon: Zap
+---
+
+```ts
+import Fastify from "fastify"
+import { katmanFastify } from "katman/fastify"
+
+const app = Fastify()
+
+// Existing Fastify routes
+app.get("/legacy", async () => ({ type: "rest" }))
+
+// Register katman router
+app.register(katmanFastify(appRouter, {
+  context: (req) => ({ user: req.user }),
+}), { prefix: "/rpc" })
+
+app.listen({ port: 3000 })
+```
+
+Each procedure becomes a POST route. Nested routers create nested paths:
+
+```
+POST /rpc/health
+POST /rpc/users/list
+POST /rpc/users/create
+```
+
+Supports JSON, MessagePack, and devalue content negotiation.

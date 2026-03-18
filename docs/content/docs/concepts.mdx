@@ -1,0 +1,131 @@
+---
+title: Core Concepts
+description: Guards, wraps, hooks, type inference — how katman works.
+icon: BookOpen
+---
+
+## Procedures
+
+Every API endpoint is a **procedure** — either a `query` (read), `mutation` (write), or `subscription` (stream).
+
+```ts
+// Short form — just a resolve function
+const health = query(() => ({ status: "ok" }))
+
+// Short form with input schema
+const getUser = query(z.object({ id: z.number() }), ({ input }) => {
+  return db.users.get(input.id)
+})
+
+// Full config form
+const createUser = mutation({
+  use: [auth, timing],
+  input: z.object({ name: z.string() }),
+  output: UserSchema,
+  errors: { CONFLICT: 409 },
+  resolve: ({ input, ctx, fail }) => {
+    if (exists(input.name)) fail("CONFLICT")
+    return db.users.create(input)
+  },
+})
+```
+
+## Guards
+
+Guards enrich the context. They run before the handler, and their return value is merged into `ctx`.
+
+```ts
+const auth = guard(async (ctx) => {
+  const user = await verifyToken(ctx.headers.authorization)
+  if (!user) throw new KatmanError("UNAUTHORIZED")
+  return { user }  // merged into ctx
+})
+
+// Now ctx.user is available in the handler
+const me = query({
+  use: [auth],
+  resolve: ({ ctx }) => ctx.user,  // typed!
+})
+```
+
+Guards are **flat** — no `next()` callback, no closure per request. This is why katman is 5.7x faster than oRPC's onion middleware.
+
+## Wraps
+
+Wraps are onion-style middleware for before/after logic:
+
+```ts
+const timing = wrap(async (ctx, next) => {
+  const start = Date.now()
+  const result = await next()
+  console.log(`Took ${Date.now() - start}ms`)
+  return result
+})
+```
+
+## Lifecycle Hooks
+
+Hooks are registered globally via `katman()` or dynamically via `k.hook()`:
+
+```ts
+const k = katman({
+  context: (req) => ({}),
+  hooks: {
+    request: ({ path, input }) => console.log(`-> ${path}`),
+    response: ({ path, durationMs }) => console.log(`<- ${path} ${durationMs}ms`),
+    error: ({ path, error }) => console.error(`x ${path}`, error),
+    "serve:start": ({ url }) => console.log(`Server at ${url}`),
+  },
+})
+
+// Dynamic hooks
+const unhook = k.hook("request", ({ path }) => metrics.inc(path))
+unhook() // remove later
+```
+
+## Typed Errors
+
+```ts
+const deleteUser = mutation({
+  errors: {
+    NOT_FOUND: 404,
+    FORBIDDEN: { status: 403, data: z.object({ reason: z.string() }) },
+  },
+  resolve: ({ input, fail }) => {
+    if (!user) fail("NOT_FOUND")                       // typed!
+    if (!owner) fail("FORBIDDEN", { reason: "Not owner" }) // data typed!
+  },
+})
+```
+
+## Type Inference
+
+Katman infers types end-to-end:
+
+```ts
+// Server defines the router
+const appRouter = router({ users: { list: listUsers, create: createUser } })
+
+// Client gets full types — no codegen needed
+type Client = InferClient<typeof appRouter>
+// Client.users.list: (input: { limit?: number }) => Promise<User[]>
+// Client.users.create: (input: { name: string }) => Promise<User>
+```
+
+## Standard Schema
+
+Katman uses `@standard-schema/spec` — works with any validator:
+
+```ts
+// Zod
+import { z } from "zod"
+const schema = z.object({ name: z.string() })
+
+// Valibot
+import * as v from "valibot"
+const schema = v.object({ name: v.string() })
+
+// ArkType
+import { type } from "arktype"
+const schema = type({ name: "string" })
+```

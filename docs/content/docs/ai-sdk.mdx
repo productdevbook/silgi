@@ -1,0 +1,43 @@
+---
+title: AI SDK
+description: Expose katman procedures as AI tools for LLM function calling.
+icon: Brain
+---
+
+```ts
+import { generateText } from "ai"
+import { openai } from "@ai-sdk/openai"
+import { routerToTools } from "katman/ai"
+
+const tools = routerToTools(appRouter)
+
+const { text } = await generateText({
+  model: openai("gpt-4o"),
+  tools,
+  prompt: "List all users with limit 5, then create a new user named Bob",
+})
+```
+
+## Single Procedure
+
+```ts
+import { procedureToTool } from "katman/ai"
+
+const searchTool = procedureToTool("search", appRouter.search, {
+  description: "Search the database for items",
+})
+```
+
+## Filtering
+
+```ts
+const tools = routerToTools(appRouter, {
+  filter: (path) => !path.startsWith("admin_"),
+  descriptions: {
+    users_list: "List all users in the system",
+    users_create: "Create a new user account",
+  },
+})
+```
+
+Auto-extracts JSON Schema from Zod input schemas for LLM function calling.

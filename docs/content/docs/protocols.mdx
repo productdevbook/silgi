@@ -1,0 +1,66 @@
+---
+title: Protocols & Codecs
+description: JSON, MessagePack, devalue — choose your wire format.
+icon: Layers
+---
+
+Katman supports 3 wire formats via content negotiation. The server responds based on the client's `Accept` header.
+
+## JSON (default)
+
+Standard JSON — fastest encode/decode, universal compatibility.
+
+```
+Content-Type: application/json
+```
+
+## MessagePack (binary)
+
+30% smaller payloads, native Date support. No competitor offers this.
+
+```ts
+// Client
+import { createLink } from "katman/client/ofetch"
+const link = createLink({ url: "http://localhost:3000", binary: true })
+
+// Manual
+import { encode, decode } from "katman/msgpack"
+const buf = encode({ name: "Alice", joined: new Date() })
+const data = decode(buf)
+```
+
+```
+Content-Type: application/x-msgpack
+Accept: application/x-msgpack
+```
+
+## devalue (rich types)
+
+Supports Date, Map, Set, BigInt, RegExp, undefined, circular references.
+
+```ts
+import { encode, decode } from "katman/devalue"
+
+const data = {
+  users: new Map([["alice", { id: 1 }]]),
+  tags: new Set(["admin"]),
+  count: 9007199254740993n,
+  created: new Date(),
+}
+
+const str = encode(data)  // JSON string with type markers
+const back = decode(str)  // Map, Set, BigInt, Date all restored
+```
+
+```
+Content-Type: application/x-devalue+json
+Accept: application/x-devalue+json
+```
+
+## Size Comparison
+
+| Payload | JSON | MessagePack | Savings |
+|---|---|---|---|
+| Small (1 object) | 33B | 22B | 33% |
+| Medium (10 objects) | 661B | 493B | 25% |
+| Large (100 objects) | 9.5KB | 6.7KB | 30% |

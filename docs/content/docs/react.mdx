@@ -1,0 +1,59 @@
+---
+title: React Server Actions
+description: Type-safe server actions from katman procedures.
+icon: Atom
+---
+
+## createAction
+
+```ts title="app/actions.ts"
+"use server"
+import { createAction } from "katman/react"
+import { appRouter } from "./router"
+
+export const listUsers = createAction(appRouter.users.list)
+export const createUser = createAction(appRouter.users.create)
+```
+
+```tsx title="app/page.tsx"
+import { listUsers, createUser } from "./actions"
+
+export default async function Page() {
+  const [error, users] = await listUsers({ limit: 10 })
+  if (error) return <p>Error: {error.message}</p>
+  return <ul>{users.map(u => <li key={u.id}>{u.name}</li>)}</ul>
+}
+```
+
+## createActions
+
+Convert entire router at once:
+
+```ts
+import { createActions } from "katman/react"
+
+const actions = createActions(appRouter)
+
+const [error, users] = await actions.users.list({ limit: 10 })
+const [error2, user] = await actions.users.create({ name: "Alice" })
+```
+
+## createFormAction
+
+```ts
+import { createFormAction } from "katman/react"
+
+export const submitForm = createFormAction(appRouter.users.create)
+```
+
+```tsx
+<form action={submitForm}>
+  <input name="name" />
+  <input name="email" type="email" />
+  <button type="submit">Create</button>
+</form>
+```
+
+Supports bracket notation: `user[name]` → `{ user: { name: value } }`.
+
+Next.js redirect/notFound errors and TanStack Router errors are automatically rethrown.
