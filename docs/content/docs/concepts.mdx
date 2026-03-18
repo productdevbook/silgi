@@ -136,23 +136,22 @@ Hooks have a **sync fast-path** — when all hooks are synchronous, zero Promise
 Types flow end-to-end — no codegen needed:
 
 ```ts twoslash
-// @noErrors
-type InferClient<T> = {
-  [K in keyof T]: T[K] extends { resolve: (...args: any) => infer R }
-    ? () => Promise<R>
-    : T[K] extends object
-      ? InferClient<T[K]>
-      : never
-}
+import { katman } from "katman"
+import { z } from "zod"
 
-const appRouter = {
+const k = katman({ context: () => ({}) })
+
+const appRouter = k.router({
+  health: k.query(() => ({ status: "ok" as const })),
   users: {
-    list: { resolve: () => [{ id: 1, name: "Alice" }] },
-    create: { resolve: () => ({ id: 2, name: "Bob" }) },
+    list: k.query(
+      z.object({ limit: z.number().optional() }),
+      ({ input }) => [{ id: 1, name: "Alice" }].slice(0, input.limit),
+    ),
   },
-}
+})
 
-type Client = InferClient<typeof appRouter>
+type AppRouter = typeof appRouter
 //   ^?
 ```
 
