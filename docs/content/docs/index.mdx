@@ -31,8 +31,11 @@ const getUsers = k.query(
   ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
 )
 
-// 3. Create a router and start the server
-k.serve(k.router({ getUsers }), { port: 3000 })
+// 3. Create a router
+const appRouter = k.router({ getUsers })
+
+// 4. Start the server
+k.serve(appRouter, { port: 3000 })
 ```
 
 That's it. The client gets full types automatically.

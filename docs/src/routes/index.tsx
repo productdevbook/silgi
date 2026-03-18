@@ -104,8 +104,13 @@ const CODE = [
   '  ({ input, ctx }) =&gt; ctx.db.users.<span class="fn">find</span>(input)',
   ')',
   '',
-  'k.<span class="fn">serve</span>(k.<span class="fn">router</span>({ users }), {',
-  '  port: <span class="nr">3000</span>, scalar: <span class="kw">true</span>, ws: <span class="kw">true</span>',
+  '<span class="cm">// Router &amp; serve</span>',
+  '<span class="kw">const</span> appRouter = k.<span class="fn">router</span>({ users })',
+  '',
+  'k.<span class="fn">serve</span>(appRouter, {',
+  '  port: <span class="nr">3000</span>,',
+  '  scalar: <span class="kw">true</span>,',
+  '  ws: <span class="kw">true</span>,',
   '})',
 ].join('\n');
 
