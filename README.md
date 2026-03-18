@@ -2,27 +2,11 @@
 
 The fastest end-to-end type-safe RPC framework for TypeScript.
 
-**14x faster pipeline. 6x less memory. Single package.**
+**5.7x faster** than oRPC. **18x faster** than H3. Single package.
 
-```
+```bash
 npm install katman
 ```
-
-## Why Katman?
-
-|  | Bare Node | oRPC | Katman |
-|---|---|---|---|
-| HTTP overhead (body + Zod) | 0µs (baseline) | +25µs | **~0µs** |
-| HTTP latency (body + Zod) | 84µs | 109µs | **80µs (1.4x vs oRPC)** |
-| Pipeline (no middleware) | — | 685 ns | **49 ns (14x)** |
-| Pipeline (3 middleware + Zod) | — | 1756 ns | **302 ns (5.8x)** |
-| Memory per call | — | 8.2 KB | **1.4 KB (6x less)** |
-| API style | Chain builder | Chain builder | **Single object** |
-| query/mutation distinction | No | Yes | **Yes** |
-| Middleware model | All onion | All onion | **guard (flat) + wrap (onion)** |
-| Package count | 37 packages | 10+ packages | **1 package** |
-| OpenAPI generation | Yes | Plugin | **Yes** |
-| SSE/Streaming | Yes | Yes | **Yes** |
 
 ## Quick Start
 
@@ -30,192 +14,256 @@ npm install katman
 import { katman, KatmanError } from "katman"
 import { z } from "zod"
 
-const k = katman({
-  context: (req) => ({
-    db: getDB(),
-    headers: Object.fromEntries(req.headers),
-  }),
-})
+const k = katman({ context: (req) => ({ db: getDB() }) })
+const { query, mutation, guard, wrap, router } = k
 
-const { query, mutation, subscription, guard, wrap, router, handler } = k
-```
-
-### Define middleware
-
-```ts
-// Guard — flat execution, zero closures, sync fast-path
+// Guard middleware (flat, zero-closure)
 const auth = guard(async (ctx) => {
   const user = await verify(ctx.headers.authorization)
   if (!user) throw new KatmanError("UNAUTHORIZED")
-  return { user } // merged into context
+  return { user }
 })
 
-// Wrap — onion model, for before/after logic
-const timing = wrap(async (ctx, next) => {
-  const t0 = performance.now()
-  const result = await next()
-  console.log(`${(performance.now() - t0).toFixed(1)}ms`)
-  return result
-})
-```
-
-### Define procedures
-
-```ts
-// Short form — schema + function
+// Query — short form
 const listUsers = query(
   z.object({ limit: z.number().optional() }),
   async ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
 )
 
-// Config form — middleware, errors, validation
+// Mutation — full config
 const createUser = mutation({
-  use: [auth, timing],
+  use: [auth],
   input: z.object({ name: z.string(), email: z.string().email() }),
-  output: UserSchema,
   errors: { CONFLICT: 409 },
   resolve: async ({ input, ctx, fail }) => {
-    if (await ctx.db.users.findByEmail(input.email)) fail("CONFLICT")
-    return ctx.db.users.create({ ...input, by: ctx.user.id })
+    if (await ctx.db.users.exists(input.email)) fail("CONFLICT")
+    return ctx.db.users.create(input)
   },
 })
 
-// SSE streaming
-const live = subscription(async function* ({ ctx }) {
-  for await (const event of ctx.db.changes()) yield event
+// Router + Serve
+const appRouter = router({ users: { list: listUsers, create: createUser } })
+
+k.serve(appRouter, {
+  port: 3000,
+  scalar: true,       // API docs at /reference
+  ws: true,           // WebSocket RPC on same port
 })
 ```
-
-### Serve
-
-```ts
-const appRouter = router({
-  users: { list: listUsers, create: createUser },
-  live,
-})
-
-// Node.js
-k.serve(appRouter, { port: 3000 })
-
-// Cloudflare Workers / Deno / Bun
-export default { fetch: handler(appRouter) }
-```
-
-## How It's Fast
-
-### 1. Guard/Wrap Split
-
-Most middleware (auth, rate limit, permissions) only enriches context — it doesn't need before/after logic. Katman separates these as **guards** (flat, zero closures) from **wraps** (onion model):
-
-```
-Traditional (oRPC/tRPC):     Katman:
-mw1 → mw2 → mw3 → handler   guard1 → guard2 → guard3 (flat, 0 closures)
-  ↑      ↑      ↑                                    ↓
-  └──────┴──────┘             wrap1(handler)          (1 closure)
-  3 closures + 6 async hops   0 closures + 2 async hops
-```
-
-### 2. Unrolled Guard Execution
-
-Guards are specialized for 0-4 count — no loop overhead. V8's Maglev compiler inlines each guard call:
-
-```ts
-// 3 guards → direct calls, no loop
-runGuards3(ctx, authGuard, rateLimitGuard, permGuard)
-```
-
-### 3. Flat Map Router
-
-Routes compile to a `Map<string, Handler>` at startup. Request-time lookup is O(1):
-
-```ts
-// oRPC: traverse router tree per request — O(depth)
-// Katman: map.get("users/list") — O(1)
-```
-
-### 4. Context Pool
-
-Pre-allocated context objects are borrowed and returned per request — zero GC pressure.
-
-### 5. Zero URL Parsing
-
-Pathname extracted via string manipulation (5ns) instead of `new URL()` (198ns) — 40x faster.
-
-## Ecosystem
-
-All from a single `npm install katman`:
-
-| Import | What |
-|---|---|
-| `katman` | Core API — katman, KatmanError, types |
-| `katman/node` | Node.js HTTP adapter |
-| `katman/fetch` | Fetch API adapter (Workers, Deno, Bun) |
-| `katman/fastify` | Fastify adapter |
-| `katman/websocket` | WebSocket handler |
-| `katman/plugins` | CORS, CSRF, Batch plugins |
-| `katman/openapi` | OpenAPI 3.1.1 spec generation |
-| `katman/zod` | Zod → JSON Schema converter |
-| `katman/tanstack-query` | TanStack Query integration |
-| `katman/react` | React Server Actions |
-| `katman/otel` | OpenTelemetry tracing |
-| `katman/pino` | Pino structured logging |
-| `katman/ratelimit` | Rate limiting middleware |
-| `katman/client` | Type-safe RPC client |
-| `katman/client/fetch` | Fetch transport |
-| `katman/client/plugins` | Retry, Batch, Dedupe, CSRF |
 
 ## Benchmarks
 
-> Auto-updated by `pnpm bench`. See [BENCHMARKS.md](./BENCHMARKS.md) for full results.
+Auto-generated on Apple M3 Max, Node.js v24.
 
-### Pipeline Performance (pure framework overhead)
+### Pipeline (pure execution, no HTTP)
 
+| Scenario | Katman | oRPC | H3 v2 | vs oRPC | vs H3 |
+|---|---|---|---|---|---|
+| No middleware | **112 ns** | 692 ns | 2161 ns | **6.2x** | **19.3x** |
+| Zod validation | **260 ns** | 865 ns | 4678 ns | **3.3x** | **18.0x** |
+| 3 mw + Zod | **318 ns** | 1823 ns | 4291 ns | **5.7x** | **13.5x** |
+| 5 mw + Zod | **450 ns** | 2420 ns | 4427 ns | **5.4x** | **9.8x** |
+
+### HTTP/1.1 (full TCP request/response)
+
+| Scenario | Katman | oRPC | vs oRPC |
+|---|---|---|---|
+| Simple query | **86 us** | 87 us | ~tied |
+| Zod validation | **103 us** | 135 us | **1.3x faster** |
+| Guard + Zod | **88 us** | 131 us | **1.5x faster** |
+
+### WebSocket (persistent connection)
+
+| | Katman | oRPC | H3 |
+|---|---|---|---|
+| Latency | **44 us** | 47 us | 39 us |
+
+### Runtime Support
+
+| Runtime | handler() | serve() | WebSocket |
+|---|---|---|---|
+| **Node.js 22+** | 9 us/req | Full | Full |
+| **Bun** | 2 us/req | Full | Full |
+
+## Features
+
+### Core
+- **Type-safe** -- Input, output, context, errors all fully typed
+- **Single package** -- No `@katman/server` + `@katman/client` + `@katman/contract`
+- **Standard Schema** -- Works with Zod, Valibot, ArkType
+- **Guard/Wrap middleware** -- Flat guards (context enrichment) + wraps (onion lifecycle)
+- **Compiled pipeline** -- Pre-linked middleware chain, unrolled guard runners
+
+### Server
+- **serve()** -- One-line Node.js server with auto port finding
+- **handler()** -- Fetch API handler for any runtime (Node, Bun, Deno, Cloudflare)
+- **HTTP/2** -- TLS with HTTP/1.1 fallback: `serve(router, { http2: { cert, key } })`
+- **WebSocket RPC** -- Bidirectional on same port: `serve(router, { ws: true })`
+- **Scalar UI** -- API docs at `/reference`: `serve(router, { scalar: true })`
+
+### Client
+- **ofetch transport** -- Retry, timeout, interceptors built-in
+- **Binary protocol** -- MessagePack (30% smaller payloads): `createLink({ binary: true })`
+- **Rich types** -- devalue codec for Date, Map, Set, BigInt across the wire
+- **Type-safe client** -- `createClient<AppRouter>(link)` with full inference
+- **Plugins** -- Retry, dedupe, batch, CSRF
+
+### Protocols and Codecs
+- **JSON** -- Default, fastest encode/decode
+- **MessagePack** -- Binary, 30% smaller, Date native (no competitor has this)
+- **devalue** -- Date, Map, Set, BigInt, RegExp, circular refs, undefined
+
+### Plugins
+- **Rate limiting** -- In-memory or custom backend
+- **CORS** -- HTTP-level CORS headers
+- **OpenTelemetry** -- Span per procedure call
+- **Pino** -- Structured logging
+- **Batch** -- Multiple RPC calls in one HTTP request
+- **CSRF** -- Token-based protection
+
+### Lifecycle Hooks
+```ts
+const k = katman({
+  context: (req) => ({}),
+  hooks: {
+    request: ({ path, input }) => console.log(`-> ${path}`),
+    response: ({ path, durationMs }) => console.log(`<- ${path} ${durationMs}ms`),
+    error: ({ path, error }) => console.error(`x ${path}`, error),
+  },
+})
+
+// Dynamic hooks
+const unhook = k.hook("request", ({ path }) => metrics.inc(path))
+unhook() // remove
 ```
-Apple M3 Max | Node v24.11.0 | mitata
 
-Scenario                     oRPC         Katman        Speedup
-──────────────────────────────────────────────────────────────
-No middleware                685 ns       49 ns         14.0x faster
-Zod input validation         858 ns       226 ns        3.8x faster
-3 middleware + Zod          1756 ns       302 ns        5.8x faster
-5 middleware + Zod          2477 ns       430 ns        5.8x faster
+## Client Usage
+
+```ts
+import { createClient } from "katman/client"
+import { createLink } from "katman/client/ofetch"
+
+const link = createLink({
+  url: "http://localhost:3000",
+  binary: true,           // MessagePack protocol
+  timeout: 5000,
+  retry: 2,
+  retryDelay: (ctx) => Math.min(1000 * 2 ** ctx.retryCount, 10000),
+  headers: () => ({ authorization: `Bearer ${getToken()}` }),
+  onRequest: ({ options }) => { /* intercept */ },
+})
+
+const client = createClient<typeof appRouter>(link)
+
+const users = await client.users.list({ limit: 10 })
+const user = await client.users.create({ name: "Alice", email: "alice@test.com" })
 ```
 
-### HTTP Framework Overhead (the real comparison)
+## WebSocket Client
 
-How much latency does each framework add on top of bare Node.js?
+```ts
+const ws = new WebSocket("ws://localhost:3000")
 
-```
-Apple M3 Max | Node v24.11.0 | 5000 requests
+ws.onopen = () => {
+  ws.send(JSON.stringify({ id: "1", path: "users/list", input: { limit: 10 } }))
+}
 
-                         Latency     Framework overhead
-───────────────────────────────────────────────────────
-Bare Node (floor)        84µs        0µs (baseline)
-Katman                   80µs        ~0µs ← near-zero overhead
-oRPC                    109µs       +25µs
-```
-
-Katman adds virtually **zero overhead** to bare Node.js HTTP. oRPC adds 25µs per request — that's the 14x pipeline difference showing up in real HTTP.
-
-### HTTP Throughput (Katman vs H3 v2 vs oRPC)
-
-```
-3000 sequential requests — Node v24.11.0
-
-Scenario              Katman          H3 v2           oRPC
-──────────────────────────────────────────────────────────
-Simple                57µs 17.7K/s   71µs 14.0K/s   69µs 14.5K/s
-Zod validation        80µs 12.4K/s   92µs 10.9K/s  103µs  9.7K/s
-Guard + Zod           77µs 12.9K/s   91µs 10.9K/s  110µs  9.1K/s
+ws.onmessage = (event) => {
+  const { id, result, error } = JSON.parse(event.data)
+  console.log(result) // [{ id: 1, name: "Alice" }, ...]
+}
 ```
 
-### Run benchmarks
+## OpenAPI / Scalar
 
-```sh
-pnpm bench              # all benchmarks → updates BENCHMARKS.md
-pnpm bench:orpc         # pipeline: oRPC vs Katman
-pnpm bench:h3           # HTTP: Katman vs H3 v2 vs oRPC
+```ts
+k.serve(appRouter, {
+  scalar: {
+    title: "My API",
+    version: "2.0.0",
+    description: "Production API",
+    security: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+    servers: [{ url: "https://api.example.com", description: "Production" }],
+    contact: { email: "dev@example.com" },
+  },
+})
+// -> /reference (Scalar UI)
+// -> /openapi.json (OpenAPI 3.1.0 spec)
 ```
+
+## Middleware
+
+```ts
+// Guard -- enriches context (flat, sync-capable)
+const auth = guard(async (ctx) => {
+  const token = ctx.headers.authorization?.replace("Bearer ", "")
+  const user = await verifyToken(token)
+  if (!user) throw new KatmanError("UNAUTHORIZED")
+  return { user }  // merged into ctx
+})
+
+// Wrap -- onion lifecycle (before + after)
+const timing = wrap(async (ctx, next) => {
+  const start = Date.now()
+  const result = await next()
+  console.log(`${Date.now() - start}ms`)
+  return result
+})
+
+// Use in procedure
+const protectedQuery = query({
+  use: [auth, timing],
+  input: z.object({ id: z.number() }),
+  resolve: ({ ctx, input }) => ctx.db.users.get(input.id),
+})
+```
+
+## Typed Errors
+
+```ts
+const deleteUser = mutation({
+  use: [auth],
+  input: z.object({ id: z.number() }),
+  errors: {
+    NOT_FOUND: 404,
+    FORBIDDEN: { status: 403, data: z.object({ reason: z.string() }) },
+  },
+  resolve: ({ input, ctx, fail }) => {
+    const user = ctx.db.users.get(input.id)
+    if (!user) fail("NOT_FOUND")
+    if (user.ownerId !== ctx.user.id) fail("FORBIDDEN", { reason: "Not owner" })
+    return ctx.db.users.delete(input.id)
+  },
+})
+```
+
+## How to Run
+
+```bash
+pnpm install
+pnpm dev              # vitest watch
+pnpm test             # vitest run (304 tests)
+pnpm build            # obuild -> dist/
+pnpm play             # playground server
+pnpm bench            # full benchmark suite
+pnpm typecheck        # tsgo --noEmit
+```
+
+## Tech Stack
+
+| Tool | Purpose |
+|---|---|
+| [obuild](https://github.com/unjs/obuild) | Build (rolldown + oxc) |
+| [ofetch](https://github.com/unjs/ofetch) | Client HTTP transport |
+| [hookable](https://github.com/unjs/hookable) | Lifecycle hooks |
+| [crossws](https://github.com/unjs/crossws) | WebSocket adapter |
+| [defu](https://github.com/unjs/defu) | Config merge |
+| [get-port-please](https://github.com/unjs/get-port-please) | Auto port finding |
+| [msgpackr](https://github.com/kriszyp/msgpackr) | Binary protocol |
+| [devalue](https://github.com/Rich-Harris/devalue) | Rich type serialization |
+| [Scalar](https://github.com/scalar/scalar) | API Reference UI |
+| [vitest](https://vitest.dev) | Testing |
+| [mitata](https://github.com/evanwashere/mitata) | Benchmarking |
 
 ## License
 
