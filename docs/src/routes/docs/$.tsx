@@ -36,9 +36,9 @@ const loader = createServerFn({
     if (!page) throw notFound();
 
     return {
-      slugs: page.slugs,
+      slugs: Array.from(page.slugs),
       path: page.path,
-      pageTree: await source.serializePageTree(source.getPageTree()),
+      pageTree: JSON.parse(JSON.stringify(await source.serializePageTree(source.getPageTree()))),
     };
   });
 
