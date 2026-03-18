@@ -1,7 +1,7 @@
 import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { DocsLayout } from 'fumadocs-ui/layouts/docs';
 import { createServerFn } from '@tanstack/react-start';
-import { source } from '@/lib/source';
+import { source, getPageImage } from '@/lib/source';
 import browserCollections from 'collections/browser';
 import {
   DocsBody,
@@ -50,13 +50,23 @@ const clientLoader = browserCollections.docs.createClientLoader({
     {
       markdownUrl,
       path,
+      slugs,
     }: {
       markdownUrl: string;
       path: string;
+      slugs: string[];
     },
   ) {
+    const ogImage = getPageImage(slugs).url;
     return (
       <DocsPage toc={toc}>
+        <title>{`${frontmatter.title} — Katman`}</title>
+        <meta name="description" content={frontmatter.description} />
+        <meta property="og:title" content={frontmatter.title} />
+        <meta property="og:description" content={frontmatter.description} />
+        <meta property="og:image" content={ogImage} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:image" content={ogImage} />
         <DocsTitle>{frontmatter.title}</DocsTitle>
         <DocsDescription>{frontmatter.description}</DocsDescription>
         <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
@@ -81,7 +91,7 @@ function Page() {
   return (
     <DocsLayout {...baseOptions()} tree={pageTree} sidebar={{ defaultOpenLevel: 1 }}>
       <Link to={markdownUrl} hidden />
-      <Suspense>{clientLoader.useContent(path, { markdownUrl, path })}</Suspense>
+      <Suspense>{clientLoader.useContent(path, { markdownUrl, path, slugs })}</Suspense>
     </DocsLayout>
   );
 }

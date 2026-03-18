@@ -8,6 +8,14 @@ export const source = loader({
   plugins: [lucideIconsPlugin()],
 });
 
+export function getPageImage(slugs: string[]) {
+  const segments = [...slugs, 'image.webp'];
+  return {
+    segments,
+    url: `/og/docs/${segments.join('/')}`,
+  };
+}
+
 export async function getLLMText(page: InferPageType<typeof source>) {
   const processed = await page.data.getText('processed');
 
