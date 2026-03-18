@@ -1,37 +1,43 @@
 ---
 title: React Server Actions
-description: Call katman procedures as React Server Actions — type-safe, [error, data] tuples.
-icon: Atom
+description: Call Katman procedures as React Server Actions — type-safe [error, data] tuples instead of try/catch.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
-React Server Actions let you call server-side code directly from React components without building an API client. Katman makes this type-safe with `[error, data]` tuples instead of try/catch.
+React Server Actions let you call server-side code directly from React components. Katman wraps your procedures as actions that return `[error, data]` tuples instead of throwing, making error handling straightforward in your UI code.
+
+This works with **Next.js** (App Router) and **TanStack Start**.
 
 ## Prerequisites
 
-You need a katman router defined on the server side. If you haven't set one up yet, see the [Getting Started](/docs/getting-started) guide.
+You need a Katman router defined on the server. If you haven't set one up yet, see the [Getting Started](/docs/getting-started) guide.
 
 ## createAction
 
-Wraps a single procedure. Returns `[error, data]` instead of throwing.
+Wraps a single procedure as a server action. Returns `[error, data]` instead of throwing.
 
-```ts twoslash title="app/actions.ts"
+Define the action in a file with `"use server"`:
+
+```ts twoslash
 // @noErrors
+// app/actions.ts
 "use server"
 import { createAction } from "katman/react"
-import { appRouter } from "./router"
+import { appRouter } from "../router"
 
 export const listUsers = createAction(appRouter.users.list)
 export const createUser = createAction(appRouter.users.create)
 ```
 
-```tsx title="app/page.tsx"
+Use it in a component:
+
+```tsx
+// app/page.tsx
 import { listUsers } from "./actions"
 
 export default async function Page() {
-  const [error, users] = await listUsers({ limit: 10 }) // [!code highlight]
+  const [error, users] = await listUsers({ limit: 10 })
 
   if (error) {
     return <p>Error: {error.message}</p>
@@ -45,27 +51,44 @@ export default async function Page() {
 }
 ```
 
+### The return type
+
+Every action returns a tuple: `[error, data]`.
+
+- On success: `[null, data]` — `error` is `null`, `data` is the procedure's return value
+- On failure: `[error, undefined]` — `error` has `code`, `status`, `message`, and optionally `data`
+
+This pattern avoids try/catch in your components and makes error states explicit.
+
 ## createActions
 
-Convert an entire router at once — mirrors the router structure:
+Converts an entire router into actions at once. The result mirrors your router structure:
 
 ```ts twoslash
 // @noErrors
+"use server"
 import { createActions } from "katman/react"
+import { appRouter } from "../router"
 
-const actions = createActions(appRouter)
+export const actions = createActions(appRouter)
+```
 
-// Same nesting as your router
+```ts twoslash
+// @noErrors
+// In a component or server function
 const [err, users] = await actions.users.list({ limit: 10 })
 const [err2, user] = await actions.users.create({ name: "Alice" })
 ```
 
+This is convenient when you have many procedures and don't want to export each one individually.
+
 ## createFormAction
 
-For HTML `<form>` submissions with FormData:
+For HTML `<form>` submissions, `createFormAction` accepts `FormData` and converts it into the input object your procedure expects:
 
-```ts twoslash title="app/actions.ts"
+```ts twoslash
 // @noErrors
+// app/actions.ts
 "use server"
 import { createFormAction } from "katman/react"
 
@@ -74,20 +97,59 @@ export const submitUser = createFormAction(appRouter.users.create)
 
 ```tsx
 <form action={submitUser}>
-  <input name="name" />
-  <input name="email" type="email" />
-  <button type="submit">Create</button>
+  <input name="name" required />
+  <input name="email" type="email" required />
+  <button type="submit">Create User</button>
 </form>
 ```
 
-Bracket notation is supported: `user[name]` becomes `{ user: { name: value } }`.
+### Nested form data
+
+Bracket notation in field names is automatically parsed into nested objects:
+
+```html
+<input name="user[name]" value="Alice" />
+<input name="user[email]" value="alice@example.com" />
+```
+
+Becomes:
+
+```json
+{ "user": { "name": "Alice", "email": "alice@example.com" } }
+```
+
+Array indices work too: `items[0]`, `items[1]`, etc.
+
+### Custom parsing
+
+If the default FormData parser doesn't match your needs, provide your own:
+
+```ts twoslash
+// @noErrors
+const submitUser = createFormAction(appRouter.users.create, {
+  parseFormData: (formData) => ({
+    name: formData.get("name"),
+    email: formData.get("email"),
+  }),
+})
+```
+
+## Framework errors
+
+Katman automatically detects and rethrows framework-specific errors:
+
+- **Next.js** `redirect()` and `notFound()` (errors with `NEXT_` digest)
+- **TanStack Router** navigation errors (`isNotFound: true`)
+- **Response** objects (used for redirects)
+
+These errors pass through untouched — they won't be caught as `[error, data]` tuples.
 
 <Callout>
-Next.js `redirect()` and `notFound()` errors, and TanStack Router navigation errors, are automatically rethrown — they won't be caught as `[error, data]`.
+This means `redirect("/login")` inside a procedure works as expected in Next.js. The redirect happens, and the action doesn't return an error tuple.
 </Callout>
 
-## Related
+## What's next?
 
-- [Getting Started](/docs/getting-started) — Set up a katman router
-- [Typed Errors](/docs/errors) — How error maps and `fail()` work
-- [TanStack Query](/docs/integrations/tanstack-query) — For client-side data fetching with caching
+- [Getting Started](/docs/getting-started) — set up a Katman router
+- [Typed Errors](/docs/errors) — how error maps and `fail()` work, and how they appear in the `error` tuple
+- [TanStack Query](/docs/integrations/tanstack-query) — client-side data fetching with caching, as an alternative

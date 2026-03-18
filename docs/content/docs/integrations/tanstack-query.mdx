@@ -1,39 +1,51 @@
 ---
 title: TanStack Query
-description: Type-safe queryOptions, mutationOptions, and cache invalidation for React, Vue, Solid, Svelte.
-icon: Database
+description: Generate type-safe queryOptions, mutationOptions, and cache keys from your Katman client.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
 
-TanStack Query is the most popular data fetching library for React (and Vue, Solid, Svelte). Katman provides a utility that generates type-safe `queryOptions` and `mutationOptions` from your client.
+[TanStack Query](https://tanstack.com/query) is the most popular data-fetching library for React, Vue, Solid, and Svelte. Katman provides `createQueryUtils`, a utility that generates type-safe `queryOptions` and `mutationOptions` from your client — so you don't have to write query keys or fetch functions by hand.
 
 ## Prerequisites
 
-You need a katman [client](/docs/client) set up. The TanStack Query integration wraps this client.
+You need a Katman [client](/docs/client) set up. The TanStack Query integration wraps this client.
 
 ```bash
 npm install @tanstack/react-query
 ```
 
+(Or `@tanstack/vue-query`, `@tanstack/solid-query`, `@tanstack/svelte-query` — the API is the same.)
+
 ## Setup
+
+<Steps>
+<Step>
+
+### Create query utils
 
 ```ts twoslash
 // @noErrors
 import { createQueryUtils } from "katman/tanstack-query"
-import { client } from "./client" // your katman client
+import { client } from "./client" // your Katman client
 
 const utils = createQueryUtils(client)
 ```
 
-## Queries
+The `utils` object mirrors your client's structure. If your client has `client.users.list`, then `utils.users.list` gives you query/mutation helpers for that procedure.
+
+</Step>
+<Step>
+
+### Use in components
 
 ```tsx
 import { useQuery } from "@tanstack/react-query"
 
 function UserList() {
   const { data, isLoading } = useQuery(
-    utils.users.list.queryOptions({ input: { limit: 10 } }) // [!code highlight]
+    utils.users.list.queryOptions({ input: { limit: 10 } })
   )
 
   if (isLoading) return <p>Loading...</p>
@@ -41,7 +53,47 @@ function UserList() {
 }
 ```
 
+</Step>
+</Steps>
+
+## Queries
+
+`queryOptions` returns everything `useQuery` needs — the query key, the fetch function, and any options you pass:
+
+```ts twoslash
+// @noErrors
+const options = utils.users.list.queryOptions({
+  input: { limit: 10 },
+  staleTime: 5000,        // data is fresh for 5 seconds
+  gcTime: 60_000,         // garbage collect after 1 minute
+  refetchInterval: 30_000, // refetch every 30 seconds
+  enabled: isLoggedIn,     // only fetch when logged in
+})
+
+// options contains:
+// - queryKey: [["users", "list"], { type: "query", input: { limit: 10 } }]
+// - queryFn: ({ signal }) => client.users.list({ limit: 10 }, { signal })
+// - staleTime, gcTime, etc.
+```
+
+Use with `useQuery`:
+
+```tsx
+const { data } = useQuery(utils.users.list.queryOptions({ input: { limit: 10 } }))
+```
+
+Or prefetch on the server:
+
+```ts twoslash
+// @noErrors
+await queryClient.prefetchQuery(
+  utils.users.list.queryOptions({ input: { limit: 10 } })
+)
+```
+
 ## Mutations
+
+`mutationOptions` returns everything `useMutation` needs:
 
 ```tsx
 import { useMutation, useQueryClient } from "@tanstack/react-query"
@@ -52,9 +104,9 @@ function CreateUser() {
   const { mutate, isPending } = useMutation(
     utils.users.create.mutationOptions({
       onSuccess: () => {
-        // Refresh the user list after creating
+        // Invalidate the user list so it refetches
         queryClient.invalidateQueries({
-          queryKey: utils.users.key(), // [!code highlight]
+          queryKey: utils.users.key(),
         })
       },
     })
@@ -68,35 +120,68 @@ function CreateUser() {
 }
 ```
 
-## Prefetching
+## Cache invalidation
 
-Server-side or in loaders:
-
-```ts twoslash
-// @noErrors
-await queryClient.prefetchQuery(
-  utils.users.list.queryOptions({ input: { limit: 10 } })
-)
-```
-
-## Cache Invalidation
+Every level of the utils tree has a `key()` method for generating cache keys:
 
 ```ts twoslash
 // @noErrors
-// Invalidate all queries under "users" namespace
-queryClient.invalidateQueries({ queryKey: utils.users.key() })
+// Invalidate all queries under "users" (list, create, etc.)
+queryClient.invalidateQueries({
+  queryKey: utils.users.key(),
+})
 
-// Invalidate a specific query
+// Invalidate a specific query with specific input
 queryClient.invalidateQueries({
   queryKey: utils.users.list.queryKey({ limit: 10 }),
 })
+
+// Invalidate everything in the entire app
+queryClient.invalidateQueries({
+  queryKey: utils.key(),
+})
 ```
 
+The key structure is `[path, { type, input }]`, which means TanStack Query's prefix matching works naturally. Invalidating `utils.users.key()` clears both `users.list` and `users.create` queries.
+
+## Direct calls
+
+If you need to call a procedure outside of React (in a loader, a utility function, etc.), each procedure util has a `call` method:
+
+```ts twoslash
+// @noErrors
+const users = await utils.users.list.call(
+  { limit: 10 },
+  { signal: controller.signal },
+)
+```
+
+This is the same as calling the client directly, but it's convenient when you're already working with the utils.
+
+## Available methods
+
+Each procedure-level util provides:
+
+| Method | Returns | Description |
+|---|---|---|
+| `queryOptions(opts)` | `{ queryKey, queryFn, ... }` | Full options for `useQuery` |
+| `mutationOptions(opts?)` | `{ mutationKey, mutationFn, ... }` | Full options for `useMutation` |
+| `queryKey(input?)` | `[path, { type, input }]` | Query key for cache operations |
+| `mutationKey()` | `[path, { type }]` | Mutation key for cache operations |
+| `call(input, opts?)` | `Promise<TOutput>` | Direct procedure call |
+
+Each router-level util provides:
+
+| Method | Returns | Description |
+|---|---|---|
+| `key(input?)` | `[path, options?]` | Key prefix for bulk invalidation |
+
 <Callout type="info">
-Works with `@tanstack/react-query`, `@tanstack/vue-query`, `@tanstack/solid-query`, and `@tanstack/svelte-query`. Same API, same types.
+This works with `@tanstack/react-query`, `@tanstack/vue-query`, `@tanstack/solid-query`, and `@tanstack/svelte-query`. Same API, same types, different framework bindings.
 </Callout>
 
-## Related
+## What's next?
 
-- [Client](/docs/client) — Set up the katman client that powers the query utils
-- [React Server Actions](/docs/integrations/react) — Alternative to TanStack Query for server-first React
+- [Client](/docs/client) — set up the Katman client that powers the query utils
+- [React Server Actions](/docs/integrations/react) — an alternative for server-first React apps
+- [Typed Errors](/docs/errors) — handle errors from your queries and mutations

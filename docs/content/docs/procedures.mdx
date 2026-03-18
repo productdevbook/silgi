@@ -1,0 +1,129 @@
+---
+title: Procedures
+description: The two ways to define an API endpoint — short form and full config.
+---
+
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Callout } from 'fumadocs-ui/components/callout';
+
+A procedure is a single endpoint in your API. You create them with `query()`, `mutation()`, or `subscription()`.
+
+## Short form
+
+The simplest way. Pass a schema and a function:
+
+```ts twoslash
+// @noErrors
+import { z } from "zod"
+
+// No input
+const health = k.query(() => ({ status: "ok" }))
+
+// With input validation
+const getUser = k.query(
+  z.object({ id: z.number() }),
+  ({ input, ctx }) => ctx.db.users.findById(input.id),
+)
+```
+
+The first argument is the input schema. Katman validates the input before your function runs. If validation fails, the client gets a 400 error automatically.
+
+## Full config
+
+When you need middleware, error definitions, or output validation, use an object:
+
+```ts twoslash
+// @noErrors
+import { z } from "zod"
+
+const createUser = k.mutation({
+  use: [auth],                                    // middleware
+  input: z.object({ name: z.string() }),          // input validation
+  output: z.object({ id: z.number() }),           // output validation (optional)
+  errors: { CONFLICT: 409 },                      // typed errors
+  resolve: ({ input, ctx, fail }) => {
+    if (ctx.db.users.exists(input.name)) {
+      fail("CONFLICT")                            // typed — only codes from `errors`
+    }
+    return ctx.db.users.create(input)
+  },
+})
+```
+
+### What each field does
+
+| Field | Required | Description |
+|---|---|---|
+| `resolve` | Yes | The function that does the work. Receives `{ input, ctx, fail, signal }`. |
+| `input` | No | A schema that validates the incoming data. |
+| `output` | No | A schema that validates the return value. |
+| `use` | No | An array of guards and wraps to run before the procedure. |
+| `errors` | No | A map of error codes to HTTP status codes. Enables the typed `fail()` function. |
+| `route` | No | HTTP route metadata (method, path, description). Used by OpenAPI. |
+
+## The resolve function
+
+Every procedure has a `resolve` function. It receives one object with four properties:
+
+```ts twoslash
+// @noErrors
+const myProcedure = k.query({
+  resolve: ({ input, ctx, fail, signal }) => {
+    // input  — the validated input (or undefined if no schema)
+    // ctx    — the context object (from context factory + guards)
+    // fail   — throws a typed error (only if `errors` is defined)
+    // signal — AbortSignal for cancellation
+  },
+})
+```
+
+## Queries vs mutations
+
+The difference is semantic, not technical. Both work the same way under the hood. The distinction helps with:
+
+- **Caching**: Queries can be cached. Mutations should not.
+- **Retries**: Queries are safe to retry. Mutations might not be.
+- **HTTP method**: Queries map to GET, mutations to POST (in OpenAPI).
+
+## Subscriptions
+
+A subscription is a procedure that returns an async generator. The server sends each yielded value as a Server-Sent Event:
+
+```ts twoslash
+// @noErrors
+const countdown = k.subscription(async function* () {
+  for (let i = 5; i > 0; i--) {
+    yield { count: i }
+    await new Promise((r) => setTimeout(r, 1000))
+  }
+})
+```
+
+The client receives a stream of `{ count: 5 }`, `{ count: 4 }`, ... `{ count: 1 }`.
+
+## Routers
+
+Procedures are grouped into routers. You can nest them:
+
+```ts twoslash
+// @noErrors
+const appRouter = k.router({
+  health: healthCheck,
+  users: {
+    list: listUsers,
+    create: createUser,
+    delete: deleteUser,
+  },
+  admin: {
+    stats: getStats,
+  },
+})
+```
+
+The nesting becomes the URL path:
+- `users.list` → `POST /users/list`
+- `admin.stats` → `POST /admin/stats`
+
+<Callout>
+Export the router type so the client can use it: `export type AppRouter = typeof appRouter`
+</Callout>

@@ -1,140 +1,283 @@
 ---
 title: Client
-description: Type-safe client with ofetch, binary mode, interceptors, and plugins.
-icon: Globe
+description: Set up the type-safe client with createLink and createClient — including binary mode, interceptors, and type inference.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 import { Step, Steps } from 'fumadocs-ui/components/steps';
 
+The Katman client gives you a fully typed proxy that mirrors your server's router structure. You call procedures like local functions, and TypeScript knows every input and output type.
+
 ## Setup
+
+Setting up the client takes two steps: create a **link** (the transport layer) and then create the **client** (the typed proxy).
 
 <Steps>
 <Step>
 
 ### Create a link
 
-The link is the transport layer — how requests are sent to the server.
+A link tells the client *how* to send requests to the server. The built-in link uses [ofetch](https://github.com/unjs/ofetch) for retries, timeouts, and JSON parsing:
 
-<Tabs items={['ofetch (recommended)', 'native fetch']}>
-  <Tab value="ofetch (recommended)">
-  ```ts twoslash
+```ts twoslash
 // @noErrors
-  import { createLink } from "katman/client/ofetch"
+import { createLink } from "katman/client/ofetch"
 
-  const link = createLink({
-    url: "http://localhost:3000",
-    timeout: 5000,
-    retry: 2,
-  })
-  ```
-  </Tab>
-  <Tab value="native fetch">
-  ```ts twoslash
-// @noErrors
-  import { RPCLink } from "katman/client/fetch"
-
-  const link = new RPCLink({ url: "http://localhost:3000" })
-  ```
-  </Tab>
-</Tabs>
+const link = createLink({
+  url: "http://localhost:3000",
+})
+```
 
 </Step>
 <Step>
 
 ### Create the client
 
+Pass the link to `createClient` with your router type as the generic parameter:
+
 ```ts twoslash
 // @noErrors
 import { createClient } from "katman/client"
-import type { InferClient } from "katman"
-import type { AppRouter } from "./router"
+import { createLink } from "katman/client/ofetch"
+import type { AppRouter } from "./server" // export type AppRouter = typeof appRouter
 
-const client = createClient<InferClient<AppRouter>>(link)
+const link = createLink({ url: "http://localhost:3000" })
+const client = createClient<AppRouter>(link)
 ```
 
 </Step>
 <Step>
 
-### Use it
+### Call procedures
+
+The client mirrors your router structure exactly. Nested routers become nested properties:
 
 ```ts twoslash
 // @noErrors
+// Router structure: { users: { list, create }, health }
+
 const users = await client.users.list({ limit: 10 })
-const user = await client.users.create({ name: "Alice", email: "a@test.com" })
-const result = await client.admin.settings.update({ theme: "dark" })
+const newUser = await client.users.create({ name: "Alice" })
+const status = await client.health()
 ```
+
+Every call has full autocomplete and type checking. If the procedure expects `{ limit: number }`, TypeScript won't let you pass `{ limit: "ten" }`.
 
 </Step>
 </Steps>
 
-## Link Options
+## Type inference
+
+To get the router type on the client side, export it from your server file:
 
 ```ts twoslash
 // @noErrors
-const link = createLink({
-  url: "http://localhost:3000",
-
-  // Auth
-  headers: () => ({
-    authorization: `Bearer ${getToken()}`,
-  }),
-
-  // Reliability
-  timeout: 5000,
-  retry: 2,
-  retryDelay: (ctx) => Math.min(1000 * 2 ** ctx.retryCount, 10000),
-
-  // Binary protocol (30% smaller payloads)
-  binary: true, // [!code highlight]
-
-  // Interceptors
-  onRequest: ({ options }) => { /* before send */ },
-  onResponse: ({ response }) => { /* after receive */ },
-  onRequestError: ({ error }) => { /* network failure */ },
+// server.ts
+export const appRouter = k.router({
+  users: {
+    list: listUsers,
+    create: createUser,
+  },
 })
+export type AppRouter = typeof appRouter
 ```
 
-## Binary Mode
-
-Send `binary: true` to use MessagePack — 30% smaller payloads, native Date support:
+Then use it when creating the client:
 
 ```ts twoslash
 // @noErrors
-const link = createLink({
-  url: "http://localhost:3000",
-  binary: true, // [!code highlight]
-})
+import type { AppRouter } from "./server"
+
+const client = createClient<AppRouter>(link)
 ```
 
-<Callout>
-Binary mode is transparent to your code. The client encodes with MessagePack, the server detects the content type and responds in kind.
+You can also use the `InferClient` utility type, which extracts the client type from any router:
+
+```ts twoslash
+// @noErrors
+import type { InferClient } from "katman"
+
+type Client = InferClient<typeof appRouter>
+// Client.users.list: (input: { limit?: number }) => Promise<User[]>
+// Client.users.create: (input: { name: string }) => Promise<User>
+```
+
+<Callout type="info">
+In a monorepo, you only need to share the *type* of the router, not the actual code. Use `import type` so no server code leaks into your client bundle.
 </Callout>
 
-## Plugins
+## Link options
 
-Plugins wrap the link to add behavior:
+The `createLink` function accepts these options:
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `url` | `string` | (required) | Server base URL (e.g. `"http://localhost:3000"`) |
+| `headers` | `Record<string, string>` or function | `undefined` | Static headers or a function that returns headers per request |
+| `retry` | `number \| false` | `0` | Number of retries on failure |
+| `retryDelay` | `number \| (ctx) => number` | `0` | Delay between retries in milliseconds |
+| `timeout` | `number` | `30000` | Request timeout in milliseconds |
+| `binary` | `boolean` | `false` | Use MessagePack instead of JSON |
+
+### Authentication headers
+
+The most common use for dynamic headers is passing an auth token:
 
 ```ts twoslash
 // @noErrors
-import { withRetry, withDedupe, withCSRF } from "katman/client/plugins"
-
-const link = createLink({ url: "http://localhost:3000" })
-
-const enhanced = withCSRF(
-  withDedupe(
-    withRetry(link, { maxRetries: 3, retryDelay: 1000 })
-  ),
-  { headerName: "x-csrf-token", headerValue: "abc123" }
-)
-
-const client = createClient<InferClient<AppRouter>>(enhanced)
+const link = createLink({
+  url: "http://localhost:3000",
+  headers: () => ({
+    Authorization: `Bearer ${getToken()}`,
+  }),
+})
 ```
 
-| Plugin | What it does |
-|---|---|
-| `withRetry` | Retry failed requests with backoff |
-| `withDedupe` | Collapse identical concurrent requests into one |
-| `withCSRF` | Inject CSRF token header |
-| `BatchLink` | Batch multiple calls into one HTTP request |
+The header function runs on every request, so it always picks up the latest token. This is important for scenarios like token refresh — when the token changes, the next request automatically uses the new one.
+
+### Retry and timeout
+
+```ts twoslash
+// @noErrors
+const link = createLink({
+  url: "http://localhost:3000",
+  retry: 3,             // retry up to 3 times on failure
+  retryDelay: 1000,     // wait 1 second between retries
+  timeout: 10_000,      // 10 second timeout per request
+})
+```
+
+For exponential backoff, pass a function:
+
+```ts twoslash
+// @noErrors
+const link = createLink({
+  url: "http://localhost:3000",
+  retry: 3,
+  retryDelay: (ctx) => Math.pow(2, ctx.options?.retryCount ?? 0) * 500,
+  // 500ms, 1000ms, 2000ms
+})
+```
+
+## Binary mode
+
+Set `binary: true` to use MessagePack instead of JSON. Payloads are smaller and encoding/decoding is faster:
+
+```ts twoslash
+// @noErrors
+const link = createLink({
+  url: "http://localhost:3000",
+  binary: true,
+})
+```
+
+The client encodes the request body as MessagePack, sets the `Content-Type` and `Accept` headers to `application/x-msgpack`, and the server responds in MessagePack too.
+
+<Callout>
+Binary mode is completely transparent to your application code. You still pass and receive regular JavaScript objects. The encoding happens inside the link — you never see MessagePack bytes in your code.
+</Callout>
+
+See the [MessagePack protocol](/docs/protocols/msgpack) page for more details on what types are supported.
+
+## Interceptors
+
+The link supports [ofetch interceptors](https://github.com/unjs/ofetch#interceptors) for fine-grained control over the request lifecycle:
+
+```ts twoslash
+// @noErrors
+const link = createLink({
+  url: "http://localhost:3000",
+  onRequest({ request, options }) {
+    // Runs before every request is sent
+    console.log("Sending:", request)
+  },
+  onResponse({ response }) {
+    // Runs after every successful response
+    console.log("Received:", response.status)
+  },
+  onRequestError({ error }) {
+    // Runs when the request fails (network error, DNS failure, etc.)
+    console.error("Request failed:", error)
+  },
+  onResponseError({ response }) {
+    // Runs when the server responds with an error status
+    console.error("Server error:", response.status)
+  },
+})
+```
+
+Interceptors are useful for:
+
+- **Logging** in development
+- **Token refresh** — intercept 401 responses, refresh the token, and retry
+- **Metrics** — measure request timing and success rates
+
+## Call options
+
+Each procedure call can receive a second argument with per-call options:
+
+```ts twoslash
+// @noErrors
+const controller = new AbortController()
+
+const users = await client.users.list(
+  { limit: 10 },
+  { signal: controller.signal },
+)
+
+// Cancel the request at any time
+controller.abort()
+```
+
+Available per-call options:
+
+| Option | Type | Description |
+|---|---|---|
+| `signal` | `AbortSignal` | Cancel the request |
+| `context` | `Record` | Custom context passed to the link |
+
+## Error handling
+
+Server errors are reconstructed as `KatmanError` instances on the client. You can catch them with try/catch:
+
+```ts twoslash
+// @noErrors
+import { KatmanError } from "katman"
+
+try {
+  await client.users.delete({ id: 1 })
+} catch (error) {
+  if (error instanceof KatmanError) {
+    console.log(error.code)   // "FORBIDDEN"
+    console.log(error.status) // 403
+    console.log(error.data)   // { reason: "Not the owner" }
+  }
+}
+```
+
+Or use the `safe()` wrapper to avoid try/catch entirely:
+
+```ts twoslash
+// @noErrors
+import { safe } from "katman/client"
+
+const { error, data, isError, isSuccess } = await safe(
+  client.users.delete({ id: 1 })
+)
+
+if (isError) {
+  console.log(error.code) // "FORBIDDEN"
+} else {
+  console.log(data) // the deleted user
+}
+```
+
+See the [Typed Errors](/docs/errors) page for the complete error handling guide, including the `defined` flag for distinguishing business errors from unexpected failures.
+
+## What's next?
+
+- [Typed Errors](/docs/errors) — handle server errors on the client with full type safety
+- [Protocols](/docs/protocols) — JSON, MessagePack, and devalue encoding
+- [TanStack Query](/docs/integrations/tanstack-query) — generate `queryOptions` and `mutationOptions` from the client
+- [Server](/docs/server) — the server-side setup that the client connects to

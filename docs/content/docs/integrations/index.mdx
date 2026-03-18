@@ -1,16 +1,26 @@
 ---
 title: Integrations
-description: Use katman with Fastify, React, TanStack Query, and AI models.
-icon: Puzzle
+description: Use Katman with Fastify, React Server Actions, TanStack Query, and Vercel AI SDK.
 ---
 
 import { Cards, Card } from 'fumadocs-ui/components/card';
 
-Katman integrates with the tools you already use. Each integration is a separate subpath import — only what you use ships in your bundle.
+Katman integrates with the tools you already use. Each integration is a separate subpath import — you only ship what you actually import.
 
 <Cards>
-  <Card title="Fastify" description="Register katman as a Fastify plugin alongside existing REST routes." href="/docs/integrations/fastify" />
-  <Card title="React Server Actions" description="createAction, createActions, createFormAction — [error, data] tuples." href="/docs/integrations/react" />
-  <Card title="TanStack Query" description="queryOptions, mutationOptions, queryKey — React, Vue, Solid, Svelte." href="/docs/integrations/tanstack-query" />
-  <Card title="AI SDK" description="Turn your API into AI tools — LLMs call your procedures directly." href="/docs/integrations/ai-sdk" />
+  <Card title="Fastify" description="Mount Katman as a Fastify plugin alongside existing REST routes." href="/docs/integrations/fastify" />
+  <Card title="React Server Actions" description="Call procedures as server actions with [error, data] tuples. Works with Next.js and TanStack Start." href="/docs/integrations/react" />
+  <Card title="TanStack Query" description="Generate type-safe queryOptions and mutationOptions for React, Vue, Solid, and Svelte." href="/docs/integrations/tanstack-query" />
+  <Card title="AI SDK" description="Turn your API procedures into AI tools — LLMs call your API through function calling." href="/docs/integrations/ai-sdk" />
 </Cards>
+
+## Which integration do I need?
+
+| Scenario | Integration |
+|---|---|
+| You have an existing Fastify app and want to add RPC | [Fastify](/docs/integrations/fastify) |
+| You're building a Next.js or TanStack Start app with server actions | [React](/docs/integrations/react) |
+| You want to use React Query (or Vue/Solid/Svelte Query) for data fetching | [TanStack Query](/docs/integrations/tanstack-query) |
+| You want LLMs to call your API procedures as tools | [AI SDK](/docs/integrations/ai-sdk) |
+
+For standalone servers (no existing framework), you don't need any integration — just use `k.serve()` or `k.handler()` from the [Server](/docs/server) page.

@@ -1,60 +1,109 @@
 ---
 title: Pino Logging
-description: Structured request logging via lifecycle hooks.
-icon: FileText
+description: Structured request logging via lifecycle hooks — request received, response sent, errors caught.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
 
-```ts twoslash
-// @noErrors
-import { loggingHooks } from "katman/pino"
-```
+[Pino](https://github.com/pinojs/pino) is the fastest Node.js JSON logger. Katman's `loggingHooks` plugs it into the [lifecycle hooks](/docs/server#lifecycle-hooks) system so every request, response, and error is logged automatically.
 
 ## Setup
 
 ```ts twoslash
 // @noErrors
+import { katman } from "katman"
 import pino from "pino"
+import { loggingHooks } from "katman/pino"
 
 const k = katman({
-  context: (req) => ({}),
-  hooks: loggingHooks({ logger: pino() }), // [!code highlight]
+  context: (req) => ({ db: getDB() }),
+  hooks: loggingHooks({ logger: pino() }),
 })
 ```
 
-That's it. Every request, response, and error is logged.
+That's it. Every request flowing through your API is now logged.
 
-## What Gets Logged
+## What gets logged
 
-**Request received:**
+**When a request is received:**
+
 ```json
-{ "level": "info", "path": "users/list", "hasInput": true, "msg": "request received" }
+{ "level": 30, "path": "users/list", "hasInput": true, "msg": "request received" }
 ```
 
-**Response sent:**
+**When a response is sent:**
+
 ```json
-{ "level": "info", "path": "users/list", "durationMs": 0.42, "msg": "response sent" }
+{ "level": 30, "path": "users/list", "durationMs": 0.42, "msg": "response sent" }
 ```
 
-**Error:**
+**When an error occurs:**
+
 ```json
-{ "level": "error", "path": "users/create", "error": "CONFLICT", "msg": "request error" }
+{ "level": 50, "path": "users/create", "error": "CONFLICT", "msg": "request error" }
 ```
+
+The `durationMs` field measures how long the procedure took, rounded to two decimal places.
 
 ## Options
 
 ```ts twoslash
 // @noErrors
+import { loggingHooks } from "katman/pino"
+
 loggingHooks({
   logger: pino(),
-  logRequests: true,   // default: true
-  logResponses: true,  // default: true
+  logRequests: true,   // log "request received" (default: true)
+  logResponses: true,  // log "response sent" (default: true)
 })
 ```
 
-Set `logRequests: false` to only log responses and errors.
+Set `logRequests: false` to skip the "request received" messages and only log responses and errors. This is useful in high-traffic production environments where you want to reduce log volume.
+
+Errors are always logged regardless of these settings.
+
+## Using any logger
+
+The `logger` option accepts any object that implements this interface:
+
+```ts twoslash
+// @noErrors
+interface Logger {
+  child(bindings: Record<string, unknown>): Logger
+  info(obj: Record<string, unknown>, msg?: string): void
+  error(obj: Record<string, unknown>, msg?: string): void
+  warn(obj: Record<string, unknown>, msg?: string): void
+  debug(obj: Record<string, unknown>, msg?: string): void
+}
+```
+
+This means you're not locked into Pino. Any logger with compatible methods works — [winston](https://github.com/winstonjs/winston) with a wrapper, [consola](https://github.com/unjs/consola), or even a custom logger.
 
 <Callout>
-The logger interface is Pino-compatible but not Pino-specific. Any logger with `info()`, `error()`, `warn()`, `debug()`, and `child()` methods works.
+The interface is Pino-compatible by design. If you use Pino, it works out of the box. If you use something else, you may need a thin adapter.
 </Callout>
+
+## Combining with other hooks
+
+`loggingHooks` returns a plain hooks object. You can combine it with other hooks by spreading:
+
+```ts twoslash
+// @noErrors
+import { loggingHooks } from "katman/pino"
+
+const k = katman({
+  context: (req) => ({}),
+  hooks: {
+    ...loggingHooks({ logger: pino() }),
+    "serve:start": ({ url }) => {
+      console.log(`Server ready at ${url}`)
+    },
+  },
+})
+```
+
+## What's next?
+
+- [OpenTelemetry](/docs/plugins/otel) — distributed tracing for each procedure call
+- [Rate Limiting](/docs/plugins/ratelimit) — protect your API from abuse
+- [Server](/docs/server) — lifecycle hooks and `serve()` options

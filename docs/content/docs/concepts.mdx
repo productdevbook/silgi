@@ -1,193 +1,89 @@
 ---
 title: Core Concepts
-description: Procedures, guards, wraps, hooks, type inference — how katman works under the hood.
-icon: BookOpen
+description: The mental model behind Katman — context, procedures, middleware, and type inference.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
-## Procedures
+Before diving into API details, it helps to understand how Katman thinks about your code. There are four main ideas.
 
-Every API endpoint is a **procedure**. Three kinds:
+## Context
 
-| Kind | HTTP Method | Use Case |
-|---|---|---|
-| `query` | GET | Read data, cacheable |
-| `mutation` | POST | Write data, side effects |
-| `subscription` | SSE/WS | Real-time streaming |
-
-<Tabs items={['Short form', 'Short + input', 'Full config']}>
-  <Tab value="Short form">
-  ```ts twoslash
-// @noErrors
-  const health = query(() => ({ status: "ok" }))
-  ```
-  </Tab>
-  <Tab value="Short + input">
-  ```ts twoslash
-// @noErrors
-  const getUser = query(
-    z.object({ id: z.number() }),
-    ({ input }) => db.users.get(input.id), // [!code highlight]
-  )
-  ```
-  </Tab>
-  <Tab value="Full config">
-  ```ts twoslash
-// @noErrors
-  const createUser = mutation({
-    use: [auth, timing],           // middleware
-    input: z.object({ name: z.string() }),
-    output: UserSchema,            // output validation
-    errors: { CONFLICT: 409 },     // typed errors
-    resolve: ({ input, ctx, fail }) => { // [!code highlight]
-      if (exists(input.name)) fail("CONFLICT")
-      return db.users.create(input)
-    },
-  })
-  ```
-  </Tab>
-</Tabs>
-
-## Guards
-
-Guards run **before** the handler. Their return value merges into `ctx`.
-
-```ts twoslash
-// @noErrors
-const auth = guard(async (ctx) => {
-  const user = await verifyToken(ctx.headers.authorization)
-  if (!user) throw new KatmanError("UNAUTHORIZED")
-  return { user, permissions: user.permissions } // → ctx.user, ctx.permissions
-})
-```
-
-<Callout type="info" title="Why guards are fast">
-Guards are **flat functions** — no `next()` callback, no closure per request. This is why katman's pipeline is 5.7x faster than oRPC's onion middleware.
-</Callout>
-
-Stack multiple guards — context accumulates:
-
-```ts twoslash
-// @noErrors
-const proc = mutation({
-  use: [auth, rateLimit, adminOnly],
-  resolve: ({ ctx }) => {
-    ctx.user        // from auth guard
-    ctx.rateLimit   // from rateLimit guard
-    // adminOnly throws if not admin — no return needed
-  },
-})
-```
-
-## Wraps
-
-Wraps are **onion-style** — they run code before and after the handler:
-
-```ts twoslash
-// @noErrors
-const timing = wrap(async (ctx, next) => {
-  const start = performance.now()
-  const result = await next() // [!code highlight]
-  console.log(`${performance.now() - start}ms`)
-  return result
-})
-```
-
-### Execution order
-
-```
-Request
-  → Guard 1 (auth)          merges { user }
-  → Guard 2 (rateLimit)     merges { rateLimit }
-  → Wrap 1 (timing)         before ↓
-    → Wrap 2 (errorBoundary) before ↓
-      → resolve()            handler runs
-    → Wrap 2                  after ↑
-  → Wrap 1                    after ↑
-Response
-```
-
-## Lifecycle Hooks
-
-Global hooks — powered by [hookable](https://github.com/unjs/hookable):
-
-```ts twoslash
-// @noErrors
-const k = katman({
-  context: (req) => ({}),
-  hooks: {
-    request: ({ path, input }) => console.log(`→ ${path}`),
-    response: ({ path, durationMs }) => console.log(`← ${path} ${durationMs.toFixed(1)}ms`),
-    error: ({ path, error }) => console.error(`✗ ${path}`, error),
-    "serve:start": ({ url }) => console.log(`Server at ${url}`),
-  },
-})
-```
-
-Dynamic registration:
-
-```ts twoslash
-// @noErrors
-const unhook = k.hook("request", ({ path }) => metrics.inc(path))
-// later...
-unhook() // remove the hook
-```
-
-<Callout>
-Hooks have a **sync fast-path** — when all hooks are synchronous, zero Promises are allocated. No performance cost when hooks aren't registered.
-</Callout>
-
-## Type Inference
-
-Types flow end-to-end — no codegen needed:
+Every request starts by running your **context factory**. This is a function you provide when creating the Katman instance. It receives the raw HTTP request and returns an object.
 
 ```ts twoslash
 // @noErrors
 import { katman } from "katman"
-import { z } from "zod"
 
-const k = katman({ context: () => ({}) })
-
-const appRouter = k.router({
-  health: k.query(() => ({ status: "ok" as const })),
-  users: {
-    list: k.query(
-      z.object({ limit: z.number().optional() }),
-      ({ input }) => [{ id: 1, name: "Alice" }].slice(0, input.limit),
-    ),
-  },
+const k = katman({
+  context: (req) => ({
+    db: getDB(),
+    headers: Object.fromEntries(req.headers),
+  }),
 })
-
-type AppRouter = typeof appRouter
-//   ^?
 ```
 
-## Standard Schema
+This object — called `ctx` — is available in every procedure and every guard. Think of it as the shared state for one request.
 
-Katman uses `@standard-schema/spec` — any validator works:
+Guards can add to the context. If a guard returns `{ user }`, then `ctx.user` becomes available in all procedures that use that guard.
 
-<Tabs items={['Zod', 'Valibot', 'ArkType']}>
-  <Tab value="Zod">
-  ```ts twoslash
+## Procedures
+
+A procedure is a single API function. It takes an input, does something, and returns an output. There are three types:
+
+| Type | What it does |
+|---|---|
+| `query` | Reads data. Like a GET request. |
+| `mutation` | Writes data. Like a POST request. |
+| `subscription` | Streams data over time. Uses Server-Sent Events. |
+
+See the [Procedures](/docs/procedures) page for how to write them.
+
+## Middleware
+
+Middleware runs before (and sometimes after) a procedure. Katman has two kinds:
+
+**Guards** run before the procedure and can add to the context:
+
+```ts twoslash
 // @noErrors
-  import { z } from "zod"
-  const schema = z.object({ name: z.string() })
-  ```
-  </Tab>
-  <Tab value="Valibot">
-  ```ts twoslash
+const auth = k.guard(async (ctx) => {
+  const user = await verifyToken(ctx.headers.authorization)
+  if (!user) throw new KatmanError("UNAUTHORIZED")
+  return { user } // added to ctx
+})
+```
+
+**Wraps** run before *and* after, like an onion:
+
+```ts twoslash
 // @noErrors
-  import * as v from "valibot"
-  const schema = v.object({ name: v.string() })
-  ```
-  </Tab>
-  <Tab value="ArkType">
-  ```ts twoslash
+const timing = k.wrap(async (ctx, next) => {
+  const start = Date.now()
+  const result = await next()
+  console.log(`Took ${Date.now() - start}ms`)
+  return result
+})
+```
+
+See the [Middleware](/docs/middleware) page for details and execution order.
+
+## Type inference
+
+Katman infers types from your code. You don't write them yourself and you don't run a code generator.
+
+When you define a procedure with a Zod schema, the client automatically knows the input type. When the procedure returns something, the client knows the return type. When a guard adds `{ user }` to the context, the procedure knows `ctx.user` exists.
+
+This works because of `InferClient`:
+
+```ts twoslash
 // @noErrors
-  import { type } from "arktype"
-  const schema = type({ name: "string" })
-  ```
-  </Tab>
-</Tabs>
+import type { InferClient } from "katman"
+
+type Client = InferClient<typeof appRouter>
+// Client.users.list: (input: { limit?: number }) => Promise<User[]>
+```
+
+<Callout>
+Katman uses the Standard Schema spec for validation. This means Zod, Valibot, and ArkType all work — you're not locked into any one library.
+</Callout>

@@ -1,15 +1,13 @@
 ---
 title: Getting Started
-description: Install katman and build your first type-safe API in 5 minutes.
-icon: Play
+description: Install Katman and build your first type-safe API in 5 minutes.
 ---
 
 import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
-import { Callout } from 'fumadocs-ui/components/callout';
 import { File, Folder, Files } from 'fumadocs-ui/components/files';
 
-## Installation
+## Install
 
 <Tabs items={['npm', 'pnpm', 'bun']}>
   <Tab value="npm">
@@ -29,82 +27,94 @@ import { File, Folder, Files } from 'fumadocs-ui/components/files';
   </Tab>
 </Tabs>
 
-<Callout type="info">
-Katman uses [Standard Schema](https://standardschema.dev) — Zod, Valibot, and ArkType all work out of the box.
-</Callout>
+You also need a validator. We use Zod here, but Valibot and ArkType also work.
 
-## Project Structure
+## What you will build
+
+A small API with two endpoints:
+
+- `users.list` — returns a list of users (anyone can call it)
+- `users.create` — creates a user (requires authentication)
+
+## Project structure
 
 <Files>
   <Folder name="src" defaultOpen>
     <File name="rpc.ts" />
-    <Folder name="routes" defaultOpen>
-      <File name="users.ts" />
-    </Folder>
-    <File name="router.ts" />
     <File name="server.ts" />
-    <File name="client.ts" />
   </Folder>
   <File name="package.json" />
-  <File name="tsconfig.json" />
 </Files>
 
-## Step by Step
+Two files. That's all you need to get started.
+
+## Step by step
 
 <Steps>
 <Step>
 
-### Create the katman instance
+### Create the Katman instance
 
-Define your context factory — this runs on every request and populates `ctx`.
+This is where you tell Katman how to build the context for each request. The context is an object that every procedure can access — a good place to put things like a database connection.
 
 ```ts twoslash title="src/rpc.ts"
 // @noErrors
 import { katman } from "katman"
 
-export const k = katman({
+const k = katman({
   context: (req) => ({
-    headers: Object.fromEntries(req.headers) as Record<string, string>,
+    // This runs on every request.
+    // Whatever you return here is available as `ctx` in procedures.
+    db: getDB(),
   }),
 })
 
+// Export the helpers you need
 export const { query, mutation, guard, wrap, router } = k
+export { k }
 ```
 
 </Step>
 <Step>
 
-### Define procedures
+### Define your procedures
 
-Each endpoint is a **procedure** — a `query` (read) or `mutation` (write).
+A **procedure** is a single API endpoint. There are two kinds:
 
-```ts twoslash title="src/routes/users.ts"
+- `query` — for reading data (like GET)
+- `mutation` — for writing data (like POST)
+
+```ts twoslash title="src/server.ts"
 // @noErrors
-import { z } from "zod"
-import { query, mutation, guard } from "../rpc"
+import { k, query, mutation, guard, router } from "./rpc"
 import { KatmanError } from "katman"
+import { z } from "zod"
 
-export const auth = guard(async (ctx) => {
-  const token = ctx.headers.authorization?.replace("Bearer ", "")
+// A guard checks something before the procedure runs.
+// If it returns an object, that object is added to the context.
+const auth = guard((ctx) => {
+  const token = ctx.headers?.authorization
   if (!token) throw new KatmanError("UNAUTHORIZED")
-  return { userId: 1 } // [!code highlight]
+  return { userId: 1 }
 })
 
-export const listUsers = query(
+// A query with input validation
+const listUsers = query(
   z.object({ limit: z.number().min(1).max(100).optional() }),
-  ({ input }) => db.users.findMany({ take: input.limit ?? 10 }),
+  ({ input, ctx }) => {
+    return ctx.db.users.findMany({ take: input.limit ?? 10 })
+  },
 )
 
-export const createUser = mutation({
-  use: [auth], // [!code highlight]
+// A mutation that requires authentication
+const createUser = mutation({
+  use: [auth],
   input: z.object({
     name: z.string().min(1),
     email: z.string().email(),
   }),
-  errors: { CONFLICT: 409 },
-  resolve: ({ input, fail }) => {
-    if (db.users.exists(input.email)) fail("CONFLICT") // [!code highlight]
-    return db.users.create(input)
+  resolve: ({ input, ctx }) => {
+    return ctx.db.users.create({ ...input, createdBy: ctx.userId })
   },
 })
 ```
@@ -112,41 +122,34 @@ export const createUser = mutation({
 </Step>
 <Step>
 
-### Build the router
+### Create a router and start the server
 
-Nest procedures into a tree. The structure becomes the API path.
-
-```ts twoslash title="src/router.ts"
-// @noErrors
-import { router } from "./rpc"
-import { listUsers, createUser } from "./routes/users"
-
-export const appRouter = router({
-  users: {
-    list: listUsers,   // → POST /users/list
-    create: createUser, // → POST /users/create
-  },
-})
-
-export type AppRouter = typeof appRouter
-```
-
-</Step>
-<Step>
-
-### Start the server
+The router groups your procedures. The structure becomes the API path: `users.list` becomes `/users/list`.
 
 ```ts twoslash title="src/server.ts"
 // @noErrors
-import { k } from "./rpc"
-import { appRouter } from "./router"
+// ... continuing from above
+
+const appRouter = router({
+  users: {
+    list: listUsers,
+    create: createUser,
+  },
+})
 
 k.serve(appRouter, {
   port: 3000,
-  scalar: true,  // → /reference (API docs)
-  ws: true,      // → WebSocket RPC on same port
+  scalar: true, // Serves API docs at /reference
 })
 ```
+
+Run it:
+
+```bash
+npx tsx src/server.ts
+```
+
+You should see:
 
 ```
 Katman server running at http://127.0.0.1:3000
@@ -156,28 +159,34 @@ Scalar API Reference at http://127.0.0.1:3000/reference
 </Step>
 <Step>
 
-### Create the client
+### Call it from the client
 
-```ts twoslash title="src/client.ts"
+```ts twoslash
 // @noErrors
 import { createClient } from "katman/client"
 import { createLink } from "katman/client/ofetch"
-import type { InferClient } from "katman"
-import type { AppRouter } from "./router"
 
+// The link tells the client how to talk to the server
 const link = createLink({ url: "http://localhost:3000" })
-export const client = createClient<InferClient<AppRouter>>(link) // [!code highlight]
 
-// Fully typed — autocomplete works!
+// InferClient gives you the types from the router
+const client = createClient<any>(link)
+
+// Now you have full autocomplete
 const users = await client.users.list({ limit: 5 })
-const user = await client.users.create({ name: "Alice", email: "a@test.com" })
+const newUser = await client.users.create({ name: "Alice", email: "alice@example.com" })
 ```
+
+In a real project, you would import the router type and use `InferClient<typeof appRouter>` instead of `any`. See the [Client](/docs/client) page for the full setup.
 
 </Step>
 </Steps>
 
 ## What's next?
 
-- [Core Concepts](/docs/concepts) — How guards, wraps, and hooks work
-- [Server](/docs/server) — HTTP/2, Scalar, serve() options
-- [Client](/docs/client) — Binary mode, interceptors, plugins
+Now that you have a working API, learn about the building blocks:
+
+- [Core Concepts](/docs/concepts) — how context, guards, and wraps work together
+- [Procedures](/docs/procedures) — the two forms: short and full config
+- [Server](/docs/server) — serve(), handler(), HTTP/2, Scalar
+- [Client](/docs/client) — ofetch link, binary mode, interceptors

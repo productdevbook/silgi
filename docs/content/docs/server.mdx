@@ -1,118 +1,293 @@
 ---
 title: Server
-description: serve(), handler(), HTTP/2, WebSocket, Scalar API docs.
-icon: Server
+description: Start your API with serve(), deploy anywhere with handler(), enable HTTP/2, and auto-generate API docs.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
+Katman gives you two ways to run your API: `serve()` for a quick Node.js server, and `handler()` for any runtime that supports the Fetch API (Bun, Deno, Cloudflare Workers, etc.).
 
 ## serve()
 
-One-line Node.js server with batteries included. `k` is the instance returned by `katman()` — see [Getting Started](/docs/getting-started).
+The simplest way to get a server running. One call, and you have an HTTP server with automatic port selection, optional API docs, and WebSocket support:
 
-```ts twoslash title="server.ts"
+```ts twoslash
 // @noErrors
-// k = katman({ context: (req) => ({ ... }) })
+import { katman } from "katman"
+import { z } from "zod"
+
+const k = katman({
+  context: (req) => ({ db: getDB() }),
+})
+
+const appRouter = k.router({
+  health: k.query(() => ({ status: "ok" })),
+})
+
 k.serve(appRouter, {
-  port: 3000,          // auto-finds if busy (3000–3100)
-  hostname: "0.0.0.0",
-  scalar: true,        // API docs at /reference
-  ws: true,            // WebSocket RPC on same port
+  port: 3000,
 })
 ```
 
-All options:
+Run it with `npx tsx src/server.ts` and you'll see:
+
+```
+Katman server running at http://127.0.0.1:3000
+```
+
+### All options
 
 ```ts twoslash
 // @noErrors
 k.serve(appRouter, {
-  port: 3000,
-  hostname: "127.0.0.1",
-  scalar: {
-    title: "My API",
-    version: "2.0.0",
-    description: "Production API",
-    security: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
-    servers: [{ url: "https://api.example.com" }],
-    contact: { email: "dev@example.com" },
+  port: 3000,               // auto-finds next available if busy
+  hostname: "0.0.0.0",      // bind to all interfaces
+  scalar: true,             // API docs at /reference
+  ws: true,                 // WebSocket RPC on the same port
+  http2: {                  // HTTP/2 with TLS
+    cert: "./certs/cert.pem",
+    key: "./certs/key.pem",
   },
-  ws: true,
-  http2: { cert: "./cert.pem", key: "./key.pem" },
 })
 ```
 
-| Option | Description |
-|---|---|
-| `port` | Port number. Auto-finds next available if busy. |
-| `hostname` | Bind address. Default `"127.0.0.1"`. |
-| `scalar` | `true` or config object. Serves OpenAPI 3.1.0 + Scalar UI. |
-| `ws` | `true` to enable WebSocket RPC on same port. |
-| `http2` | `{ cert, key }` for HTTP/2 with TLS (HTTP/1.1 fallback). |
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `port` | `number` | `3000` | Port to listen on. If it's taken, Katman automatically picks the next free port in 3000-3100. |
+| `hostname` | `string` | `"127.0.0.1"` | Network interface. Use `"0.0.0.0"` to accept connections from other machines. |
+| `scalar` | `boolean \| ScalarOptions` | `false` | Enable auto-generated API docs at `/reference`. |
+| `ws` | `boolean` | `false` | Enable WebSocket RPC on the same port. |
+| `http2` | `{ cert, key }` | `undefined` | Enable HTTP/2 with TLS certificates. Falls back to HTTP/1.1 for older clients. |
+
+### Automatic port selection
+
+If your requested port is already in use, `serve()` finds the next available one in the 3000-3100 range. You never need to handle `EADDRINUSE` yourself.
 
 ## handler()
 
-Fetch API handler — works everywhere:
+For runtimes other than Node.js, or when you want to plug Katman into an existing server, use `handler()`. It returns a standard Fetch API function: `(Request) => Promise<Response>`.
 
-<Tabs items={['Node.js', 'Bun', 'Deno', 'Cloudflare Workers']}>
-  <Tab value="Node.js">
-  ```ts twoslash
+```ts twoslash
 // @noErrors
-  import { createServer } from "node:http"
-  const handle = k.handler(appRouter)
-  // Use with any Node.js HTTP adapter
-  ```
-  </Tab>
+const handle = k.handler(appRouter)
+// handle is: (request: Request) => Promise<Response>
+```
+
+This works everywhere the Web Fetch API exists:
+
+<Tabs items={['Bun', 'Deno', 'Cloudflare Workers']}>
   <Tab value="Bun">
   ```ts twoslash
 // @noErrors
-  const handle = k.handler(appRouter)
-  Bun.serve({ fetch: handle, port: 3000 })
+const handle = k.handler(appRouter)
+
+Bun.serve({
+  port: 3000,
+  fetch: handle,
+})
   ```
   </Tab>
   <Tab value="Deno">
   ```ts twoslash
 // @noErrors
-  const handle = k.handler(appRouter)
-  Deno.serve({ port: 3000 }, handle)
+const handle = k.handler(appRouter)
+
+Deno.serve({ port: 3000 }, handle)
   ```
   </Tab>
   <Tab value="Cloudflare Workers">
   ```ts twoslash
 // @noErrors
-  const handle = k.handler(appRouter)
-  export default { fetch: handle }
+const handle = k.handler(appRouter)
+
+export default {
+  fetch: handle,
+}
   ```
   </Tab>
 </Tabs>
 
-## Content Negotiation
-
-The server automatically responds in the format the client requests:
-
-| Accept Header | Format | Use Case |
-|---|---|---|
-| `application/json` | JSON | Default |
-| `application/x-msgpack` | MessagePack | 30% smaller payloads |
-| `application/x-devalue+json` | devalue | Date, Map, Set, BigInt |
-
-<Callout>
-Content negotiation is automatic. Send the `Accept` header and the server responds accordingly. No configuration needed.
+<Callout type="info">
+`handler()` supports content negotiation automatically. If the client sends an `Accept: application/x-msgpack` header, the response is encoded as MessagePack. Same for devalue. JSON is the default fallback.
 </Callout>
 
-## Scalar API Reference
+## Content negotiation
 
-When `scalar` is enabled:
+Both `serve()` and `handler()` inspect the `Accept` header and respond in the format the client prefers:
 
-- **`/reference`** — Interactive API documentation UI
-- **`/openapi.json`** — OpenAPI 3.1.0 JSON specification
+| Accept header | Response format | When to use |
+|---|---|---|
+| `application/json` (or none) | JSON | Default, works everywhere |
+| `application/x-msgpack` | MessagePack | Smaller payloads, binary |
+| `application/x-devalue+json` | devalue | Rich types (Date, Map, Set, BigInt) |
 
-The spec is generated at startup from your router — zero runtime cost per request.
+The server also checks `Content-Type` on incoming POST requests to decode the body correctly. No configuration needed on the server side — it all happens automatically.
 
-## Related
+## Scalar API docs
 
-- [Getting Started](/docs/getting-started) — Set up a katman router
-- [Middleware](/docs/middleware) — Guards and wraps that run inside your server
-- [Protocols](/docs/protocols) — JSON, MessagePack, devalue wire formats
-- [WebSocket](/docs/protocols/websocket) — Enable `ws: true` for bidirectional RPC
-- [Fastify](/docs/integrations/fastify) — Use katman inside an existing Fastify app instead of `serve()`
+Katman can generate an OpenAPI 3.1.0 spec from your router and serve an interactive API reference powered by [Scalar](https://scalar.com):
+
+```ts twoslash
+// @noErrors
+k.serve(appRouter, {
+  port: 3000,
+  scalar: true,
+})
+```
+
+This gives you two extra routes:
+
+- **`/reference`** — interactive API documentation UI
+- **`/openapi.json`** — the raw OpenAPI specification
+
+The spec is generated once at startup, so there is no per-request cost.
+
+### Customizing the docs
+
+Pass an options object instead of `true`:
+
+```ts twoslash
+// @noErrors
+k.serve(appRouter, {
+  scalar: {
+    title: "My API",
+    description: "Built with Katman",
+    version: "2.0.0",
+    servers: [{ url: "https://api.example.com" }],
+    contact: { email: "dev@example.com" },
+    security: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+  },
+})
+```
+
+### Adding metadata to procedures
+
+The generated docs pull information from your procedure definitions. Add `route` metadata to make the docs more useful:
+
+```ts twoslash
+// @noErrors
+const listUsers = k.query({
+  input: z.object({ limit: z.number().optional() }),
+  route: {
+    summary: "List all users",
+    description: "Returns a paginated list of users, ordered by creation date.",
+    tags: ["users"],
+  },
+  resolve: ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
+})
+```
+
+The `route` field accepts:
+
+| Property | Description |
+|---|---|
+| `summary` | Short description shown in the endpoint list |
+| `description` | Longer description shown in the detail view |
+| `tags` | Group endpoints by tag |
+| `deprecated` | Mark an endpoint as deprecated |
+| `successStatus` | Override the default 200 status |
+| `successDescription` | Describe what a successful response looks like |
+
+## HTTP/2
+
+For production deployments that benefit from multiplexing and header compression, pass TLS certificates:
+
+```ts twoslash
+// @noErrors
+k.serve(appRouter, {
+  port: 443,
+  http2: {
+    cert: "./certs/cert.pem",
+    key: "./certs/key.pem",
+  },
+})
+```
+
+Output:
+
+```
+Katman server running at https://127.0.0.1:443
+  HTTP/2 enabled (with HTTP/1.1 fallback)
+```
+
+HTTP/2 requires TLS. Older clients that don't support HTTP/2 automatically fall back to HTTP/1.1 on the same port.
+
+<Callout>
+For local development, generate self-signed certificates with [mkcert](https://github.com/FiloSottile/mkcert). For production, use certificates from your hosting provider or Let's Encrypt.
+</Callout>
+
+## WebSocket support
+
+Enable bidirectional RPC alongside the HTTP server:
+
+```ts twoslash
+// @noErrors
+k.serve(appRouter, {
+  port: 3000,
+  ws: true,
+})
+```
+
+```
+Katman server running at http://127.0.0.1:3000
+  WebSocket RPC at ws://127.0.0.1:3000
+```
+
+HTTP and WebSocket share the same port. The server detects WebSocket upgrade requests and routes them accordingly. See the [WebSocket protocol](/docs/protocols/websocket) page for the message format and how to connect from the client.
+
+## Lifecycle hooks
+
+Katman fires hooks at key points during request processing. Register them in the `hooks` option when creating the instance:
+
+```ts twoslash
+// @noErrors
+const k = katman({
+  context: (req) => ({ db: getDB() }),
+  hooks: {
+    request: ({ path, input }) => {
+      console.log(`--> ${path}`)
+    },
+    response: ({ path, output, durationMs }) => {
+      console.log(`<-- ${path} (${durationMs.toFixed(1)}ms)`)
+    },
+    error: ({ path, error }) => {
+      console.error(`ERR ${path}:`, error)
+    },
+    "serve:start": ({ url, port, hostname }) => {
+      console.log(`Server ready at ${url}`)
+    },
+  },
+})
+```
+
+You can also add or remove hooks after the instance is created:
+
+```ts twoslash
+// @noErrors
+// Add a hook
+k.hook("error", ({ error }) => reportToSentry(error))
+
+// Remove a hook
+k.removeHook("error", myHookFn)
+```
+
+| Hook | When it fires | Payload |
+|---|---|---|
+| `request` | Before a request is processed | `{ path, input }` |
+| `response` | After a successful response | `{ path, output, durationMs }` |
+| `error` | When any error occurs | `{ path, error }` |
+| `serve:start` | When the server starts listening | `{ url, port, hostname }` |
+
+<Callout type="info">
+Hooks are for side effects like logging and metrics. They don't modify the request or response. For that, use [guards and wraps](/docs/middleware).
+</Callout>
+
+## What's next?
+
+- [Client](/docs/client) — connect to your server from the browser or another service
+- [Middleware](/docs/middleware) — guards and wraps that run inside your request pipeline
+- [Fastify integration](/docs/integrations/fastify) — mount Katman inside an existing Fastify app
+- [Plugins](/docs/plugins) — add CORS, logging, rate limiting, and tracing
+- [Protocols](/docs/protocols) — learn about JSON, MessagePack, devalue, and WebSocket

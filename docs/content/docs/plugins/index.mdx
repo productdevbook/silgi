@@ -1,21 +1,36 @@
 ---
 title: Plugins
-description: Extend katman with CORS, tracing, logging, and rate limiting.
-icon: Plug
+description: Extend Katman with CORS, distributed tracing, structured logging, and rate limiting.
 ---
 
 import { Cards, Card } from 'fumadocs-ui/components/card';
 import { Callout } from 'fumadocs-ui/components/callout';
 
-Katman plugins follow the v2 pattern — guards for request-level logic, wraps for lifecycle, hooks for global events. No special plugin API. Just middleware.
+Katman plugins are just regular middleware and hooks. There is no special plugin API — a "plugin" is a guard, a wrap, or a set of lifecycle hooks that someone has packaged up for reuse.
+
+All plugins ship as subpath imports from the `katman` package. You only import what you use, and unused plugins add zero bytes to your bundle.
 
 <Callout>
-All plugins are tree-shakeable. Import only what you use — unused plugins add zero bytes to your bundle.
+You can build your own plugins the same way. A guard that checks a feature flag, a wrap that logs slow queries, a set of hooks that track metrics — they all follow the same patterns described in the [Middleware](/docs/middleware) and [Server](/docs/server) docs.
 </Callout>
 
 <Cards>
-  <Card title="CORS" description="Cross-origin headers — string, array, or dynamic origin matching." href="/docs/plugins/cors" />
-  <Card title="OpenTelemetry" description="Distributed tracing — each procedure call becomes a span." href="/docs/plugins/otel" />
-  <Card title="Pino" description="Structured logging — request received, response sent, error caught." href="/docs/plugins/pino" />
-  <Card title="Rate Limiting" description="Sliding window guard — in-memory or custom backend (Redis, Upstash)." href="/docs/plugins/ratelimit" />
+  <Card title="CORS" description="Cross-origin headers — static origin, origin list, or dynamic matching with a function." href="/docs/plugins/cors" />
+  <Card title="OpenTelemetry" description="Distributed tracing — each procedure call becomes a span with error recording." href="/docs/plugins/otel" />
+  <Card title="Pino Logging" description="Structured request logging — request received, response sent, errors caught." href="/docs/plugins/pino" />
+  <Card title="Rate Limiting" description="Sliding window rate limiter — in-memory or pluggable backend (Redis, Upstash, etc.)." href="/docs/plugins/ratelimit" />
 </Cards>
+
+## Plugin types at a glance
+
+| Plugin | Type | How to use |
+|---|---|---|
+| CORS | Header helper | Call `corsHeaders()` to get a headers object |
+| OpenTelemetry | Wrap middleware | Add `otelWrap(tracer)` to a procedure's `use` array |
+| Pino Logging | Lifecycle hooks | Pass `loggingHooks({ logger })` to the `hooks` option |
+| Rate Limiting | Guard middleware | Add `rateLimitGuard(...)` to a procedure's `use` array |
+
+## What's next?
+
+- [Middleware](/docs/middleware) — understand guards and wraps, which power most plugins
+- [Server](/docs/server) — lifecycle hooks, which power the logging plugin

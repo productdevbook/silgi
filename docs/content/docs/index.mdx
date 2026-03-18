@@ -1,97 +1,57 @@
 ---
-title: Katman
-description: The fastest end-to-end type-safe RPC framework for TypeScript.
-icon: Rocket
+title: Introduction
+description: What is Katman and why should you use it?
 ---
 
 import { Cards, Card } from 'fumadocs-ui/components/card';
-import { Callout } from 'fumadocs-ui/components/callout';
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
-End-to-end type-safe RPC for TypeScript. Single package. Every runtime.
+## What is Katman?
 
-<Tabs items={['npm', 'pnpm', 'bun']}>
-  <Tab value="npm">
-  ```bash
-  npm install katman
-  ```
-  </Tab>
-  <Tab value="pnpm">
-  ```bash
-  pnpm add katman
-  ```
-  </Tab>
-  <Tab value="bun">
-  ```bash
-  bun add katman
-  ```
-  </Tab>
-</Tabs>
+Katman is a TypeScript library that lets you build APIs with full type safety from the server all the way to the client. You define your API procedures once, and TypeScript makes sure everything is connected correctly — inputs, outputs, errors, and context.
 
-<Callout type="info" title="Why Katman?">
-Katman compiles your middleware into a pre-linked chain at startup. No per-request closures. No runtime overhead. Just raw speed.
-</Callout>
+The name comes from the Turkish word for "layer". The idea is simple: you build your API in clean, composable layers. Each layer has one job.
 
-```ts twoslash title="server.ts"
+## How does it work?
+
+You write functions on the server. Katman compiles them into a fast pipeline at startup. Then you call those functions from the client with full autocomplete — no code generation, no manual type definitions.
+
+```ts twoslash
 // @noErrors
-import { katman, KatmanError } from "katman"
+import { katman } from "katman"
 import { z } from "zod"
 
+// 1. Create an instance
 const k = katman({
   context: (req) => ({ db: getDB() }),
 })
 
-const { query, mutation, guard, router } = k
-
-const auth = guard(async (ctx) => {
-  const user = await verify(ctx.headers.authorization)
-  if (!user) throw new KatmanError("UNAUTHORIZED")
-  return { user } // [!code highlight]
-})
-
-const listUsers = query(
+// 2. Define a procedure
+const getUsers = k.query(
   z.object({ limit: z.number().optional() }),
   ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
 )
 
-const createUser = mutation({
-  use: [auth],
-  input: z.object({ name: z.string() }),
-  errors: { CONFLICT: 409 },
-  resolve: ({ input, ctx, fail }) => {
-    if (ctx.db.users.exists(input.name)) fail("CONFLICT") // [!code highlight]
-    return ctx.db.users.create(input)
-  },
-})
-
-k.serve(router({ users: { list: listUsers, create: createUser } }), {
-  port: 3000,
-  scalar: true, // API docs at /reference
-  ws: true,     // WebSocket on same port
-})
+// 3. Create a router and start the server
+k.serve(k.router({ getUsers }), { port: 3000 })
 ```
 
-## What's included
+That's it. The client gets full types automatically.
+
+## Key ideas
+
+**Single package.** You install one thing: `katman`. Server, client, plugins, codecs — all included. No juggling five scoped packages.
+
+**Standard Schema.** Katman doesn't lock you into Zod. It uses the Standard Schema spec, so Valibot and ArkType work too.
+
+**Compiled pipeline.** When your server starts, Katman pre-links all your middleware into a direct function chain. No closures are created per request.
+
+**Multiple protocols.** JSON by default, MessagePack for binary, devalue for rich types like Date and Map. The server picks the right format based on what the client asks for.
+
+## Next steps
 
 <Cards>
-  <Card title="Getting Started" description="Install and build your first API in 5 minutes." href="/docs/getting-started" />
-  <Card title="Core Concepts" description="Guards, wraps, hooks, type inference." href="/docs/concepts" />
-  <Card title="Client" description="ofetch transport, binary mode, interceptors." href="/docs/client" />
-  <Card title="Protocols" description="JSON, MessagePack, devalue — pick your wire format." href="/docs/protocols" />
-  <Card title="Plugins" description="CORS, OTel, Pino, rate limiting." href="/docs/plugins" />
-  <Card title="Integrations" description="React, TanStack Query, AI SDK, Fastify." href="/docs/react" />
+  <Card title="Getting Started" description="Install Katman and build your first API." href="/docs/getting-started" />
+  <Card title="Core Concepts" description="Understand procedures, guards, wraps, and hooks." href="/docs/concepts" />
+  <Card title="Server" description="Learn about serve(), handler(), and deployment." href="/docs/server" />
+  <Card title="Client" description="Set up the type-safe client." href="/docs/client" />
 </Cards>
-
-## Performance
-
-| Scenario | Pipeline | HTTP |
-|---|---|---|
-| No middleware | 112 ns | 86 µs |
-| Guard + Zod validation | 318 ns | 78 µs |
-| WebSocket (persistent) | — | 39 µs |
-
-| Runtime | handler() |
-|---|---|
-| Node.js 22+ | 9 µs/req |
-| Bun | 2 µs/req |
-| Deno | Supported |

@@ -1,23 +1,26 @@
 ---
 title: AI SDK
-description: Turn katman procedures into AI tools — LLMs call your API through function calling.
-icon: Brain
+description: Turn Katman procedures into AI tools — LLMs call your API through function calling.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Step, Steps } from 'fumadocs-ui/components/steps';
 
-The [Vercel AI SDK](https://sdk.vercel.ai) lets you connect LLMs to tools — functions the model can call. Katman automatically converts your procedures into AI tools, extracting JSON Schema from your Zod input schemas.
+The [Vercel AI SDK](https://sdk.vercel.ai) lets you connect LLMs to **tools** — functions the model can call when it needs data or wants to take actions. Katman can automatically convert your procedures into AI tools, extracting JSON Schema from your Zod input schemas.
+
+This means your existing API becomes callable by AI models with zero extra code.
 
 ## Prerequisites
 
-You need a katman [router](/docs/getting-started) and the AI SDK:
+You need a Katman [router](/docs/getting-started) and the AI SDK:
 
 ```bash
 npm install ai @ai-sdk/openai
 ```
 
-## Quick Start
+(Or any other AI SDK provider — Anthropic, Google, etc.)
+
+## Quick start
 
 <Steps>
 <Step>
@@ -27,11 +30,12 @@ npm install ai @ai-sdk/openai
 ```ts twoslash
 // @noErrors
 import { routerToTools } from "katman/ai"
+import { appRouter } from "./router"
 
-const tools = routerToTools(appRouter) // [!code highlight]
+const tools = routerToTools(appRouter)
 ```
 
-This creates one tool per procedure. Nested routers are flattened: `users.list` becomes `users_list`.
+This creates one AI tool per procedure. Nested routers are flattened with underscores: `users.list` becomes `users_list`, `admin.stats` becomes `admin_stats`.
 
 </Step>
 <Step>
@@ -45,19 +49,43 @@ import { openai } from "@ai-sdk/openai"
 
 const { text } = await generateText({
   model: openai("gpt-4o"),
-  tools, // [!code highlight]
+  tools,
   prompt: "List all users with limit 5, then create a user named Bob",
 })
 ```
 
-The model sees your procedures as callable functions. Input schemas are sent as JSON Schema for function calling.
+The model sees your procedures as callable functions. It reads the descriptions and parameter schemas, decides which tools to call, and Katman executes them.
 
 </Step>
 </Steps>
 
-## Single Procedure
+## How it works
 
-For more control, convert individual procedures:
+For each procedure, Katman:
+
+1. **Extracts a description** from `route.description` or `route.summary` in your procedure definition. Falls back to `"Call {name}"`.
+2. **Converts the Zod input schema** to JSON Schema, which is the format LLMs use for function calling.
+3. **Creates an AI SDK `tool`** that executes the procedure when the model calls it.
+
+This means your existing route metadata doubles as AI tool documentation:
+
+```ts twoslash
+// @noErrors
+const listUsers = k.query({
+  input: z.object({ limit: z.number().optional() }),
+  route: {
+    summary: "List all registered users",
+    description: "Returns a list of users, optionally limited by count.",
+  },
+  resolve: ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
+})
+```
+
+The AI model sees `"List all registered users"` as the tool description and knows it can pass `{ limit: number }` as input.
+
+## Single procedure
+
+For more control, convert individual procedures instead of the whole router:
 
 ```ts twoslash
 // @noErrors
@@ -66,28 +94,75 @@ import { procedureToTool } from "katman/ai"
 const searchTool = procedureToTool("search", appRouter.search, {
   description: "Search the database for items matching a query",
 })
+
+const { text } = await generateText({
+  model: openai("gpt-4o"),
+  tools: { search: searchTool },
+  prompt: "Find all items related to TypeScript",
+})
 ```
 
-## Filtering
+The `description` option overrides anything from the procedure's route metadata.
 
-Expose only specific procedures:
+## Filtering procedures
+
+You probably don't want to expose every procedure to the AI. Use the `filter` option to control which ones become tools:
 
 ```ts twoslash
 // @noErrors
 const tools = routerToTools(appRouter, {
-  filter: (path) => !path.startsWith("admin_"), // [!code highlight]
+  // Only expose query procedures, not mutations
+  filter: (path, procedure) => procedure.type === "query",
+})
+```
+
+Or filter by path:
+
+```ts twoslash
+// @noErrors
+const tools = routerToTools(appRouter, {
+  filter: (path) => !path.startsWith("admin_"),
+})
+```
+
+## Custom descriptions
+
+Override descriptions for specific tools:
+
+```ts twoslash
+// @noErrors
+const tools = routerToTools(appRouter, {
   descriptions: {
-    users_list: "List all registered users",
-    users_create: "Create a new user account",
+    users_list: "Get a list of all registered users. Supports a limit parameter.",
+    users_create: "Create a new user account with a name and email.",
   },
 })
 ```
 
+These take priority over route metadata.
+
 <Callout>
-Tool descriptions are extracted from your route metadata (`route.description` or `route.summary`). Pass custom `descriptions` to override.
+Good descriptions matter. LLMs decide which tool to call based on the description. Be specific about what the tool does and what parameters it accepts.
 </Callout>
 
-## Related
+## Supported input types
 
-- [Getting Started](/docs/getting-started) — Set up a katman router
-- [Core Concepts](/docs/concepts) — How procedures and type inference work
+The Zod-to-JSON-Schema converter handles common types:
+
+| Zod type | JSON Schema |
+|---|---|
+| `z.string()` | `{ "type": "string" }` |
+| `z.number()` | `{ "type": "number" }` |
+| `z.boolean()` | `{ "type": "boolean" }` |
+| `z.object({...})` | `{ "type": "object", "properties": {...} }` |
+| `z.array(z.string())` | `{ "type": "array", "items": { "type": "string" } }` |
+| `z.enum(["a", "b"])` | `{ "type": "string", "enum": ["a", "b"] }` |
+| `z.optional(...)` | Marked as not required |
+
+For procedures without an input schema, the tool accepts an empty object.
+
+## What's next?
+
+- [Getting Started](/docs/getting-started) — set up a Katman router to convert into tools
+- [Procedures](/docs/procedures) — add route metadata that becomes tool descriptions
+- [Integrations](/docs/integrations) — other available integrations

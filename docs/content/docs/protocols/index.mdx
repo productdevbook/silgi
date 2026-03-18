@@ -1,21 +1,65 @@
 ---
 title: Protocols
-description: Katman supports three wire formats. The server picks the right one automatically.
-icon: Layers
+description: Katman supports three wire formats — JSON, MessagePack, and devalue — plus WebSocket for persistent connections.
 ---
 
 import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Callout } from 'fumadocs-ui/components/callout';
 
-Katman uses content negotiation — the client sends an `Accept` header and the server responds in that format. No configuration needed.
+When a client sends a request, the server needs to agree on how to encode the data. Katman handles this automatically through **content negotiation** — the client says what format it wants via the `Accept` header, and the server responds accordingly. No configuration needed.
 
-| Format | Size | Rich Types | Binary | Best For |
+## The three formats
+
+| Format | Payload size | Rich types | Binary | Best for |
 |---|---|---|---|---|
-| **JSON** | Baseline | No | No | Default, universal |
-| **MessagePack** | 30% smaller | Date | Yes | Mobile, bandwidth |
-| **devalue** | ~Same | All | No | Date, Map, Set, BigInt |
+| **JSON** | Baseline | No | No | Default, universal compatibility |
+| **MessagePack** | ~30% smaller | Date, Set, Map | Yes | Mobile apps, bandwidth-sensitive |
+| **devalue** | ~Same as JSON | Date, Map, Set, BigInt, RegExp, circular refs | No | APIs returning rich JavaScript types |
+
+**JSON** is the default. Every client and every tool understands it. If you don't configure anything, this is what you get.
+
+**MessagePack** is a binary format. Same data, fewer bytes. If you're building a mobile app or sending large payloads, switching to MessagePack can noticeably reduce bandwidth and improve parse speed.
+
+**devalue** preserves JavaScript types that JSON loses. If your API returns `Date` objects, `Map`, `Set`, or `BigInt`, devalue keeps them intact instead of converting them to strings or empty objects.
+
+## How content negotiation works
+
+The client sends an `Accept` header, and the server picks the matching format:
+
+```
+Accept: application/json              --> JSON (default)
+Accept: application/x-msgpack         --> MessagePack
+Accept: application/x-devalue+json    --> devalue
+```
+
+For request bodies, the server checks `Content-Type` and decodes accordingly. This all happens inside Katman — you don't need to configure anything on the server.
+
+On the client side, setting `binary: true` in `createLink` switches to MessagePack automatically:
+
+```ts twoslash
+// @noErrors
+import { createLink } from "katman/client/ofetch"
+
+const link = createLink({
+  url: "http://localhost:3000",
+  binary: true, // uses MessagePack for all requests
+})
+```
+
+<Callout type="info">
+You can also use these formats over [WebSocket](/docs/protocols/websocket). Pass `binary: true` to `attachWebSocket` for MessagePack over WebSocket.
+</Callout>
+
+## Choose a format
+
+Most applications work great with plain JSON. Consider switching when:
+
+- You need **smaller payloads** (mobile, IoT, high-traffic) --> MessagePack
+- Your API returns **Date, Map, Set, or BigInt** --> devalue
+- You want the **lowest possible latency** for repeated calls --> WebSocket
 
 <Cards>
-  <Card title="MessagePack" description="Binary protocol — 30% smaller payloads, native Date. No competitor has this." href="/docs/protocols/msgpack" />
+  <Card title="MessagePack" description="Binary protocol for smaller payloads and native Date support." href="/docs/protocols/msgpack" />
   <Card title="devalue" description="Rich type serialization — Date, Map, Set, BigInt, RegExp, circular refs." href="/docs/protocols/devalue" />
-  <Card title="WebSocket" description="Bidirectional RPC over persistent connection. 40% lower latency than HTTP." href="/docs/protocols/websocket" />
+  <Card title="WebSocket" description="Bidirectional RPC over a persistent connection. Ideal for real-time and subscriptions." href="/docs/protocols/websocket" />
 </Cards>

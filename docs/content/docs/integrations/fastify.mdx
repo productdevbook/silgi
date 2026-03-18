@@ -1,19 +1,18 @@
 ---
 title: Fastify
-description: Use katman as a Fastify plugin — RPC and REST on the same server.
-icon: Zap
+description: Mount Katman as a Fastify plugin — run RPC and REST routes on the same server.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Step, Steps } from 'fumadocs-ui/components/steps';
 
-Katman has a built-in `serve()` function that creates its own HTTP server. But if you already have a Fastify application and want to add katman alongside existing REST endpoints, use the Fastify adapter.
+Katman has a built-in `serve()` function that creates its own HTTP server. But if you already have a Fastify application with REST routes, middleware, and plugins, you can add Katman alongside everything else using the Fastify adapter.
 
-## When to Use
+## When to use this
 
 | Approach | When |
 |---|---|
-| `k.serve(router)` | New project, katman-only server |
+| `k.serve(router)` | New project, Katman-only server |
 | `katmanFastify(router)` | Adding RPC to an existing Fastify app |
 
 ## Setup
@@ -30,9 +29,16 @@ npm install fastify
 </Step>
 <Step>
 
-### Register the Plugin
+### Create your Katman router
 
-```ts twoslash title="server.ts"
+If you haven't defined a router yet, see the [Getting Started](/docs/getting-started) guide. You need a router object — the same one you'd pass to `k.serve()`.
+
+</Step>
+<Step>
+
+### Register the plugin
+
+```ts twoslash
 // @noErrors
 import Fastify from "fastify"
 import { katmanFastify } from "katman/fastify"
@@ -41,11 +47,14 @@ import { appRouter } from "./router"
 const app = Fastify()
 
 // Your existing REST routes
-app.get("/api/legacy", async () => ({ type: "rest" }))
+app.get("/api/health", async () => ({ type: "rest" }))
 
 // Katman RPC under /rpc prefix
 app.register(katmanFastify(appRouter, {
-  context: (req) => ({ user: req.user }), // [!code highlight]
+  context: (req) => ({
+    user: req.user,
+    ip: req.ip,
+  }),
 }), { prefix: "/rpc" })
 
 app.listen({ port: 3000 })
@@ -54,7 +63,7 @@ app.listen({ port: 3000 })
 </Step>
 </Steps>
 
-Each procedure becomes a POST route:
+Each procedure becomes a POST route under the prefix:
 
 ```
 POST /rpc/health
@@ -64,25 +73,47 @@ POST /rpc/users/create
 
 ## Context from Fastify
 
-The `context` option receives the Fastify request — use it to pass auth, IP, etc. into katman procedures:
+The `context` option receives the Fastify request object. Use it to bridge Fastify's auth plugins, IP detection, and headers into Katman's context:
 
 ```ts twoslash
 // @noErrors
 katmanFastify(appRouter, {
   context: (req) => ({
-    user: req.user,             // from Fastify auth plugin
-    ip: req.ip,                 // client IP
-    headers: req.headers,       // raw headers
+    user: req.user,            // from @fastify/jwt or similar
+    ip: req.ip,                // client IP
+    headers: req.headers,      // raw headers
   }),
 })
 ```
 
-<Callout>
-Fastify's built-in JSON parser is used — request bodies are already parsed when your handler runs. [Content negotiation](/docs/protocols) (JSON, MessagePack, devalue) works automatically.
+If you don't provide a `context` function, an empty object is used.
+
+## Content negotiation
+
+Content negotiation works automatically. If the client sends `Accept: application/x-msgpack`, the Fastify adapter responds with MessagePack. Same for devalue. JSON is the default.
+
+Fastify's built-in JSON parser handles request body parsing. The adapter only needs to encode the response.
+
+<Callout type="info">
+Fastify's schema-based serialization is not used here — Katman has its own compiled serializers. Request bodies are parsed by Fastify, but response encoding is handled by Katman for consistency with `serve()` and `handler()`.
 </Callout>
 
-## Related
+## Error handling
 
-- [Server](/docs/server) — `serve()` for standalone katman servers
-- [Protocols](/docs/protocols) — JSON, MessagePack, devalue wire formats
-- [Client](/docs/client) — Connect to your Fastify-hosted katman API
+Errors from guards, wraps, and resolvers are caught and returned as JSON responses with the appropriate status code. Validation errors return 400, `KatmanError` returns its defined status, and unexpected errors return 500.
+
+The error format is the same as `serve()` and `handler()`:
+
+```json
+{
+  "code": "NOT_FOUND",
+  "status": 404,
+  "message": "Not Found"
+}
+```
+
+## What's next?
+
+- [Server](/docs/server) — `serve()` for standalone Katman servers
+- [Client](/docs/client) — connect to your Fastify-hosted Katman API
+- [Protocols](/docs/protocols) — JSON, MessagePack, and devalue wire formats

@@ -1,63 +1,116 @@
 ---
 title: OpenTelemetry
-description: Distributed tracing — each procedure call becomes a span.
-icon: Activity
+description: Distributed tracing — each procedure call becomes a span with automatic error recording.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
+OpenTelemetry (OTel) is the standard for distributed tracing. Katman's `otelWrap` creates a span for each procedure call, so you can see every RPC call in your tracing dashboard (Jaeger, Zipkin, Honeycomb, Datadog, etc.).
+
+## How it works
+
+`otelWrap` is a [wrap middleware](/docs/middleware). It creates a span, runs your procedure inside it, then closes the span. If the procedure throws, the span records the error before rethrowing.
+
+## Setup
+
+<Steps>
+<Step>
+
+### Install OpenTelemetry
+
+```bash
+npm install @opentelemetry/api
+```
+
+You'll also need an OTel SDK and exporter for your backend (Jaeger, OTLP, etc.) — but that's standard OTel setup, not Katman-specific.
+
+</Step>
+<Step>
+
+### Create the wrap
 
 ```ts twoslash
 // @noErrors
 import { otelWrap } from "katman/otel"
-```
-
-## Setup
-
-```ts twoslash
-// @noErrors
 import { trace } from "@opentelemetry/api"
 
 const tracing = otelWrap(trace.getTracer("my-service"))
 ```
 
-## Usage
+</Step>
+<Step>
 
-Add as a wrap middleware to any procedure:
+### Add it to procedures
 
 ```ts twoslash
 // @noErrors
-const proc = query({
-  use: [tracing], // [!code highlight]
+const listUsers = k.query({
+  use: [tracing],
   resolve: ({ ctx }) => ctx.db.users.findMany(),
+})
+
+const createUser = k.mutation({
+  use: [auth, tracing],
+  resolve: ({ ctx, input }) => ctx.db.users.create(input),
 })
 ```
 
-Every call creates a span with:
-- `rpc.system: "katman"`
-- Status code 0 (OK) or 2 (ERROR)
-- Exception events on error with `exception.message`
+</Step>
+</Steps>
 
-## Error Recording
+Each call to these procedures now produces a span in your tracing backend.
 
-Errors are automatically captured:
+## What gets recorded
+
+Every span includes:
+
+| Attribute | Value |
+|---|---|
+| `rpc.system` | `"katman"` |
+| Status code | `0` (OK) on success, `2` (ERROR) on failure |
+
+On errors, the span also includes an exception event:
+
+```
+Event: exception
+  exception.message: "Not found"
+```
+
+This means errors are automatically visible in your tracing dashboard — you don't need to add manual error reporting to each procedure.
+
+## Custom span name
+
+The default span name is `"rpc.call"`. You can change it:
 
 ```ts twoslash
 // @noErrors
-// On success:
-// span.setStatus({ code: 0 })
+import { otelWrap } from "katman/otel"
 
-// On error:
-// span.setStatus({ code: 2, message: "Not found" })
-// span.addEvent("exception", { "exception.message": "Not found" })
+const tracing = otelWrap(tracer, "api.procedure")
 ```
+
+## Combining with other middleware
+
+`otelWrap` is a regular wrap middleware. Stack it with guards and other wraps normally:
+
+```ts twoslash
+// @noErrors
+const createUser = k.mutation({
+  use: [auth, rateLimit, tracing],
+  //    guards first, then wraps
+  resolve: ({ ctx, input }) => ctx.db.users.create(input),
+})
+```
+
+Guards (`auth`, `rateLimit`) run before the span wraps around the resolver. If you want the span to include guard execution time, put `tracing` before the guards in the array.
 
 <Callout type="info">
-Katman has zero OpenTelemetry dependency — we define a lightweight `Tracer` / `Span` interface. You bring your own `@opentelemetry/api`.
+Katman has zero OpenTelemetry dependency. The plugin defines a lightweight `Tracer` and `Span` interface. You bring `@opentelemetry/api` yourself, which means Katman never pins you to a specific OTel version.
 </Callout>
 
-## Custom Span Name
+## What's next?
 
-```ts twoslash
-// @noErrors
-const tracing = otelWrap(tracer, "api.call") // default: "rpc.call"
-```
+- [Pino Logging](/docs/plugins/pino) — structured logging for requests and responses
+- [Middleware](/docs/middleware) — learn about guards and wraps
+- [Plugins](/docs/plugins) — all available plugins
