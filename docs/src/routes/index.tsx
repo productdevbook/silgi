@@ -115,24 +115,14 @@ function SponsorBanner() {
   const link = "https://github.com/sponsors/productdevbook";
   return (
     <section>
-      <W ticks className="p-6 sm:p-10">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-6">
-            <span className="k-mono text-xs uppercase tracking-[.2em] text-[var(--k-dim)] shrink-0">Special Sponsor</span>
-            <div className="flex items-center gap-3">
-              {[1, 2].map((i) => (
-                <a key={i} href={link} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center justify-center h-10 w-36 rounded-lg border border-dashed border-[var(--k-line)] text-[var(--k-dim)] text-sm hover:border-[var(--k-accent)]/40 hover:text-[var(--k-accent)] transition-colors">
-                  Sponsor
-                </a>
-              ))}
-            </div>
-          </div>
-          <a href={link} target="_blank" rel="noopener noreferrer"
-            className="flex items-center gap-2 text-[var(--k-dim)] hover:text-[var(--k-accent)] transition-colors text-sm">
-            Become a sponsor <span className="text-[var(--k-accent)]">→</span>
+      <W ticks className="grid grid-cols-2">
+        {[1, 2].map((i) => (
+          <a key={i} href={link} target="_blank" rel="noopener noreferrer"
+            className={`flex flex-col items-center justify-center gap-2 py-10 text-[var(--k-dim)] hover:text-[var(--k-accent)] transition-colors ${i === 2 ? 'border-l border-[var(--k-line)]' : ''}`}>
+            <span className="k-mono text-[11px] uppercase tracking-[.2em]">Special Sponsor</span>
+            <span className="text-sm">Your Company</span>
           </a>
-        </div>
+        ))}
       </W>
     </section>
   );
