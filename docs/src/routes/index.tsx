@@ -3,104 +3,75 @@ import { HomeLayout } from 'fumadocs-ui/layouts/home';
 import { baseOptions } from '@/lib/layout.shared';
 import { useState } from 'react';
 
-export const Route = createFileRoute('/')({
-  component: Home,
-});
+export const Route = createFileRoute('/')({ component: Home });
 
 function Home() {
   return (
     <HomeLayout {...baseOptions()}>
-      <div className="landing-body">
+      <div className="k-sans">
         <Hero />
-        <LayersSection />
-        <FeaturesGrid />
-        <CodeSection />
-        <ProtocolsSection />
-        <CTASection />
+        <Div />
+        <Layers />
+        <Div />
+        <DX />
+        <Div />
+        <Protocols />
+        <Div />
+        <Closing />
       </div>
     </HomeLayout>
   );
 }
 
-/* ─── Hero ─────────────────────────────────────────── */
+/* ═══ HERO ═════════════════════════════════════════════ */
 
 function Hero() {
-  const [pm, setPm] = useState<'npm' | 'pnpm' | 'bun'>('pnpm');
-  const cmds = { npm: 'npm install katman', pnpm: 'pnpm add katman', bun: 'bun add katman' };
+  const [pm, setPm] = useState<'pnpm' | 'npm' | 'bun'>('pnpm');
+  const cmd = { pnpm: 'pnpm add katman', npm: 'npm i katman', bun: 'bun add katman' };
 
   return (
-    <section className="relative overflow-hidden noise-overlay">
-      {/* Ambient glow */}
+    <section className="relative overflow-hidden k-grain k-strata">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-1/4 -top-32 h-[600px] w-[600px] rounded-full bg-amber-500/[0.07] blur-[140px] animate-glow" />
-        <div className="absolute right-1/4 top-20 h-[400px] w-[400px] rounded-full bg-fd-primary/[0.05] blur-[120px]" />
+        <div className="absolute left-1/2 top-[-20%] -translate-x-1/2 w-[min(900px,100vw)] aspect-square rounded-full bg-[var(--k-accent)] opacity-[0.04] blur-[160px]" />
       </div>
 
-      <div className="relative mx-auto max-w-5xl px-6 pt-28 pb-24 text-center">
-        {/* Badge */}
-        <div className="animate-fade-up mb-8 inline-flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/[0.06] px-4 py-1.5">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-400" />
-          </span>
-          <span className="landing-mono text-xs text-amber-300/80">v0.1.0</span>
-        </div>
-
-        {/* Title */}
-        <h1 className="animate-fade-up-1 landing-hero-title mb-6 text-5xl font-extrabold tracking-tight md:text-7xl">
-          Build APIs in
-          <br />
-          <span className="bg-gradient-to-r from-amber-300 via-orange-400 to-rose-400 bg-clip-text text-transparent">
-            layers
-          </span>
-        </h1>
-
-        {/* Subtitle */}
-        <p className="animate-fade-up-2 mx-auto mb-10 max-w-lg text-lg leading-relaxed text-fd-muted-foreground">
-          Katman is a type-safe RPC framework for TypeScript.
-          Define guards, compose pipelines, serve everywhere.
+      <div className="relative mx-auto max-w-[1080px] px-6 pt-32 pb-28 lg:pt-40 lg:pb-36">
+        <p className="k-reveal k-mono text-[11px] uppercase tracking-[.25em] text-[var(--k-dim)] mb-8">
+          Type-safe RPC for TypeScript
         </p>
 
-        {/* CTA */}
-        <div className="animate-fade-up-3 mb-12 flex flex-wrap items-center justify-center gap-3">
-          <Link
-            to="/docs/$"
-            params={{ _splat: 'getting-started' }}
-            className="group relative overflow-hidden rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 px-7 py-3 text-sm font-semibold text-black shadow-lg shadow-amber-500/20 transition hover:shadow-amber-500/30"
-          >
-            Get Started
-            <span className="absolute inset-0 bg-white/10 opacity-0 transition group-hover:opacity-100" />
+        <h1 className="k-reveal-1 k-serif text-[clamp(3rem,8vw,6.5rem)] leading-[0.95] tracking-[-0.02em] mb-8">
+          Build in<br /><em className="text-[var(--k-accent)]">layers.</em>
+        </h1>
+
+        <p className="k-reveal-2 max-w-md text-[var(--k-warm)] text-lg leading-relaxed mb-12">
+          Katman compiles your guards and middleware into a pre&#8209;linked
+          pipeline at startup. Define once, run everywhere.
+        </p>
+
+        <div className="k-reveal-3 flex flex-wrap items-center gap-4 mb-16">
+          <Link to="/docs/$" params={{ _splat: 'getting-started' }}
+            className="px-7 py-3 text-sm font-semibold text-black rounded-full bg-[var(--k-accent)] shadow-[0_0_32px_rgba(240,198,116,.15)] transition-shadow hover:shadow-[0_0_48px_rgba(240,198,116,.25)]">
+            Get started
           </Link>
-          <a
-            href="https://github.com/productdevbook/katman"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-lg border border-fd-border px-7 py-3 text-sm font-medium transition hover:bg-fd-accent"
-          >
-            GitHub
+          <a href="https://github.com/productdevbook/katman" target="_blank" rel="noopener noreferrer"
+            className="px-7 py-3 text-sm font-medium rounded-full border border-[var(--k-line)] text-[var(--k-warm)] transition hover:border-[var(--k-warm)]/30 hover:text-[var(--k-cream)]">
+            View source
           </a>
         </div>
 
-        {/* Install */}
-        <div className="animate-fade-up-4 mx-auto max-w-xs overflow-hidden rounded-xl border border-fd-border bg-fd-card/80 backdrop-blur-sm shadow-xl">
-          <div className="flex border-b border-fd-border">
-            {(Object.keys(cmds) as Array<keyof typeof cmds>).map((key) => (
-              <button
-                key={key}
-                onClick={() => setPm(key)}
-                className={`flex-1 py-2 text-xs font-medium transition ${
-                  pm === key
-                    ? 'text-amber-400 shadow-[inset_0_-2px_0] shadow-amber-400'
-                    : 'text-fd-muted-foreground hover:text-fd-foreground'
-                }`}
-              >
-                {key}
+        <div className="k-reveal-4 inline-flex flex-col rounded-2xl border border-[var(--k-line)] bg-[#0e0d0b]/80 backdrop-blur-md shadow-[0_24px_80px_rgba(0,0,0,.4)]">
+          <div className="flex border-b border-[var(--k-line)]">
+            {(Object.keys(cmd) as Array<keyof typeof cmd>).map((k) => (
+              <button key={k} onClick={() => setPm(k)}
+                className={`k-mono px-5 py-2.5 text-[11px] transition-colors ${pm === k ? 'text-[var(--k-accent)]' : 'text-[var(--k-dim)] hover:text-[var(--k-warm)]'}`}>
+                {k}
               </button>
             ))}
           </div>
-          <div className="px-4 py-3 landing-mono text-sm">
-            <span className="text-fd-muted-foreground/60">$ </span>
-            <span className="text-fd-foreground">{cmds[pm]}</span>
+          <div className="px-5 py-3.5 k-mono text-sm">
+            <span className="text-[var(--k-dim)]">❯ </span>
+            <span className="text-[var(--k-cream)]">{cmd[pm]}</span>
           </div>
         </div>
       </div>
@@ -108,68 +79,41 @@ function Hero() {
   );
 }
 
-/* ─── Layers Visualization ─────────────────────────── */
+/* ═══ LAYERS ══════════════════════════════════════════ */
 
-function LayersSection() {
+function Layers() {
   return (
-    <section className="relative border-t border-fd-border grid-pattern">
-      <div className="mx-auto max-w-5xl px-6 py-28">
-        <div className="grid items-center gap-16 lg:grid-cols-2">
-          {/* Visual — stacked layers */}
-          <div className="relative flex items-center justify-center py-8">
-            <div className="relative w-72">
-              {/* Layer 3 — Server (bottom) */}
-              <div className="animate-layer-3 relative z-10 rounded-2xl border border-fd-border bg-fd-card p-5 shadow-2xl shadow-black/20">
-                <div className="mb-2 flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-emerald-400" />
-                  <span className="landing-mono text-[11px] text-fd-muted-foreground uppercase tracking-widest">Server</span>
-                </div>
-                <div className="landing-mono text-xs text-fd-muted-foreground/60 space-y-1">
-                  <p>serve() &middot; handler()</p>
-                  <p>HTTP/2 &middot; WebSocket</p>
-                </div>
-              </div>
-
-              {/* Layer 2 — Pipeline (middle) */}
-              <div className="animate-layer-2 relative z-20 -mt-4 ml-6 rounded-2xl border border-amber-500/20 bg-fd-card p-5 shadow-2xl shadow-black/20">
-                <div className="mb-2 flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-amber-400" />
-                  <span className="landing-mono text-[11px] text-amber-400/80 uppercase tracking-widest">Pipeline</span>
-                </div>
-                <div className="landing-mono text-xs text-fd-muted-foreground/60 space-y-1">
-                  <p>guard() &middot; wrap()</p>
-                  <p>compiled &middot; unrolled</p>
-                </div>
-              </div>
-
-              {/* Layer 1 — Client (top) */}
-              <div className="animate-layer-1 relative z-30 -mt-4 ml-12 rounded-2xl border border-fd-border bg-fd-card p-5 shadow-2xl shadow-black/20">
-                <div className="mb-2 flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-sky-400" />
-                  <span className="landing-mono text-[11px] text-fd-muted-foreground uppercase tracking-widest">Client</span>
-                </div>
-                <div className="landing-mono text-xs text-fd-muted-foreground/60 space-y-1">
-                  <p>createClient&lt;T&gt;()</p>
-                  <p>typed &middot; inferred</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Text */}
+    <section className="relative k-grain">
+      <div className="mx-auto max-w-[1080px] px-6 py-28 lg:py-36">
+        <div className="grid gap-20 lg:grid-cols-[1fr,1.2fr] items-center">
           <div>
-            <h2 className="landing-hero-title mb-4 text-3xl font-bold">
-              Architecture in
-              <span className="text-amber-400"> layers</span>
+            <p className="k-mono text-[11px] uppercase tracking-[.25em] text-[var(--k-dim)] mb-6">Architecture</p>
+            <h2 className="k-serif text-4xl lg:text-5xl leading-[1.05] tracking-[-0.02em] mb-6">
+              Three layers,<br /><em className="text-[var(--k-accent)]">one package</em>
             </h2>
-            <p className="mb-6 text-fd-muted-foreground leading-relaxed">
-              Katman (Turkish for <em>layer</em>) organizes your API into clean, composable layers.
-              Guards enrich context. Pipelines compile at startup. Types flow end-to-end.
+            <p className="text-[var(--k-warm)] leading-relaxed mb-10">
+              <em className="k-serif text-[var(--k-cream)]">Katman</em> means <em className="k-serif">layer</em> in Turkish.
+              Your API is organized into composable strata — each with its own responsibility, all type&#8209;safe end to end.
             </p>
-            <div className="space-y-3 text-sm">
-              <LayerItem color="bg-sky-400" label="Client" desc="Full autocomplete — types inferred, not generated" />
-              <LayerItem color="bg-amber-400" label="Pipeline" desc="Guards + wraps compiled into a pre-linked chain" />
-              <LayerItem color="bg-emerald-400" label="Server" desc="HTTP, HTTP/2, WebSocket, Scalar — one line" />
+            <div className="space-y-6">
+              <LR n="01" c="#f0c674" t="Guards" d="Enrich context. Return { user }, { permissions }. Flat — no callbacks." />
+              <LR n="02" c="#8abeb7" t="Pipeline" d="Compiled at startup. Guards unrolled. Wraps pre-linked. Zero closures." />
+              <LR n="03" c="#c9a0dc" t="Transport" d="HTTP, HTTP/2, WebSocket. JSON, MessagePack, devalue. Auto negotiation." />
+            </div>
+          </div>
+
+          <div className="relative">
+            <div className="absolute -inset-8 rounded-3xl bg-[var(--k-accent)]/[.03] blur-3xl k-breathe" />
+            <div className="relative rounded-2xl border border-[var(--k-line)] bg-[#0e0d0b] shadow-[0_32px_80px_rgba(0,0,0,.5)] overflow-hidden">
+              <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--k-line)]">
+                <div className="flex gap-[6px]">
+                  <i className="block w-[10px] h-[10px] rounded-full bg-white/[.07]" />
+                  <i className="block w-[10px] h-[10px] rounded-full bg-white/[.07]" />
+                  <i className="block w-[10px] h-[10px] rounded-full bg-white/[.07]" />
+                </div>
+                <span className="k-mono text-[11px] text-[var(--k-dim)] ml-2">server.ts</span>
+              </div>
+              <pre className="k-code k-mono p-6 text-[13px] leading-[1.9] overflow-x-auto" dangerouslySetInnerHTML={{ __html: CODE }} />
             </div>
           </div>
         </div>
@@ -178,42 +122,72 @@ function LayersSection() {
   );
 }
 
-function LayerItem({ color, label, desc }: { color: string; label: string; desc: string }) {
+function LR({ n, c, t, d }: { n: string; c: string; t: string; d: string }) {
   return (
-    <div className="flex items-start gap-3">
-      <div className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${color}`} />
+    <div className="flex items-start gap-4 group">
+      <div className="flex flex-col items-center pt-1">
+        <span className="k-mono text-[10px] text-[var(--k-dim)]">{n}</span>
+        <div className="mt-1.5 w-px h-full bg-[var(--k-line)] group-last:hidden" />
+      </div>
       <div>
-        <span className="font-semibold">{label}</span>
-        <span className="text-fd-muted-foreground"> — {desc}</span>
+        <h3 className="font-semibold text-[var(--k-cream)] mb-1 flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: c }} />{t}
+        </h3>
+        <p className="text-sm text-[var(--k-dim)] leading-relaxed">{d}</p>
       </div>
     </div>
   );
 }
 
-/* ─── Features Grid ────────────────────────────────── */
+const CODE = `<span class="kw">import</span> <span class="tx">{ katman }</span> <span class="kw">from</span> <span class="st">'katman'</span>
+<span class="kw">import</span> <span class="tx">{ z }</span> <span class="kw">from</span> <span class="st">'zod'</span>
 
-function FeaturesGrid() {
-  const features = [
-    { icon: '⌘', title: 'End-to-end types', desc: 'Input, output, context, errors. No codegen. No runtime cost.' },
-    { icon: '◆', title: 'Single package', desc: 'Server, client, plugins, codecs. One npm install.' },
-    { icon: '◇', title: 'Standard Schema', desc: 'Zod, Valibot, ArkType. Bring your own validator.' },
-    { icon: '⚡', title: 'Compiled pipeline', desc: 'Pre-linked at startup. Guards unrolled. Zero closures.' },
-    { icon: '◉', title: 'Every runtime', desc: 'Node.js, Bun, Deno, Cloudflare Workers.' },
-    { icon: '↔', title: 'Three protocols', desc: 'JSON, MessagePack, devalue. Auto negotiation.' },
+<span class="kw">const</span> <span class="tx">k = </span><span class="fn">katman</span><span class="tx">({</span>
+  <span class="tx">context: (req) =&gt; ({ db: </span><span class="fn">getDB</span><span class="tx">() }),</span>
+<span class="tx">})</span>
+
+<span class="cm">// Guard — returns context additions</span>
+<span class="kw">const</span> <span class="tx">auth = k.</span><span class="fn">guard</span><span class="tx">(</span><span class="kw">async</span> <span class="tx">(ctx) =&gt; {</span>
+  <span class="kw">const</span> <span class="tx">user = </span><span class="kw">await</span> <span class="fn">verify</span><span class="tx">(ctx.headers.auth)</span>
+  <span class="kw">if</span> <span class="tx">(!user) </span><span class="kw">throw new</span> <span class="fn">KatmanError</span><span class="tx">(</span><span class="st">'UNAUTHORIZED'</span><span class="tx">)</span>
+  <span class="kw">return</span> <span class="tx">{ user }</span>
+<span class="tx">})</span>
+
+<span class="cm">// Procedure — typed end-to-end</span>
+<span class="kw">const</span> <span class="tx">users = k.</span><span class="fn">query</span><span class="tx">(</span>
+  <span class="tx">z.</span><span class="fn">object</span><span class="tx">({ limit: z.</span><span class="fn">number</span><span class="tx">().</span><span class="fn">optional</span><span class="tx">() }),</span>
+  <span class="tx">({ input, ctx }) =&gt; ctx.db.users.</span><span class="fn">find</span><span class="tx">(input)</span>
+<span class="tx">)</span>
+
+<span class="tx">k.</span><span class="fn">serve</span><span class="tx">(k.</span><span class="fn">router</span><span class="tx">({ users }), {</span>
+  <span class="tx">port: </span><span class="nr">3000</span><span class="tx">, scalar: </span><span class="kw">true</span><span class="tx">, ws: </span><span class="kw">true</span>
+<span class="tx">})</span>`;
+
+/* ═══ DX GRID ═════════════════════════════════════════ */
+
+function DX() {
+  const items = [
+    { l: 'End-to-end types', d: 'Input, output, context, errors. Inferred — not generated.' },
+    { l: 'Single package', d: 'Server, client, plugins, codecs. One npm install.' },
+    { l: 'Standard Schema', d: 'Zod, Valibot, ArkType. Bring your own.' },
+    { l: 'Compiled guards', d: 'Unrolled at startup. Zero closures per request.' },
+    { l: 'Every runtime', d: 'Node, Bun, Deno, Cloudflare Workers.' },
+    { l: 'Scalar docs', d: 'OpenAPI 3.1 + interactive UI at /reference.' },
   ];
 
   return (
-    <section className="border-t border-fd-border">
-      <div className="mx-auto max-w-5xl px-6 py-24">
-        <h2 className="landing-hero-title mb-16 text-center text-3xl font-bold">
-          Built different
+    <section className="relative k-grain">
+      <div className="mx-auto max-w-[1080px] px-6 py-28 lg:py-36">
+        <p className="k-mono text-[11px] uppercase tracking-[.25em] text-[var(--k-dim)] mb-6">Developer experience</p>
+        <h2 className="k-serif text-4xl lg:text-5xl leading-[1.05] tracking-[-0.02em] mb-20">
+          Less ceremony,<br /><em className="text-[var(--k-accent)]">more building</em>
         </h2>
-        <div className="grid gap-px overflow-hidden rounded-2xl border border-fd-border bg-fd-border sm:grid-cols-2 lg:grid-cols-3">
-          {features.map((f, i) => (
-            <div key={i} className="bg-fd-card p-7 transition hover:bg-fd-accent/30">
-              <span className="mb-4 block text-xl text-amber-400 landing-mono">{f.icon}</span>
-              <h3 className="mb-2 font-semibold">{f.title}</h3>
-              <p className="text-sm leading-relaxed text-fd-muted-foreground">{f.desc}</p>
+        <div className="grid gap-px sm:grid-cols-2 lg:grid-cols-3 rounded-2xl overflow-hidden border border-[var(--k-line)]">
+          {items.map((item, i) => (
+            <div key={i} className="p-8 bg-[#0e0d0b] transition-colors hover:bg-[#13120f] k-shimmer">
+              <p className="k-mono text-[10px] uppercase tracking-[.2em] text-[var(--k-dim)] mb-3">0{i + 1}</p>
+              <h3 className="font-semibold text-[var(--k-cream)] mb-2">{item.l}</h3>
+              <p className="text-sm text-[var(--k-dim)] leading-relaxed">{item.d}</p>
             </div>
           ))}
         </div>
@@ -222,154 +196,78 @@ function FeaturesGrid() {
   );
 }
 
-/* ─── Code Section ─────────────────────────────────── */
+/* ═══ PROTOCOLS ═══════════════════════════════════════ */
 
-function CodeSection() {
+function Protocols() {
   return (
-    <section className="border-t border-fd-border grid-pattern">
-      <div className="mx-auto max-w-5xl px-6 py-24">
-        <div className="grid items-center gap-12 lg:grid-cols-5">
-          <div className="lg:col-span-2">
-            <h2 className="landing-hero-title mb-4 text-3xl font-bold">
-              Minimal API
-            </h2>
-            <p className="mb-6 text-fd-muted-foreground leading-relaxed">
-              A complete server with auth, validation,
-              API docs, and WebSocket — in one file.
-            </p>
-            <ul className="space-y-3 text-sm">
-              {[
-                'Guards enrich context — no callbacks',
-                'Typed errors with fail()',
-                'Scalar docs at /reference',
-                'WebSocket on same port',
-              ].map((t, i) => (
-                <li key={i} className="flex items-center gap-2 text-fd-muted-foreground">
-                  <span className="text-amber-400">&#8250;</span> {t}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="lg:col-span-3 overflow-hidden rounded-xl border border-fd-border shadow-2xl shadow-black/20">
-            <div className="flex items-center border-b border-fd-border bg-fd-card px-4 py-2.5">
-              <div className="flex gap-1.5">
-                <div className="h-3 w-3 rounded-full bg-fd-muted-foreground/15" />
-                <div className="h-3 w-3 rounded-full bg-fd-muted-foreground/15" />
-                <div className="h-3 w-3 rounded-full bg-fd-muted-foreground/15" />
-              </div>
-              <span className="ml-3 landing-mono text-xs text-fd-muted-foreground">server.ts</span>
-            </div>
-            <pre className="bg-fd-card p-5 overflow-x-auto text-[13px] leading-[1.85] landing-mono">
-<code className="text-fd-foreground">{`import { katman } from "katman"
-import { z } from "zod"
-
-const k = katman({
-  context: (req) => ({ db: getDB() }),
-})
-
-const auth = k.guard(async (ctx) => {
-  const user = await verify(ctx.headers.auth)
-  if (!user) throw new KatmanError("UNAUTHORIZED")
-  return { user }
-})
-
-const users = k.query(
-  z.object({ limit: z.number().optional() }),
-  ({ input, ctx }) => ctx.db.users.find(input)
-)
-
-k.serve(k.router({ users }), {
-  port: 3000, scalar: true, ws: true
-})`}</code>
-            </pre>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ─── Protocols Section ────────────────────────────── */
-
-function ProtocolsSection() {
-  return (
-    <section className="border-t border-fd-border">
-      <div className="mx-auto max-w-5xl px-6 py-24">
-        <h2 className="landing-hero-title mb-4 text-center text-3xl font-bold">
-          Your protocol, your choice
+    <section className="relative k-grain">
+      <div className="mx-auto max-w-[1080px] px-6 py-28 lg:py-36">
+        <p className="k-mono text-[11px] uppercase tracking-[.25em] text-[var(--k-dim)] mb-6">Wire formats</p>
+        <h2 className="k-serif text-4xl lg:text-5xl leading-[1.05] tracking-[-0.02em] mb-6">
+          Choose your<br /><em className="text-[var(--k-accent)]">protocol</em>
         </h2>
-        <p className="mx-auto mb-16 max-w-md text-center text-fd-muted-foreground">
-          Automatic content negotiation. The client picks the format, the server follows.
+        <p className="text-[var(--k-warm)] max-w-md leading-relaxed mb-16">
+          The server negotiates automatically. Send an Accept header — get the format you want.
         </p>
-
         <div className="grid gap-6 md:grid-cols-3">
-          <ProtocolCard
-            name="JSON"
-            tag="default"
-            desc="Universal. Fastest encode/decode. Works everywhere."
-            accent="text-emerald-400"
-            border="border-emerald-500/20 hover:border-emerald-500/40"
-          />
-          <ProtocolCard
-            name="MessagePack"
-            tag="binary"
-            desc="30% smaller. Native Date. No competitor has this."
-            accent="text-amber-400"
-            border="border-amber-500/20 hover:border-amber-500/40"
-          />
-          <ProtocolCard
-            name="devalue"
-            tag="rich types"
-            desc="Date, Map, Set, BigInt, RegExp, circular refs."
-            accent="text-purple-400"
-            border="border-purple-500/20 hover:border-purple-500/40"
-          />
+          <PC n="JSON" b="default" c="#a8c97f" ls={['Universal compatibility', 'Fastest encode/decode', 'Zero config']} />
+          <PC n="MessagePack" b="binary" c="var(--k-accent)" ls={['30% smaller payloads', 'Native Date support', 'binary: true']} />
+          <PC n="devalue" b="rich types" c="#c9a0dc" ls={['Date, Map, Set, BigInt', 'RegExp, circular refs', '2.7× faster than superjson']} />
         </div>
       </div>
     </section>
   );
 }
 
-function ProtocolCard({ name, tag, desc, accent, border }: {
-  name: string; tag: string; desc: string; accent: string; border: string;
-}) {
+function PC({ n, b, c, ls }: { n: string; b: string; c: string; ls: string[] }) {
   return (
-    <div className={`rounded-xl border ${border} bg-fd-card/50 p-6 transition`}>
-      <div className="mb-3 flex items-center gap-3">
-        <h3 className="font-semibold">{name}</h3>
-        <span className={`landing-mono text-[10px] uppercase tracking-wider ${accent}`}>{tag}</span>
+    <div className="rounded-2xl border border-[var(--k-line)] bg-[#0e0d0b] p-7 transition hover:border-white/[.08]">
+      <div className="flex items-center gap-3 mb-5">
+        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: c.startsWith('var') ? undefined : c, color: c.startsWith('var') ? c : undefined }} />
+        <h3 className="font-semibold text-[var(--k-cream)]">{n}</h3>
+        <span className="k-mono text-[10px] uppercase tracking-[.15em]" style={{ color: c }}>{b}</span>
       </div>
-      <p className="text-sm leading-relaxed text-fd-muted-foreground">{desc}</p>
+      <ul className="space-y-2">
+        {ls.map((l, i) => (
+          <li key={i} className="text-sm text-[var(--k-dim)] flex items-center gap-2">
+            <span className="w-1 h-1 rounded-full bg-[var(--k-line)]" />{l}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
 
-/* ─── CTA ──────────────────────────────────────────── */
+/* ═══ CTA ═════════════════════════════════════════════ */
 
-function CTASection() {
+function Closing() {
   return (
-    <section className="relative overflow-hidden border-t border-fd-border noise-overlay">
+    <section className="relative k-grain overflow-hidden">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-1/2 bottom-0 -translate-x-1/2 h-[300px] w-[600px] rounded-full bg-amber-500/[0.05] blur-[120px]" />
+        <div className="absolute left-1/2 bottom-[-30%] -translate-x-1/2 w-[600px] aspect-square rounded-full bg-[var(--k-accent)] opacity-[0.03] blur-[140px]" />
       </div>
-
-      <div className="relative flex flex-col items-center px-6 py-28 text-center">
-        <h2 className="landing-hero-title mb-4 text-4xl font-bold">
-          Start building
+      <div className="relative mx-auto max-w-[1080px] px-6 py-32 lg:py-40 text-center">
+        <h2 className="k-serif text-4xl lg:text-6xl leading-[1] tracking-[-0.02em] mb-6">
+          Your first API,<br /><em className="text-[var(--k-accent)]">in five minutes</em>
         </h2>
-        <p className="mb-10 max-w-md text-fd-muted-foreground">
-          Your first type-safe API in under five minutes.
+        <p className="text-[var(--k-warm)] mb-12 max-w-sm mx-auto">
+          Follow the guide. Define a procedure. Start the server.
         </p>
-        <Link
-          to="/docs/$"
-          params={{ _splat: 'getting-started' }}
-          className="group relative overflow-hidden rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 px-8 py-3 text-sm font-semibold text-black shadow-lg shadow-amber-500/20 transition hover:shadow-amber-500/30"
-        >
+        <Link to="/docs/$" params={{ _splat: 'getting-started' }}
+          className="inline-flex px-8 py-3.5 text-sm font-semibold text-black rounded-full bg-[var(--k-accent)] shadow-[0_0_40px_rgba(240,198,116,.12)] transition-shadow hover:shadow-[0_0_56px_rgba(240,198,116,.22)]">
           Read the documentation
-          <span className="absolute inset-0 bg-white/10 opacity-0 transition group-hover:opacity-100" />
         </Link>
       </div>
     </section>
+  );
+}
+
+/* ═══ DIVIDER ═════════════════════════════════════════ */
+
+function Div() {
+  return (
+    <div className="mx-auto max-w-[1080px] px-6">
+      <div className="h-px bg-[var(--k-line)] k-line-grow" />
+    </div>
   );
 }
