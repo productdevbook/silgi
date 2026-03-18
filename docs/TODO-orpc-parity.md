@@ -50,8 +50,8 @@ oRPC ile karsilastirildiginda Katman'da eksik olan ozellikler.
 
 - [ ] `.streamedOptions()` — Streaming query destegi (data array'e eklenir)
 - [ ] `.liveOptions()` — Live query (son event oncekini degistirir)
-- [ ] `.infiniteOptions()` — Infinite/paginated query
-- [ ] `skipToken` — Type-safe query devre disi birakma
+- [x] `.infiniteOptions()` — Infinite/paginated query
+- [x] `skipToken` — Type-safe query devre disi birakma
 - [ ] SSR hydration — Custom serializer'lar ile refetch waterfall onleme
 
 ## React Gelistirmeleri

@@ -48,6 +48,20 @@ export interface MutationOptionsIn<TInput, TOutput, TError> {
   retry?: boolean | number;
 }
 
+/** Sentinel value to disable a query in a type-safe way. */
+export const skipToken: unique symbol = Symbol.for("katman.skipToken");
+export type SkipToken = typeof skipToken;
+
+export interface InfiniteQueryOptionsIn<TInput, TOutput, TError, TPageParam> {
+  input: (pageParam: TPageParam) => TInput;
+  initialPageParam: TPageParam;
+  getNextPageParam: (lastPage: TOutput, allPages: TOutput[], lastPageParam: TPageParam) => TPageParam | undefined;
+  queryKey?: unknown[];
+  enabled?: boolean;
+  staleTime?: number;
+  gcTime?: number;
+}
+
 export interface ProcedureQueryUtils<TInput, TOutput, TError> {
   /** Direct call to the procedure */
   call: (input: TInput, options?: { signal?: AbortSignal }) => Promise<TOutput>;
@@ -55,8 +69,8 @@ export interface ProcedureQueryUtils<TInput, TOutput, TError> {
   /** Generate a query key for this procedure */
   queryKey: (input?: TInput) => OperationKey;
 
-  /** Generate full query options for useQuery */
-  queryOptions: (options: QueryOptionsIn<TInput, TOutput, TError>) => {
+  /** Generate full query options for useQuery. Pass `skipToken` as input to disable. */
+  queryOptions: (options: QueryOptionsIn<TInput | SkipToken, TOutput, TError>) => {
     queryKey: OperationKey;
     queryFn: (ctx: { signal: AbortSignal }) => Promise<TOutput>;
     enabled?: boolean;
@@ -65,6 +79,17 @@ export interface ProcedureQueryUtils<TInput, TOutput, TError> {
     refetchInterval?: number | false;
     retry?: boolean | number;
     select?: (data: TOutput) => unknown;
+  };
+
+  /** Generate infinite query options for useInfiniteQuery */
+  infiniteOptions: <TPageParam = number>(options: InfiniteQueryOptionsIn<TInput, TOutput, TError, TPageParam>) => {
+    queryKey: OperationKey;
+    queryFn: (ctx: { signal: AbortSignal; pageParam: TPageParam }) => Promise<TOutput>;
+    initialPageParam: TPageParam;
+    getNextPageParam: (lastPage: TOutput, allPages: TOutput[], lastPageParam: TPageParam) => TPageParam | undefined;
+    enabled?: boolean;
+    staleTime?: number;
+    gcTime?: number;
   };
 
   /** Generate a mutation key */
@@ -92,17 +117,34 @@ function createProcedureUtils<TInput, TOutput, TError>(
     queryKey: (input?: TInput) =>
       generateKey(path, { type: "query", input }),
 
-    queryOptions: (options) => ({
+    queryOptions: (options) => {
+      const isSkipped = options.input === skipToken;
+      return {
+        queryKey: options.queryKey
+          ? (options.queryKey as OperationKey)
+          : generateKey(path, { type: "query", input: isSkipped ? undefined : options.input }),
+        queryFn: ({ signal }) => client(options.input as TInput, { signal } as any) as Promise<TOutput>,
+        ...(isSkipped && { enabled: false }),
+        ...(options.enabled !== undefined && { enabled: options.enabled }),
+        ...(options.staleTime !== undefined && { staleTime: options.staleTime }),
+        ...(options.gcTime !== undefined && { gcTime: options.gcTime }),
+        ...(options.refetchInterval !== undefined && { refetchInterval: options.refetchInterval }),
+        ...(options.retry !== undefined && { retry: options.retry }),
+        ...(options.select !== undefined && { select: options.select }),
+      };
+    },
+
+    infiniteOptions: (options: any) => ({
       queryKey: options.queryKey
         ? (options.queryKey as OperationKey)
-        : generateKey(path, { type: "query", input: options.input }),
-      queryFn: ({ signal }) => client(options.input, { signal } as any) as Promise<TOutput>,
+        : generateKey(path, { type: "infinite" }),
+      queryFn: ({ signal, pageParam }: { signal: AbortSignal; pageParam: unknown }) =>
+        client(options.input(pageParam), { signal } as any) as Promise<TOutput>,
+      initialPageParam: options.initialPageParam,
+      getNextPageParam: options.getNextPageParam,
       ...(options.enabled !== undefined && { enabled: options.enabled }),
       ...(options.staleTime !== undefined && { staleTime: options.staleTime }),
       ...(options.gcTime !== undefined && { gcTime: options.gcTime }),
-      ...(options.refetchInterval !== undefined && { refetchInterval: options.refetchInterval }),
-      ...(options.retry !== undefined && { retry: options.retry }),
-      ...(options.select !== undefined && { select: options.select }),
     }),
 
     mutationKey: () => generateKey(path, { type: "mutation" }),

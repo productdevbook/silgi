@@ -180,6 +180,55 @@ Each router-level util provides:
 This works with `@tanstack/react-query`, `@tanstack/vue-query`, `@tanstack/solid-query`, and `@tanstack/svelte-query`. Same API, same types, different framework bindings.
 </Callout>
 
+## Infinite queries
+
+Use `infiniteOptions` for paginated data. It works like `queryOptions` but returns everything `useInfiniteQuery` needs:
+
+```tsx
+import { useInfiniteQuery } from "@tanstack/react-query"
+
+function UserList() {
+  const { data, fetchNextPage, hasNextPage } = useInfiniteQuery(
+    utils.users.list.infiniteOptions({
+      input: (pageParam) => ({ cursor: pageParam, limit: 10 }),
+      initialPageParam: 0,
+      getNextPageParam: (lastPage) => lastPage.nextCursor,
+    })
+  )
+
+  return (
+    <>
+      {data?.pages.flatMap(p => p.items).map(u => <p key={u.id}>{u.name}</p>)}
+      {hasNextPage && <button onClick={() => fetchNextPage()}>Load more</button>}
+    </>
+  )
+}
+```
+
+The `input` option is a function that receives the current page parameter and returns the procedure input. The query key includes the base input so cache invalidation works the same way as regular queries.
+
+## skipToken
+
+Use `skipToken` to conditionally disable a query. This is the type-safe alternative to `enabled: false` — it tells both TanStack Query and TypeScript that the query should not run:
+
+```tsx
+import { skipToken } from "katman/tanstack-query"
+import { useQuery } from "@tanstack/react-query"
+
+function UserProfile({ userId }: { userId: string | null }) {
+  // Query is disabled until userId is available
+  const { data } = useQuery(
+    utils.users.get.queryOptions({
+      input: userId ? { id: userId } : skipToken,
+    })
+  )
+
+  return data ? <p>{data.name}</p> : <p>Select a user</p>
+}
+```
+
+When `input` is `skipToken`, the query key is still generated (for prefetching later) but `queryFn` is never called.
+
 ## What's next?
 
 - [Client](/docs/client) — set up the Katman client that powers the query utils

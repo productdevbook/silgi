@@ -19,6 +19,10 @@ You can build your own plugins the same way. A guard that checks a feature flag,
   <Card title="OpenTelemetry" description="Distributed tracing — each procedure call becomes a span with error recording." href="/docs/plugins/otel" />
   <Card title="Pino Logging" description="Structured request logging — request received, response sent, errors caught." href="/docs/plugins/pino" />
   <Card title="Rate Limiting" description="Sliding window rate limiter — in-memory or pluggable backend (Redis, Upstash, etc.)." href="/docs/plugins/ratelimit" />
+  <Card title="Body Limit" description="Reject requests with bodies larger than a threshold — protect against oversized payloads." href="#body-limit" />
+  <Card title="Strict GET" description="Enforce GET-only access on query procedures — block accidental POST calls." href="#strict-get" />
+  <Card title="Cookies" description="Read and set cookies inside procedures — typed helpers for common cookie options." href="#cookies" />
+  <Card title="Compression" description="Gzip or Brotli response compression — automatic content negotiation." href="#compression" />
 </Cards>
 
 ## Plugin types at a glance
@@ -29,6 +33,88 @@ You can build your own plugins the same way. A guard that checks a feature flag,
 | OpenTelemetry | Wrap middleware | Add `otelWrap(tracer)` to a procedure's `use` array |
 | Pino Logging | Lifecycle hooks | Pass `loggingHooks({ logger })` to the `hooks` option |
 | Rate Limiting | Guard middleware | Add `rateLimitGuard(...)` to a procedure's `use` array |
+| Body Limit | Guard middleware | Add `bodyLimitGuard(...)` to reject oversized payloads |
+| Strict GET | Guard middleware | Add `strictGetGuard()` to enforce GET on queries |
+| Cookies | Context helper | Use `cookies(ctx)` to read/set cookies inside procedures |
+| Compression | Wrap middleware | Add `compressionWrap()` to gzip/brotli responses |
+
+## Body Limit
+
+Reject requests whose body exceeds a given size. Useful for file uploads or any endpoint where you want to cap incoming payloads.
+
+```ts twoslash
+// @noErrors
+import { bodyLimitGuard } from "katman/body-limit"
+
+const createPost = k.procedure
+  .use(bodyLimitGuard({ maxBytes: 1024 * 512 })) // 512 KB
+  .input(z.object({ title: z.string(), body: z.string() }))
+  .handler(async ({ input }) => {
+    return db.posts.create(input)
+  })
+```
+
+Requests larger than `maxBytes` receive a `413 Payload Too Large` response before the handler runs.
+
+## Strict GET
+
+Enforce that query procedures only accept `GET` requests. This prevents clients from accidentally sending mutations as queries:
+
+```ts twoslash
+// @noErrors
+import { strictGetGuard } from "katman/strict-get"
+
+const listUsers = k.procedure
+  .use(strictGetGuard())
+  .input(z.object({ limit: z.number().optional() }))
+  .handler(async ({ input }) => {
+    return db.users.findMany({ take: input.limit })
+  })
+```
+
+A `POST` to a strict-GET procedure returns `405 Method Not Allowed`.
+
+## Cookies
+
+Read and set cookies inside any procedure. The helper wraps the platform's cookie API with typed options:
+
+```ts twoslash
+// @noErrors
+import { cookies } from "katman/cookies"
+
+const login = k.procedure
+  .input(z.object({ email: z.string(), password: z.string() }))
+  .handler(async ({ input, ctx }) => {
+    const token = await authenticate(input)
+    const c = cookies(ctx)
+    c.set("session", token, { httpOnly: true, maxAge: 60 * 60 * 24 })
+    return { ok: true }
+  })
+```
+
+Use `c.get("session")` to read a cookie and `c.delete("session")` to remove one.
+
+## Compression
+
+Automatically compress responses with gzip or Brotli based on the client's `Accept-Encoding` header:
+
+```ts twoslash
+// @noErrors
+import { compressionWrap } from "katman/compression"
+
+const listUsers = k.procedure
+  .use(compressionWrap()) // defaults to gzip, threshold 1 KB
+  .handler(async () => {
+    return db.users.findMany()
+  })
+```
+
+Options:
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `encoding` | `"gzip" \| "br" \| "auto"` | `"auto"` | Preferred encoding (`auto` uses `Accept-Encoding`) |
+| `threshold` | `number` | `1024` | Minimum response size in bytes before compressing |
 
 ## What's next?
 

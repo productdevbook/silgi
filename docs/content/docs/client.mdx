@@ -300,6 +300,64 @@ This is especially useful for:
 - **Testing** — write integration tests against the real pipeline without starting a server
 - **Server-to-server** — call procedures from background jobs, cron tasks, or other services running in the same process
 
+## DynamicLink
+
+A `DynamicLink` lets you route requests to different links at runtime. The factory function receives the procedure path, input, and call options, and returns the link to use:
+
+```ts twoslash
+// @noErrors
+import { createClient, DynamicLink } from "katman/client"
+
+const link = new DynamicLink((path, input, options) => {
+  if (path[0] === "admin") return adminLink
+  return defaultLink
+})
+
+const client = createClient<AppRouter>(link)
+```
+
+This is useful when different parts of your API live on different servers, or when you want to swap between real and mock links based on environment.
+
+## mergeClients
+
+Combine multiple Katman clients into a single object. Each client can point to a different server — the merged result keeps full type safety:
+
+```ts twoslash
+// @noErrors
+import { mergeClients } from "katman/client"
+
+const client = mergeClients({
+  users: usersClient,
+  billing: billingClient,
+})
+
+// client.users.list(...)   → hits the users service
+// client.billing.charges() → hits the billing service
+```
+
+## withInterceptors
+
+Wrap any link with lifecycle hooks. Unlike ofetch interceptors (which are HTTP-level), these run at the Katman procedure level and receive the procedure path and input:
+
+```ts twoslash
+// @noErrors
+import { withInterceptors } from "katman/client"
+
+const link = withInterceptors(baseLink, {
+  onRequest({ path, input }) {
+    console.log(`-> ${path.join("/")}`)
+  },
+  onResponse({ path, durationMs }) {
+    console.log(`<- ${path.join("/")} (${durationMs}ms)`)
+  },
+  onError({ path, error }) {
+    reportToSentry(error)
+  },
+})
+```
+
+All three hooks are optional. `onError` fires on any thrown error — the error still propagates to the caller after the hook runs.
+
 ## What's next?
 
 - [Typed Errors](/docs/errors) — handle server errors on the client with full type safety
