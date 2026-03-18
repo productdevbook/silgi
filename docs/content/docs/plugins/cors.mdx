@@ -1,0 +1,59 @@
+---
+title: CORS
+description: Cross-origin resource sharing headers for your API.
+icon: Shield
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+```ts
+import { corsHeaders } from "katman/cors"
+```
+
+## Basic Usage
+
+```ts
+const headers = corsHeaders({
+  origin: "https://app.example.com",
+  credentials: true,
+})
+// → {
+//   "access-control-allow-origin": "https://app.example.com",
+//   "access-control-allow-credentials": "true",
+//   "access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+//   "access-control-allow-headers": "Content-Type, Authorization",
+// }
+```
+
+## Dynamic Origin
+
+Match origins with a function:
+
+```ts
+const headers = corsHeaders({
+  origin: (requestOrigin) => requestOrigin.endsWith(".example.com"),
+}, req.headers.get("origin"))
+```
+
+Or allow a list:
+
+```ts
+const headers = corsHeaders({
+  origin: ["https://app.example.com", "https://admin.example.com"],
+}, req.headers.get("origin"))
+```
+
+<Callout>
+When using array or function origins, a `Vary: Origin` header is automatically included.
+</Callout>
+
+## Options
+
+| Option | Type | Default |
+|---|---|---|
+| `origin` | `string \| string[] \| (origin) => boolean` | `"*"` |
+| `methods` | `string[]` | `["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]` |
+| `allowedHeaders` | `string[]` | `["Content-Type", "Authorization"]` |
+| `exposedHeaders` | `string[]` | — |
+| `credentials` | `boolean` | `false` |
+| `maxAge` | `number` | — |

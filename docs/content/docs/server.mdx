@@ -9,9 +9,10 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 ## serve()
 
-One-line Node.js server with batteries included:
+One-line Node.js server with batteries included. `k` is the instance returned by `katman()` — see [Getting Started](/docs/getting-started).
 
 ```ts title="server.ts"
+// k = katman({ context: (req) => ({ ... }) })
 k.serve(appRouter, {
   port: 3000,          // auto-finds if busy (3000–3100)
   hostname: "0.0.0.0",
@@ -101,3 +102,11 @@ When `scalar` is enabled:
 - **`/openapi.json`** — OpenAPI 3.1.0 JSON specification
 
 The spec is generated at startup from your router — zero runtime cost per request.
+
+## Related
+
+- [Getting Started](/docs/getting-started) — Set up a katman router
+- [Middleware](/docs/middleware) — Guards and wraps that run inside your server
+- [Protocols](/docs/protocols) — JSON, MessagePack, devalue wire formats
+- [WebSocket](/docs/protocols/websocket) — Enable `ws: true` for bidirectional RPC
+- [Fastify](/docs/integrations/fastify) — Use katman inside an existing Fastify app instead of `serve()`

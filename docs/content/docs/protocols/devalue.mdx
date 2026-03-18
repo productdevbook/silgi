@@ -1,0 +1,69 @@
+---
+title: devalue
+description: Rich type serialization — Date, Map, Set, BigInt, RegExp, circular refs, undefined.
+icon: Braces
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+## The Problem
+
+`JSON.stringify` loses type information:
+
+```ts
+JSON.stringify(new Date())     // → "2026-03-18T..." (string, not Date)
+JSON.stringify(new Map())      // → "{}"
+JSON.stringify(new Set([1,2])) // → "{}"
+JSON.stringify(42n)            // → throws TypeError
+```
+
+## The Solution
+
+devalue preserves every JavaScript type:
+
+```ts
+import { encode, decode } from "katman/devalue"
+
+const data = {
+  users: new Map([["alice", { id: 1 }]]),
+  tags: new Set(["admin", "user"]),
+  count: 9007199254740993n,
+  created: new Date("2026-01-01"),
+  pattern: /test/gi,
+  optional: undefined,
+}
+
+const str = encode(data) // JSON string with type markers
+const back = decode(str)
+
+back.users   // Map { "alice" => { id: 1 } }
+back.tags    // Set { "admin", "user" }
+back.count   // 9007199254740993n (BigInt)
+back.created // Date 2026-01-01T00:00:00.000Z
+back.pattern // /test/gi (RegExp)
+back.optional // undefined (not missing)
+```
+
+## Server Integration
+
+Set the `Accept` header:
+
+```
+Accept: application/x-devalue+json
+```
+
+The server responds with devalue-encoded JSON. Request bodies with `Content-Type: application/x-devalue+json` are decoded automatically.
+
+## When to Use
+
+| Scenario | Recommended Format |
+|---|---|
+| Standard APIs | JSON (default) |
+| Mobile / low bandwidth | MessagePack |
+| **Returning Date, Map, Set** | **devalue** |
+| **BigInt values** | **devalue** |
+| **Circular references** | **devalue** |
+
+<Callout>
+devalue is 2.7x faster than superjson with 37% smaller output. Powered by [Rich Harris's devalue](https://github.com/Rich-Harris/devalue).
+</Callout>

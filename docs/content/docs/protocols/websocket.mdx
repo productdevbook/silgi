@@ -1,0 +1,124 @@
+---
+title: WebSocket
+description: Bidirectional RPC over persistent connection. Streaming subscriptions. 40% lower latency.
+icon: Radio
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+While katman's default transport is HTTP (see [Server](/docs/server)), you can also use WebSocket for persistent connections. This is useful for real-time features, subscriptions, and reducing latency — a WebSocket message skips TCP handshake, making it **40% faster** than HTTP for repeated calls.
+
+## When to Use WebSocket
+
+| Use Case | Recommendation |
+|---|---|
+| Standard API calls | HTTP (via `serve()` or `handler()`) |
+| High-frequency calls | WebSocket |
+| Real-time subscriptions | WebSocket |
+| Server-to-client push | WebSocket |
+
+## Enable in serve()
+
+If you're using katman's built-in [`serve()`](/docs/server), add `ws: true`. The `k` instance comes from `katman()` — see [Getting Started](/docs/getting-started) for the full setup.
+
+```ts
+import { katman } from "katman"
+
+const k = katman({ context: (req) => ({}) })
+const { query, router } = k
+
+const appRouter = router({
+  health: query(() => ({ status: "ok" })),
+})
+
+k.serve(appRouter, {
+  port: 3000,
+  ws: true, // [!code highlight]
+})
+```
+
+HTTP and WebSocket share the same port. Powered by [crossws](https://github.com/unjs/crossws).
+
+## Standalone (Existing Server)
+
+If you have your own HTTP server (or a [Fastify](/docs/integrations/fastify) app), attach WebSocket separately:
+
+```ts
+import { createServer } from "node:http"
+import { attachWebSocket } from "katman/ws"
+
+const server = createServer(yourHttpHandler)
+attachWebSocket(server, appRouter) // [!code highlight]
+server.listen(3000)
+```
+
+## Message Protocol
+
+Every message is JSON. The `id` field correlates requests with responses.
+
+### Request → Response
+
+```json
+// Client sends
+{ "id": "1", "path": "users/list", "input": { "limit": 10 } }
+
+// Server responds
+{ "id": "1", "result": [{ "id": 1, "name": "Alice" }] }
+```
+
+### Errors
+
+```json
+{ "id": "2", "error": { "code": "NOT_FOUND", "status": 404, "message": "Not found" } }
+```
+
+### Streaming (Subscriptions)
+
+For procedures defined with `k.subscription()`, the server sends multiple `data` messages:
+
+```json
+{ "id": "3", "data": { "count": 1 } }
+{ "id": "3", "data": { "count": 2 } }
+{ "id": "3", "data": null, "done": true }
+```
+
+## Client Example
+
+```ts
+const ws = new WebSocket("ws://localhost:3000")
+
+ws.onopen = () => {
+  ws.send(JSON.stringify({
+    id: "1",
+    path: "users/list",
+    input: { limit: 10 },
+  }))
+}
+
+ws.onmessage = ({ data }) => {
+  const msg = JSON.parse(data)
+  if (msg.error) console.error(msg.error)
+  else if (msg.done) console.log("Stream ended")
+  else if (msg.data !== undefined) console.log("Stream:", msg.data)
+  else console.log("Result:", msg.result)
+}
+```
+
+## Binary WebSocket
+
+Combine with [MessagePack](/docs/protocols/msgpack) for smaller messages:
+
+```ts
+attachWebSocket(server, appRouter, { binary: true })
+```
+
+<Callout type="info" title="Performance">
+WebSocket latency: **39 µs** per message vs HTTP **65 µs** — 40% faster due to persistent connection.
+</Callout>
+
+## Related
+
+- [Server](/docs/server) — `serve()` options including `ws: true`
+- [MessagePack](/docs/protocols/msgpack) — Binary protocol for smaller payloads
+- [Getting Started](/docs/getting-started) — Set up a katman router first

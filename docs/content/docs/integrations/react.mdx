@@ -1,15 +1,21 @@
 ---
 title: React Server Actions
-description: Type-safe server actions from katman procedures — Next.js and TanStack Start.
+description: Call katman procedures as React Server Actions — type-safe, [error, data] tuples.
 icon: Atom
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
+React Server Actions let you call server-side code directly from React components without building an API client. Katman makes this type-safe with `[error, data]` tuples instead of try/catch.
+
+## Prerequisites
+
+You need a katman router defined on the server side. If you haven't set one up yet, see the [Getting Started](/docs/getting-started) guide.
+
 ## createAction
 
-Wrap a single procedure as a server action. Returns `[error, data]` tuples.
+Wraps a single procedure. Returns `[error, data]` instead of throwing.
 
 ```ts title="app/actions.ts"
 "use server"
@@ -25,7 +31,10 @@ import { listUsers } from "./actions"
 
 export default async function Page() {
   const [error, users] = await listUsers({ limit: 10 }) // [!code highlight]
-  if (error) return <p>Error: {error.message}</p>
+
+  if (error) {
+    return <p>Error: {error.message}</p>
+  }
 
   return (
     <ul>
@@ -37,20 +46,21 @@ export default async function Page() {
 
 ## createActions
 
-Convert an entire router at once:
+Convert an entire router at once — mirrors the router structure:
 
 ```ts
 import { createActions } from "katman/react"
 
 const actions = createActions(appRouter)
 
+// Same nesting as your router
 const [err, users] = await actions.users.list({ limit: 10 })
 const [err2, user] = await actions.users.create({ name: "Alice" })
 ```
 
 ## createFormAction
 
-For `<form action={...}>`:
+For HTML `<form>` submissions with FormData:
 
 ```ts title="app/actions.ts"
 "use server"
@@ -67,7 +77,14 @@ export const submitUser = createFormAction(appRouter.users.create)
 </form>
 ```
 
+Bracket notation is supported: `user[name]` becomes `{ user: { name: value } }`.
+
 <Callout>
-Supports bracket notation in form fields: `user[name]` becomes `{ user: { name: value } }`.
-Next.js redirect/notFound and TanStack Router errors are automatically rethrown.
+Next.js `redirect()` and `notFound()` errors, and TanStack Router navigation errors, are automatically rethrown — they won't be caught as `[error, data]`.
 </Callout>
+
+## Related
+
+- [Getting Started](/docs/getting-started) — Set up a katman router
+- [Typed Errors](/docs/errors) — How error maps and `fail()` work
+- [TanStack Query](/docs/integrations/tanstack-query) — For client-side data fetching with caching

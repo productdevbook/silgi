@@ -1,0 +1,111 @@
+---
+title: Rate Limiting
+description: Sliding window rate limiter — in-memory or custom backend.
+icon: Timer
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+```ts
+import { rateLimitGuard, MemoryRateLimiter } from "katman/ratelimit"
+```
+
+## Quick Start
+
+```ts
+const rateLimit = rateLimitGuard({
+  limiter: new MemoryRateLimiter({
+    limit: 100,        // max requests
+    windowMs: 60_000,  // per minute
+  }),
+  keyFn: (ctx) => ctx.ip ?? "anonymous", // [!code highlight]
+})
+
+const proc = query({
+  use: [rateLimit],
+  resolve: () => ({ ok: true }),
+})
+```
+
+When the limit is exceeded, a `TOO_MANY_REQUESTS` error is thrown:
+
+```json
+{
+  "code": "TOO_MANY_REQUESTS",
+  "status": 429,
+  "data": {
+    "limit": 100,
+    "remaining": 0,
+    "reset": 1710720000000,
+    "retryAfter": 42
+  }
+}
+```
+
+## Custom Backend
+
+Implement the `RateLimiter` interface for Redis, Upstash, DynamoDB, etc.:
+
+<Tabs items={['Interface', 'Redis example']}>
+  <Tab value="Interface">
+  ```ts
+  import type { RateLimiter, RateLimitResult } from "katman/ratelimit"
+
+  interface RateLimiter {
+    limit(key: string): Promise<RateLimitResult>
+  }
+
+  interface RateLimitResult {
+    success: boolean
+    limit: number
+    remaining: number
+    reset: number // Unix timestamp in ms
+  }
+  ```
+  </Tab>
+  <Tab value="Redis example">
+  ```ts
+  import type { RateLimiter } from "katman/ratelimit"
+  import Redis from "ioredis"
+
+  class RedisRateLimiter implements RateLimiter {
+    #redis = new Redis()
+    #limit: number
+    #windowMs: number
+
+    constructor(limit: number, windowMs: number) {
+      this.#limit = limit
+      this.#windowMs = windowMs
+    }
+
+    async limit(key: string) {
+      const now = Date.now()
+      const windowKey = `rl:${key}:${Math.floor(now / this.#windowMs)}`
+
+      const count = await this.#redis.incr(windowKey)
+      if (count === 1) await this.#redis.pexpire(windowKey, this.#windowMs)
+
+      return {
+        success: count <= this.#limit,
+        limit: this.#limit,
+        remaining: Math.max(0, this.#limit - count),
+        reset: (Math.floor(now / this.#windowMs) + 1) * this.#windowMs,
+      }
+    }
+  }
+  ```
+  </Tab>
+</Tabs>
+
+## Options
+
+| Option | Type | Description |
+|---|---|---|
+| `limiter` | `RateLimiter` | Rate limiter instance |
+| `keyFn` | `(ctx) => string` | Extract key from context (IP, user ID, API key) |
+| `message` | `string` | Custom error message (default: "Rate limit exceeded") |
+
+<Callout>
+The guard adds `ctx.rateLimit` with `{ success, limit, remaining, reset }` — you can access it in your handler or downstream guards.
+</Callout>

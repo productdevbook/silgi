@@ -1,0 +1,57 @@
+---
+title: Pino Logging
+description: Structured request logging via lifecycle hooks.
+icon: FileText
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+```ts
+import { loggingHooks } from "katman/pino"
+```
+
+## Setup
+
+```ts
+import pino from "pino"
+
+const k = katman({
+  context: (req) => ({}),
+  hooks: loggingHooks({ logger: pino() }), // [!code highlight]
+})
+```
+
+That's it. Every request, response, and error is logged.
+
+## What Gets Logged
+
+**Request received:**
+```json
+{ "level": "info", "path": "users/list", "hasInput": true, "msg": "request received" }
+```
+
+**Response sent:**
+```json
+{ "level": "info", "path": "users/list", "durationMs": 0.42, "msg": "response sent" }
+```
+
+**Error:**
+```json
+{ "level": "error", "path": "users/create", "error": "CONFLICT", "msg": "request error" }
+```
+
+## Options
+
+```ts
+loggingHooks({
+  logger: pino(),
+  logRequests: true,   // default: true
+  logResponses: true,  // default: true
+})
+```
+
+Set `logRequests: false` to only log responses and errors.
+
+<Callout>
+The logger interface is Pino-compatible but not Pino-specific. Any logger with `info()`, `error()`, `warn()`, `debug()`, and `child()` methods works.
+</Callout>

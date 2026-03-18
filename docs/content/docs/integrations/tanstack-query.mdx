@@ -1,0 +1,99 @@
+---
+title: TanStack Query
+description: Type-safe queryOptions, mutationOptions, and cache invalidation for React, Vue, Solid, Svelte.
+icon: Database
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+TanStack Query is the most popular data fetching library for React (and Vue, Solid, Svelte). Katman provides a utility that generates type-safe `queryOptions` and `mutationOptions` from your client.
+
+## Prerequisites
+
+You need a katman [client](/docs/client) set up. The TanStack Query integration wraps this client.
+
+```bash
+npm install @tanstack/react-query
+```
+
+## Setup
+
+```ts
+import { createQueryUtils } from "katman/tanstack-query"
+import { client } from "./client" // your katman client
+
+const utils = createQueryUtils(client)
+```
+
+## Queries
+
+```tsx
+import { useQuery } from "@tanstack/react-query"
+
+function UserList() {
+  const { data, isLoading } = useQuery(
+    utils.users.list.queryOptions({ input: { limit: 10 } }) // [!code highlight]
+  )
+
+  if (isLoading) return <p>Loading...</p>
+  return <ul>{data?.map(u => <li key={u.id}>{u.name}</li>)}</ul>
+}
+```
+
+## Mutations
+
+```tsx
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+
+function CreateUser() {
+  const queryClient = useQueryClient()
+
+  const { mutate, isPending } = useMutation(
+    utils.users.create.mutationOptions({
+      onSuccess: () => {
+        // Refresh the user list after creating
+        queryClient.invalidateQueries({
+          queryKey: utils.users.key(), // [!code highlight]
+        })
+      },
+    })
+  )
+
+  return (
+    <button onClick={() => mutate({ name: "Alice" })} disabled={isPending}>
+      {isPending ? "Creating..." : "Create User"}
+    </button>
+  )
+}
+```
+
+## Prefetching
+
+Server-side or in loaders:
+
+```ts
+await queryClient.prefetchQuery(
+  utils.users.list.queryOptions({ input: { limit: 10 } })
+)
+```
+
+## Cache Invalidation
+
+```ts
+// Invalidate all queries under "users" namespace
+queryClient.invalidateQueries({ queryKey: utils.users.key() })
+
+// Invalidate a specific query
+queryClient.invalidateQueries({
+  queryKey: utils.users.list.queryKey({ limit: 10 }),
+})
+```
+
+<Callout type="info">
+Works with `@tanstack/react-query`, `@tanstack/vue-query`, `@tanstack/solid-query`, and `@tanstack/svelte-query`. Same API, same types.
+</Callout>
+
+## Related
+
+- [Client](/docs/client) — Set up the katman client that powers the query utils
+- [React Server Actions](/docs/integrations/react) — Alternative to TanStack Query for server-first React

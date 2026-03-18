@@ -1,0 +1,86 @@
+---
+title: Fastify
+description: Use katman as a Fastify plugin — RPC and REST on the same server.
+icon: Zap
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
+Katman has a built-in `serve()` function that creates its own HTTP server. But if you already have a Fastify application and want to add katman alongside existing REST endpoints, use the Fastify adapter.
+
+## When to Use
+
+| Approach | When |
+|---|---|
+| `k.serve(router)` | New project, katman-only server |
+| `katmanFastify(router)` | Adding RPC to an existing Fastify app |
+
+## Setup
+
+<Steps>
+<Step>
+
+### Install Fastify
+
+```bash
+npm install fastify
+```
+
+</Step>
+<Step>
+
+### Register the Plugin
+
+```ts title="server.ts"
+import Fastify from "fastify"
+import { katmanFastify } from "katman/fastify"
+import { appRouter } from "./router"
+
+const app = Fastify()
+
+// Your existing REST routes
+app.get("/api/legacy", async () => ({ type: "rest" }))
+
+// Katman RPC under /rpc prefix
+app.register(katmanFastify(appRouter, {
+  context: (req) => ({ user: req.user }), // [!code highlight]
+}), { prefix: "/rpc" })
+
+app.listen({ port: 3000 })
+```
+
+</Step>
+</Steps>
+
+Each procedure becomes a POST route:
+
+```
+POST /rpc/health
+POST /rpc/users/list
+POST /rpc/users/create
+```
+
+## Context from Fastify
+
+The `context` option receives the Fastify request — use it to pass auth, IP, etc. into katman procedures:
+
+```ts
+katmanFastify(appRouter, {
+  context: (req) => ({
+    user: req.user,             // from Fastify auth plugin
+    ip: req.ip,                 // client IP
+    headers: req.headers,       // raw headers
+  }),
+})
+```
+
+<Callout>
+Fastify's built-in JSON parser is used — request bodies are already parsed when your handler runs. [Content negotiation](/docs/protocols) (JSON, MessagePack, devalue) works automatically.
+</Callout>
+
+## Related
+
+- [Server](/docs/server) — `serve()` for standalone katman servers
+- [Protocols](/docs/protocols) — JSON, MessagePack, devalue wire formats
+- [Client](/docs/client) — Connect to your Fastify-hosted katman API

@@ -1,0 +1,58 @@
+---
+title: OpenTelemetry
+description: Distributed tracing — each procedure call becomes a span.
+icon: Activity
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+```ts
+import { otelWrap } from "katman/otel"
+```
+
+## Setup
+
+```ts
+import { trace } from "@opentelemetry/api"
+
+const tracing = otelWrap(trace.getTracer("my-service"))
+```
+
+## Usage
+
+Add as a wrap middleware to any procedure:
+
+```ts
+const proc = query({
+  use: [tracing], // [!code highlight]
+  resolve: ({ ctx }) => ctx.db.users.findMany(),
+})
+```
+
+Every call creates a span with:
+- `rpc.system: "katman"`
+- Status code 0 (OK) or 2 (ERROR)
+- Exception events on error with `exception.message`
+
+## Error Recording
+
+Errors are automatically captured:
+
+```ts
+// On success:
+// span.setStatus({ code: 0 })
+
+// On error:
+// span.setStatus({ code: 2, message: "Not found" })
+// span.addEvent("exception", { "exception.message": "Not found" })
+```
+
+<Callout type="info">
+Katman has zero OpenTelemetry dependency — we define a lightweight `Tracer` / `Span` interface. You bring your own `@opentelemetry/api`.
+</Callout>
+
+## Custom Span Name
+
+```ts
+const tracing = otelWrap(tracer, "api.call") // default: "rpc.call"
+```

@@ -1,0 +1,89 @@
+---
+title: AI SDK
+description: Turn katman procedures into AI tools — LLMs call your API through function calling.
+icon: Brain
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
+The [Vercel AI SDK](https://sdk.vercel.ai) lets you connect LLMs to tools — functions the model can call. Katman automatically converts your procedures into AI tools, extracting JSON Schema from your Zod input schemas.
+
+## Prerequisites
+
+You need a katman [router](/docs/getting-started) and the AI SDK:
+
+```bash
+npm install ai @ai-sdk/openai
+```
+
+## Quick Start
+
+<Steps>
+<Step>
+
+### Convert your router to tools
+
+```ts
+import { routerToTools } from "katman/ai"
+
+const tools = routerToTools(appRouter) // [!code highlight]
+```
+
+This creates one tool per procedure. Nested routers are flattened: `users.list` becomes `users_list`.
+
+</Step>
+<Step>
+
+### Use with any model
+
+```ts
+import { generateText } from "ai"
+import { openai } from "@ai-sdk/openai"
+
+const { text } = await generateText({
+  model: openai("gpt-4o"),
+  tools, // [!code highlight]
+  prompt: "List all users with limit 5, then create a user named Bob",
+})
+```
+
+The model sees your procedures as callable functions. Input schemas are sent as JSON Schema for function calling.
+
+</Step>
+</Steps>
+
+## Single Procedure
+
+For more control, convert individual procedures:
+
+```ts
+import { procedureToTool } from "katman/ai"
+
+const searchTool = procedureToTool("search", appRouter.search, {
+  description: "Search the database for items matching a query",
+})
+```
+
+## Filtering
+
+Expose only specific procedures:
+
+```ts
+const tools = routerToTools(appRouter, {
+  filter: (path) => !path.startsWith("admin_"), // [!code highlight]
+  descriptions: {
+    users_list: "List all registered users",
+    users_create: "Create a new user account",
+  },
+})
+```
+
+<Callout>
+Tool descriptions are extracted from your route metadata (`route.description` or `route.summary`). Pass custom `descriptions` to override.
+</Callout>
+
+## Related
+
+- [Getting Started](/docs/getting-started) — Set up a katman router
+- [Core Concepts](/docs/concepts) — How procedures and type inference work

@@ -1,0 +1,82 @@
+---
+title: MessagePack
+description: Binary protocol — 30% smaller payloads, native Date support. No competitor offers this.
+icon: Binary
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+## Why MessagePack?
+
+JSON is text. MessagePack is binary. Same data, fewer bytes.
+
+| Payload | JSON | MessagePack | Savings |
+|---|---|---|---|
+| 1 object | 33 B | 22 B | **33%** |
+| 10 objects | 661 B | 493 B | **25%** |
+| 100 objects | 9.5 KB | 6.7 KB | **30%** |
+
+<Callout type="info">
+Neither oRPC, tRPC, nor Hono offer a binary wire format. This is a katman exclusive.
+</Callout>
+
+## Client Usage
+
+One flag:
+
+```ts
+import { createLink } from "katman/client/ofetch"
+
+const link = createLink({
+  url: "http://localhost:3000",
+  binary: true, // [!code highlight]
+})
+```
+
+Everything else stays the same. The client encodes with MessagePack, the server detects the content type and responds in kind.
+
+## Direct API
+
+```ts
+import { encode, decode } from "katman/msgpack"
+
+const buf = encode({ name: "Alice", joined: new Date() })
+// buf is a Uint8Array — 30% smaller than JSON.stringify
+
+const data = decode(buf)
+// data.joined is a Date object — preserved natively
+```
+
+## Server Behavior
+
+The server checks the `Accept` header:
+
+```
+Accept: application/x-msgpack → responds with MessagePack
+Accept: application/json      → responds with JSON (default)
+```
+
+Request bodies with `Content-Type: application/x-msgpack` are automatically decoded.
+
+## Supported Types
+
+| Type | Support |
+|---|---|
+| String, Number, Boolean, null | Native |
+| Object, Array | Native |
+| **Date** | Native (MessagePack timestamp extension) |
+| **BigInt** | Up to 64-bit natively |
+| Set, Map, Error, RegExp | With `moreTypes` (enabled by default) |
+| undefined | Distinct from null |
+| NaN, Infinity | IEEE 754 |
+
+## WebSocket
+
+Binary MessagePack over WebSocket:
+
+```ts
+import { attachWebSocket } from "katman/ws"
+
+attachWebSocket(server, appRouter, { binary: true })
+```

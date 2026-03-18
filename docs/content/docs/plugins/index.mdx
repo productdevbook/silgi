@@ -1,0 +1,21 @@
+---
+title: Plugins
+description: Extend katman with CORS, tracing, logging, and rate limiting.
+icon: Plug
+---
+
+import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Katman plugins follow the v2 pattern — guards for request-level logic, wraps for lifecycle, hooks for global events. No special plugin API. Just middleware.
+
+<Callout>
+All plugins are tree-shakeable. Import only what you use — unused plugins add zero bytes to your bundle.
+</Callout>
+
+<Cards>
+  <Card title="CORS" description="Cross-origin headers — string, array, or dynamic origin matching." href="/docs/plugins/cors" />
+  <Card title="OpenTelemetry" description="Distributed tracing — each procedure call becomes a span." href="/docs/plugins/otel" />
+  <Card title="Pino" description="Structured logging — request received, response sent, error caught." href="/docs/plugins/pino" />
+  <Card title="Rate Limiting" description="Sliding window guard — in-memory or custom backend (Redis, Upstash)." href="/docs/plugins/ratelimit" />
+</Cards>

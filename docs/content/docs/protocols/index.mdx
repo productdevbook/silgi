@@ -1,0 +1,21 @@
+---
+title: Protocols
+description: Katman supports three wire formats. The server picks the right one automatically.
+icon: Layers
+---
+
+import { Cards, Card } from 'fumadocs-ui/components/card';
+
+Katman uses content negotiation — the client sends an `Accept` header and the server responds in that format. No configuration needed.
+
+| Format | Size | Rich Types | Binary | Best For |
+|---|---|---|---|---|
+| **JSON** | Baseline | No | No | Default, universal |
+| **MessagePack** | 30% smaller | Date | Yes | Mobile, bandwidth |
+| **devalue** | ~Same | All | No | Date, Map, Set, BigInt |
+
+<Cards>
+  <Card title="MessagePack" description="Binary protocol — 30% smaller payloads, native Date. No competitor has this." href="/docs/protocols/msgpack" />
+  <Card title="devalue" description="Rich type serialization — Date, Map, Set, BigInt, RegExp, circular refs." href="/docs/protocols/devalue" />
+  <Card title="WebSocket" description="Bidirectional RPC over persistent connection. 40% lower latency than HTTP." href="/docs/protocols/websocket" />
+</Cards>
