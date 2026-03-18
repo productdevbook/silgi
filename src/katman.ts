@@ -511,18 +511,10 @@ function createFetchHandler(
 
   return async (request: Request): Promise<Response> => {
     // FAST pathname extraction — 40x faster than new URL()
-    // Handles both string URLs and URL objects (H3 v2 / Nitro)
-    const rawUrl = request.url;
-    let pathname: string;
-    if (typeof rawUrl === "string") {
-      const pathStart = rawUrl.indexOf("/", rawUrl.indexOf("//") + 2);
-      const qMark = rawUrl.indexOf("?", pathStart);
-      pathname = qMark === -1 ? rawUrl.slice(pathStart + 1) : rawUrl.slice(pathStart + 1, qMark);
-    } else {
-      // URL object (e.g., from H3 v2 / Nitro)
-      const urlObj = rawUrl as unknown as URL;
-      pathname = urlObj.pathname.startsWith("/") ? urlObj.pathname.slice(1) : urlObj.pathname;
-    }
+    const url = request.url;
+    const pathStart = url.indexOf("/", url.indexOf("//") + 2);
+    const qMark = url.indexOf("?", pathStart);
+    const pathname = qMark === -1 ? url.slice(pathStart + 1) : url.slice(pathStart + 1, qMark);
 
     // O(1) flat Map lookup
     const route = flatRouter!.get(pathname);
@@ -542,15 +534,8 @@ function createFetchHandler(
       // Parse input — use .json() directly when possible
       let rawInput: unknown;
       if (request.method === "GET") {
-        // Extract query params (works for both string URLs and URL objects)
-        let searchStr: string | undefined;
-        if (typeof rawUrl === "string") {
-          const qIdx = rawUrl.indexOf("?");
-          if (qIdx !== -1) searchStr = rawUrl.slice(qIdx + 1);
-        } else {
-          searchStr = (rawUrl as unknown as URL).search?.slice(1);
-        }
-        if (searchStr) {
+        if (qMark !== -1) {
+          const searchStr = url.slice(qMark + 1);
           const dataIdx = searchStr.indexOf("data=");
           if (dataIdx !== -1) {
             const valueStart = dataIdx + 5;
@@ -561,18 +546,16 @@ function createFetchHandler(
         }
       } else {
         const ct = request.headers.get("content-type");
-        try {
-          if (isMsgpack(ct)) {
-            const buf = new Uint8Array(await request.arrayBuffer());
-            if (buf.byteLength > 0) rawInput = msgpackDecode(buf);
-          } else if (isDevalue(ct)) {
-            const text = await request.text();
-            if (text) rawInput = devalueDecode(text);
-          } else {
-            rawInput = await request.json();
-          }
-        } catch {
-          // Body empty, not parseable, or no body — leave rawInput as undefined
+        if (isMsgpack(ct) && request.body) {
+          const buf = new Uint8Array(await request.arrayBuffer());
+          rawInput = msgpackDecode(buf);
+        } else if (isDevalue(ct) && request.body) {
+          rawInput = devalueDecode(await request.text());
+        } else if (ct?.includes("json") && request.body) {
+          rawInput = await request.json();
+        } else if (request.body) {
+          const text = await request.text();
+          rawInput = text ? parseEmptyableJSON(text) : undefined;
         }
       }
 

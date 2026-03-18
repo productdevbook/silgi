@@ -1,11 +1,10 @@
 /**
- * Katman + Nitro — direct integration.
+ * Katman + Nitro — direct integration (like Hono + Nitro).
  *
- * katmanNitro reads the body from the H3 event directly,
- * bypassing Nitro's body consumption issue with fetch handlers.
+ * Export an object with a `fetch` method — Nitro uses it as the server.
+ * No H3, no katmanNitro adapter needed — just handler().
  */
 import { katman, KatmanError } from "katman";
-import { katmanNitro } from "katman/nitro";
 import { z } from "zod";
 
 // ── In-memory DB ─────────────────────────────────────
@@ -22,15 +21,18 @@ const db = {
 // ── Katman Instance ──────────────────────────────────
 
 const k = katman({
-  context: () => ({ db }),
+  context: (req) => ({
+    db,
+    headers: Object.fromEntries(req.headers),
+  }),
 });
 
-const { query, mutation, guard, router } = k;
+const { query, mutation, guard, router, handler } = k;
 
 // ── Middleware ────────────────────────────────────────
 
 const auth = guard((ctx) => {
-  const token = (ctx as any).token as string | undefined;
+  const token = ctx.headers.authorization?.replace("Bearer ", "");
   if (token !== "secret-token") {
     throw new KatmanError("UNAUTHORIZED", { message: "Invalid token" });
   }
@@ -88,10 +90,6 @@ const appRouter = router({
   },
 });
 
-// Export as Nitro server entry — katmanNitro handles H3 events directly
-export default katmanNitro(appRouter, {
-  context: (event) => ({
-    db,
-    token: event.req.headers.get("authorization")?.replace("Bearer ", ""),
-  }),
-});
+// Export with fetch method — Nitro detects this like Hono
+const fetchHandler = handler(appRouter);
+export default { fetch: fetchHandler };
