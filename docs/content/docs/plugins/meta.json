@@ -1,4 +1,4 @@
 {
   "title": "Plugins",
-  "pages": ["index", "cors", "otel", "pino", "ratelimit", "body-limit", "strict-get", "cookies", "compression"]
+  "pages": ["index", "cors", "otel", "pino", "ratelimit", "body-limit", "strict-get", "cookies", "compression", "signing", "coerce", "batch-server"]
 }

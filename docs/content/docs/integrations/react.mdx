@@ -148,6 +148,54 @@ These errors pass through untouched — they won't be caught as `[error, data]` 
 This means `redirect("/login")` inside a procedure works as expected in Next.js. The redirect happens, and the action doesn't return an error tuple.
 </Callout>
 
+## useServerAction
+
+A React hook that wraps a server action with loading and error state:
+
+```tsx
+import { useServerAction } from "katman/react"
+
+function CreateUserButton() {
+  const { execute, data, error, isPending, reset } = useServerAction(createUser)
+
+  return (
+    <div>
+      <button onClick={() => execute({ name: "Alice" })} disabled={isPending}>
+        {isPending ? "Creating..." : "Create User"}
+      </button>
+      {error && <p>Error: {error.message}</p>}
+      {data && <p>Created: {data.name}</p>}
+    </div>
+  )
+}
+```
+
+`execute()` returns the same `[error, data]` tuple as the action itself, so you can also handle results inline.
+
+## useOptimisticServerAction
+
+Like `useServerAction`, but applies an optimistic update immediately while the server call is in flight:
+
+```tsx
+import { useOptimisticServerAction } from "katman/react"
+
+function UserName({ user }) {
+  const { execute, displayData, isPending } = useOptimisticServerAction(updateUser, {
+    optimistic: (input) => ({ ...user, ...input }),
+  })
+
+  return (
+    <div>
+      <span>{displayData?.name ?? user.name}</span>
+      <button onClick={() => execute({ name: "Bob" })}>Rename</button>
+    </div>
+  )
+}
+```
+
+- `displayData` shows the optimistic value while pending, then switches to the confirmed server response.
+- If the call fails, the optimistic value is rolled back automatically.
+
 ## What's next?
 
 - [Getting Started](/docs/getting-started) — set up a Katman router

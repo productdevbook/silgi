@@ -1,0 +1,78 @@
+---
+title: Signing & Encryption
+description: HMAC-SHA256 signing and AES-256-GCM encryption — tamper-proof and confidential data using the Web Crypto API.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+Katman provides `sign`/`unsign` for tamper-proof data and `encrypt`/`decrypt` for confidential data. Both use the Web Crypto API — works in Node.js, Bun, Deno, and Cloudflare Workers.
+
+## Signing (HMAC-SHA256)
+
+Signing proves that a value hasn't been tampered with. The value is still readable — it's not encrypted.
+
+```ts twoslash
+// @noErrors
+import { sign, unsign } from "katman/plugins"
+
+// Sign a value
+const signed = await sign("user:123", "my-secret-key")
+// "user:123.a1b2c3d4..."
+
+// Verify and extract
+const value = await unsign(signed, "my-secret-key")
+// "user:123" — or null if tampered
+```
+
+Common use cases: session tokens in cookies, CSRF tokens, signed URLs.
+
+### Signed cookies
+
+```ts twoslash
+// @noErrors
+import { sign, unsign } from "katman/plugins"
+import { setCookie, getCookie } from "katman/cookies"
+
+// Set a signed session cookie
+const signed = await sign(userId, SECRET)
+const header = setCookie("session", signed, { httpOnly: true })
+
+// Read and verify
+const raw = getCookie(ctx.headers, "session")
+const userId = raw ? await unsign(raw, SECRET) : null
+if (!userId) throw new KatmanError("UNAUTHORIZED")
+```
+
+## Encryption (AES-256-GCM)
+
+Encryption makes data unreadable without the secret. Uses PBKDF2 key derivation with a random salt and IV per encryption.
+
+```ts twoslash
+// @noErrors
+import { encrypt, decrypt } from "katman/plugins"
+
+const encrypted = await encrypt("sensitive-data", "my-secret-key")
+// "base64url-encoded-blob"
+
+const original = await decrypt(encrypted, "my-secret-key")
+// "sensitive-data"
+```
+
+<Callout type="info">
+Each call to `encrypt()` produces a different output (random salt + IV), so the same plaintext encrypted twice gives different ciphertexts. This is by design — it prevents pattern analysis.
+</Callout>
+
+## When to use which
+
+| Need | Use |
+|---|---|
+| Prove a value wasn't tampered with | `sign` / `unsign` |
+| Hide a value from the client | `encrypt` / `decrypt` |
+| Session tokens in cookies | `sign` (no need to hide the user ID) |
+| Storing secrets in cookies | `encrypt` (the value must be confidential) |
+
+## What's next?
+
+- [Cookies](/docs/plugins/cookies) — read and set cookies
+- [Plugins](/docs/plugins) — other available plugins

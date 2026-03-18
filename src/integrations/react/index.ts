@@ -81,6 +81,132 @@ export function createActions<T extends RouterDef>(router: T): ActionRouter<T> {
   return result as ActionRouter<T>;
 }
 
+// ── Hooks ─────────────────────────────────────────
+
+/**
+ * React hook for calling server actions with loading/error state.
+ *
+ * @example
+ * ```tsx
+ * const { execute, data, error, isPending } = useServerAction(createUser)
+ *
+ * <button onClick={() => execute({ name: "Alice" })} disabled={isPending}>
+ *   {isPending ? "Creating..." : "Create User"}
+ * </button>
+ * ```
+ */
+export function useServerAction<TInput, TOutput>(
+  action: (input: TInput) => Promise<ActionResult<TOutput>>,
+) {
+  // These imports are inline to avoid breaking non-React environments
+  const { useState, useCallback, useRef } = require("react") as typeof import("react");
+
+  const [data, setData] = useState<TOutput | undefined>(undefined);
+  const [error, setError] = useState<ActionResult<TOutput>[0] | null>(null);
+  const [isPending, setIsPending] = useState(false);
+  const mountedRef = useRef(true);
+
+  // Cleanup on unmount
+  const { useEffect } = require("react") as typeof import("react");
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  const execute = useCallback(async (input: TInput) => {
+    setIsPending(true);
+    setError(null);
+    try {
+      const [err, result] = await action(input);
+      if (!mountedRef.current) return;
+      if (err) {
+        setError(err);
+        setData(undefined);
+      } else {
+        setData(result);
+        setError(null);
+      }
+      return [err, result] as ActionResult<TOutput>;
+    } finally {
+      if (mountedRef.current) setIsPending(false);
+    }
+  }, [action]);
+
+  const reset = useCallback(() => {
+    setData(undefined);
+    setError(null);
+    setIsPending(false);
+  }, []);
+
+  return { execute, data, error, isPending, reset };
+}
+
+/**
+ * React hook for server actions with optimistic UI updates.
+ *
+ * @example
+ * ```tsx
+ * const { execute, data, optimisticData, isPending } = useOptimisticServerAction(updateUser, {
+ *   optimistic: (input) => ({ ...currentUser, ...input }),
+ * })
+ * ```
+ */
+export function useOptimisticServerAction<TInput, TOutput>(
+  action: (input: TInput) => Promise<ActionResult<TOutput>>,
+  options: { optimistic: (input: TInput) => TOutput },
+) {
+  const { useState, useCallback, useRef } = require("react") as typeof import("react");
+  const { useEffect } = require("react") as typeof import("react");
+
+  const [data, setData] = useState<TOutput | undefined>(undefined);
+  const [optimisticData, setOptimisticData] = useState<TOutput | undefined>(undefined);
+  const [error, setError] = useState<ActionResult<TOutput>[0] | null>(null);
+  const [isPending, setIsPending] = useState(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  const execute = useCallback(async (input: TInput) => {
+    setIsPending(true);
+    setError(null);
+    // Apply optimistic update immediately
+    setOptimisticData(options.optimistic(input));
+
+    try {
+      const [err, result] = await action(input);
+      if (!mountedRef.current) return;
+      if (err) {
+        setError(err);
+        setOptimisticData(undefined); // Rollback
+      } else {
+        setData(result);
+        setOptimisticData(undefined); // Real data replaces optimistic
+      }
+      return [err, result] as ActionResult<TOutput>;
+    } catch (e) {
+      if (mountedRef.current) setOptimisticData(undefined);
+      throw e;
+    } finally {
+      if (mountedRef.current) setIsPending(false);
+    }
+  }, [action, options.optimistic]);
+
+  return {
+    execute,
+    /** Confirmed server data */
+    data,
+    /** Optimistic data (shown while pending, cleared on settle) */
+    optimisticData,
+    /** The value to display: optimistic while pending, confirmed otherwise */
+    displayData: optimisticData ?? data,
+    error,
+    isPending,
+  };
+}
+
 // ── Types ──────────────────────────────────────────
 
 type ActionRouter<T extends RouterDef> = {

@@ -23,6 +23,9 @@ You can build your own plugins the same way. A guard that checks a feature flag,
   <Card title="Strict GET" description="Enforce GET-only access on query procedures — CSRF prevention." href="/docs/plugins/strict-get" />
   <Card title="Cookies" description="Read, set, and delete cookies inside procedures — secure defaults." href="/docs/plugins/cookies" />
   <Card title="Compression" description="Gzip/deflate response compression hints for custom servers." href="/docs/plugins/compression" />
+  <Card title="Signing & Encryption" description="HMAC-SHA256 signing and AES-256-GCM encryption via Web Crypto API." href="/docs/plugins/signing" />
+  <Card title="Smart Coercion" description="Convert string query parameters to numbers, booleans, and null automatically." href="/docs/plugins/coerce" />
+  <Card title="Server Batch" description="Handle multiple RPC calls in one HTTP request — pairs with client BatchLink." href="/docs/plugins/batch-server" />
 </Cards>
 
 ## Plugin types at a glance
@@ -37,6 +40,9 @@ You can build your own plugins the same way. A guard that checks a feature flag,
 | Strict GET | Guard (singleton) | Add `strictGetGuard` to enforce GET on queries |
 | Cookies | Helper functions | Use `getCookie()`, `setCookie()`, `deleteCookie()` |
 | Compression | Wrap middleware | Add `compressionWrap()` for gzip/deflate hints |
+| Signing | Helper functions | Use `sign()`, `unsign()`, `encrypt()`, `decrypt()` |
+| Smart Coercion | Guard (singleton) | Add `coerceGuard` to auto-convert string inputs |
+| Server Batch | Handler factory | Use `createBatchHandler()` for batch endpoint |
 
 ## What's next?
 

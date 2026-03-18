@@ -19,3 +19,6 @@ export {
   deleteCookie,
   type CookieOptions,
 } from "./cookies.ts";
+export { sign, unsign, encrypt, decrypt } from "./signing.ts";
+export { coerceGuard, coerceValue, coerceObject } from "./coerce.ts";
+export { createBatchHandler, type BatchHandlerOptions } from "./batch-server.ts";

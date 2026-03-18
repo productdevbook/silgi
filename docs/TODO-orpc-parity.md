@@ -9,7 +9,7 @@ oRPC ile karsilastirildiginda Katman'da eksik olan ozellikler.
 ## Kritik Eksikler
 
 - [ ] **File Upload/Download** — Native File/Blob type-safe destegi (input schema'da `z.file()`)
-- [ ] **Server-side Batch Requests** — Server tarafinda batch endpoint (client plugin mevcut)
+- [x] **Server-side Batch Requests** — `createBatchHandler()` — batch endpoint
 - [x] **Server-side Client** — `createServerClient(router, { context })` — HTTP'siz direkt cagrisi
 - [x] **Callable Procedures** — `callable(procedure, { context })` ile proseduru fonksiyon gibi cagirma
 - [x] **Meta in ProcedureDef** — meta alani ProcedureDef'e eklendi (8. property)
@@ -36,7 +36,7 @@ oRPC ile karsilastirildiginda Katman'da eksik olan ozellikler.
 - [x] **Response Compression** — `compressionWrap()` — gzip/deflate hint middleware
 - [x] **Body Limit** — `bodyLimitGuard()` — 413 Payload Too Large guard
 - [x] **Cookie Helpers** — `getCookie`, `parseCookies`, `setCookie`, `deleteCookie` (katman/cookies)
-- [ ] **Signing & Encryption** — HMAC-SHA256 imza, AES-GCM sifreleme
+- [x] **Signing & Encryption** — `sign`, `unsign`, `encrypt`, `decrypt` (Web Crypto API)
 - [ ] **Publisher/PubSub** — Event pub/sub (Memory, Redis, Durable Objects adapterleri)
 - [x] **Strict GET Method** — `strictGetGuard` — 405 on non-GET for queries
 
@@ -56,8 +56,8 @@ oRPC ile karsilastirildiginda Katman'da eksik olan ozellikler.
 
 ## React Gelistirmeleri
 
-- [ ] `useServerAction` hook — Loading state ile server action cagrisi
-- [ ] `useOptimisticServerAction` hook — Optimistic UI update
+- [x] `useServerAction` hook — Loading/error state ile server action cagrisi
+- [x] `useOptimisticServerAction` hook — Optimistic UI update + rollback
 
 ## Middleware Gelistirmeleri
 
@@ -71,7 +71,7 @@ oRPC ile karsilastirildiginda Katman'da eksik olan ozellikler.
 - [ ] **OpenAPI Client** — OpenAPI endpoint'lerini client olarak consume etme
 - [ ] **Durable Iterator** — Cloudflare Durable Object streaming + reconnection
 - [ ] **Hibernation Plugin** — CF Durable Object WebSocket hibernation
-- [ ] **Smart Coercion** — String query param'lari otomatik tipe cevirme
+- [x] **Smart Coercion** — `coerceGuard` + `coerceValue`/`coerceObject` utilities
 
 ---
 
