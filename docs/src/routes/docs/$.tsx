@@ -57,16 +57,15 @@ const clientLoader = browserCollections.docs.createClientLoader({
       slugs: string[];
     },
   ) {
-    const ogImage = getPageImage(slugs).url;
     return (
       <DocsPage toc={toc}>
         <title>{`${frontmatter.title} — Katman`}</title>
         <meta name="description" content={frontmatter.description} />
         <meta property="og:title" content={frontmatter.title} />
         <meta property="og:description" content={frontmatter.description} />
-        <meta property="og:image" content={ogImage} />
+        <meta property="og:image" content={getPageImage(slugs).url} />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:image" content={ogImage} />
+        <meta name="twitter:image" content={getPageImage(slugs).url} />
         <DocsTitle>{frontmatter.title}</DocsTitle>
         <DocsDescription>{frontmatter.description}</DocsDescription>
         <div className="flex flex-row gap-2 items-center border-b -mt-4 pb-6">
