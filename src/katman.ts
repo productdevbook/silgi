@@ -31,14 +31,35 @@ import { ValidationError, validateSchema } from "./core/schema.ts";
 import { stringifyJSON, parseEmptyableJSON, once } from "./core/utils.ts";
 import { iteratorToEventStream } from "./core/sse.ts";
 import { generateOpenAPI, scalarHTML, type ScalarOptions } from "./scalar.ts";
+import { createHooks, type Hookable, type HookCallback } from "hookable";
+
+// ── Lifecycle Hooks ─────────────────────────────────
+
+export interface KatmanHooks {
+  /** Called before a request is processed */
+  "request": (event: { path: string; input: unknown }) => void;
+  /** Called after a successful response */
+  "response": (event: { path: string; output: unknown; durationMs: number }) => void;
+  /** Called when an error occurs */
+  "error": (event: { path: string; error: unknown }) => void;
+  /** Called when the server starts */
+  "serve:start": (event: { url: string; port: number; hostname: string }) => void;
+}
 
 // ── Katman Instance ─────────────────────────────────
 
 export interface KatmanConfig<TCtx extends Record<string, unknown>> {
   context: (req: Request) => TCtx | Promise<TCtx>;
+  /** Register lifecycle hooks */
+  hooks?: Partial<{ [K in keyof KatmanHooks]: KatmanHooks[K] | KatmanHooks[K][] }>;
 }
 
 export interface KatmanInstance<TBaseCtx extends Record<string, unknown>> {
+  /** Register a lifecycle hook */
+  hook: Hookable<KatmanHooks>["hook"];
+
+  /** Remove a lifecycle hook */
+  removeHook: Hookable<KatmanHooks>["removeHook"];
   /** Create a guard middleware (flat, zero-closure) */
   guard: <TReturn extends Record<string, unknown> | void>(
     fn: GuardFn<TBaseCtx, TReturn>,
@@ -168,7 +189,22 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
 ): KatmanInstance<TBaseCtx> {
   const contextFactory = config.context;
 
+  // Lifecycle hooks (sync fast-path when no hooks registered)
+  const hooks = createHooks<KatmanHooks>();
+  if (config.hooks) {
+    for (const [name, fn] of Object.entries(config.hooks)) {
+      if (Array.isArray(fn)) {
+        for (const f of fn) hooks.hook(name as keyof KatmanHooks, f as any);
+      } else if (fn) {
+        hooks.hook(name as keyof KatmanHooks, fn as any);
+      }
+    }
+  }
+
   const instance: KatmanInstance<TBaseCtx> = {
+    hook: hooks.hook,
+    removeHook: hooks.removeHook.bind(hooks),
+
     guard: (fn) => ({ kind: "guard" as const, fn }),
     wrap: (fn) => ({ kind: "wrap" as const, fn }),
 
@@ -178,13 +214,12 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
 
     router: (def) => {
       assignPaths(def);
-      // Compile to flat Map — O(1) lookup at request time
       const flat = compileRouter(def);
       routerCache.set(def, flat);
       return def;
     },
 
-    handler: (routerDef) => createFetchHandler(routerDef, contextFactory),
+    handler: (routerDef) => createFetchHandler(routerDef, contextFactory, hooks),
 
     serve: (routerDef, options) => {
       // Compile flat router ONCE
@@ -262,14 +297,16 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
           // FIX #2b: Don't use pool (delete causes V8 dictionary mode)
           const ctx: Record<string, unknown> = Object.create(null);
 
-          // FIX #4: Content-Length header (saves 2-8µs client-side chunked parse)
+          const t0 = performance.now();
+
           const respond = (output: unknown) => {
             const body = route.stringify(output);
             res.writeHead(200, {
               "content-type": "application/json",
-              "content-length": body.length, // ASCII JSON — byteLength === length
+              "content-length": body.length,
             });
             res.end(body);
+            hooks.callHook("response", { path: pathname, output, durationMs: performance.now() - t0 });
           };
 
           const handleError = (err: unknown) => {
@@ -279,6 +316,7 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
               res.writeHead(e.status, { "content-type": "application/json", "content-length": body.length });
               res.end(body);
             }
+            hooks.callHook("error", { path: pathname, error: err });
           };
 
           const runWithContext = (rawInput: unknown) => {
@@ -314,6 +352,7 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
           const method = req.method ?? "GET";
           if (!cl || cl === "0" || method === "GET" || method === "HEAD") {
             if (cl) req.resume();
+            hooks.callHook("request", { path: pathname, input: undefined });
             runWithContext(undefined);
             return;
           }
@@ -322,14 +361,18 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
           let body = "";
           req.on("data", (d: Buffer) => { body += d; });
           req.on("end", () => {
-            runWithContext(body ? JSON.parse(body) : undefined);
+            const input = body ? JSON.parse(body) : undefined;
+            hooks.callHook("request", { path: pathname, input });
+            runWithContext(input);
           });
         });
 
         server.listen(port, hostname, () => {
-          console.log(`\nKatman server running at http://${hostname}:${port}`);
-          if (scalarEnabled) console.log(`Scalar API Reference at http://${hostname}:${port}/reference`);
+          const url = `http://${hostname}:${port}`;
+          console.log(`\nKatman server running at ${url}`);
+          if (scalarEnabled) console.log(`Scalar API Reference at ${url}/reference`);
           console.log();
+          hooks.callHook("serve:start", { url, port, hostname });
         });
       });
     },
@@ -372,6 +415,7 @@ function assignPaths(def: RouterDef, prefix: string[] = []): void {
 function createFetchHandler(
   routerDef: RouterDef,
   contextFactory: (req: Request) => Record<string, unknown> | Promise<Record<string, unknown>>,
+  hooks?: Hookable<KatmanHooks>,
 ): (request: Request) => Promise<Response> {
   // Get or compile the flat router map — O(1) lookup
   let flatRouter = routerCache.get(routerDef);
@@ -433,6 +477,9 @@ function createFetchHandler(
         }
       }
 
+      const t0 = performance.now();
+      hooks?.callHook("request", { path: pathname, input: rawInput });
+
       // Execute compiled pipeline — sync dispatch when possible
       const pipelineResult = route.handler(ctx, rawInput, request.signal);
       const output = pipelineResult instanceof Promise ? await pipelineResult : pipelineResult;
@@ -444,8 +491,10 @@ function createFetchHandler(
       }
 
       // JSON response — schema-compiled fast stringify
+      hooks?.callHook("response", { path: pathname, output, durationMs: performance.now() - t0 });
       return new Response(route.stringify(output), { status: 200, headers: jsonHeaders });
     } catch (error) {
+      hooks?.callHook("error", { path: pathname, error });
       if (error instanceof ValidationError) {
         return new Response(
           JSON.stringify({ code: "BAD_REQUEST", status: 400, message: error.message, data: { issues: error.issues } }),
@@ -455,7 +504,6 @@ function createFetchHandler(
       const e = error instanceof KatmanError ? error : toKatmanError(error);
       return new Response(stringifyJSON(e.toJSON()), { status: e.status, headers: jsonHeaders });
     } finally {
-      // Return context to pool
       ctxPool.release(ctx);
     }
   };

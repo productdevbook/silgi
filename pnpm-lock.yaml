@@ -11,6 +11,12 @@ importers:
       '@standard-schema/spec':
         specifier: ^1.0.0
         version: 1.1.0
+      hookable:
+        specifier: ^6.1.0
+        version: 6.1.0
+      ofetch:
+        specifier: 2.0.0-alpha.3
+        version: 2.0.0-alpha.3
     devDependencies:
       '@orpc/client':
         specifier: ^1.13.7
@@ -999,6 +1005,9 @@ packages:
       crossws:
         optional: true
 
+  hookable@6.1.0:
+    resolution: {integrity: sha512-ZoKZSJgu8voGK2geJS+6YtYjvIzu9AOM/KZXsBxr83uhLL++e9pEv/dlgwgy3dvHg06kTz6JOh1hk3C8Ceiymw==}
+
   jiti@2.6.1:
     resolution: {integrity: sha512-ekilCSN1jwRvIbgeg/57YFh8qQDNbwDb9xT/qu2DAHbFFZUicIl4ygVaAvzveMhMVr3LnpSKTNnwt8PoOfmKhQ==}
     hasBin: true
@@ -1031,6 +1040,9 @@ packages:
   obuild@0.4.32:
     resolution: {integrity: sha512-U6NNt0ZL6lCE6B6aU+qcBwbFU4g2DwrO/68aKhyXNUXgq0jf+fyHg9s9+ETZOLmlfJvQwub5mHF3aohGgWGYKQ==}
     hasBin: true
+
+  ofetch@2.0.0-alpha.3:
+    resolution: {integrity: sha512-zpYTCs2byOuft65vI3z43Dd6iSdFbOZZLb9/d21aCpx2rGastVU9dOCv0lu4ykc1Ur1anAYjDi3SUvR0vq50JA==}
 
   openapi-types@12.1.3:
     resolution: {integrity: sha512-N4YtSYJqghVu4iek2ZUvcN/0aqH1kRDuNqzcycDxhOUpg7GdvLa2F3DgS6yBNhInhv2r/6I0Flkn7CqL8+nIcw==}
@@ -1939,6 +1951,8 @@ snapshots:
       rou3: 0.8.1
       srvx: 0.11.12
 
+  hookable@6.1.0: {}
+
   jiti@2.6.1:
     optional: true
 
@@ -1984,6 +1998,8 @@ snapshots:
       - rollup
       - typescript
       - vue-tsc
+
+  ofetch@2.0.0-alpha.3: {}
 
   openapi-types@12.1.3: {}
 
