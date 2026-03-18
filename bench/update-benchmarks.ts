@@ -423,13 +423,44 @@ async function runH2Benchmarks(): Promise<H2Result[]> {
   return [{ name: "Simple query", h1_us: h1us, h2_us: h2us, improvement }];
 }
 
-// ── WebSocket Benchmark ─────────────────────────────
+// ── WebSocket Benchmark (3 libs) ────────────────────
+
+import { WebSocketServer } from "ws";
+import nodeWsAdapter from "crossws/adapters/node";
 
 interface WSResult {
   name: string;
-  ws_us: number;
-  http_us: number;
-  improvement: string;
+  katman_us: number;
+  orpc_us: number;
+  h3_us: number;
+  vs_orpc: string;
+  vs_h3: string;
+}
+
+async function wsBench(url: string, msgFn: (i: number) => string, parseFn: (data: string) => boolean, n: number): Promise<number> {
+  const ws = new WebSocket(url);
+  await new Promise<void>((r) => ws.on("open", r));
+  // Warmup
+  for (let i = 0; i < 200; i++) {
+    await new Promise<void>((resolve) => {
+      ws.once("message", () => resolve());
+      ws.send(msgFn(i));
+    });
+  }
+  const times: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const s = performance.now();
+    await new Promise<void>((resolve) => {
+      ws.once("message", (data) => {
+        parseFn(data.toString());
+        resolve();
+      });
+      ws.send(msgFn(i));
+    });
+    times.push(performance.now() - s);
+  }
+  ws.close();
+  return times.reduce((a, b) => a + b) / n;
 }
 
 async function runWSBenchmarks(): Promise<WSResult[]> {
@@ -437,58 +468,85 @@ async function runWSBenchmarks(): Promise<WSResult[]> {
   const flat = compileRouter(katmanRouter);
   const sig = new AbortController().signal;
 
-  // HTTP server with WebSocket
-  const srv: Server = await new Promise(r => {
-    const s = createServer({ keepAlive: true, requestTimeout: 0, headersTimeout: 0 }, (req, res) => {
-      const u = (req.url ?? "/").slice(1);
-      const route = flat.get(u);
-      if (!route) { res.writeHead(404); res.end(); return; }
-      const ctx: Record<string, unknown> = Object.create(null);
-      const result = route.handler(ctx, undefined, sig);
-      if (result instanceof Promise) {
-        result.then(out => { const b = route.stringify(out); res.writeHead(200, { "content-type": "application/json", "content-length": b.length }); res.end(b); });
-      } else {
-        const b = route.stringify(result); res.writeHead(200, { "content-type": "application/json", "content-length": b.length }); res.end(b);
-      }
-    });
+  // ── Katman WS Server (crossws) ──
+  const katmanSrv: Server = await new Promise(r => {
+    const s = createServer((req, res) => { res.writeHead(404); res.end(); });
     attachWebSocket(s, katmanRouter);
     s.listen(4320, "127.0.0.1", () => r(s));
   });
 
-  // HTTP benchmark
-  const httpR = await httpBench("http://127.0.0.1:4320/health", null, N);
-
-  // WebSocket benchmark — single persistent connection
-  const ws = new WebSocket("ws://127.0.0.1:4320");
-  await new Promise<void>((r) => ws.on("open", r));
-
-  // Warmup
-  for (let i = 0; i < 200; i++) {
-    await new Promise<void>((resolve) => {
-      ws.once("message", () => resolve());
-      ws.send(JSON.stringify({ id: String(i), path: "health" }));
+  // ── oRPC WS Server (raw ws, same protocol as Katman for fair comparison) ──
+  const orpcWss = new WebSocketServer({ port: 4321, host: "127.0.0.1" });
+  orpcWss.on("connection", (ws) => {
+    ws.on("message", async (data) => {
+      const msg = JSON.parse(data.toString());
+      // Execute oRPC procedure directly (skip oRPC ws protocol, measure pure execution)
+      const { createRouterClient } = await import("@orpc/server");
+      const client = createRouterClient(orpcRouter, { context: {} });
+      try {
+        const result = await (client as any)[msg.path]?.(msg.input);
+        ws.send(JSON.stringify({ id: msg.id, result }));
+      } catch (e: any) {
+        ws.send(JSON.stringify({ id: msg.id, error: e.message }));
+      }
     });
-  }
+  });
+  await new Promise<void>((r) => orpcWss.on("listening", r));
 
-  const times: number[] = [];
-  for (let i = 0; i < N; i++) {
-    const s = performance.now();
-    await new Promise<void>((resolve) => {
-      ws.once("message", () => resolve());
-      ws.send(JSON.stringify({ id: String(i), path: "health" }));
-    });
-    times.push(performance.now() - s);
-  }
+  // ── H3 WS Server (crossws, same protocol as Katman) ──
+  const h3Ws = nodeWsAdapter({
+    hooks: {
+      message(peer, msg) {
+        const data = msg.json();
+        if (data.path === "health") {
+          peer.send(JSON.stringify({ id: data.id, result: { status: "ok" } }));
+        }
+      },
+    },
+  });
+  const h3WsSrv: Server = await new Promise(r => {
+    const s = createServer((req, res) => { res.writeHead(404); res.end(); });
+    s.on("upgrade", (req, socket, head) => h3Ws.handleUpgrade(req, socket, head));
+    s.listen(4322, "127.0.0.1", () => r(s));
+  });
 
-  ws.close();
-  srv.close();
+  // ── Benchmark ──
+  // Katman WS
+  const katmanAvg = await wsBench(
+    "ws://127.0.0.1:4320",
+    (i) => JSON.stringify({ id: String(i), path: "health" }),
+    (d) => { JSON.parse(d); return true; },
+    N,
+  );
 
-  const wsAvg = times.reduce((a, b) => a + b) / N;
-  const wsUs = Math.round(wsAvg * 1000);
-  const httpUs = Math.round(httpR.avg * 1000);
-  const improvement = httpUs > wsUs ? `${((1 - wsUs / httpUs) * 100).toFixed(0)}% faster` : `${((wsUs / httpUs - 1) * 100).toFixed(0)}% slower`;
+  // oRPC WS (same protocol for fair comparison)
+  const orpcAvg = await wsBench(
+    "ws://127.0.0.1:4321",
+    (i) => JSON.stringify({ id: String(i), path: "health" }),
+    (d) => { JSON.parse(d); return true; },
+    N,
+  );
 
-  return [{ name: "Simple query (persistent conn)", ws_us: wsUs, http_us: httpUs, improvement }];
+  // H3 WS (crossws)
+  const h3Avg = await wsBench(
+    "ws://127.0.0.1:4322",
+    (i) => JSON.stringify({ id: String(i), path: "health" }),
+    (d) => { JSON.parse(d); return true; },
+    N,
+  );
+
+  katmanSrv.close();
+  orpcWss.close();
+  h3WsSrv.close();
+
+  const kUs = Math.round(katmanAvg * 1000);
+  const oUs = Math.round(orpcAvg * 1000);
+  const hUs = Math.round(h3Avg * 1000);
+
+  const vs_orpc = oUs > kUs * 1.05 ? `${(oUs / kUs).toFixed(1)}x faster` : oUs < kUs * 0.95 ? `${(kUs / oUs).toFixed(1)}x slower` : `~tied`;
+  const vs_h3 = hUs > kUs * 1.05 ? `${(hUs / kUs).toFixed(1)}x faster` : hUs < kUs * 0.95 ? `${(kUs / hUs).toFixed(1)}x slower` : `~tied`;
+
+  return [{ name: "Simple query (persistent conn)", katman_us: kUs, orpc_us: oUs, h3_us: hUs, vs_orpc, vs_h3 }];
 }
 
 // ── Generate Markdown ───────────────────────────────
@@ -550,9 +608,9 @@ async function main() {
   ].join("\n");
 
   const wsTable = [
-    `| Scenario | HTTP/1.1 | WebSocket | Improvement |`,
-    `|---|---|---|---|`,
-    ...wsResults.map(r => `| ${r.name} | ${r.http_us}µs | ${r.ws_us}µs | ${r.improvement} |`),
+    `| Scenario | Katman | oRPC | H3 v2 | vs oRPC | vs H3 |`,
+    `|---|---|---|---|---|---|`,
+    ...wsResults.map(r => `| ${r.name} | **${r.katman_us}µs** | ${r.orpc_us}µs | ${r.h3_us}µs | ${r.vs_orpc} | ${r.vs_h3} |`),
   ].join("\n");
 
   const md = `# Benchmarks
@@ -581,9 +639,9 @@ Same Katman server, comparing protocols. HTTP/2 uses TLS.
 
 ${h2Table}
 
-## WebSocket vs HTTP
+## WebSocket Performance (persistent connection)
 
-Katman WebSocket RPC (persistent connection) vs HTTP/1.1 (new connection per request).
+WebSocket RPC latency — Katman vs oRPC vs H3 v2, 2000 sequential messages.
 
 ${wsTable}
 
@@ -607,8 +665,8 @@ pnpm bench:micro     # per-operation bottleneck analysis
   for (const r of httpResults) console.log(`  ${r.name}: Katman ${r.katman_us}µs | H3 ${r.h3_us}µs | oRPC ${r.orpc_us}µs`);
   console.log("\nHTTP/2 vs HTTP/1.1:");
   for (const r of h2Results) console.log(`  ${r.name}: H1 ${r.h1_us}µs | H2 ${r.h2_us}µs (${r.improvement})`);
-  console.log("\nWebSocket vs HTTP:");
-  for (const r of wsResults) console.log(`  ${r.name}: HTTP ${r.http_us}µs | WS ${r.ws_us}µs (${r.improvement})`);
+  console.log("\nWebSocket:");
+  for (const r of wsResults) console.log(`  ${r.name}: Katman ${r.katman_us}µs | oRPC ${r.orpc_us}µs | H3 ${r.h3_us}µs`);
 
   process.exit(0);
 }
