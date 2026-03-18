@@ -48,6 +48,7 @@
   "dependencies": {
     "@standard-schema/spec": "^1.0.0",
     "defu": "^6.1.4",
+    "get-port-please": "^3.2.0",
     "hookable": "^6.1.0",
     "ofetch": "2.0.0-alpha.3",
     "ohash": "^2.0.11"

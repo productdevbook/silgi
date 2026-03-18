@@ -33,6 +33,7 @@ import { iteratorToEventStream } from "./core/sse.ts";
 import { generateOpenAPI, scalarHTML, type ScalarOptions } from "./scalar.ts";
 import { createHooks, type Hookable, type HookCallback } from "hookable";
 import { defu } from "defu";
+import { getPort } from "get-port-please";
 
 // ── Lifecycle Hooks ─────────────────────────────────
 
@@ -231,25 +232,27 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
       }
 
       const opts = defu(options ?? {}, { port: 3000, hostname: "127.0.0.1" });
-      const port = opts.port;
       const hostname = opts.hostname;
       const fr = flatRouter;
-      const sharedSignal = new AbortController().signal; // shared, no timer per request
-
-      // Scalar API Reference (pre-computed, zero per-request cost)
+      const sharedSignal = new AbortController().signal;
       const scalarEnabled = !!options?.scalar;
-      let specJson: string | undefined;
-      let specHtml: string | undefined;
-      if (scalarEnabled) {
-        const scalarOpts = typeof options!.scalar === "object" ? options!.scalar : {};
-        const spec = generateOpenAPI(routerDef, scalarOpts);
-        specJson = JSON.stringify(spec);
-        specHtml = scalarHTML(`http://${hostname}:${port}/openapi.json`, scalarOpts);
-      }
 
       const notFound = '{"code":"NOT_FOUND","status":404,"message":"Not found"}';
 
-      import("node:http").then(({ createServer }) => {
+      // Find available port, then start server
+      Promise.all([
+        getPort({ port: opts.port, host: hostname, alternativePortRange: [3000, 3100] }),
+        import("node:http"),
+      ]).then(([port, { createServer }]) => {
+        // Scalar API Reference (needs resolved port for URL)
+        let specJson: string | undefined;
+        let specHtml: string | undefined;
+        if (scalarEnabled) {
+          const scalarOpts = typeof options!.scalar === "object" ? options!.scalar : {};
+          const spec = generateOpenAPI(routerDef, scalarOpts);
+          specJson = JSON.stringify(spec);
+          specHtml = scalarHTML(`http://${hostname}:${port}/openapi.json`, scalarOpts);
+        }
         const server = createServer({ keepAlive: true, requestTimeout: 0, headersTimeout: 0 }, (req, res) => {
           const rawUrl = req.url ?? "/";
           const qIdx = rawUrl.indexOf("?");
