@@ -62,6 +62,30 @@ k.serve(appRouter, { port: 3000, scalar: true })
 | AWS Lambda | `katman/aws-lambda` |
 | MessagePort | `katman/message-port` |
 
+## OpenAPI / Scalar
+
+Built-in OpenAPI 3.1 spec generation and [Scalar](https://scalar.com) API reference UI.
+
+```ts
+k.serve(appRouter, {
+  scalar: {
+    title: 'My API',
+    version: '1.0.0',
+    security: { type: 'http', scheme: 'bearer' },
+    // cdn: 'cdn'     — jsdelivr (default)
+    // cdn: 'unpkg'   — unpkg.com
+    // cdn: 'local'   — offline, serves from node_modules
+    // cdn: '/scalar.js' — self-hosted
+  },
+})
+```
+
+For offline/airgapped environments, use `cdn: 'local'`:
+
+```bash
+pnpm add @scalar/api-reference   # required for local mode
+```
+
 ## Integrations
 
 - **TanStack Query** — `queryOptions`, `mutationOptions`, `infiniteOptions`, `skipToken`
