@@ -29,6 +29,16 @@ const link = createLink({
 })
 ```
 
+Relative URLs work too — useful with dev server proxies or same-origin deployments:
+
+```ts twoslash
+// @noErrors
+import { createLink } from 'katman/client/ofetch'
+
+const link = createLink({ url: '/api' })
+// Calls resolve to /api/users/list, /api/health, etc.
+```
+
 </Step>
 <Step>
 
