@@ -176,6 +176,49 @@ describe('guard errors', () => {
   })
 })
 
+// ── Output schema type safety ───────────────────────
+
+describe('output schema enforces resolve return type', () => {
+  const outputSchema = z.object({ id: z.number(), name: z.string() })
+
+  it('resolve must return output-compatible type when output is set', () => {
+    const proc = k.query({
+      output: outputSchema,
+      resolve: () => ({ id: 1, name: 'Alice' }),
+    })
+    // ProcedureDef TOutput is the schema output type, not the raw resolve return
+    expectTypeOf(proc).toMatchTypeOf<ProcedureDef<'query', undefined, { id: number; name: string }, {}>>()
+  })
+
+  it('mutation output schema enforces return type', () => {
+    const proc = k.mutation({
+      input: z.object({ name: z.string() }),
+      output: outputSchema,
+      resolve: ({ input }) => ({ id: 1, name: input.name }),
+    })
+    expectTypeOf(proc).toMatchTypeOf<
+      ProcedureDef<'mutation', { name: string }, { id: number; name: string }, {}>
+    >()
+  })
+
+  it('without output schema — resolve return type is inferred freely', () => {
+    const proc = k.query({
+      resolve: () => ({ custom: true, count: 42 }),
+    })
+    expectTypeOf(proc).toMatchTypeOf<ProcedureDef<'query', undefined, { custom: boolean; count: number }, {}>>()
+  })
+
+  it('output with transform — resolve must match schema input type', () => {
+    const schema = z.object({ id: z.number() }).transform((v) => ({ ...v, computed: true }))
+    const proc = k.query({
+      output: schema,
+      resolve: () => ({ id: 1 }), // returns schema INPUT type (pre-transform)
+    })
+    // ProcedureDef TOutput is the schema OUTPUT type (post-transform)
+    expectTypeOf(proc).toMatchTypeOf<ProcedureDef<'query', undefined, { id: number; computed: boolean }, {}>>()
+  })
+})
+
 // ── Error / fail type inference ─────────────────────
 
 describe('error type inference', () => {

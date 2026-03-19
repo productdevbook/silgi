@@ -130,10 +130,11 @@ export interface ProcedureConfig<
   TOutput,
   TErrors extends ErrorDef,
   TUse extends readonly MiddlewareDef[],
+  TOutputSchema extends AnySchema | undefined = undefined,
 > {
   use?: TUse
   input?: TInputSchema
-  output?: AnySchema
+  output?: TOutputSchema
   errors?: TErrors
   resolve: (
     opts: ResolveContext<
@@ -141,7 +142,9 @@ export interface ProcedureConfig<
       TInputSchema extends AnySchema ? InferSchemaOutput<TInputSchema> : undefined,
       NoInfer<TErrors> & InferErrorsFromUse<TUse>
     >,
-  ) => Promise<TOutput> | TOutput
+  ) => TOutputSchema extends AnySchema
+    ? Promise<InferSchemaInput<TOutputSchema>> | InferSchemaInput<TOutputSchema>
+    : Promise<TOutput> | TOutput
   route?: Route
   meta?: Meta
 }

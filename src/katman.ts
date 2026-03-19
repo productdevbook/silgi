@@ -155,12 +155,13 @@ interface QueryFactory<TBaseCtx> {
     TErrors extends ErrorDef,
     const TUse extends readonly MiddlewareDef[],
     TInputSchema extends AnySchema | undefined = undefined,
+    TOutputSchema extends AnySchema | undefined = undefined,
   >(
-    config: ProcedureConfig<TBaseCtx, TInputSchema, TOutput, TErrors, TUse>,
+    config: ProcedureConfig<TBaseCtx, TInputSchema, TOutput, TErrors, TUse, TOutputSchema>,
   ): ProcedureDef<
     'query',
     TInputSchema extends AnySchema ? InferSchemaInput<TInputSchema> : undefined,
-    TOutput,
+    TOutputSchema extends AnySchema ? InferSchemaOutput<TOutputSchema> : TOutput,
     TErrors
   >
 }
@@ -180,12 +181,13 @@ interface MutationFactory<TBaseCtx> {
     TErrors extends ErrorDef,
     const TUse extends readonly MiddlewareDef[],
     TInputSchema extends AnySchema | undefined = undefined,
+    TOutputSchema extends AnySchema | undefined = undefined,
   >(
-    config: ProcedureConfig<TBaseCtx, TInputSchema, TOutput, TErrors, TUse>,
+    config: ProcedureConfig<TBaseCtx, TInputSchema, TOutput, TErrors, TUse, TOutputSchema>,
   ): ProcedureDef<
     'mutation',
     TInputSchema extends AnySchema ? InferSchemaInput<TInputSchema> : undefined,
-    TOutput,
+    TOutputSchema extends AnySchema ? InferSchemaOutput<TOutputSchema> : TOutput,
     TErrors
   >
 }
@@ -205,12 +207,13 @@ interface SubscriptionFactory<TBaseCtx> {
     TErrors extends ErrorDef,
     const TUse extends readonly MiddlewareDef[],
     TInputSchema extends AnySchema | undefined = undefined,
+    TOutputSchema extends AnySchema | undefined = undefined,
   >(
-    config: ProcedureConfig<TBaseCtx, TInputSchema, TOutput, TErrors, TUse>,
+    config: ProcedureConfig<TBaseCtx, TInputSchema, TOutput, TErrors, TUse, TOutputSchema>,
   ): ProcedureDef<
     'subscription',
     TInputSchema extends AnySchema ? InferSchemaInput<TInputSchema> : undefined,
-    TOutput,
+    TOutputSchema extends AnySchema ? InferSchemaOutput<TOutputSchema> : TOutput,
     TErrors
   >
 }
