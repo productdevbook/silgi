@@ -87,6 +87,11 @@ These patterns are intentional and critical — do not refactor them away:
 - **Direct property set**: Guards merge context via direct property assignment, not `Object.assign`
 - **Sucrose-style analysis** (`analyze.ts`): `Function.toString()` introspection for compile-time optimization decisions
 
+## Workflow Rules
+
+- **Every feature/fix MUST include docs**: When adding or changing any user-facing feature, update the relevant docs page in `docs/content/docs/` in the SAME commit or immediately after. Never skip docs.
+- **Every feature MUST include tests**: Type-level tests (`expectTypeOf`) in `test/core/types.test.ts`, runtime tests in the appropriate `test/` file.
+
 ## Documentation (docs/)
 
 Docs site lives in `docs/` — powered by [Fumadocs](https://fumadocs.vercel.app). Pages are `.mdx` files under `docs/content/docs/`.
