@@ -1,0 +1,61 @@
+import { describe, it, expect } from "vitest";
+import { z } from "zod";
+import { katman } from "#src/katman.ts";
+
+const k = katman({ context: () => ({ db: "test" }) });
+
+const testRouter = k.router({
+  health: k.query(() => ({ status: "ok" })),
+  echo: k.query(z.object({ msg: z.string() }), ({ input }) => ({ echo: input.msg })),
+  greet: k.mutation(z.object({ name: z.string() }), ({ input }) => ({ hello: input.name })),
+});
+
+describe("MessagePort adapter", () => {
+  it("handles RPC over message port", async () => {
+    const { katmanMessagePort, MessagePortLink } = await import("#src/adapters/message-port.ts");
+    const { createClient } = await import("#src/client/client.ts");
+
+    // Create a mock MessageChannel
+    const channel = new MessageChannel();
+
+    // Server side
+    const dispose = katmanMessagePort(testRouter, channel.port1, {
+      context: () => ({ db: "test" }),
+    });
+
+    // Client side
+    const link = new MessagePortLink(channel.port2);
+    const client = createClient<any>(link);
+
+    const result = await client.health();
+    expect(result).toEqual({ status: "ok" });
+
+    const echo = await client.echo({ msg: "hello" });
+    expect(echo).toEqual({ echo: "hello" });
+
+    dispose();
+    channel.port1.close();
+    channel.port2.close();
+  });
+
+  it("returns error for unknown procedure", async () => {
+    const { katmanMessagePort, MessagePortLink } = await import("#src/adapters/message-port.ts");
+    const { createClient } = await import("#src/client/client.ts");
+
+    const channel = new MessageChannel();
+    const dispose = katmanMessagePort(testRouter, channel.port1, {
+      context: () => ({}),
+    });
+
+    const link = new MessagePortLink(channel.port2);
+    const client = createClient<any>(link);
+
+    await expect(client.nonexistent()).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+
+    dispose();
+    channel.port1.close();
+    channel.port2.close();
+  });
+});
