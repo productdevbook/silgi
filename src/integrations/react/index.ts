@@ -5,7 +5,8 @@
  * Returns [error, data] tuples instead of throwing.
  */
 
-import { compileProcedure, type CompiledHandler } from '../../compile.ts'
+import { compileProcedure } from '../../compile.ts';
+import type { CompiledHandler } from '../../compile.ts';
 import { KatmanError, toKatmanError } from '../../core/error.ts'
 
 import type { ProcedureDef, RouterDef } from '../../types.ts'

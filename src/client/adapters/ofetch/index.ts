@@ -5,7 +5,8 @@
  * Replaces manual fetch + retry/dedupe plugins with a single link.
  */
 
-import { ofetch, type FetchOptions, type FetchContext, FetchError } from 'ofetch'
+import { ofetch, FetchError } from 'ofetch';
+import type { FetchOptions, FetchContext } from 'ofetch';
 
 import { encode as msgpackEncode, decode as msgpackDecode, MSGPACK_CONTENT_TYPE } from '../../../codec/msgpack.ts'
 import { KatmanError, isKatmanErrorJSON, fromKatmanErrorJSON, isErrorStatus } from '../../../core/error.ts'

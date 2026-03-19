@@ -12,7 +12,8 @@
 
 import { defu } from 'defu'
 import { getPort } from 'get-port-please'
-import { createHooks, type Hookable, type HookCallback } from 'hookable'
+import { createHooks } from 'hookable';
+import type { Hookable, HookCallback } from 'hookable';
 
 import {
   encode as devalueEncode,
@@ -28,12 +29,14 @@ import {
   isMsgpack,
   MSGPACK_CONTENT_TYPE,
 } from './codec/msgpack.ts'
-import { compileProcedure, compileRouter, ContextPool, type CompiledHandler, type FlatRouter } from './compile.ts'
+import { compileProcedure, compileRouter, ContextPool } from './compile.ts';
+import type { CompiledHandler, FlatRouter } from './compile.ts';
 import { KatmanError, toKatmanError, isErrorStatus } from './core/error.ts'
 import { ValidationError, validateSchema } from './core/schema.ts'
 import { iteratorToEventStream } from './core/sse.ts'
 import { stringifyJSON, parseEmptyableJSON, once } from './core/utils.ts'
-import { generateOpenAPI, scalarHTML, type ScalarOptions } from './scalar.ts'
+import { generateOpenAPI, scalarHTML } from './scalar.ts';
+import type { ScalarOptions } from './scalar.ts';
 
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
 import type {

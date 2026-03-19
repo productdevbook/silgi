@@ -9,11 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "katman": "latest",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
     "@tanstack/react-query": "^5.80.6",
-    "ofetch": "^1.4.1"
+    "katman": "latest",
+    "ofetch": "^1.4.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
     "@types/react": "^19.1.8",

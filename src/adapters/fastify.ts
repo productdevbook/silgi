@@ -14,7 +14,8 @@
 
 import { encode as devalueEncode, acceptsDevalue, DEVALUE_CONTENT_TYPE } from '../codec/devalue.ts'
 import { encode as msgpackEncode, acceptsMsgpack, isMsgpack, MSGPACK_CONTENT_TYPE } from '../codec/msgpack.ts'
-import { compileRouter, type FlatRouter } from '../compile.ts'
+import { compileRouter } from '../compile.ts';
+import type { FlatRouter } from '../compile.ts';
 import { KatmanError, toKatmanError } from '../core/error.ts'
 import { ValidationError } from '../core/schema.ts'
 

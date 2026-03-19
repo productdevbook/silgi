@@ -17,7 +17,8 @@
  * ```
  */
 
-import { compileProcedure, compileRouter, type FlatRouter, type CompiledHandler } from '../compile.ts'
+import { compileProcedure, compileRouter } from '../compile.ts';
+import type { FlatRouter, CompiledHandler } from '../compile.ts';
 
 import type { RouterDef, ProcedureDef, InferClient } from '../types.ts'
 

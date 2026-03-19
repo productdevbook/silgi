@@ -14,7 +14,8 @@
 
 import { analyzeHandler } from './analyze.ts'
 import { KatmanError } from './core/error.ts'
-import { validateSchema, type AnySchema } from './core/schema.ts'
+import { validateSchema } from './core/schema.ts';
+import type { AnySchema } from './core/schema.ts';
 import { compileStringify } from './fast-stringify.ts'
 
 import type { ProcedureDef, GuardDef, WrapDef, MiddlewareDef, ErrorDef } from './types.ts'

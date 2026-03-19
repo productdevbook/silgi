@@ -17,7 +17,8 @@
  * ```
  */
 
-import { compileRouter, type FlatRouter } from '../compile.ts'
+import { compileRouter } from '../compile.ts';
+import type { FlatRouter } from '../compile.ts';
 import { KatmanError, toKatmanError } from '../core/error.ts'
 import { ValidationError } from '../core/schema.ts'
 

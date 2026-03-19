@@ -169,8 +169,8 @@
     "bench:memory": "node --expose-gc --experimental-strip-types bench/memory.ts",
     "bench:bun": "bun test/bun-compat.ts",
     "play": "pnpm build && pnpm --filter katman-playground dev",
-    "lint": "oxlint .",
-    "fmt": "oxfmt .",
+    "lint": "oxlint . && oxfmt --check .",
+    "format": "oxlint --fix . && oxfmt .",
     "test": "vitest run",
     "typecheck": "tsgo --noEmit",
     "prepublishOnly": "pnpm build"
