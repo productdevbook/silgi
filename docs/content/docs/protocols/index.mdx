@@ -3,18 +3,18 @@ title: Protocols
 description: Katman supports three wire formats — JSON, MessagePack, and devalue — plus WebSocket for persistent connections.
 ---
 
-import { Cards, Card } from 'fumadocs-ui/components/card';
-import { Callout } from 'fumadocs-ui/components/callout';
+import { Cards, Card } from 'fumadocs-ui/components/card'
+import { Callout } from 'fumadocs-ui/components/callout'
 
 When a client sends a request, the server needs to agree on how to encode the data. Katman handles this automatically through **content negotiation** — the client says what format it wants via the `Accept` header, and the server responds accordingly. No configuration needed.
 
 ## The three formats
 
-| Format | Payload size | Rich types | Binary | Best for |
-|---|---|---|---|---|
-| **JSON** | Baseline | No | No | Default, universal compatibility |
-| **MessagePack** | ~30% smaller | Date, Set, Map | Yes | Mobile apps, bandwidth-sensitive |
-| **devalue** | ~Same as JSON | Date, Map, Set, BigInt, RegExp, circular refs | No | APIs returning rich JavaScript types |
+| Format          | Payload size  | Rich types                                    | Binary | Best for                             |
+| --------------- | ------------- | --------------------------------------------- | ------ | ------------------------------------ |
+| **JSON**        | Baseline      | No                                            | No     | Default, universal compatibility     |
+| **MessagePack** | ~30% smaller  | Date, Set, Map                                | Yes    | Mobile apps, bandwidth-sensitive     |
+| **devalue**     | ~Same as JSON | Date, Map, Set, BigInt, RegExp, circular refs | No     | APIs returning rich JavaScript types |
 
 **JSON** is the default. Every client and every tool understands it. If you don't configure anything, this is what you get.
 
@@ -38,16 +38,17 @@ On the client side, setting `binary: true` in `createLink` switches to MessagePa
 
 ```ts twoslash
 // @noErrors
-import { createLink } from "katman/client/ofetch"
+import { createLink } from 'katman/client/ofetch'
 
 const link = createLink({
-  url: "http://localhost:3000",
+  url: 'http://localhost:3000',
   binary: true, // uses MessagePack for all requests
 })
 ```
 
-<Callout type="info">
-You can also use these formats over [WebSocket](/docs/protocols/websocket). Pass `binary: true` to `attachWebSocket` for MessagePack over WebSocket.
+<Callout type='info'>
+  You can also use these formats over [WebSocket](/docs/protocols/websocket). Pass `binary: true` to `attachWebSocket`
+  for MessagePack over WebSocket.
 </Callout>
 
 ## Choose a format
@@ -59,7 +60,19 @@ Most applications work great with plain JSON. Consider switching when:
 - You want the **lowest possible latency** for repeated calls --> WebSocket
 
 <Cards>
-  <Card title="MessagePack" description="Binary protocol for smaller payloads and native Date support." href="/docs/protocols/msgpack" />
-  <Card title="devalue" description="Rich type serialization — Date, Map, Set, BigInt, RegExp, circular refs." href="/docs/protocols/devalue" />
-  <Card title="WebSocket" description="Bidirectional RPC over a persistent connection. Ideal for real-time and subscriptions." href="/docs/protocols/websocket" />
+  <Card
+    title='MessagePack'
+    description='Binary protocol for smaller payloads and native Date support.'
+    href='/docs/protocols/msgpack'
+  />
+  <Card
+    title='devalue'
+    description='Rich type serialization — Date, Map, Set, BigInt, RegExp, circular refs.'
+    href='/docs/protocols/devalue'
+  />
+  <Card
+    title='WebSocket'
+    description='Bidirectional RPC over a persistent connection. Ideal for real-time and subscriptions.'
+    href='/docs/protocols/websocket'
+  />
 </Cards>

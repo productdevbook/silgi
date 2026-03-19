@@ -3,9 +3,9 @@ title: SSR Optimization
 description: Prevent refetch waterfalls with server-side prefetching.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
-import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
+import { Step, Steps } from 'fumadocs-ui/components/steps'
 
 When you render on the server, data should already be in the cache when the client hydrates. Otherwise, TanStack Query refetches everything on mount — causing a visible loading flash.
 
@@ -39,9 +39,9 @@ Use `createServerClient` so prefetching runs in-process — no network round-tri
 
 ```ts twoslash title="server/query.ts"
 // @noErrors
-import { createServerClient } from "katman/client/server"
-import { createQueryUtils } from "katman/tanstack-query"
-import { appRouter } from "./router"
+import { createServerClient } from 'katman/client/server'
+import { createQueryUtils } from 'katman/tanstack-query'
+import { appRouter } from './router'
 
 export function createSSRUtils() {
   const client = createServerClient(appRouter, {
@@ -62,9 +62,9 @@ export function createSSRUtils() {
   import { dehydrate, HydrationBoundary, QueryClient } from "@tanstack/react-query"
   import { createSSRUtils } from "../../server/query"
 
-  export default async function UsersPage() {
-    const queryClient = new QueryClient()
-    const utils = createSSRUtils()
+export default async function UsersPage() {
+const queryClient = new QueryClient()
+const utils = createSSRUtils()
 
     // Prefetch the data server-side
     await queryClient.prefetchQuery(
@@ -76,38 +76,41 @@ export function createSSRUtils() {
         <UserList />
       </HydrationBoundary>
     )
-  }
-  ```
-  </Tab>
-  <Tab value="TanStack Start">
-  ```tsx title="routes/users.tsx"
-  import { dehydrate, HydrationBoundary, QueryClient } from "@tanstack/react-query"
-  import { createSSRUtils } from "../server/query"
-  import { createFileRoute } from "@tanstack/react-router"
 
-  export const Route = createFileRoute("/users")({
-    loader: async () => {
-      const queryClient = new QueryClient()
-      const utils = createSSRUtils()
+}
 
-      await queryClient.prefetchQuery(
-        utils.users.list.queryOptions({ input: { limit: 20 } })
-      )
+````
+</Tab>
+<Tab value="TanStack Start">
+```tsx title="routes/users.tsx"
+import { dehydrate, HydrationBoundary, QueryClient } from "@tanstack/react-query"
+import { createSSRUtils } from "../server/query"
+import { createFileRoute } from "@tanstack/react-router"
 
-      return { dehydratedState: dehydrate(queryClient) }
-    },
-    component: UsersPage,
-  })
+export const Route = createFileRoute("/users")({
+  loader: async () => {
+    const queryClient = new QueryClient()
+    const utils = createSSRUtils()
 
-  function UsersPage() {
-    const { dehydratedState } = Route.useLoaderData()
-    return (
-      <HydrationBoundary state={dehydratedState}>
-        <UserList />
-      </HydrationBoundary>
+    await queryClient.prefetchQuery(
+      utils.users.list.queryOptions({ input: { limit: 20 } })
     )
-  }
-  ```
+
+    return { dehydratedState: dehydrate(queryClient) }
+  },
+  component: UsersPage,
+})
+
+function UsersPage() {
+  const { dehydratedState } = Route.useLoaderData()
+  return (
+    <HydrationBoundary state={dehydratedState}>
+      <UserList />
+    </HydrationBoundary>
+  )
+}
+````
+
   </Tab>
 </Tabs>
 
@@ -119,19 +122,19 @@ export function createSSRUtils() {
 The client component uses `useQuery` as normal. Because the data was prefetched, it is immediately available — no loading state.
 
 ```tsx title="components/UserList.tsx"
-"use client"
-import { useQuery } from "@tanstack/react-query"
-import { utils } from "../client/query"
+'use client'
+import { useQuery } from '@tanstack/react-query'
+import { utils } from '../client/query'
 
 export function UserList() {
   // Data is already in the cache from SSR prefetching
-  const { data: users } = useQuery(
-    utils.users.list.queryOptions({ input: { limit: 20 } })
-  )
+  const { data: users } = useQuery(utils.users.list.queryOptions({ input: { limit: 20 } }))
 
   return (
     <ul>
-      {users?.map(u => <li key={u.id}>{u.name}</li>)}
+      {users?.map((u) => (
+        <li key={u.id}>{u.name}</li>
+      ))}
     </ul>
   )
 }
@@ -151,12 +154,8 @@ Prefetch several queries in parallel with `Promise.all`:
 ```ts twoslash
 // @noErrors
 await Promise.all([
-  queryClient.prefetchQuery(
-    utils.users.list.queryOptions({ input: { limit: 20 } })
-  ),
-  queryClient.prefetchQuery(
-    utils.stats.summary.queryOptions({ input: undefined })
-  ),
+  queryClient.prefetchQuery(utils.users.list.queryOptions({ input: { limit: 20 } })),
+  queryClient.prefetchQuery(utils.stats.summary.queryOptions({ input: undefined })),
 ])
 ```
 

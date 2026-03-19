@@ -6,7 +6,9 @@ import { describe, it, expect, expectTypeOf } from 'vitest'
 import { z } from 'zod'
 
 import { compileProcedure } from '#src/compile.ts'
-import { contract, implement, type InferContractClient } from '#src/contract.ts'
+import { contract, implement } from '#src/contract.ts'
+
+import type { InferContractClient } from '#src/contract.ts'
 
 const UserSchema = z.object({ id: z.number(), name: z.string() })
 

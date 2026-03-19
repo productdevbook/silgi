@@ -3,8 +3,8 @@ title: Testing & Mocking
 description: Test Katman procedures without starting a server.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 
 Three patterns for testing Katman APIs, from lightweight unit tests to full HTTP-level integration tests.
 
@@ -14,12 +14,11 @@ Test a single procedure in isolation. The compiled pipeline runs (guards, wraps,
 
 ```ts twoslash
 // @noErrors
-import { callable } from "katman"
-import { describe, it, expect } from "vitest"
+import { callable } from 'katman'
+import { describe, it, expect } from 'vitest'
 
-const listUsers = k.query(
-  z.object({ limit: z.number().optional() }),
-  ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
+const listUsers = k.query(z.object({ limit: z.number().optional() }), ({ input, ctx }) =>
+  ctx.db.users.findMany({ take: input.limit }),
 )
 
 const listUsersFn = callable(listUsers, {
@@ -28,15 +27,15 @@ const listUsersFn = callable(listUsers, {
   }),
 })
 
-describe("listUsers", () => {
-  it("returns users with limit", async () => {
+describe('listUsers', () => {
+  it('returns users with limit', async () => {
     const users = await listUsersFn({ limit: 2 })
     expect(users).toHaveLength(2)
   })
 
-  it("rejects invalid input", async () => {
+  it('rejects invalid input', async () => {
     // @ts-expect-error — testing runtime validation
-    await expect(listUsersFn({ limit: "bad" })).rejects.toThrow()
+    await expect(listUsersFn({ limit: 'bad' })).rejects.toThrow()
   })
 })
 ```
@@ -57,14 +56,14 @@ const createUser = k.mutation({
 
 const createUserFn = callable(createUser, {
   context: () => ({
-    headers: { authorization: "Bearer test-token" },
+    headers: { authorization: 'Bearer test-token' },
     db: createTestDB(),
   }),
 })
 
-it("creates a user when authenticated", async () => {
-  const user = await createUserFn({ name: "Alice" })
-  expect(user.name).toBe("Alice")
+it('creates a user when authenticated', async () => {
+  const user = await createUserFn({ name: 'Alice' })
+  expect(user.name).toBe('Alice')
 })
 ```
 
@@ -79,8 +78,8 @@ const createUserNoAuth = callable(createUser, {
   }),
 })
 
-it("rejects unauthenticated requests", async () => {
-  await expect(createUserNoAuth({ name: "Alice" })).rejects.toThrow("UNAUTHORIZED")
+it('rejects unauthenticated requests', async () => {
+  await expect(createUserNoAuth({ name: 'Alice' })).rejects.toThrow('UNAUTHORIZED')
 })
 ```
 
@@ -90,23 +89,23 @@ Test the full router as a single unit. The server client compiles the router onc
 
 ```ts twoslash
 // @noErrors
-import { createServerClient } from "katman/client/server"
+import { createServerClient } from 'katman/client/server'
 
 const client = createServerClient(appRouter, {
   context: () => ({
     db: createTestDB(),
-    headers: { authorization: "Bearer test-token" },
+    headers: { authorization: 'Bearer test-token' },
   }),
 })
 
-describe("user flow", () => {
-  it("creates and lists users", async () => {
-    await client.users.create({ name: "Alice" })
-    await client.users.create({ name: "Bob" })
+describe('user flow', () => {
+  it('creates and lists users', async () => {
+    await client.users.create({ name: 'Alice' })
+    await client.users.create({ name: 'Bob' })
 
     const users = await client.users.list({ limit: 10 })
     expect(users).toHaveLength(2)
-    expect(users[0].name).toBe("Alice")
+    expect(users[0].name).toBe('Alice')
   })
 })
 ```
@@ -114,7 +113,8 @@ describe("user flow", () => {
 This is the best pattern for integration tests. You exercise the full pipeline — guards, wraps, validation, routing — without starting a server or dealing with ports.
 
 <Callout>
-`createServerClient()` reuses the compiled handler for every call. It is fast enough to use in large test suites without worrying about setup overhead.
+  `createServerClient()` reuses the compiled handler for every call. It is fast enough to use in large test suites
+  without worrying about setup overhead.
 </Callout>
 
 ## 3. handler() + fetch() — HTTP-level testing
@@ -125,48 +125,48 @@ When you need to test the actual HTTP layer — status codes, headers, content n
 // @noErrors
 const handle = k.handler(appRouter)
 
-describe("HTTP behavior", () => {
-  it("returns 200 with JSON", async () => {
+describe('HTTP behavior', () => {
+  it('returns 200 with JSON', async () => {
     const res = await handle(
-      new Request("http://localhost/users/list", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      new Request('http://localhost/users/list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ limit: 5 }),
-      })
+      }),
     )
 
     expect(res.status).toBe(200)
-    expect(res.headers.get("content-type")).toContain("application/json")
+    expect(res.headers.get('content-type')).toContain('application/json')
 
     const data = await res.json()
     expect(data).toHaveLength(5)
   })
 
-  it("returns 400 for invalid input", async () => {
+  it('returns 400 for invalid input', async () => {
     const res = await handle(
-      new Request("http://localhost/users/list", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ limit: "not-a-number" }),
-      })
+      new Request('http://localhost/users/list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 'not-a-number' }),
+      }),
     )
 
     expect(res.status).toBe(400)
   })
 
-  it("negotiates MessagePack", async () => {
+  it('negotiates MessagePack', async () => {
     const res = await handle(
-      new Request("http://localhost/users/list", {
-        method: "POST",
+      new Request('http://localhost/users/list', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/x-msgpack",
+          'Content-Type': 'application/json',
+          Accept: 'application/x-msgpack',
         },
         body: JSON.stringify({ limit: 5 }),
-      })
+      }),
     )
 
-    expect(res.headers.get("content-type")).toContain("application/x-msgpack")
+    expect(res.headers.get('content-type')).toContain('application/x-msgpack')
   })
 })
 ```
@@ -175,11 +175,11 @@ No server process, no port allocation. The `handler()` function takes a `Request
 
 ## Which pattern to use
 
-| Pattern | Best for | Speed | What it tests |
-|---|---|---|---|
-| `callable()` | Unit tests | Fastest | Procedure logic, validation, guards |
-| `createServerClient()` | Integration tests | Fast | Full pipeline, routing, procedure interactions |
-| `handler()` + `fetch()` | HTTP tests | Medium | Status codes, headers, content negotiation |
+| Pattern                 | Best for          | Speed   | What it tests                                  |
+| ----------------------- | ----------------- | ------- | ---------------------------------------------- |
+| `callable()`            | Unit tests        | Fastest | Procedure logic, validation, guards            |
+| `createServerClient()`  | Integration tests | Fast    | Full pipeline, routing, procedure interactions |
+| `handler()` + `fetch()` | HTTP tests        | Medium  | Status codes, headers, content negotiation     |
 
 Start with `callable()` for most tests. Move to `createServerClient()` when you need to test across procedures. Use `handler()` only when the HTTP layer matters.
 

@@ -3,8 +3,8 @@ title: Typed Errors
 description: Define error maps, use fail() for type-safe errors, and handle them on the client.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 
 Most APIs handle errors with generic try/catch and status codes. Katman takes a different approach: you declare the errors a procedure can produce upfront, and TypeScript enforces them on both sides.
 
@@ -14,13 +14,14 @@ An error map is an object you pass to a procedure's `errors` field. Each key is 
 
 ```ts twoslash
 // @noErrors
-import { z } from "zod"
+import { z } from 'zod'
 
 const deleteUser = k.mutation({
   input: z.object({ id: z.number() }),
   errors: {
-    NOT_FOUND: 404,                            // just a status code
-    FORBIDDEN: {                               // status + typed data
+    NOT_FOUND: 404, // just a status code
+    FORBIDDEN: {
+      // status + typed data
       status: 403,
       message: "You don't own this resource",
       data: z.object({ reason: z.string() }),
@@ -28,9 +29,9 @@ const deleteUser = k.mutation({
   },
   resolve: ({ input, ctx, fail }) => {
     const user = ctx.db.users.findById(input.id)
-    if (!user) fail("NOT_FOUND")
+    if (!user) fail('NOT_FOUND')
     if (user.ownerId !== ctx.user.id) {
-      fail("FORBIDDEN", { reason: "Not the owner" })
+      fail('FORBIDDEN', { reason: 'Not the owner' })
     }
     return ctx.db.users.delete(input.id)
   },
@@ -47,8 +48,9 @@ When you define an `errors` map, the `fail()` function in your resolver becomes 
 
 `fail()` throws a `KatmanError` internally. It has a return type of `never`, so TypeScript knows that code after `fail()` won't run — no need for `return` after it.
 
-<Callout type="info">
-`fail()` is only typed when you provide the `errors` map. Without it, `fail()` still works but accepts any string code.
+<Callout type='info'>
+  `fail()` is only typed when you provide the `errors` map. Without it, `fail()` still works but accepts any string
+  code.
 </Callout>
 
 ### Status shorthand vs full config
@@ -64,7 +66,7 @@ const errors = {
   // Full config: status, optional message, optional data schema
   CONFLICT: {
     status: 409,
-    message: "Resource already exists",
+    message: 'Resource already exists',
     data: z.object({ existingId: z.number() }),
   },
 }
@@ -78,27 +80,27 @@ Under the hood, `fail()` throws a `KatmanError`. You can also throw one directly
 
 ```ts twoslash
 // @noErrors
-import { KatmanError } from "katman"
+import { KatmanError } from 'katman'
 
 // Common codes are mapped to HTTP statuses automatically
-throw new KatmanError("NOT_FOUND")           // 404
-throw new KatmanError("UNAUTHORIZED")        // 401
-throw new KatmanError("BAD_REQUEST")         // 400
-throw new KatmanError("FORBIDDEN")           // 403
-throw new KatmanError("TOO_MANY_REQUESTS")   // 429
-throw new KatmanError("INTERNAL_SERVER_ERROR") // 500
+throw new KatmanError('NOT_FOUND') // 404
+throw new KatmanError('UNAUTHORIZED') // 401
+throw new KatmanError('BAD_REQUEST') // 400
+throw new KatmanError('FORBIDDEN') // 403
+throw new KatmanError('TOO_MANY_REQUESTS') // 429
+throw new KatmanError('INTERNAL_SERVER_ERROR') // 500
 ```
 
 You can also create custom errors with any code:
 
 ```ts twoslash
 // @noErrors
-import { KatmanError } from "katman"
+import { KatmanError } from 'katman'
 
-throw new KatmanError("PAYMENT_REQUIRED", {
+throw new KatmanError('PAYMENT_REQUIRED', {
   status: 402,
-  message: "Upgrade to Pro to use this feature",
-  data: { plan: "pro", price: 29 },
+  message: 'Upgrade to Pro to use this feature',
+  data: { plan: 'pro', price: 29 },
 })
 ```
 
@@ -106,21 +108,21 @@ throw new KatmanError("PAYMENT_REQUIRED", {
 
 These codes are recognized automatically — you don't need to specify a status:
 
-| Code | Status |
-|---|---|
-| `BAD_REQUEST` | 400 |
-| `UNAUTHORIZED` | 401 |
-| `FORBIDDEN` | 403 |
-| `NOT_FOUND` | 404 |
-| `METHOD_NOT_ALLOWED` | 405 |
-| `CONFLICT` | 409 |
-| `GONE` | 410 |
-| `UNPROCESSABLE_CONTENT` | 422 |
-| `TOO_MANY_REQUESTS` | 429 |
-| `INTERNAL_SERVER_ERROR` | 500 |
-| `NOT_IMPLEMENTED` | 501 |
-| `SERVICE_UNAVAILABLE` | 503 |
-| `GATEWAY_TIMEOUT` | 504 |
+| Code                    | Status |
+| ----------------------- | ------ |
+| `BAD_REQUEST`           | 400    |
+| `UNAUTHORIZED`          | 401    |
+| `FORBIDDEN`             | 403    |
+| `NOT_FOUND`             | 404    |
+| `METHOD_NOT_ALLOWED`    | 405    |
+| `CONFLICT`              | 409    |
+| `GONE`                  | 410    |
+| `UNPROCESSABLE_CONTENT` | 422    |
+| `TOO_MANY_REQUESTS`     | 429    |
+| `INTERNAL_SERVER_ERROR` | 500    |
+| `NOT_IMPLEMENTED`       | 501    |
+| `SERVICE_UNAVAILABLE`   | 503    |
+| `GATEWAY_TIMEOUT`       | 504    |
 
 ### Error JSON format
 
@@ -149,47 +151,50 @@ Errors thrown on the server are reconstructed as `KatmanError` instances on the 
 import { KatmanError } from "katman"
 
 try {
-  await client.users.delete({ id: 1 })
+await client.users.delete({ id: 1 })
 } catch (error) {
-  if (error instanceof KatmanError) {
-    console.log(error.code)    // "FORBIDDEN"
-    console.log(error.status)  // 403
-    console.log(error.message) // "You don't own this resource"
-    console.log(error.data)    // { reason: "Not the owner" }
+if (error instanceof KatmanError) {
+console.log(error.code) // "FORBIDDEN"
+console.log(error.status) // 403
+console.log(error.message) // "You don't own this resource"
+console.log(error.data) // { reason: "Not the owner" }
 
     if (error.defined) {
       // This error was declared in the error map — expected business logic
     } else {
       // This was an unexpected error
     }
-  }
-}
-  ```
-  </Tab>
-  <Tab value="safe() wrapper">
-  The `safe()` helper wraps a promise and returns a result object instead of throwing:
 
-  ```ts twoslash
+}
+}
+
+````
+</Tab>
+<Tab value="safe() wrapper">
+The `safe()` helper wraps a promise and returns a result object instead of throwing:
+
+```ts twoslash
 // @noErrors
 import { safe } from "katman/client"
 
 const result = await safe(client.users.delete({ id: 1 }))
 
 if (result.isError) {
-  console.log(result.error.code) // "FORBIDDEN"
-  console.log(result.data)       // undefined
+console.log(result.error.code) // "FORBIDDEN"
+console.log(result.data)       // undefined
 } else {
-  console.log(result.data)       // the deleted user
-  console.log(result.error)      // null
+console.log(result.data)       // the deleted user
+console.log(result.error)      // null
 }
-  ```
+````
 
-  The `safe()` function returns an object with:
-  - `error` — the error if one occurred, or `null`
-  - `data` — the result if successful, or `undefined`
-  - `isError` — `true` if the call failed
-  - `isSuccess` — `true` if the call succeeded
-  </Tab>
+The `safe()` function returns an object with:
+
+- `error` — the error if one occurred, or `null`
+- `data` — the result if successful, or `undefined`
+- `isError` — `true` if the call failed
+- `isSuccess` — `true` if the call succeeded
+    </Tab>
 </Tabs>
 
 ## Validation errors
@@ -202,9 +207,7 @@ When input validation fails (the data doesn't match your Zod/Valibot schema), Ka
   "status": 400,
   "message": "Validation failed",
   "data": {
-    "issues": [
-      { "path": ["email"], "message": "Invalid email" }
-    ]
+    "issues": [{ "path": ["email"], "message": "Invalid email" }]
   }
 }
 ```
@@ -219,9 +222,9 @@ Guards can throw errors too. A common pattern is an auth guard that throws `UNAU
 // @noErrors
 const auth = k.guard(async (ctx) => {
   const token = ctx.headers.authorization
-  if (!token) throw new KatmanError("UNAUTHORIZED")
+  if (!token) throw new KatmanError('UNAUTHORIZED')
   const user = await verifyToken(token)
-  if (!user) throw new KatmanError("UNAUTHORIZED", { message: "Invalid token" })
+  if (!user) throw new KatmanError('UNAUTHORIZED', { message: 'Invalid token' })
   return { user }
 })
 ```

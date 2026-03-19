@@ -3,7 +3,7 @@ title: Strict GET
 description: Enforce GET-only access on query procedures — prevents CSRF and accidental POST calls.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
+import { Callout } from 'fumadocs-ui/components/callout'
 
 The strict GET guard rejects non-GET requests with `405 Method Not Allowed`. Apply it to query procedures to enforce RESTful method semantics and prevent CSRF.
 
@@ -11,7 +11,7 @@ The strict GET guard rejects non-GET requests with `405 Method Not Allowed`. App
 
 ```ts twoslash
 // @noErrors
-import { strictGetGuard } from "katman/plugins"
+import { strictGetGuard } from 'katman/plugins'
 
 const listUsers = k.query({
   use: [strictGetGuard],
@@ -31,8 +31,10 @@ A `POST` request to this procedure returns:
 
 `strictGetGuard` is a singleton — no factory call needed. Add it directly to the `use` array.
 
-<Callout type="info">
-This guard only works when the request method is available in the context. With `serve()` and `handler()`, the method is part of the Request object. If you're using a custom transport that doesn't set `ctx.method`, the guard passes through without blocking.
+<Callout type='info'>
+  This guard only works when the request method is available in the context. With `serve()` and `handler()`, the method
+  is part of the Request object. If you're using a custom transport that doesn't set `ctx.method`, the guard passes
+  through without blocking.
 </Callout>
 
 ## What's next?

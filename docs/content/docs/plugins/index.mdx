@@ -3,50 +3,104 @@ title: Plugins
 description: Extend Katman with CORS, distributed tracing, structured logging, rate limiting, and more.
 ---
 
-import { Cards, Card } from 'fumadocs-ui/components/card';
-import { Callout } from 'fumadocs-ui/components/callout';
+import { Cards, Card } from 'fumadocs-ui/components/card'
+import { Callout } from 'fumadocs-ui/components/callout'
 
 Katman plugins are just regular middleware and hooks. There is no special plugin API — a "plugin" is a guard, a wrap, or a set of lifecycle hooks that someone has packaged up for reuse.
 
 All plugins ship as subpath imports from the `katman` package. You only import what you use, and unused plugins add zero bytes to your bundle.
 
 <Callout>
-You can build your own plugins the same way. A guard that checks a feature flag, a wrap that logs slow queries, a set of hooks that track metrics — they all follow the same patterns described in the [Middleware](/docs/middleware) and [Server](/docs/server) docs.
+  You can build your own plugins the same way. A guard that checks a feature flag, a wrap that logs slow queries, a set
+  of hooks that track metrics — they all follow the same patterns described in the [Middleware](/docs/middleware) and
+  [Server](/docs/server) docs.
 </Callout>
 
 <Cards>
-  <Card title="CORS" description="Cross-origin headers — static origin, origin list, or dynamic matching with a function." href="/docs/plugins/cors" />
-  <Card title="OpenTelemetry" description="Distributed tracing — each procedure call becomes a span with error recording." href="/docs/plugins/otel" />
-  <Card title="Pino Logging" description="Structured request logging — request received, response sent, errors caught." href="/docs/plugins/pino" />
-  <Card title="Rate Limiting" description="Sliding window rate limiter — in-memory or pluggable backend (Redis, Upstash, etc.)." href="/docs/plugins/ratelimit" />
-  <Card title="Body Limit" description="Reject oversized request bodies — returns 413 Payload Too Large." href="/docs/plugins/body-limit" />
-  <Card title="Strict GET" description="Enforce GET-only access on query procedures — CSRF prevention." href="/docs/plugins/strict-get" />
-  <Card title="Cookies" description="Read, set, and delete cookies inside procedures — secure defaults." href="/docs/plugins/cookies" />
-  <Card title="Compression" description="Gzip/deflate response compression hints for custom servers." href="/docs/plugins/compression" />
-  <Card title="Signing & Encryption" description="HMAC-SHA256 signing and AES-256-GCM encryption via Web Crypto API." href="/docs/plugins/signing" />
-  <Card title="Smart Coercion" description="Convert string query parameters to numbers, booleans, and null automatically." href="/docs/plugins/coerce" />
-  <Card title="Server Batch" description="Handle multiple RPC calls in one HTTP request — pairs with client BatchLink." href="/docs/plugins/batch-server" />
-  <Card title="Publisher/PubSub" description="Event pub/sub — publish from mutations, subscribe via SSE. Memory or Redis backend." href="/docs/plugins/pubsub" />
-  <Card title="Custom Serializers" description="Extend JSON for custom types — Date, BigInt, or your own classes." href="/docs/plugins/custom-serializer" />
+  <Card
+    title='CORS'
+    description='Cross-origin headers — static origin, origin list, or dynamic matching with a function.'
+    href='/docs/plugins/cors'
+  />
+  <Card
+    title='OpenTelemetry'
+    description='Distributed tracing — each procedure call becomes a span with error recording.'
+    href='/docs/plugins/otel'
+  />
+  <Card
+    title='Pino Logging'
+    description='Structured request logging — request received, response sent, errors caught.'
+    href='/docs/plugins/pino'
+  />
+  <Card
+    title='Rate Limiting'
+    description='Sliding window rate limiter — in-memory or pluggable backend (Redis, Upstash, etc.).'
+    href='/docs/plugins/ratelimit'
+  />
+  <Card
+    title='Body Limit'
+    description='Reject oversized request bodies — returns 413 Payload Too Large.'
+    href='/docs/plugins/body-limit'
+  />
+  <Card
+    title='Strict GET'
+    description='Enforce GET-only access on query procedures — CSRF prevention.'
+    href='/docs/plugins/strict-get'
+  />
+  <Card
+    title='Cookies'
+    description='Read, set, and delete cookies inside procedures — secure defaults.'
+    href='/docs/plugins/cookies'
+  />
+  <Card
+    title='Compression'
+    description='Gzip/deflate response compression hints for custom servers.'
+    href='/docs/plugins/compression'
+  />
+  <Card
+    title='Signing & Encryption'
+    description='HMAC-SHA256 signing and AES-256-GCM encryption via Web Crypto API.'
+    href='/docs/plugins/signing'
+  />
+  <Card
+    title='Smart Coercion'
+    description='Convert string query parameters to numbers, booleans, and null automatically.'
+    href='/docs/plugins/coerce'
+  />
+  <Card
+    title='Server Batch'
+    description='Handle multiple RPC calls in one HTTP request — pairs with client BatchLink.'
+    href='/docs/plugins/batch-server'
+  />
+  <Card
+    title='Publisher/PubSub'
+    description='Event pub/sub — publish from mutations, subscribe via SSE. Memory or Redis backend.'
+    href='/docs/plugins/pubsub'
+  />
+  <Card
+    title='Custom Serializers'
+    description='Extend JSON for custom types — Date, BigInt, or your own classes.'
+    href='/docs/plugins/custom-serializer'
+  />
 </Cards>
 
 ## Plugin types at a glance
 
-| Plugin | Type | How to use |
-|---|---|---|
-| CORS | Header helper | Call `corsHeaders()` to get a headers object |
-| OpenTelemetry | Wrap middleware | Add `otelWrap(tracer)` to a procedure's `use` array |
-| Pino Logging | Lifecycle hooks | Pass `loggingHooks({ logger })` to the `hooks` option |
-| Rate Limiting | Guard middleware | Add `rateLimitGuard(...)` to a procedure's `use` array |
-| Body Limit | Guard middleware | Add `bodyLimitGuard(...)` to reject oversized payloads |
-| Strict GET | Guard (singleton) | Add `strictGetGuard` to enforce GET on queries |
-| Cookies | Helper functions | Use `getCookie()`, `setCookie()`, `deleteCookie()` |
-| Compression | Wrap middleware | Add `compressionWrap()` for gzip/deflate hints |
-| Signing | Helper functions | Use `sign()`, `unsign()`, `encrypt()`, `decrypt()` |
-| Smart Coercion | Guard (singleton) | Add `coerceGuard` to auto-convert string inputs |
-| Server Batch | Handler factory | Use `createBatchHandler()` for batch endpoint |
-| Publisher/PubSub | Event system | Use `createPublisher()` + `MemoryPubSub` or Redis |
-| Custom Serializers | Helper | Use `createSerializer()` for custom JSON types |
+| Plugin             | Type              | How to use                                             |
+| ------------------ | ----------------- | ------------------------------------------------------ |
+| CORS               | Header helper     | Call `corsHeaders()` to get a headers object           |
+| OpenTelemetry      | Wrap middleware   | Add `otelWrap(tracer)` to a procedure's `use` array    |
+| Pino Logging       | Lifecycle hooks   | Pass `loggingHooks({ logger })` to the `hooks` option  |
+| Rate Limiting      | Guard middleware  | Add `rateLimitGuard(...)` to a procedure's `use` array |
+| Body Limit         | Guard middleware  | Add `bodyLimitGuard(...)` to reject oversized payloads |
+| Strict GET         | Guard (singleton) | Add `strictGetGuard` to enforce GET on queries         |
+| Cookies            | Helper functions  | Use `getCookie()`, `setCookie()`, `deleteCookie()`     |
+| Compression        | Wrap middleware   | Add `compressionWrap()` for gzip/deflate hints         |
+| Signing            | Helper functions  | Use `sign()`, `unsign()`, `encrypt()`, `decrypt()`     |
+| Smart Coercion     | Guard (singleton) | Add `coerceGuard` to auto-convert string inputs        |
+| Server Batch       | Handler factory   | Use `createBatchHandler()` for batch endpoint          |
+| Publisher/PubSub   | Event system      | Use `createPublisher()` + `MemoryPubSub` or Redis      |
+| Custom Serializers | Helper            | Use `createSerializer()` for custom JSON types         |
 
 ## What's next?
 

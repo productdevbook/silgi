@@ -5,7 +5,7 @@
  * end-to-end binary transport via ofetch client.
  */
 
-import { createServer, type Server } from 'node:http'
+import { createServer } from 'node:http'
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { z } from 'zod'
@@ -16,6 +16,7 @@ import { encode, decode, acceptsMsgpack, isMsgpack, MSGPACK_CONTENT_TYPE } from 
 import { katman } from '#src/katman.ts'
 
 import type { InferClient } from '#src/types.ts'
+import type { Server } from 'node:http'
 
 // ── Codec Unit Tests ────────────────────────────────
 

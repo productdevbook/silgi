@@ -3,9 +3,9 @@ title: Client
 description: Set up the type-safe client with createLink and createClient — including binary mode, interceptors, and type inference.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
-import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
+import { Step, Steps } from 'fumadocs-ui/components/steps'
 
 The Katman client gives you a fully typed proxy that mirrors your server's router structure. You call procedures like local functions, and TypeScript knows every input and output type.
 
@@ -18,14 +18,14 @@ Setting up the client takes two steps: create a **link** (the transport layer) a
 
 ### Create a link
 
-A link tells the client *how* to send requests to the server. The built-in link uses [ofetch](https://github.com/unjs/ofetch) for retries, timeouts, and JSON parsing:
+A link tells the client _how_ to send requests to the server. The built-in link uses [ofetch](https://github.com/unjs/ofetch) for retries, timeouts, and JSON parsing:
 
 ```ts twoslash
 // @noErrors
-import { createLink } from "katman/client/ofetch"
+import { createLink } from 'katman/client/ofetch'
 
 const link = createLink({
-  url: "http://localhost:3000",
+  url: 'http://localhost:3000',
 })
 ```
 
@@ -38,11 +38,11 @@ Pass the link to `createClient` with your router type as the generic parameter:
 
 ```ts twoslash
 // @noErrors
-import { createClient } from "katman/client"
-import { createLink } from "katman/client/ofetch"
-import type { AppRouter } from "./server" // export type AppRouter = typeof appRouter
+import { createClient } from 'katman/client'
+import { createLink } from 'katman/client/ofetch'
+import type { AppRouter } from './server' // export type AppRouter = typeof appRouter
 
-const link = createLink({ url: "http://localhost:3000" })
+const link = createLink({ url: 'http://localhost:3000' })
 const client = createClient<AppRouter>(link)
 ```
 
@@ -58,7 +58,7 @@ The client mirrors your router structure exactly. Nested routers become nested p
 // Router structure: { users: { list, create }, health }
 
 const users = await client.users.list({ limit: 10 })
-const newUser = await client.users.create({ name: "Alice" })
+const newUser = await client.users.create({ name: 'Alice' })
 const status = await client.health()
 ```
 
@@ -87,7 +87,7 @@ Then use it when creating the client:
 
 ```ts twoslash
 // @noErrors
-import type { AppRouter } from "./server"
+import type { AppRouter } from './server'
 
 const client = createClient<AppRouter>(link)
 ```
@@ -96,29 +96,30 @@ You can also use the `InferClient` utility type, which extracts the client type 
 
 ```ts twoslash
 // @noErrors
-import type { InferClient } from "katman"
+import type { InferClient } from 'katman'
 
 type Client = InferClient<typeof appRouter>
 // Client.users.list: (input: { limit?: number }) => Promise<User[]>
 // Client.users.create: (input: { name: string }) => Promise<User>
 ```
 
-<Callout type="info">
-In a monorepo, you only need to share the *type* of the router, not the actual code. Use `import type` so no server code leaks into your client bundle.
+<Callout type='info'>
+  In a monorepo, you only need to share the *type* of the router, not the actual code. Use `import type` so no server
+  code leaks into your client bundle.
 </Callout>
 
 ## Link options
 
 The `createLink` function accepts these options:
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `url` | `string` | (required) | Server base URL (e.g. `"http://localhost:3000"`) |
-| `headers` | `Record<string, string>` or function | `undefined` | Static headers or a function that returns headers per request |
-| `retry` | `number \| false` | `0` | Number of retries on failure |
-| `retryDelay` | `number \| (ctx) => number` | `0` | Delay between retries in milliseconds |
-| `timeout` | `number` | `30000` | Request timeout in milliseconds |
-| `binary` | `boolean` | `false` | Use MessagePack instead of JSON |
+| Option       | Type                                 | Default     | Description                                                   |
+| ------------ | ------------------------------------ | ----------- | ------------------------------------------------------------- |
+| `url`        | `string`                             | (required)  | Server base URL (e.g. `"http://localhost:3000"`)              |
+| `headers`    | `Record<string, string>` or function | `undefined` | Static headers or a function that returns headers per request |
+| `retry`      | `number \| false`                    | `0`         | Number of retries on failure                                  |
+| `retryDelay` | `number \| (ctx) => number`          | `0`         | Delay between retries in milliseconds                         |
+| `timeout`    | `number`                             | `30000`     | Request timeout in milliseconds                               |
+| `binary`     | `boolean`                            | `false`     | Use MessagePack instead of JSON                               |
 
 ### Authentication headers
 
@@ -127,7 +128,7 @@ The most common use for dynamic headers is passing an auth token:
 ```ts twoslash
 // @noErrors
 const link = createLink({
-  url: "http://localhost:3000",
+  url: 'http://localhost:3000',
   headers: () => ({
     Authorization: `Bearer ${getToken()}`,
   }),
@@ -141,10 +142,10 @@ The header function runs on every request, so it always picks up the latest toke
 ```ts twoslash
 // @noErrors
 const link = createLink({
-  url: "http://localhost:3000",
-  retry: 3,             // retry up to 3 times on failure
-  retryDelay: 1000,     // wait 1 second between retries
-  timeout: 10_000,      // 10 second timeout per request
+  url: 'http://localhost:3000',
+  retry: 3, // retry up to 3 times on failure
+  retryDelay: 1000, // wait 1 second between retries
+  timeout: 10_000, // 10 second timeout per request
 })
 ```
 
@@ -153,7 +154,7 @@ For exponential backoff, pass a function:
 ```ts twoslash
 // @noErrors
 const link = createLink({
-  url: "http://localhost:3000",
+  url: 'http://localhost:3000',
   retry: 3,
   retryDelay: (ctx) => Math.pow(2, ctx.options?.retryCount ?? 0) * 500,
   // 500ms, 1000ms, 2000ms
@@ -167,7 +168,7 @@ Set `binary: true` to use MessagePack instead of JSON. Payloads are smaller and 
 ```ts twoslash
 // @noErrors
 const link = createLink({
-  url: "http://localhost:3000",
+  url: 'http://localhost:3000',
   binary: true,
 })
 ```
@@ -175,7 +176,8 @@ const link = createLink({
 The client encodes the request body as MessagePack, sets the `Content-Type` and `Accept` headers to `application/x-msgpack`, and the server responds in MessagePack too.
 
 <Callout>
-Binary mode is completely transparent to your application code. You still pass and receive regular JavaScript objects. The encoding happens inside the link — you never see MessagePack bytes in your code.
+  Binary mode is completely transparent to your application code. You still pass and receive regular JavaScript objects.
+  The encoding happens inside the link — you never see MessagePack bytes in your code.
 </Callout>
 
 See the [MessagePack protocol](/docs/protocols/msgpack) page for more details on what types are supported.
@@ -187,22 +189,22 @@ The link supports [ofetch interceptors](https://github.com/unjs/ofetch#intercept
 ```ts twoslash
 // @noErrors
 const link = createLink({
-  url: "http://localhost:3000",
+  url: 'http://localhost:3000',
   onRequest({ request, options }) {
     // Runs before every request is sent
-    console.log("Sending:", request)
+    console.log('Sending:', request)
   },
   onResponse({ response }) {
     // Runs after every successful response
-    console.log("Received:", response.status)
+    console.log('Received:', response.status)
   },
   onRequestError({ error }) {
     // Runs when the request fails (network error, DNS failure, etc.)
-    console.error("Request failed:", error)
+    console.error('Request failed:', error)
   },
   onResponseError({ response }) {
     // Runs when the server responds with an error status
-    console.error("Server error:", response.status)
+    console.error('Server error:', response.status)
   },
 })
 ```
@@ -221,10 +223,7 @@ Each procedure call can receive a second argument with per-call options:
 // @noErrors
 const controller = new AbortController()
 
-const users = await client.users.list(
-  { limit: 10 },
-  { signal: controller.signal },
-)
+const users = await client.users.list({ limit: 10 }, { signal: controller.signal })
 
 // Cancel the request at any time
 controller.abort()
@@ -232,10 +231,10 @@ controller.abort()
 
 Available per-call options:
 
-| Option | Type | Description |
-|---|---|---|
-| `signal` | `AbortSignal` | Cancel the request |
-| `context` | `Record` | Custom context passed to the link |
+| Option    | Type          | Description                       |
+| --------- | ------------- | --------------------------------- |
+| `signal`  | `AbortSignal` | Cancel the request                |
+| `context` | `Record`      | Custom context passed to the link |
 
 ## Error handling
 
@@ -243,15 +242,15 @@ Server errors are reconstructed as `KatmanError` instances on the client. You ca
 
 ```ts twoslash
 // @noErrors
-import { KatmanError } from "katman"
+import { KatmanError } from 'katman'
 
 try {
   await client.users.delete({ id: 1 })
 } catch (error) {
   if (error instanceof KatmanError) {
-    console.log(error.code)   // "FORBIDDEN"
+    console.log(error.code) // "FORBIDDEN"
     console.log(error.status) // 403
-    console.log(error.data)   // { reason: "Not the owner" }
+    console.log(error.data) // { reason: "Not the owner" }
   }
 }
 ```
@@ -260,11 +259,9 @@ Or use the `safe()` wrapper to avoid try/catch entirely:
 
 ```ts twoslash
 // @noErrors
-import { safe } from "katman/client"
+import { safe } from 'katman/client'
 
-const { error, data, isError, isSuccess } = await safe(
-  client.users.delete({ id: 1 })
-)
+const { error, data, isError, isSuccess } = await safe(client.users.delete({ id: 1 }))
 
 if (isError) {
   console.log(error.code) // "FORBIDDEN"
@@ -281,7 +278,7 @@ For SSR, server components, or testing — use `createServerClient` to get the s
 
 ```ts twoslash
 // @noErrors
-import { createServerClient } from "katman/client/server"
+import { createServerClient } from 'katman/client/server'
 
 const client = createServerClient(appRouter, {
   context: () => ({ db: getDB() }),
@@ -289,7 +286,7 @@ const client = createServerClient(appRouter, {
 
 // Same API as the HTTP client — but runs in-process
 const users = await client.users.list({ limit: 10 })
-const user = await client.users.create({ name: "Alice" })
+const user = await client.users.create({ name: 'Alice' })
 ```
 
 The server client compiles the router once and reuses the compiled handlers. Every call runs the full pipeline (guards, wraps, validation) — the only thing skipped is HTTP serialization.
@@ -306,10 +303,10 @@ A `DynamicLink` lets you route requests to different links at runtime. The facto
 
 ```ts twoslash
 // @noErrors
-import { createClient, DynamicLink } from "katman/client"
+import { createClient, DynamicLink } from 'katman/client'
 
 const link = new DynamicLink((path, input, options) => {
-  if (path[0] === "admin") return adminLink
+  if (path[0] === 'admin') return adminLink
   return defaultLink
 })
 
@@ -324,7 +321,7 @@ Combine multiple Katman clients into a single object. Each client can point to a
 
 ```ts twoslash
 // @noErrors
-import { mergeClients } from "katman/client"
+import { mergeClients } from 'katman/client'
 
 const client = mergeClients({
   users: usersClient,
@@ -341,14 +338,14 @@ Wrap any link with lifecycle hooks. Unlike ofetch interceptors (which are HTTP-l
 
 ```ts twoslash
 // @noErrors
-import { withInterceptors } from "katman/client"
+import { withInterceptors } from 'katman/client'
 
 const link = withInterceptors(baseLink, {
   onRequest({ path, input }) {
-    console.log(`-> ${path.join("/")}`)
+    console.log(`-> ${path.join('/')}`)
   },
   onResponse({ path, durationMs }) {
-    console.log(`<- ${path.join("/")} (${durationMs}ms)`)
+    console.log(`<- ${path.join('/')} (${durationMs}ms)`)
   },
   onError({ path, error }) {
     reportToSentry(error)

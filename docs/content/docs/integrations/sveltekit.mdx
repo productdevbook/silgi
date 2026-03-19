@@ -10,11 +10,11 @@ description: Use Katman with SvelteKit API routes — catch-all endpoint with fu
 ```ts twoslash
 // @noErrors
 // src/routes/api/rpc/[...path]/+server.ts
-import { katmanSvelteKit } from "katman/sveltekit"
-import { appRouter } from "$lib/server/rpc"
+import { katmanSvelteKit } from 'katman/sveltekit'
+import { appRouter } from '$lib/server/rpc'
 
 const handler = katmanSvelteKit(appRouter, {
-  prefix: "/api/rpc",
+  prefix: '/api/rpc',
   context: (event) => ({
     db: getDB(),
     user: event.locals.user,
@@ -33,7 +33,7 @@ Use SvelteKit's `handle` hook to set `event.locals`, then access in the context 
 // @noErrors
 // src/hooks.server.ts
 export async function handle({ event, resolve }) {
-  event.locals.user = await getUser(event.cookies.get("session"))
+  event.locals.user = await getUser(event.cookies.get('session'))
   return resolve(event)
 }
 ```

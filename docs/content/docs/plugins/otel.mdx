@@ -3,8 +3,8 @@ title: OpenTelemetry
 description: Distributed tracing — each procedure call becomes a span with automatic error recording.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
-import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Step, Steps } from 'fumadocs-ui/components/steps'
 
 OpenTelemetry (OTel) is the standard for distributed tracing. Katman's `otelWrap` creates a span for each procedure call, so you can see every RPC call in your tracing dashboard (Jaeger, Zipkin, Honeycomb, Datadog, etc.).
 
@@ -32,10 +32,10 @@ You'll also need an OTel SDK and exporter for your backend (Jaeger, OTLP, etc.) 
 
 ```ts twoslash
 // @noErrors
-import { otelWrap } from "katman/otel"
-import { trace } from "@opentelemetry/api"
+import { otelWrap } from 'katman/otel'
+import { trace } from '@opentelemetry/api'
 
-const tracing = otelWrap(trace.getTracer("my-service"))
+const tracing = otelWrap(trace.getTracer('my-service'))
 ```
 
 </Step>
@@ -65,10 +65,10 @@ Each call to these procedures now produces a span in your tracing backend.
 
 Every span includes:
 
-| Attribute | Value |
-|---|---|
-| `rpc.system` | `"katman"` |
-| Status code | `0` (OK) on success, `2` (ERROR) on failure |
+| Attribute    | Value                                       |
+| ------------ | ------------------------------------------- |
+| `rpc.system` | `"katman"`                                  |
+| Status code  | `0` (OK) on success, `2` (ERROR) on failure |
 
 On errors, the span also includes an exception event:
 
@@ -85,9 +85,9 @@ The default span name is `"rpc.call"`. You can change it:
 
 ```ts twoslash
 // @noErrors
-import { otelWrap } from "katman/otel"
+import { otelWrap } from 'katman/otel'
 
-const tracing = otelWrap(tracer, "api.procedure")
+const tracing = otelWrap(tracer, 'api.procedure')
 ```
 
 ## Combining with other middleware
@@ -105,8 +105,9 @@ const createUser = k.mutation({
 
 Guards (`auth`, `rateLimit`) run before the span wraps around the resolver. If you want the span to include guard execution time, put `tracing` before the guards in the array.
 
-<Callout type="info">
-Katman has zero OpenTelemetry dependency. The plugin defines a lightweight `Tracer` and `Span` interface. You bring `@opentelemetry/api` yourself, which means Katman never pins you to a specific OTel version.
+<Callout type='info'>
+  Katman has zero OpenTelemetry dependency. The plugin defines a lightweight `Tracer` and `Span` interface. You bring
+  `@opentelemetry/api` yourself, which means Katman never pins you to a specific OTel version.
 </Callout>
 
 ## What's next?

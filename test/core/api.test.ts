@@ -204,9 +204,9 @@ describe('query() / mutation() / subscription()', () => {
     })
 
     const keys = ['type', 'input', 'output', 'errors', 'use', 'resolve', 'route', 'meta']
-    expect(Object.keys(q).sort()).toEqual(keys.sort())
-    expect(Object.keys(m).sort()).toEqual(keys.sort())
-    expect(Object.keys(s).sort()).toEqual(keys.sort())
+    expect(Object.keys(q).toSorted()).toEqual(keys.toSorted())
+    expect(Object.keys(m).toSorted()).toEqual(keys.toSorted())
+    expect(Object.keys(s).toSorted()).toEqual(keys.toSorted())
   })
 })
 

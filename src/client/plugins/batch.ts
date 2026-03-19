@@ -31,7 +31,6 @@ export class BatchLink<TClientContext extends ClientContext = ClientContext> imp
   #link: ClientLink<TClientContext>
   #batchPath: string
   #maxSize: number
-  #url: string
   #pending: PendingCall[] = []
   #scheduled = false
 
@@ -39,7 +38,6 @@ export class BatchLink<TClientContext extends ClientContext = ClientContext> imp
     this.#link = options.link as ClientLink<TClientContext>
     this.#batchPath = options.path ?? '/__batch__'
     this.#maxSize = options.maxSize ?? 20
-    this.#url = typeof options.url === 'string' ? options.url : options.url.href
   }
 
   call(path: readonly string[], input: unknown, options: ClientOptions<TClientContext>): Promise<unknown> {

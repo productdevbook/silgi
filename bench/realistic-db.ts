@@ -8,7 +8,7 @@
  * Run: node --experimental-strip-types bench/realistic-db.ts
  */
 
-import { createServer, type Server } from 'node:http'
+import { createServer } from 'node:http'
 
 import { os as orpcOs } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/node'
@@ -18,6 +18,8 @@ import { RequestCoalescer } from '../src/coalesce.ts'
 import { compileRouter, ContextPool } from '../src/compile.ts'
 import { katman } from '../src/katman.ts'
 import { ResponseCache } from '../src/response-cache.ts'
+
+import type { Server } from 'node:http'
 
 // ── Simulated DB with realistic latency ─────────────
 

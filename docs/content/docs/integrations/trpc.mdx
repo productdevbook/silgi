@@ -3,7 +3,7 @@ title: tRPC Interop
 description: Convert tRPC routers to Katman — incremental migration path.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
+import { Callout } from 'fumadocs-ui/components/callout'
 
 Migrate from tRPC to Katman incrementally. Convert your existing tRPC router and serve it with Katman's pipeline.
 
@@ -11,8 +11,8 @@ Migrate from tRPC to Katman incrementally. Convert your existing tRPC router and
 
 ```ts twoslash
 // @noErrors
-import { fromTRPC } from "katman/trpc"
-import { trpcRouter } from "./trpc-router"
+import { fromTRPC } from 'katman/trpc'
+import { trpcRouter } from './trpc-router'
 
 const katmanRouter = fromTRPC(trpcRouter)
 
@@ -22,13 +22,13 @@ k.serve(katmanRouter, { port: 3000 })
 
 ## What gets converted
 
-| tRPC | Katman |
-|---|---|
-| `query` procedure | `query` ProcedureDef |
-| `mutation` procedure | `mutation` ProcedureDef |
+| tRPC                     | Katman                      |
+| ------------------------ | --------------------------- |
+| `query` procedure        | `query` ProcedureDef        |
+| `mutation` procedure     | `mutation` ProcedureDef     |
 | `subscription` procedure | `subscription` ProcedureDef |
-| Input schemas (Zod) | Passed through as-is |
-| Nested routers | Nested RouterDef |
+| Input schemas (Zod)      | Passed through as-is        |
+| Nested routers           | Nested RouterDef            |
 
 ## What doesn't convert
 
@@ -36,8 +36,9 @@ k.serve(katmanRouter, { port: 3000 })
 - **tRPC context** — use Katman's `context` factory instead
 - **tRPC links** — use Katman's client links
 
-<Callout type="info">
-`fromTRPC` wraps each procedure's resolver. tRPC middleware still runs inside the tRPC procedure — it's not converted to Katman guards/wraps. For full Katman features, rewrite procedures natively.
+<Callout type='info'>
+  `fromTRPC` wraps each procedure's resolver. tRPC middleware still runs inside the tRPC procedure — it's not converted
+  to Katman guards/wraps. For full Katman features, rewrite procedures natively.
 </Callout>
 
 ## Migration strategy

@@ -3,8 +3,8 @@ title: CORS
 description: Add cross-origin resource sharing headers to your API responses.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 
 When your API runs on one domain (like `api.example.com`) and your frontend on another (like `app.example.com`), browsers block the requests by default. CORS headers tell the browser it's safe to proceed.
 
@@ -14,10 +14,10 @@ Katman provides `corsHeaders()` — a function that returns the right headers fo
 
 ```ts twoslash
 // @noErrors
-import { corsHeaders } from "katman/cors"
+import { corsHeaders } from 'katman/cors'
 
 const headers = corsHeaders({
-  origin: "https://app.example.com",
+  origin: 'https://app.example.com',
   credentials: true,
 })
 ```
@@ -41,14 +41,15 @@ The default (no `origin` option or `origin: "*"`) allows any origin:
 
 ```ts twoslash
 // @noErrors
-import { corsHeaders } from "katman/cors"
+import { corsHeaders } from 'katman/cors'
 
 const headers = corsHeaders()
 // "access-control-allow-origin": "*"
 ```
 
-<Callout type="warn">
-Using `origin: "*"` with `credentials: true` doesn't work — browsers reject it. If you need credentials, specify the exact origin.
+<Callout type='warn'>
+  Using `origin: "*"` with `credentials: true` doesn't work — browsers reject it. If you need credentials, specify the
+  exact origin.
 </Callout>
 
 ## Multiple origins
@@ -57,14 +58,14 @@ Pass an array to allow several specific origins:
 
 ```ts twoslash
 // @noErrors
-import { corsHeaders } from "katman/cors"
+import { corsHeaders } from 'katman/cors'
 
-const headers = corsHeaders({
-  origin: [
-    "https://app.example.com",
-    "https://admin.example.com",
-  ],
-}, requestOrigin)
+const headers = corsHeaders(
+  {
+    origin: ['https://app.example.com', 'https://admin.example.com'],
+  },
+  requestOrigin,
+)
 ```
 
 The second argument is the requesting origin (from the `Origin` header on the incoming request). Katman checks if it's in the list and responds with the matching origin. A `Vary: Origin` header is automatically included so caches work correctly.
@@ -75,27 +76,30 @@ For more complex rules, pass a function:
 
 ```ts twoslash
 // @noErrors
-import { corsHeaders } from "katman/cors"
+import { corsHeaders } from 'katman/cors'
 
-const headers = corsHeaders({
-  origin: (requestOrigin) => {
-    return requestOrigin.endsWith(".example.com")
+const headers = corsHeaders(
+  {
+    origin: (requestOrigin) => {
+      return requestOrigin.endsWith('.example.com')
+    },
   },
-}, req.headers.get("origin"))
+  req.headers.get('origin'),
+)
 ```
 
 The function receives the requesting origin and returns `true` to allow it or `false` to block it. Like array origins, `Vary: Origin` is added automatically.
 
 ## All options
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `origin` | `string \| string[] \| (origin) => boolean` | `"*"` | Which origins are allowed |
-| `methods` | `string[]` | `["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]` | Allowed HTTP methods |
-| `allowedHeaders` | `string[]` | `["Content-Type", "Authorization"]` | Headers the client can send |
-| `exposedHeaders` | `string[]` | none | Response headers the client can read |
-| `credentials` | `boolean` | `false` | Allow cookies and auth headers |
-| `maxAge` | `number` | none | Preflight cache duration in seconds |
+| Option           | Type                                        | Default                                                | Description                          |
+| ---------------- | ------------------------------------------- | ------------------------------------------------------ | ------------------------------------ |
+| `origin`         | `string \| string[] \| (origin) => boolean` | `"*"`                                                  | Which origins are allowed            |
+| `methods`        | `string[]`                                  | `["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]` | Allowed HTTP methods                 |
+| `allowedHeaders` | `string[]`                                  | `["Content-Type", "Authorization"]`                    | Headers the client can send          |
+| `exposedHeaders` | `string[]`                                  | none                                                   | Response headers the client can read |
+| `credentials`    | `boolean`                                   | `false`                                                | Allow cookies and auth headers       |
+| `maxAge`         | `number`                                    | none                                                   | Preflight cache duration in seconds  |
 
 ## Example with handler()
 
@@ -103,14 +107,14 @@ If you're using `handler()` with a custom server, you can wrap it to add CORS he
 
 ```ts twoslash
 // @noErrors
-import { corsHeaders } from "katman/cors"
+import { corsHeaders } from 'katman/cors'
 
 const handle = k.handler(appRouter)
-const cors = corsHeaders({ origin: "https://app.example.com", credentials: true })
+const cors = corsHeaders({ origin: 'https://app.example.com', credentials: true })
 
 async function fetch(request: Request): Promise<Response> {
   // Handle preflight
-  if (request.method === "OPTIONS") {
+  if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: cors })
   }
 

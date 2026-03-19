@@ -3,8 +3,8 @@ title: AI SDK
 description: Turn Katman procedures into AI tools — LLMs call your API through function calling.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
-import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Step, Steps } from 'fumadocs-ui/components/steps'
 
 The [Vercel AI SDK](https://sdk.vercel.ai) lets you connect LLMs to **tools** — functions the model can call when it needs data or wants to take actions. Katman can automatically convert your procedures into AI tools, extracting JSON Schema from your Zod input schemas.
 
@@ -29,8 +29,8 @@ npm install ai @ai-sdk/openai
 
 ```ts twoslash
 // @noErrors
-import { routerToTools } from "katman/ai"
-import { appRouter } from "./router"
+import { routerToTools } from 'katman/ai'
+import { appRouter } from './router'
 
 const tools = routerToTools(appRouter)
 ```
@@ -44,13 +44,13 @@ This creates one AI tool per procedure. Nested routers are flattened with unders
 
 ```ts twoslash
 // @noErrors
-import { generateText } from "ai"
-import { openai } from "@ai-sdk/openai"
+import { generateText } from 'ai'
+import { openai } from '@ai-sdk/openai'
 
 const { text } = await generateText({
-  model: openai("gpt-4o"),
+  model: openai('gpt-4o'),
   tools,
-  prompt: "List all users with limit 5, then create a user named Bob",
+  prompt: 'List all users with limit 5, then create a user named Bob',
 })
 ```
 
@@ -74,8 +74,8 @@ This means your existing route metadata doubles as AI tool documentation:
 const listUsers = k.query({
   input: z.object({ limit: z.number().optional() }),
   route: {
-    summary: "List all registered users",
-    description: "Returns a list of users, optionally limited by count.",
+    summary: 'List all registered users',
+    description: 'Returns a list of users, optionally limited by count.',
   },
   resolve: ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
 })
@@ -89,16 +89,16 @@ For more control, convert individual procedures instead of the whole router:
 
 ```ts twoslash
 // @noErrors
-import { procedureToTool } from "katman/ai"
+import { procedureToTool } from 'katman/ai'
 
-const searchTool = procedureToTool("search", appRouter.search, {
-  description: "Search the database for items matching a query",
+const searchTool = procedureToTool('search', appRouter.search, {
+  description: 'Search the database for items matching a query',
 })
 
 const { text } = await generateText({
-  model: openai("gpt-4o"),
+  model: openai('gpt-4o'),
   tools: { search: searchTool },
-  prompt: "Find all items related to TypeScript",
+  prompt: 'Find all items related to TypeScript',
 })
 ```
 
@@ -112,7 +112,7 @@ You probably don't want to expose every procedure to the AI. Use the `filter` op
 // @noErrors
 const tools = routerToTools(appRouter, {
   // Only expose query procedures, not mutations
-  filter: (path, procedure) => procedure.type === "query",
+  filter: (path, procedure) => procedure.type === 'query',
 })
 ```
 
@@ -121,7 +121,7 @@ Or filter by path:
 ```ts twoslash
 // @noErrors
 const tools = routerToTools(appRouter, {
-  filter: (path) => !path.startsWith("admin_"),
+  filter: (path) => !path.startsWith('admin_'),
 })
 ```
 
@@ -133,8 +133,8 @@ Override descriptions for specific tools:
 // @noErrors
 const tools = routerToTools(appRouter, {
   descriptions: {
-    users_list: "Get a list of all registered users. Supports a limit parameter.",
-    users_create: "Create a new user account with a name and email.",
+    users_list: 'Get a list of all registered users. Supports a limit parameter.',
+    users_create: 'Create a new user account with a name and email.',
   },
 })
 ```
@@ -142,22 +142,23 @@ const tools = routerToTools(appRouter, {
 These take priority over route metadata.
 
 <Callout>
-Good descriptions matter. LLMs decide which tool to call based on the description. Be specific about what the tool does and what parameters it accepts.
+  Good descriptions matter. LLMs decide which tool to call based on the description. Be specific about what the tool
+  does and what parameters it accepts.
 </Callout>
 
 ## Supported input types
 
 The Zod-to-JSON-Schema converter handles common types:
 
-| Zod type | JSON Schema |
-|---|---|
-| `z.string()` | `{ "type": "string" }` |
-| `z.number()` | `{ "type": "number" }` |
-| `z.boolean()` | `{ "type": "boolean" }` |
-| `z.object({...})` | `{ "type": "object", "properties": {...} }` |
+| Zod type              | JSON Schema                                          |
+| --------------------- | ---------------------------------------------------- |
+| `z.string()`          | `{ "type": "string" }`                               |
+| `z.number()`          | `{ "type": "number" }`                               |
+| `z.boolean()`         | `{ "type": "boolean" }`                              |
+| `z.object({...})`     | `{ "type": "object", "properties": {...} }`          |
 | `z.array(z.string())` | `{ "type": "array", "items": { "type": "string" } }` |
-| `z.enum(["a", "b"])` | `{ "type": "string", "enum": ["a", "b"] }` |
-| `z.optional(...)` | Marked as not required |
+| `z.enum(["a", "b"])`  | `{ "type": "string", "enum": ["a", "b"] }`           |
+| `z.optional(...)`     | Marked as not required                               |
 
 For procedures without an input schema, the tool accepts an empty object.
 

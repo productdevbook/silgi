@@ -9,12 +9,14 @@
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
-import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http'
+import { createServer } from 'node:http'
 import * as http2 from 'node:http2'
 import os from 'node:os'
 
 import { WebSocket } from 'ws'
 import { z } from 'zod'
+
+import type { Server, IncomingMessage, ServerResponse } from 'node:http'
 
 // ── Schemas ─────────────────────────────────────────
 

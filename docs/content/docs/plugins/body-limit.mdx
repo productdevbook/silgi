@@ -3,7 +3,7 @@ title: Body Limit
 description: Reject oversized request bodies with a guard — returns 413 Payload Too Large.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
+import { Callout } from 'fumadocs-ui/components/callout'
 
 The body limit guard checks the `Content-Length` header before the procedure runs. If the body exceeds your threshold, the request is rejected with `413 Payload Too Large`. Zero overhead for GET requests.
 
@@ -11,7 +11,7 @@ The body limit guard checks the `Content-Length` header before the procedure run
 
 ```ts twoslash
 // @noErrors
-import { bodyLimitGuard } from "katman/plugins"
+import { bodyLimitGuard } from 'katman/plugins'
 
 const upload = k.mutation({
   use: [bodyLimitGuard({ maxBytes: 5 * 1024 * 1024 })], // 5 MB
@@ -33,10 +33,10 @@ When exceeded, the client receives:
 
 ## Options
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `maxBytes` | `number` | `1_048_576` (1 MB) | Maximum body size in bytes |
-| `message` | `string` | `"Request body too large"` | Custom error message |
+| Option     | Type     | Default                    | Description                |
+| ---------- | -------- | -------------------------- | -------------------------- |
+| `maxBytes` | `number` | `1_048_576` (1 MB)         | Maximum body size in bytes |
+| `message`  | `string` | `"Request body too large"` | Custom error message       |
 
 ## Apply globally
 
@@ -58,7 +58,8 @@ const createPost = k.mutation({
 ```
 
 <Callout>
-The guard only checks `Content-Length`. It does not buffer or measure the actual body stream. For streaming uploads, consider using a transport-level limit instead.
+  The guard only checks `Content-Length`. It does not buffer or measure the actual body stream. For streaming uploads,
+  consider using a transport-level limit instead.
 </Callout>
 
 ## What's next?

@@ -3,19 +3,19 @@ title: WebSocket
 description: Bidirectional RPC over a persistent connection — ideal for real-time features and subscriptions.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 
 Katman's default transport is HTTP — every procedure call is a separate request/response. WebSocket gives you a persistent connection instead. Messages skip the TCP handshake, which makes repeated calls faster and enables real-time server-to-client streaming.
 
 ## When to use WebSocket
 
-| Scenario | Recommendation |
-|---|---|
-| Standard API calls | HTTP (via `serve()` or `handler()`) |
-| High-frequency calls (many per second) | WebSocket |
-| Real-time subscriptions | WebSocket |
-| Server-to-client push | WebSocket |
+| Scenario                               | Recommendation                      |
+| -------------------------------------- | ----------------------------------- |
+| Standard API calls                     | HTTP (via `serve()` or `handler()`) |
+| High-frequency calls (many per second) | WebSocket                           |
+| Real-time subscriptions                | WebSocket                           |
+| Server-to-client push                  | WebSocket                           |
 
 For most APIs, HTTP is the right choice. WebSocket adds value when you need persistent connections or when you're making many calls per second and want to skip the per-request overhead.
 
@@ -25,13 +25,13 @@ If you're using `serve()`, add `ws: true`:
 
 ```ts twoslash
 // @noErrors
-import { katman } from "katman"
+import { katman } from 'katman'
 
 const k = katman({ context: (req) => ({}) })
 const { query, subscription, router } = k
 
 const appRouter = router({
-  health: query(() => ({ status: "ok" })),
+  health: query(() => ({ status: 'ok' })),
   countdown: subscription(async function* () {
     for (let i = 5; i > 0; i--) {
       yield { count: i }
@@ -54,8 +54,8 @@ If you have your own HTTP server (or an existing Fastify/Express app), attach We
 
 ```ts twoslash
 // @noErrors
-import { createServer } from "node:http"
-import { attachWebSocket } from "katman/ws"
+import { createServer } from 'node:http'
+import { attachWebSocket } from 'katman/ws'
 
 const server = createServer(yourHttpHandler)
 attachWebSocket(server, appRouter)
@@ -111,7 +111,7 @@ Here's a basic client using the native `WebSocket` API:
 
 ```ts twoslash
 // @noErrors
-const ws = new WebSocket("ws://localhost:3000")
+const ws = new WebSocket('ws://localhost:3000')
 
 // Track pending requests by ID
 const pending = new Map<string, (msg: any) => void>()
@@ -130,8 +130,8 @@ function call(path: string, input?: unknown): Promise<unknown> {
 }
 
 ws.onopen = async () => {
-  const users = await call("users/list", { limit: 10 })
-  console.log("Users:", users)
+  const users = await call('users/list', { limit: 10 })
+  console.log('Users:', users)
 }
 
 ws.onmessage = ({ data }) => {
@@ -151,13 +151,13 @@ ws.onmessage = ({ data }) => {
   const msg = JSON.parse(data)
 
   if (msg.done) {
-    console.log("Stream ended for", msg.id)
+    console.log('Stream ended for', msg.id)
   } else if (msg.data !== undefined) {
-    console.log("Stream data:", msg.data)
+    console.log('Stream data:', msg.data)
   } else if (msg.error) {
-    console.error("Error:", msg.error)
+    console.error('Error:', msg.error)
   } else {
-    console.log("Result:", msg.result)
+    console.log('Result:', msg.result)
   }
 }
 ```
@@ -168,15 +168,16 @@ Combine WebSocket with [MessagePack](/docs/protocols/msgpack) for smaller messag
 
 ```ts twoslash
 // @noErrors
-import { attachWebSocket } from "katman/ws"
+import { attachWebSocket } from 'katman/ws'
 
 attachWebSocket(server, appRouter, { binary: true })
 ```
 
 With binary mode, messages are sent as MessagePack-encoded binary frames instead of JSON text. On the client side, you'd use `msgpack` to encode/decode instead of `JSON.parse`/`JSON.stringify`.
 
-<Callout type="info">
-Binary WebSocket is especially useful for high-throughput scenarios where many small messages are sent per second. The combination of persistent connection + compact encoding gives you the lowest possible overhead.
+<Callout type='info'>
+  Binary WebSocket is especially useful for high-throughput scenarios where many small messages are sent per second. The
+  combination of persistent connection + compact encoding gives you the lowest possible overhead.
 </Callout>
 
 ## What's next?

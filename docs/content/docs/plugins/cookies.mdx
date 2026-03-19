@@ -3,8 +3,8 @@ title: Cookies
 description: Read, set, and delete cookies inside procedures — typed helpers with secure defaults.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 
 Lightweight cookie utilities for Katman handlers. No dependencies. Works with both `serve()` and `handler()`.
 
@@ -12,11 +12,11 @@ Lightweight cookie utilities for Katman handlers. No dependencies. Works with bo
 
 ```ts twoslash
 // @noErrors
-import { getCookie, parseCookies } from "katman/cookies"
+import { getCookie, parseCookies } from 'katman/cookies'
 
 const auth = k.guard((ctx) => {
-  const token = getCookie(ctx.headers, "session")
-  if (!token) throw new KatmanError("UNAUTHORIZED")
+  const token = getCookie(ctx.headers, 'session')
+  if (!token) throw new KatmanError('UNAUTHORIZED')
   return { sessionToken: token }
 })
 
@@ -31,14 +31,14 @@ const all = parseCookies(ctx.headers)
 
 ```ts twoslash
 // @noErrors
-import { setCookie } from "katman/cookies"
+import { setCookie } from 'katman/cookies'
 
-const header = setCookie("session", token, {
+const header = setCookie('session', token, {
   httpOnly: true,
   secure: true,
-  sameSite: "lax",
+  sameSite: 'lax',
   maxAge: 60 * 60 * 24, // 1 day
-  path: "/",
+  path: '/',
 })
 // "session=abc123; Path=/; Max-Age=86400; HttpOnly; Secure; SameSite=Lax"
 ```
@@ -47,26 +47,27 @@ const header = setCookie("session", token, {
 
 ```ts twoslash
 // @noErrors
-import { deleteCookie } from "katman/cookies"
+import { deleteCookie } from 'katman/cookies'
 
-const header = deleteCookie("session")
+const header = deleteCookie('session')
 // "session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax"
 ```
 
 ## Options
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `maxAge` | `number` | — | Cookie expiry in seconds from now |
-| `expires` | `Date` | — | Absolute expiry date |
-| `path` | `string` | `"/"` | Cookie path |
-| `domain` | `string` | — | Cookie domain |
-| `secure` | `boolean` | `true` in production | HTTPS only |
-| `httpOnly` | `boolean` | `true` | Prevent JavaScript access |
-| `sameSite` | `"strict" \| "lax" \| "none"` | `"lax"` | SameSite policy |
+| Option     | Type                          | Default              | Description                       |
+| ---------- | ----------------------------- | -------------------- | --------------------------------- |
+| `maxAge`   | `number`                      | —                    | Cookie expiry in seconds from now |
+| `expires`  | `Date`                        | —                    | Absolute expiry date              |
+| `path`     | `string`                      | `"/"`                | Cookie path                       |
+| `domain`   | `string`                      | —                    | Cookie domain                     |
+| `secure`   | `boolean`                     | `true` in production | HTTPS only                        |
+| `httpOnly` | `boolean`                     | `true`               | Prevent JavaScript access         |
+| `sameSite` | `"strict" \| "lax" \| "none"` | `"lax"`              | SameSite policy                   |
 
 <Callout>
-Defaults are secure by design: `HttpOnly`, `SameSite=Lax`, and `Secure` in production. You only need to override when you have a specific reason.
+  Defaults are secure by design: `HttpOnly`, `SameSite=Lax`, and `Secure` in production. You only need to override when
+  you have a specific reason.
 </Callout>
 
 ## What's next?

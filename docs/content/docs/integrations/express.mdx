@@ -3,7 +3,7 @@ title: Express
 description: Mount Katman as Express middleware — run RPC and REST routes on the same server.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
+import { Callout } from 'fumadocs-ui/components/callout'
 
 If you have an existing Express application, Katman can be mounted as middleware alongside your REST routes.
 
@@ -11,23 +11,26 @@ If you have an existing Express application, Katman can be mounted as middleware
 
 ```ts twoslash
 // @noErrors
-import express from "express"
-import { katmanExpress } from "katman/express"
+import express from 'express'
+import { katmanExpress } from 'katman/express'
 
 const app = express()
 app.use(express.json()) // Required for POST body parsing
 
 // Existing routes
-app.get("/api/health", (req, res) => res.json({ status: "ok" }))
+app.get('/api/health', (req, res) => res.json({ status: 'ok' }))
 
 // Katman RPC under /rpc
-app.use("/rpc", katmanExpress(appRouter, {
-  context: (req) => ({
-    db: getDB(),
-    user: req.user,
-    ip: req.ip,
+app.use(
+  '/rpc',
+  katmanExpress(appRouter, {
+    context: (req) => ({
+      db: getDB(),
+      user: req.user,
+      ip: req.ip,
+    }),
   }),
-}))
+)
 
 app.listen(3000)
 ```
@@ -40,7 +43,7 @@ The `context` function receives the Express request object. Bridge your existing
 // @noErrors
 katmanExpress(appRouter, {
   context: (req) => ({
-    user: req.user,           // from passport or similar
+    user: req.user, // from passport or similar
     ip: req.ip,
     headers: req.headers,
   }),
@@ -54,8 +57,9 @@ katmanExpress(appRouter, {
 - `GET /rpc/users/list?data={"limit":10}` → calls `users.list` with parsed query data
 - Unmatched paths pass through to the next Express middleware (`next()`)
 
-<Callout type="info">
-Make sure `express.json()` middleware is registered before the Katman middleware — otherwise POST bodies won't be parsed.
+<Callout type='info'>
+  Make sure `express.json()` middleware is registered before the Katman middleware — otherwise POST bodies won't be
+  parsed.
 </Callout>
 
 ## What's next?

@@ -3,8 +3,8 @@ title: Procedures
 description: The two ways to define an API endpoint — short form and full config.
 ---
 
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
-import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
+import { Callout } from 'fumadocs-ui/components/callout'
 
 A procedure is a single endpoint in your API. You create them with `query()`, `mutation()`, or `subscription()`.
 
@@ -14,16 +14,13 @@ The simplest way. Pass a schema and a function:
 
 ```ts twoslash
 // @noErrors
-import { z } from "zod"
+import { z } from 'zod'
 
 // No input
-const health = k.query(() => ({ status: "ok" }))
+const health = k.query(() => ({ status: 'ok' }))
 
 // With input validation
-const getUser = k.query(
-  z.object({ id: z.number() }),
-  ({ input, ctx }) => ctx.db.users.findById(input.id),
-)
+const getUser = k.query(z.object({ id: z.number() }), ({ input, ctx }) => ctx.db.users.findById(input.id))
 ```
 
 The first argument is the input schema. Katman validates the input before your function runs. If validation fails, the client gets a 400 error automatically.
@@ -34,16 +31,16 @@ When you need middleware, error definitions, or output validation, use an object
 
 ```ts twoslash
 // @noErrors
-import { z } from "zod"
+import { z } from 'zod'
 
 const createUser = k.mutation({
-  use: [auth],                                    // middleware
-  input: z.object({ name: z.string() }),          // input validation
-  output: z.object({ id: z.number() }),           // output validation (optional)
-  errors: { CONFLICT: 409 },                      // typed errors
+  use: [auth], // middleware
+  input: z.object({ name: z.string() }), // input validation
+  output: z.object({ id: z.number() }), // output validation (optional)
+  errors: { CONFLICT: 409 }, // typed errors
   resolve: ({ input, ctx, fail }) => {
     if (ctx.db.users.exists(input.name)) {
-      fail("CONFLICT")                            // typed — only codes from `errors`
+      fail('CONFLICT') // typed — only codes from `errors`
     }
     return ctx.db.users.create(input)
   },
@@ -52,14 +49,14 @@ const createUser = k.mutation({
 
 ### What each field does
 
-| Field | Required | Description |
-|---|---|---|
-| `resolve` | Yes | The function that does the work. Receives `{ input, ctx, fail, signal }`. |
-| `input` | No | A schema that validates the incoming data. |
-| `output` | No | A schema that validates the return value. |
-| `use` | No | An array of guards and wraps to run before the procedure. |
-| `errors` | No | A map of error codes to HTTP status codes. Enables the typed `fail()` function. |
-| `route` | No | HTTP route metadata (method, path, description). Used by OpenAPI. |
+| Field     | Required | Description                                                                     |
+| --------- | -------- | ------------------------------------------------------------------------------- |
+| `resolve` | Yes      | The function that does the work. Receives `{ input, ctx, fail, signal }`.       |
+| `input`   | No       | A schema that validates the incoming data.                                      |
+| `output`  | No       | A schema that validates the return value.                                       |
+| `use`     | No       | An array of guards and wraps to run before the procedure.                       |
+| `errors`  | No       | A map of error codes to HTTP status codes. Enables the typed `fail()` function. |
+| `route`   | No       | HTTP route metadata (method, path, description). Used by OpenAPI.               |
 
 ## The resolve function
 
@@ -121,6 +118,7 @@ const appRouter = k.router({
 ```
 
 The nesting becomes the URL path:
+
 - `users.list` → `POST /users/list`
 - `admin.stats` → `POST /admin/stats`
 
@@ -150,6 +148,4 @@ const cacheWrap = k.wrap(async (ctx, next) => {
 
 Common use cases: cache policies, rate limit tiers, feature flags, authorization rules, and documentation hints.
 
-<Callout>
-Export the router type so the client can use it: `export type AppRouter = typeof appRouter`
-</Callout>
+<Callout>Export the router type so the client can use it: `export type AppRouter = typeof appRouter`</Callout>

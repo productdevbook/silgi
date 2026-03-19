@@ -9,7 +9,7 @@ Two peers that can call each other's procedures simultaneously. Uses MessagePort
 
 ```ts twoslash
 // @noErrors
-import { createPeer } from "katman/peer"
+import { createPeer } from 'katman/peer'
 
 // Peer A (e.g., Electron main process)
 const peerA = createPeer(mainRouter, channel.port1)
@@ -21,7 +21,7 @@ const peerB = createPeer(rendererRouter, channel.port2)
 const data = await peerA.client.getRendererState()
 
 // B calls A's procedures
-const files = await peerB.client.readFiles({ dir: "/tmp" })
+const files = await peerB.client.readFiles({ dir: '/tmp' })
 ```
 
 ## Use cases
@@ -34,6 +34,7 @@ const files = await peerB.client.readFiles({ dir: "/tmp" })
 ## How it works
 
 `createPeer()` does two things on the same port:
+
 1. **Serves** your local router (handles incoming requests)
 2. **Creates** a typed client for the remote peer's router
 

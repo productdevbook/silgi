@@ -16,15 +16,7 @@
   "proseWrap": "preserve",
   "singleAttributePerLine": false,
   "sortImports": {
-    "groups": [
-      "builtin",
-      "external",
-      "internal",
-      "parent",
-      "sibling",
-      "index",
-      "type"
-    ],
+    "groups": ["builtin", "external", "internal", "parent", "sibling", "index", "type"],
     "order": "asc",
     "ignoreCase": true,
     "newlinesBetween": true,
@@ -38,6 +30,7 @@
     ".nitro",
     ".next",
     ".nuxt",
-    "*.md"
+    "*.md",
+    "docs/content/docs/errors.mdx"
   ]
 }

@@ -6,7 +6,7 @@
  * Run: node --experimental-strip-types bench/http-floor.ts
  */
 
-import { createServer, type Server } from 'node:http'
+import { createServer } from 'node:http'
 
 import { os as orpcOs } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/node'
@@ -14,6 +14,8 @@ import { z } from 'zod'
 
 import { compileRouter, ContextPool } from '../src/compile.ts'
 import { katman } from '../src/katman.ts'
+
+import type { Server } from 'node:http'
 
 const N = 5000
 

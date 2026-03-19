@@ -6,9 +6,11 @@
  * Run: node --experimental-strip-types bench/vs-h3.ts
  */
 
-import { createServer, type Server } from 'node:http'
+import { createServer } from 'node:http'
 
 import { z } from 'zod'
+
+import type { Server } from 'node:http'
 
 const ITERATIONS = 3000
 const KATMAN_PORT = 4200

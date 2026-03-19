@@ -3,16 +3,16 @@ title: Fastify
 description: Mount Katman as a Fastify plugin — run RPC and REST routes on the same server.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
-import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Step, Steps } from 'fumadocs-ui/components/steps'
 
 Katman has a built-in `serve()` function that creates its own HTTP server. But if you already have a Fastify application with REST routes, middleware, and plugins, you can add Katman alongside everything else using the Fastify adapter.
 
 ## When to use this
 
-| Approach | When |
-|---|---|
-| `k.serve(router)` | New project, Katman-only server |
+| Approach                | When                                  |
+| ----------------------- | ------------------------------------- |
+| `k.serve(router)`       | New project, Katman-only server       |
 | `katmanFastify(router)` | Adding RPC to an existing Fastify app |
 
 ## Setup
@@ -40,22 +40,25 @@ If you haven't defined a router yet, see the [Getting Started](/docs/getting-sta
 
 ```ts twoslash
 // @noErrors
-import Fastify from "fastify"
-import { katmanFastify } from "katman/fastify"
-import { appRouter } from "./router"
+import Fastify from 'fastify'
+import { katmanFastify } from 'katman/fastify'
+import { appRouter } from './router'
 
 const app = Fastify()
 
 // Your existing REST routes
-app.get("/api/health", async () => ({ type: "rest" }))
+app.get('/api/health', async () => ({ type: 'rest' }))
 
 // Katman RPC under /rpc prefix
-app.register(katmanFastify(appRouter, {
-  context: (req) => ({
-    user: req.user,
-    ip: req.ip,
+app.register(
+  katmanFastify(appRouter, {
+    context: (req) => ({
+      user: req.user,
+      ip: req.ip,
+    }),
   }),
-}), { prefix: "/rpc" })
+  { prefix: '/rpc' },
+)
 
 app.listen({ port: 3000 })
 ```
@@ -79,9 +82,9 @@ The `context` option receives the Fastify request object. Use it to bridge Fasti
 // @noErrors
 katmanFastify(appRouter, {
   context: (req) => ({
-    user: req.user,            // from @fastify/jwt or similar
-    ip: req.ip,                // client IP
-    headers: req.headers,      // raw headers
+    user: req.user, // from @fastify/jwt or similar
+    ip: req.ip, // client IP
+    headers: req.headers, // raw headers
   }),
 })
 ```
@@ -94,8 +97,9 @@ Content negotiation works automatically. If the client sends `Accept: applicatio
 
 Fastify's built-in JSON parser handles request body parsing. The adapter only needs to encode the response.
 
-<Callout type="info">
-Fastify's schema-based serialization is not used here — Katman has its own compiled serializers. Request bodies are parsed by Fastify, but response encoding is handled by Katman for consistency with `serve()` and `handler()`.
+<Callout type='info'>
+  Fastify's schema-based serialization is not used here — Katman has its own compiled serializers. Request bodies are
+  parsed by Fastify, but response encoding is handled by Katman for consistency with `serve()` and `handler()`.
 </Callout>
 
 ## Error handling

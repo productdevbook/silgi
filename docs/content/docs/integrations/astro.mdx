@@ -12,11 +12,11 @@ Create a catch-all API route:
 ```ts twoslash
 // @noErrors
 // src/pages/api/rpc/[...path].ts
-import { katmanAstro } from "katman/astro"
-import { appRouter } from "~/server/rpc"
+import { katmanAstro } from 'katman/astro'
+import { appRouter } from '~/server/rpc'
 
 const handler = katmanAstro(appRouter, {
-  prefix: "/api/rpc",
+  prefix: '/api/rpc',
   context: (ctx) => ({
     db: getDB(),
     headers: Object.fromEntries(ctx.request.headers),
@@ -43,7 +43,7 @@ Katman requires server-side rendering. Enable it in your Astro config:
 // @noErrors
 // astro.config.mjs
 export default defineConfig({
-  output: "server",
+  output: 'server',
 })
 ```
 

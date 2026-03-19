@@ -4,7 +4,7 @@
  * Spins up a real katman server and tests the ofetch-based client.
  */
 
-import { createServer, type Server } from 'node:http'
+import { createServer } from 'node:http'
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { z } from 'zod'
@@ -14,6 +14,7 @@ import { createClient } from '#src/client/client.ts'
 import { katman } from '#src/katman.ts'
 
 import type { InferClient } from '#src/types.ts'
+import type { Server } from 'node:http'
 
 // ── Server Setup ────────────────────────────────────
 

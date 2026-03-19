@@ -9,18 +9,20 @@ description: Use Katman with Elysia on Bun — register as an Elysia plugin.
 
 ```ts twoslash
 // @noErrors
-import { Elysia } from "elysia"
-import { katmanElysia } from "katman/elysia"
+import { Elysia } from 'elysia'
+import { katmanElysia } from 'katman/elysia'
 
 const app = new Elysia()
-  .get("/", () => "Hello from Elysia")
-  .use(katmanElysia(appRouter, {
-    prefix: "/rpc",
-    context: (ctx) => ({
-      db: getDB(),
-      user: ctx.store?.user,
+  .get('/', () => 'Hello from Elysia')
+  .use(
+    katmanElysia(appRouter, {
+      prefix: '/rpc',
+      context: (ctx) => ({
+        db: getDB(),
+        user: ctx.store?.user,
+      }),
     }),
-  }))
+  )
   .listen(3000)
 ```
 
@@ -33,7 +35,7 @@ The context factory receives the Elysia context — access `store`, `request`, `
 katmanElysia(appRouter, {
   context: (ctx) => ({
     user: ctx.store?.user,
-    ip: ctx.request.headers.get("x-forwarded-for"),
+    ip: ctx.request.headers.get('x-forwarded-for'),
   }),
 })
 ```

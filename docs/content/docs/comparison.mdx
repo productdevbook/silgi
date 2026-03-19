@@ -3,45 +3,43 @@ title: Comparison
 description: How Katman compares to oRPC, tRPC, ts-rest, and Hono — features, architecture, and benchmarks.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
+import { Callout } from 'fumadocs-ui/components/callout'
 
 ## Feature matrix
 
-| Feature | Katman | oRPC | tRPC | ts-rest |
-|---|---|---|---|---|
-| End-to-end type-safe I/O | Yes | Yes | Yes | Yes |
-| End-to-end type-safe errors | Yes | Yes | Partial | Yes |
-| End-to-end type-safe File/Blob | Yes | Yes | Partial | No |
-| End-to-end type-safe streaming | Yes | Yes | Yes | No |
-| Single package | **1 package** | 35 packages | 4+ packages | 3+ packages |
-| Middleware model | **Guard + Wrap** | Middleware chain | Middleware chain | — |
-| Compiled pipeline | **Yes** | No | No | No |
-| Content negotiation | **Automatic** | RPC protocol | No | No |
-| JSON protocol | Yes | Yes | Yes | Yes |
-| MessagePack (binary) | **Built-in** | Via RPC protocol | Via superjson link | No |
-| devalue (rich types) | **Built-in** | Native types via RPC | Via superjson | No |
-| WebSocket RPC | Yes | Yes | Yes | No |
-| Contract-first | Yes | Yes | No | Yes |
-| Standard Schema (Zod, Valibot, ArkType) | Yes | Yes | Yes | No |
-| OpenAPI generation | Built-in (Scalar) | Plugin | Via trpc-openapi | Built-in |
-| SSE / Streaming | Yes | Yes | Yes | No |
-| Server Actions (React) | Built-in | Built-in | Yes | No |
-| TanStack Query (React) | Built-in | Built-in | Built-in | Partial |
-| TanStack Query (Vue) | Yes | Yes | No | Partial |
-| TanStack Query (Solid) | Yes | Yes | No | Partial |
-| TanStack Query (Svelte) | Yes | Yes | No | No |
-| AI SDK integration | Built-in | Built-in | No | No |
-| Batch requests | Yes | Yes | Yes | No |
-| Lazy routing | Yes | Yes | Yes | No |
-| NestJS integration | Yes | Yes | Partial | Yes |
-| Message Port (Electron, Workers) | Yes | Yes | Partial | No |
-| CF WebSocket Hibernation | No | Yes | No | No |
-| Framework adapters | **15** | 17+ | 4+ | 2 |
-| Built-in plugins | **15** | 14+ | — | — |
+| Feature                                 | Katman            | oRPC                 | tRPC               | ts-rest     |
+| --------------------------------------- | ----------------- | -------------------- | ------------------ | ----------- |
+| End-to-end type-safe I/O                | Yes               | Yes                  | Yes                | Yes         |
+| End-to-end type-safe errors             | Yes               | Yes                  | Partial            | Yes         |
+| End-to-end type-safe File/Blob          | Yes               | Yes                  | Partial            | No          |
+| End-to-end type-safe streaming          | Yes               | Yes                  | Yes                | No          |
+| Single package                          | **1 package**     | 35 packages          | 4+ packages        | 3+ packages |
+| Middleware model                        | **Guard + Wrap**  | Middleware chain     | Middleware chain   | —           |
+| Compiled pipeline                       | **Yes**           | No                   | No                 | No          |
+| Content negotiation                     | **Automatic**     | RPC protocol         | No                 | No          |
+| JSON protocol                           | Yes               | Yes                  | Yes                | Yes         |
+| MessagePack (binary)                    | **Built-in**      | Via RPC protocol     | Via superjson link | No          |
+| devalue (rich types)                    | **Built-in**      | Native types via RPC | Via superjson      | No          |
+| WebSocket RPC                           | Yes               | Yes                  | Yes                | No          |
+| Contract-first                          | Yes               | Yes                  | No                 | Yes         |
+| Standard Schema (Zod, Valibot, ArkType) | Yes               | Yes                  | Yes                | No          |
+| OpenAPI generation                      | Built-in (Scalar) | Plugin               | Via trpc-openapi   | Built-in    |
+| SSE / Streaming                         | Yes               | Yes                  | Yes                | No          |
+| Server Actions (React)                  | Built-in          | Built-in             | Yes                | No          |
+| TanStack Query (React)                  | Built-in          | Built-in             | Built-in           | Partial     |
+| TanStack Query (Vue)                    | Yes               | Yes                  | No                 | Partial     |
+| TanStack Query (Solid)                  | Yes               | Yes                  | No                 | Partial     |
+| TanStack Query (Svelte)                 | Yes               | Yes                  | No                 | No          |
+| AI SDK integration                      | Built-in          | Built-in             | No                 | No          |
+| Batch requests                          | Yes               | Yes                  | Yes                | No          |
+| Lazy routing                            | Yes               | Yes                  | Yes                | No          |
+| NestJS integration                      | Yes               | Yes                  | Partial            | Yes         |
+| Message Port (Electron, Workers)        | Yes               | Yes                  | Partial            | No          |
+| CF WebSocket Hibernation                | No                | Yes                  | No                 | No          |
+| Framework adapters                      | **15**            | 17+                  | 4+                 | 2           |
+| Built-in plugins                        | **15**            | 14+                  | —                  | —           |
 
-<Callout>
-This table is maintained honestly. Where oRPC or tRPC has a feature we don't, it's marked accurately.
-</Callout>
+<Callout>This table is maintained honestly. Where oRPC or tRPC has a feature we don't, it's marked accurately.</Callout>
 
 ## Architecture differences
 
@@ -51,10 +49,10 @@ Katman ships everything as one `npm install katman` with subpath imports:
 
 ```ts twoslash
 // @noErrors
-import { katman } from "katman"
-import { createClient } from "katman/client"
-import { katmanHono } from "katman/hono"
-import { otelWrap } from "katman/otel"
+import { katman } from 'katman'
+import { createClient } from 'katman/client'
+import { katmanHono } from 'katman/hono'
+import { otelWrap } from 'katman/otel'
 ```
 
 oRPC requires separate installs: `@orpc/server`, `@orpc/client`, `@orpc/react-query`, `@orpc/openapi`, `@orpc/zod`, etc. Both approaches work — single package is simpler to manage, monorepo packages allow finer dependency control.
@@ -76,6 +74,7 @@ Guards are semantically clearer and faster (no async overhead when sync). oRPC's
 ### Compiled pipeline vs runtime dispatch
 
 Katman compiles the middleware chain once at startup:
+
 - Guards are unrolled (0-4 specialization, no loop)
 - Context pool eliminates per-request allocation
 - Handler analysis skips unused features
@@ -98,12 +97,12 @@ All benchmarks run on the same machine (Apple M3 Max, Node v24.11.0). Sequential
 
 Measures raw middleware pipeline overhead — how fast the framework processes a call after TCP/HTTP is stripped away.
 
-| Scenario | Katman | oRPC | H3 v2 | vs oRPC | vs H3 |
-|---|---|---|---|---|---|
-| No middleware | **111 ns** | 685 ns | 2,025 ns | **6.2x faster** | **18.2x faster** |
-| Zod input validation | **241 ns** | 804 ns | 4,214 ns | **3.3x faster** | **17.5x faster** |
-| 3 middleware + Zod | **297 ns** | 1,718 ns | 3,954 ns | **5.8x faster** | **13.3x faster** |
-| 5 middleware + Zod | **413 ns** | 2,219 ns | 3,917 ns | **5.4x faster** | **9.5x faster** |
+| Scenario             | Katman     | oRPC     | H3 v2    | vs oRPC         | vs H3            |
+| -------------------- | ---------- | -------- | -------- | --------------- | ---------------- |
+| No middleware        | **111 ns** | 685 ns   | 2,025 ns | **6.2x faster** | **18.2x faster** |
+| Zod input validation | **241 ns** | 804 ns   | 4,214 ns | **3.3x faster** | **17.5x faster** |
+| 3 middleware + Zod   | **297 ns** | 1,718 ns | 3,954 ns | **5.8x faster** | **13.3x faster** |
+| 5 middleware + Zod   | **413 ns** | 2,219 ns | 3,917 ns | **5.4x faster** | **9.5x faster**  |
 
 Katman's compiled pipeline (unrolled guards, context pool) is **3-6x faster than oRPC** and **9-18x faster than H3** at the pipeline level.
 
@@ -111,17 +110,17 @@ Katman's compiled pipeline (unrolled guards, context pool) is **3-6x faster than
 
 Real HTTP servers, real TCP connections, 3000 sequential requests per scenario.
 
-| Scenario | Katman | oRPC | H3 v2 | Hono |
-|---|---|---|---|---|
+| Scenario               | Katman              | oRPC            | H3 v2           | Hono            |
+| ---------------------- | ------------------- | --------------- | --------------- | --------------- |
 | Simple (no middleware) | **79µs** (12,592/s) | 83µs (12,048/s) | 78µs (12,753/s) | 74µs (13,516/s) |
-| Zod validation | **86µs** (11,627/s) | 120µs (8,315/s) | 93µs (10,707/s) | 97µs (10,280/s) |
-| Guard + Zod | **79µs** (12,706/s) | 116µs (8,625/s) | 96µs (10,359/s) | 102µs (9,799/s) |
+| Zod validation         | **86µs** (11,627/s) | 120µs (8,315/s) | 93µs (10,707/s) | 97µs (10,280/s) |
+| Guard + Zod            | **79µs** (12,706/s) | 116µs (8,625/s) | 96µs (10,359/s) | 102µs (9,799/s) |
 
-| Comparison | Simple | Zod | Guard + Zod |
-|---|---|---|---|
-| Katman vs oRPC | ~tied | **1.4x faster** | **1.5x faster** |
-| Katman vs H3 | ~tied | **1.1x faster** | **1.2x faster** |
-| Katman vs Hono | 0.9x | **1.1x faster** | **1.3x faster** |
+| Comparison     | Simple | Zod             | Guard + Zod     |
+| -------------- | ------ | --------------- | --------------- |
+| Katman vs oRPC | ~tied  | **1.4x faster** | **1.5x faster** |
+| Katman vs H3   | ~tied  | **1.1x faster** | **1.2x faster** |
+| Katman vs Hono | 0.9x   | **1.1x faster** | **1.3x faster** |
 
 For simple routes, all four are within 10% — TCP overhead dominates. As middleware complexity grows, Katman's compiled pipeline pulls ahead: **1.5x faster than oRPC** and **1.2-1.3x faster than H3/Hono** with guards + validation.
 
@@ -129,22 +128,22 @@ For simple routes, all four are within 10% — TCP overhead dominates. As middle
 
 Real Nitro dev server process vs Katman `serve()`, 2000 requests.
 
-| Scenario | Katman serve() | Nitro v3 (real) | |
-|---|---|---|---|
+| Scenario               | Katman serve()          | Nitro v3 (real)     |                 |
+| ---------------------- | ----------------------- | ------------------- | --------------- |
 | Health (no middleware) | **102µs** / 9,781 req/s | 238µs / 4,208 req/s | **2.3x faster** |
-| List + Zod validation | **108µs** / 9,250 req/s | 231µs / 4,322 req/s | **2.1x faster** |
+| List + Zod validation  | **108µs** / 9,250 req/s | 231µs / 4,322 req/s | **2.1x faster** |
 | Guard + Zod validation | **108µs** / 9,268 req/s | 223µs / 4,484 req/s | **2.1x faster** |
 
 Nitro adds srvx abstraction, H3 middleware chain, and Node→Fetch conversion per request. Production builds would be faster, but the H3/srvx layer remains.
 
 ### Tail latency (p99)
 
-| Scenario (Guard + Zod) | avg | p50 | p99 |
-|---|---|---|---|
-| **Katman** | **79µs** | **70µs** | **148µs** |
-| oRPC | 116µs | 103µs | 223µs |
-| H3 v2 | 96µs | 82µs | 236µs |
-| Hono | 102µs | 87µs | 194µs |
+| Scenario (Guard + Zod) | avg      | p50      | p99       |
+| ---------------------- | -------- | -------- | --------- |
+| **Katman**             | **79µs** | **70µs** | **148µs** |
+| oRPC                   | 116µs    | 103µs    | 223µs     |
+| H3 v2                  | 96µs     | 82µs     | 236µs     |
+| Hono                   | 102µs    | 87µs     | 194µs     |
 
 Katman's p99 is **34% lower** than oRPC and **37% lower** than H3 — compiled pipelines keep tail latency predictable.
 
@@ -152,18 +151,18 @@ Katman's p99 is **34% lower** than oRPC and **37% lower** than H3 — compiled p
 
 > 50K calls, 3 guards + Zod validation, measured with `--expose-gc`
 
-| Framework | Bytes per call | Ratio |
-|---|---|---|
-| **Katman** | ~40 bytes | **1x** |
-| oRPC | ~56 bytes | 1.4x more |
+| Framework  | Bytes per call | Ratio     |
+| ---------- | -------------- | --------- |
+| **Katman** | ~40 bytes      | **1x**    |
+| oRPC       | ~56 bytes      | 1.4x more |
 
 ### WebSocket performance
 
 > 2000 sequential messages over persistent connection
 
-| Scenario | Katman | oRPC | H3 v2 |
-|---|---|---|---|
-| Simple query | **39µs** | 42µs | 34µs |
+| Scenario     | Katman   | oRPC | H3 v2 |
+| ------------ | -------- | ---- | ----- |
+| Simple query | **39µs** | 42µs | 34µs  |
 
 WebSocket eliminates TCP handshake overhead. All three are close — H3 is slightly faster here.
 
@@ -174,12 +173,9 @@ WebSocket eliminates TCP handshake overhead. All three are close — H3 is sligh
 - All benchmarks are sequential (1 connection). Concurrent load may show different characteristics.
 
 <Callout>
-Reproduce on your hardware:
-```bash
-node --experimental-strip-types bench/vs-all.ts     # Katman vs oRPC vs H3 vs Hono
-node --experimental-strip-types bench/vs-nitro.ts   # vs real Nitro server
-node --experimental-strip-types bench/pipeline.ts   # pipeline only (no HTTP)
-```
+  Reproduce on your hardware: ```bash node --experimental-strip-types bench/vs-all.ts # Katman vs oRPC vs H3 vs Hono
+  node --experimental-strip-types bench/vs-nitro.ts # vs real Nitro server node --experimental-strip-types
+  bench/pipeline.ts # pipeline only (no HTTP) ```
 </Callout>
 
 ## Where oRPC is ahead
@@ -204,15 +200,15 @@ Being honest about oRPC's strengths:
 
 ## When to choose what
 
-| You need | Choose |
-|---|---|
-| Simplest setup (1 install, everything works) | **Katman** |
-| Largest ecosystem, niche integrations | **oRPC** |
-| Migrate from tRPC | **Katman** (`fromTRPC()`) or **oRPC** (`toORPCRouter()`) |
-| Contract-first with OpenAPI | **Katman**, **oRPC**, or **ts-rest** |
-| Cloudflare Durable Objects | **oRPC** |
-| Lowest per-request latency | **Katman** |
-| Already using Hono as your framework | **Hono** native |
+| You need                                     | Choose                                                   |
+| -------------------------------------------- | -------------------------------------------------------- |
+| Simplest setup (1 install, everything works) | **Katman**                                               |
+| Largest ecosystem, niche integrations        | **oRPC**                                                 |
+| Migrate from tRPC                            | **Katman** (`fromTRPC()`) or **oRPC** (`toORPCRouter()`) |
+| Contract-first with OpenAPI                  | **Katman**, **oRPC**, or **ts-rest**                     |
+| Cloudflare Durable Objects                   | **oRPC**                                                 |
+| Lowest per-request latency                   | **Katman**                                               |
+| Already using Hono as your framework         | **Hono** native                                          |
 
 ## What's next?
 

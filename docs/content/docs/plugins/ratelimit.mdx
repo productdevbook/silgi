@@ -3,8 +3,8 @@ title: Rate Limiting
 description: Sliding window rate limiter — protect your API with in-memory or pluggable backends like Redis.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 
 Rate limiting prevents clients from making too many requests in a short period. Katman provides a guard middleware that uses a sliding window algorithm and works with an in-memory store or any custom backend.
 
@@ -12,14 +12,14 @@ Rate limiting prevents clients from making too many requests in a short period. 
 
 ```ts twoslash
 // @noErrors
-import { rateLimitGuard, MemoryRateLimiter } from "katman/ratelimit"
+import { rateLimitGuard, MemoryRateLimiter } from 'katman/ratelimit'
 
 const rateLimit = rateLimitGuard({
   limiter: new MemoryRateLimiter({
-    limit: 100,        // max 100 requests
-    windowMs: 60_000,  // per 60 seconds
+    limit: 100, // max 100 requests
+    windowMs: 60_000, // per 60 seconds
   }),
-  keyFn: (ctx) => ctx.ip ?? "anonymous",
+  keyFn: (ctx) => ctx.ip ?? 'anonymous',
 })
 ```
 
@@ -53,18 +53,18 @@ The `retryAfter` field tells the client how many seconds to wait before trying a
 
 ## How the key function works
 
-The `keyFn` determines *who* is being rate-limited. Different keys mean different rate limit buckets:
+The `keyFn` determines _who_ is being rate-limited. Different keys mean different rate limit buckets:
 
 ```ts twoslash
 // @noErrors
 // Rate limit by IP address
-keyFn: (ctx) => ctx.ip ?? "anonymous"
+keyFn: (ctx) => ctx.ip ?? 'anonymous'
 
 // Rate limit by authenticated user
 keyFn: (ctx) => ctx.user?.id ?? ctx.ip
 
 // Rate limit by API key
-keyFn: (ctx) => ctx.headers["x-api-key"] ?? "no-key"
+keyFn: (ctx) => ctx.headers['x-api-key'] ?? 'no-key'
 ```
 
 Each unique key gets its own counter. So if you key by user ID, one user hitting the limit doesn't affect other users.
@@ -87,12 +87,12 @@ const listUsers = k.query({
 
 The `ctx.rateLimit` object has:
 
-| Property | Type | Description |
-|---|---|---|
-| `success` | `boolean` | Always `true` (the guard throws if `false`) |
-| `limit` | `number` | Maximum requests allowed |
-| `remaining` | `number` | Requests remaining in the current window |
-| `reset` | `number` | Unix timestamp (ms) when the window resets |
+| Property    | Type      | Description                                 |
+| ----------- | --------- | ------------------------------------------- |
+| `success`   | `boolean` | Always `true` (the guard throws if `false`) |
+| `limit`     | `number`  | Maximum requests allowed                    |
+| `remaining` | `number`  | Requests remaining in the current window    |
+| `reset`     | `number`  | Unix timestamp (ms) when the window resets  |
 
 ## MemoryRateLimiter
 
@@ -100,18 +100,18 @@ The built-in limiter stores counters in memory using a sliding window algorithm:
 
 ```ts twoslash
 // @noErrors
-import { MemoryRateLimiter } from "katman/ratelimit"
+import { MemoryRateLimiter } from 'katman/ratelimit'
 
 const limiter = new MemoryRateLimiter({
-  limit: 100,        // max requests per window
-  windowMs: 60_000,  // window duration in milliseconds
+  limit: 100, // max requests per window
+  windowMs: 60_000, // window duration in milliseconds
 })
 ```
 
 This works well for single-server deployments. Counters are lost when the server restarts, which is usually fine — rate limiting is about preventing abuse, not exact accounting.
 
 <Callout>
-For multi-server deployments, use a shared backend like Redis. See below for how to plug in a custom rate limiter.
+  For multi-server deployments, use a shared backend like Redis. See below for how to plug in a custom rate limiter.
 </Callout>
 
 ## Custom backend
@@ -125,65 +125,67 @@ The rate limiter is an interface with a single method. Implement it for Redis, U
 import type { RateLimiter, RateLimitResult } from "katman/ratelimit"
 
 interface RateLimiter {
-  limit(key: string): Promise<RateLimitResult>
+limit(key: string): Promise<RateLimitResult>
 }
 
 interface RateLimitResult {
-  success: boolean
-  limit: number
-  remaining: number
-  reset: number // Unix timestamp in ms
+success: boolean
+limit: number
+remaining: number
+reset: number // Unix timestamp in ms
 }
-  ```
-  </Tab>
-  <Tab value="Redis example">
-  ```ts twoslash
+
+````
+</Tab>
+<Tab value="Redis example">
+```ts twoslash
 // @noErrors
 import type { RateLimiter, RateLimitResult } from "katman/ratelimit"
 import Redis from "ioredis"
 
 class RedisRateLimiter implements RateLimiter {
-  #redis = new Redis()
-  #limit: number
-  #windowMs: number
+#redis = new Redis()
+#limit: number
+#windowMs: number
 
-  constructor(limit: number, windowMs: number) {
-    this.#limit = limit
-    this.#windowMs = windowMs
+constructor(limit: number, windowMs: number) {
+  this.#limit = limit
+  this.#windowMs = windowMs
+}
+
+async limit(key: string): Promise<RateLimitResult> {
+  const now = Date.now()
+  const windowKey = `rl:${key}:${Math.floor(now / this.#windowMs)}`
+
+  const count = await this.#redis.incr(windowKey)
+  if (count === 1) await this.#redis.pexpire(windowKey, this.#windowMs)
+
+  return {
+    success: count <= this.#limit,
+    limit: this.#limit,
+    remaining: Math.max(0, this.#limit - count),
+    reset: (Math.floor(now / this.#windowMs) + 1) * this.#windowMs,
   }
-
-  async limit(key: string): Promise<RateLimitResult> {
-    const now = Date.now()
-    const windowKey = `rl:${key}:${Math.floor(now / this.#windowMs)}`
-
-    const count = await this.#redis.incr(windowKey)
-    if (count === 1) await this.#redis.pexpire(windowKey, this.#windowMs)
-
-    return {
-      success: count <= this.#limit,
-      limit: this.#limit,
-      remaining: Math.max(0, this.#limit - count),
-      reset: (Math.floor(now / this.#windowMs) + 1) * this.#windowMs,
-    }
-  }
+}
 }
 
 // Use it like the MemoryRateLimiter
 const rateLimit = rateLimitGuard({
-  limiter: new RedisRateLimiter(100, 60_000),
-  keyFn: (ctx) => ctx.ip,
+limiter: new RedisRateLimiter(100, 60_000),
+keyFn: (ctx) => ctx.ip,
 })
-  ```
+````
+
   </Tab>
 </Tabs>
 
 ## Options
 
-| Option | Type | Required | Description |
-|---|---|---|---|
-| `limiter` | `RateLimiter` | Yes | The rate limiter instance (in-memory, Redis, etc.) |
-| `keyFn` | `(ctx) => string \| Promise<string>` | Yes | Extract the rate limit key from the context |
-| `message` | `string` | No | Custom error message (default: `"Rate limit exceeded"`) |
+| Option    | Type                                 | Required | Description                                             |
+| --------- | ------------------------------------ | -------- | ------------------------------------------------------- |
+| `limiter` | `RateLimiter`                        | Yes      | The rate limiter instance (in-memory, Redis, etc.)      |
+| `keyFn`   | `(ctx) => string \| Promise<string>` | Yes      | Extract the rate limit key from the context             |
+| `message` | `string`                             | No       | Custom error message (default: `"Rate limit exceeded"`) |
 
 ## Different limits per endpoint
 

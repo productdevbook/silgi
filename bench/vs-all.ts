@@ -7,9 +7,11 @@
  * Run: node --experimental-strip-types bench/vs-all.ts
  */
 
-import { createServer, type Server } from 'node:http'
+import { createServer } from 'node:http'
 
 import { z } from 'zod'
+
+import type { Server } from 'node:http'
 
 const ITERATIONS = 3000
 const PORTS = { katman: 4500, orpc: 4501, h3: 4502, hono: 4503, trpc: 4504 }

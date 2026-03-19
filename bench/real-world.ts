@@ -8,15 +8,18 @@
  * Run: node --experimental-strip-types bench/real-world.ts
  */
 
-import { createServer, type Server } from 'node:http'
+import { createServer } from 'node:http'
 
 import { os as orpcOs } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/node'
 import { z } from 'zod'
 
-import { compileRouter, ContextPool, type CompiledRoute } from '../src/compile.ts'
+import { compileRouter, ContextPool } from '../src/compile.ts'
 import { katman } from '../src/katman.ts'
 import { ResponseCache } from '../src/response-cache.ts'
+
+import type { CompiledRoute } from '../src/compile.ts'
+import type { Server } from 'node:http'
 
 const KATMAN_PORT = 4400
 const ORPC_PORT = 4401

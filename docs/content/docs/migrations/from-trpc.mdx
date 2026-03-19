@@ -3,9 +3,9 @@ title: Migrating from tRPC
 description: Step-by-step guide to migrate from tRPC to Katman.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
-import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
+import { Step, Steps } from 'fumadocs-ui/components/steps'
 
 Migrate incrementally. Start serving your existing tRPC router through Katman today, then rewrite procedures at your own pace.
 
@@ -15,9 +15,9 @@ Use `fromTRPC()` to convert your entire tRPC router. Everything keeps working �
 
 ```ts twoslash
 // @noErrors
-import { katman } from "katman"
-import { fromTRPC } from "katman/trpc"
-import { trpcRouter } from "./trpc-router"
+import { katman } from 'katman'
+import { fromTRPC } from 'katman/trpc'
+import { trpcRouter } from './trpc-router'
 
 const k = katman({
   context: (req) => ({
@@ -34,8 +34,9 @@ k.serve(appRouter, { port: 3000 })
 
 Your existing tRPC client still works. Point it at the new server and everything connects.
 
-<Callout type="info">
-`fromTRPC()` wraps each tRPC procedure resolver. tRPC middleware still runs inside the procedure — it is not converted to Katman guards/wraps. This is intentional: nothing breaks.
+<Callout type='info'>
+  `fromTRPC()` wraps each tRPC procedure resolver. tRPC middleware still runs inside the procedure — it is not converted
+  to Katman guards/wraps. This is intentional: nothing breaks.
 </Callout>
 
 ## Phase 2: Incremental rewrite
@@ -56,23 +57,23 @@ Start with a simple query. Here's the tRPC version:
   import { z } from "zod"
   import { t } from "./trpc"
 
-  export const listUsers = t.procedure
-    .input(z.object({ limit: z.number().optional() }))
-    .query(({ input, ctx }) => {
-      return ctx.db.users.findMany({ take: input.limit })
-    })
-  ```
-  </Tab>
-  <Tab value="Katman (after)">
-  ```ts twoslash
-  // @noErrors
-  import { z } from "zod"
+export const listUsers = t.procedure.input(z.object({ limit: z.number().optional() })).query(({ input, ctx }) => {
+  return ctx.db.users.findMany({ take: input.limit })
+})
 
-  const listUsers = k.query(
-    z.object({ limit: z.number().optional() }),
-    ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
-  )
-  ```
+````
+</Tab>
+<Tab value="Katman (after)">
+```ts twoslash
+// @noErrors
+import { z } from "zod"
+
+const listUsers = k.query(
+  z.object({ limit: z.number().optional() }),
+  ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
+)
+````
+
   </Tab>
 </Tabs>
 
@@ -92,31 +93,31 @@ tRPC middleware becomes Katman guards (for auth/context) or wraps (for before+af
     return next({ ctx: { user: ctx.session.user } })
   })
 
-  const protectedProcedure = t.procedure.use(isAuthed)
+const protectedProcedure = t.procedure.use(isAuthed)
 
-  export const createUser = protectedProcedure
-    .input(z.object({ name: z.string() }))
-    .mutation(({ input, ctx }) => {
-      return ctx.db.users.create({ ...input, createdBy: ctx.user.id })
-    })
-  ```
-  </Tab>
-  <Tab value="Katman (after)">
-  ```ts twoslash
-  // @noErrors
-  const auth = k.guard(async (ctx) => {
-    if (!ctx.session) throw new KatmanError("UNAUTHORIZED")
-    return { user: ctx.session.user }
-  })
+export const createUser = protectedProcedure.input(z.object({ name: z.string() })).mutation(({ input, ctx }) => {
+  return ctx.db.users.create({ ...input, createdBy: ctx.user.id })
+})
 
-  const createUser = k.mutation({
-    use: [auth],
-    input: z.object({ name: z.string() }),
-    resolve: ({ input, ctx }) => {
-      return ctx.db.users.create({ ...input, createdBy: ctx.user.id })
-    },
-  })
-  ```
+````
+</Tab>
+<Tab value="Katman (after)">
+```ts twoslash
+// @noErrors
+const auth = k.guard(async (ctx) => {
+  if (!ctx.session) throw new KatmanError("UNAUTHORIZED")
+  return { user: ctx.session.user }
+})
+
+const createUser = k.mutation({
+  use: [auth],
+  input: z.object({ name: z.string() }),
+  resolve: ({ input, ctx }) => {
+    return ctx.db.users.create({ ...input, createdBy: ctx.user.id })
+  },
+})
+````
+
   </Tab>
 </Tabs>
 
@@ -133,31 +134,33 @@ tRPC uses `TRPCError`. Katman uses `KatmanError` with the same code names, plus 
   // @noErrors
   import { TRPCError } from "@trpc/server"
 
-  throw new TRPCError({
-    code: "NOT_FOUND",
-    message: "User not found",
-  })
-  ```
-  </Tab>
-  <Tab value="Katman (after)">
-  ```ts twoslash
-  // @noErrors
-  import { KatmanError } from "katman"
+throw new TRPCError({
+code: "NOT_FOUND",
+message: "User not found",
+})
 
-  // Option 1: Same pattern as tRPC
-  throw new KatmanError("NOT_FOUND", { message: "User not found" })
+````
+</Tab>
+<Tab value="Katman (after)">
+```ts twoslash
+// @noErrors
+import { KatmanError } from "katman"
 
-  // Option 2: Typed errors with fail()
-  const deleteUser = k.mutation({
-    errors: { NOT_FOUND: 404, FORBIDDEN: 403 },
-    resolve: ({ input, ctx, fail }) => {
-      const user = ctx.db.users.find(input.id)
-      if (!user) fail("NOT_FOUND")           // typed — only these codes allowed
-      if (user.ownerId !== ctx.user.id) fail("FORBIDDEN")
-      return ctx.db.users.delete(input.id)
-    },
-  })
-  ```
+// Option 1: Same pattern as tRPC
+throw new KatmanError("NOT_FOUND", { message: "User not found" })
+
+// Option 2: Typed errors with fail()
+const deleteUser = k.mutation({
+  errors: { NOT_FOUND: 404, FORBIDDEN: 403 },
+  resolve: ({ input, ctx, fail }) => {
+    const user = ctx.db.users.find(input.id)
+    if (!user) fail("NOT_FOUND")           // typed — only these codes allowed
+    if (user.ownerId !== ctx.user.id) fail("FORBIDDEN")
+    return ctx.db.users.delete(input.id)
+  },
+})
+````
+
   </Tab>
 </Tabs>
 
@@ -171,8 +174,8 @@ Replace the converted procedure in your router. Unconverted tRPC procedures sit 
 ```ts twoslash
 // @noErrors
 const katmanUsers = {
-  list: listUsers,       // native Katman
-  create: createUser,    // native Katman
+  list: listUsers, // native Katman
+  create: createUser, // native Katman
   delete: fromTRPC(trpcRouter).users.delete, // still tRPC
 }
 
@@ -197,10 +200,10 @@ Once all procedures are rewritten:
 ```ts twoslash
 // @noErrors
 // Before (tRPC client)
-import { createTRPCProxyClient, httpBatchLink } from "@trpc/client"
+import { createTRPCProxyClient, httpBatchLink } from '@trpc/client'
 
 const trpc = createTRPCProxyClient({
-  links: [httpBatchLink({ url: "http://localhost:3000" })],
+  links: [httpBatchLink({ url: 'http://localhost:3000' })],
 })
 const users = await trpc.users.list.query({ limit: 10 })
 ```
@@ -208,27 +211,25 @@ const users = await trpc.users.list.query({ limit: 10 })
 ```ts twoslash
 // @noErrors
 // After (Katman client)
-import { createClient } from "katman/client"
-import { createLink } from "katman/client/ofetch"
+import { createClient } from 'katman/client'
+import { createLink } from 'katman/client/ofetch'
 
-const client = createClient<AppRouter>(
-  createLink({ url: "http://localhost:3000" })
-)
+const client = createClient<AppRouter>(createLink({ url: 'http://localhost:3000' }))
 const users = await client.users.list({ limit: 10 })
 ```
 
 ## Concept mapping
 
-| tRPC | Katman | Notes |
-|---|---|---|
-| `t.procedure` | `k.query()` / `k.mutation()` | Katman uses separate methods |
-| `t.router()` | `k.router()` | Same nesting |
-| `t.middleware()` | `k.guard()` or `k.wrap()` | Guards for auth, wraps for before+after |
-| `TRPCError` | `KatmanError` | Same code names |
-| `createTRPCProxyClient()` | `createClient()` | Same proxy pattern |
-| `httpBatchLink` | `createLink()` | Batching via separate plugin |
-| `@trpc/react-query` | `katman/tanstack-query` | `createQueryUtils()` instead of `createTRPCReact()` |
-| `ctx` via `createContext()` | `context:` in `katman()` | Factory runs per request |
+| tRPC                        | Katman                       | Notes                                               |
+| --------------------------- | ---------------------------- | --------------------------------------------------- |
+| `t.procedure`               | `k.query()` / `k.mutation()` | Katman uses separate methods                        |
+| `t.router()`                | `k.router()`                 | Same nesting                                        |
+| `t.middleware()`            | `k.guard()` or `k.wrap()`    | Guards for auth, wraps for before+after             |
+| `TRPCError`                 | `KatmanError`                | Same code names                                     |
+| `createTRPCProxyClient()`   | `createClient()`             | Same proxy pattern                                  |
+| `httpBatchLink`             | `createLink()`               | Batching via separate plugin                        |
+| `@trpc/react-query`         | `katman/tanstack-query`      | `createQueryUtils()` instead of `createTRPCReact()` |
+| `ctx` via `createContext()` | `context:` in `katman()`     | Factory runs per request                            |
 
 ## What you gain
 

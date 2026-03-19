@@ -10,12 +10,14 @@
  * Run: node --experimental-strip-types bench/http.ts
  */
 
-import { createServer, type Server } from 'node:http'
+import { createServer } from 'node:http'
 
 import { z } from 'zod'
-// ── Katman Server ───────────────────────────────────
 
 import { katman } from '../src/katman.ts'
+// ── Katman Server ───────────────────────────────────
+
+import type { Server } from 'node:http'
 
 const k = katman({
   context: () => ({}),

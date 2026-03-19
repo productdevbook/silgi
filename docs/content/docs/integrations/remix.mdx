@@ -12,11 +12,11 @@ Create a catch-all route:
 ```ts twoslash
 // @noErrors
 // app/routes/rpc.$.tsx
-import { katmanRemix } from "katman/remix"
-import { appRouter } from "~/server/rpc"
+import { katmanRemix } from 'katman/remix'
+import { appRouter } from '~/server/rpc'
 
 const handler = katmanRemix(appRouter, {
-  prefix: "/rpc",
+  prefix: '/rpc',
   context: (args) => ({
     db: getDB(),
     headers: Object.fromEntries(args.request.headers),
@@ -43,7 +43,7 @@ The `context` function receives the standard Remix `LoaderFunctionArgs` / `Actio
 // @noErrors
 katmanRemix(appRouter, {
   context: (args) => ({
-    user: args.context.user,   // from Remix server context
+    user: args.context.user, // from Remix server context
     params: args.params,
   }),
 })

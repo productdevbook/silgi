@@ -3,7 +3,7 @@ title: Next.js
 description: Use Katman with Next.js App Router — API routes with full type safety and protocol support.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
+import { Callout } from 'fumadocs-ui/components/callout'
 
 Katman integrates with Next.js App Router via catch-all API routes. Full content negotiation (JSON, MessagePack, devalue) works out of the box.
 
@@ -14,11 +14,11 @@ Create a catch-all API route:
 ```ts twoslash
 // @noErrors
 // app/api/rpc/[...path]/route.ts
-import { katmanNextjs } from "katman/nextjs"
-import { appRouter } from "~/server/rpc"
+import { katmanNextjs } from 'katman/nextjs'
+import { appRouter } from '~/server/rpc'
 
 const handler = katmanNextjs(appRouter, {
-  prefix: "/api/rpc",
+  prefix: '/api/rpc',
   context: (req) => ({
     db: getDB(),
     headers: Object.fromEntries(req.headers),
@@ -43,8 +43,8 @@ For server-first React apps, use [React Server Actions](/docs/integrations/react
 ```ts twoslash
 // @noErrors
 // app/actions.ts
-"use server"
-import { createAction } from "katman/react"
+'use server'
+import { createAction } from 'katman/react'
 
 export const listUsers = createAction(appRouter.users.list)
 ```
@@ -55,11 +55,12 @@ The handler uses standard Fetch API — works on both Node.js and Edge runtime:
 
 ```ts twoslash
 // @noErrors
-export const runtime = "edge"
+export const runtime = 'edge'
 ```
 
-<Callout type="info">
-Katman compiles the router once at module load time. Next.js caches module imports across requests, so the compilation cost is paid only once per cold start.
+<Callout type='info'>
+  Katman compiles the router once at module load time. Next.js caches module imports across requests, so the compilation
+  cost is paid only once per cold start.
 </Callout>
 
 ## What's next?

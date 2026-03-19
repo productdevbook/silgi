@@ -3,8 +3,8 @@ title: Nitro
 description: Use Katman with Nitro v3 — as the server framework (like Hono) or alongside H3 routes.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 
 [Nitro](https://nitro.build) is the server engine behind Nuxt and TanStack Start. Katman integrates with Nitro in two ways: as the **server framework** (replacing H3, like Hono does) or alongside **H3 file-system routes**.
 
@@ -15,8 +15,8 @@ Just like [Hono with Nitro](https://github.com/nitrojs/nitro/tree/main/examples/
 ```ts twoslash
 // @noErrors
 // server.ts
-import { katman, KatmanError } from "katman"
-import { z } from "zod"
+import { katman, KatmanError } from 'katman'
+import { z } from 'zod'
 
 const k = katman({
   context: (req) => ({
@@ -27,11 +27,10 @@ const k = katman({
 
 const { query, mutation, guard, router, handler } = k
 
-const health = query(() => ({ status: "ok" }))
+const health = query(() => ({ status: 'ok' }))
 
-const listUsers = query(
-  z.object({ limit: z.number().optional() }),
-  ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
+const listUsers = query(z.object({ limit: z.number().optional() }), ({ input, ctx }) =>
+  ctx.db.users.findMany({ take: input.limit }),
 )
 
 const appRouter = router({ health, users: { list: listUsers } })
@@ -48,7 +47,8 @@ POST /users/list      → [{ id: 1, name: "Alice" }, ...]
 ```
 
 <Callout>
-This is the same pattern Hono uses with Nitro. Nitro detects the `fetch` method on the default export and routes all requests through it.
+  This is the same pattern Hono uses with Nitro. Nitro detects the `fetch` method on the default export and routes all
+  requests through it.
 </Callout>
 
 ## H3 mode
@@ -58,8 +58,8 @@ If you need Nitro's file-system routing or want to mix Katman with H3 routes, us
 ```ts twoslash
 // @noErrors
 // server/routes/rpc/[...path].ts
-import { katmanNitro } from "katman/nitro"
-import { appRouter } from "~/server/rpc"
+import { katmanNitro } from 'katman/nitro'
+import { appRouter } from '~/server/rpc'
 
 export default katmanNitro(appRouter, {
   context: (event) => ({
@@ -81,10 +81,10 @@ POST /rpc/users/create   → users/create
 ```ts twoslash
 // @noErrors
 // server/middleware/auth.ts
-import { defineMiddleware } from "nitro/h3"
+import { defineMiddleware } from 'nitro/h3'
 
 export default defineMiddleware((event) => {
-  event.context.auth = verifyToken(event.req.headers.get("authorization"))
+  event.context.auth = verifyToken(event.req.headers.get('authorization'))
 })
 ```
 
@@ -100,15 +100,15 @@ export default katmanNitro(appRouter, {
 
 ## Which mode to choose?
 
-| Scenario | Mode |
-|---|---|
-| New project, Katman is the only framework | **Direct** (`{ fetch: handler() }`) |
-| Existing Nitro/Nuxt app, adding RPC | **H3** (`katmanNitro()`) |
-| Need H3 middleware (auth, session, etc.) | **H3** |
-| Want full protocol support (msgpack, devalue, SSE) | **Direct** |
+| Scenario                                           | Mode                                |
+| -------------------------------------------------- | ----------------------------------- |
+| New project, Katman is the only framework          | **Direct** (`{ fetch: handler() }`) |
+| Existing Nitro/Nuxt app, adding RPC                | **H3** (`katmanNitro()`)            |
+| Need H3 middleware (auth, session, etc.)           | **H3**                              |
+| Want full protocol support (msgpack, devalue, SSE) | **Direct**                          |
 
-<Callout type="info">
-Both modes target Nitro v3 (H3 v2). For Nitro v2 (Nuxt 3), use the [H3 adapter](/docs/integrations/h3) instead.
+<Callout type='info'>
+  Both modes target Nitro v3 (H3 v2). For Nitro v2 (Nuxt 3), use the [H3 adapter](/docs/integrations/h3) instead.
 </Callout>
 
 ## Examples

@@ -2,13 +2,15 @@
  * Fastify adapter — real Fastify integration tests.
  */
 
-import Fastify, { type FastifyInstance } from 'fastify'
+import Fastify from 'fastify'
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { z } from 'zod'
 
 import { katmanFastify } from '#src/adapters/fastify.ts'
 import { MSGPACK_CONTENT_TYPE } from '#src/codec/msgpack.ts'
 import { katman } from '#src/katman.ts'
+
+import type { FastifyInstance } from 'fastify'
 
 const k = katman({ context: () => ({ db: true }) })
 

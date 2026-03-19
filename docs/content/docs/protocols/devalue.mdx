@@ -3,7 +3,7 @@ title: devalue
 description: Rich type serialization — Date, Map, Set, BigInt, RegExp, undefined, and circular references survive the round-trip.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
+import { Callout } from 'fumadocs-ui/components/callout'
 
 If your API returns JavaScript types that `JSON.stringify` can't handle, devalue is the answer. It's a text-based format (like JSON) that preserves rich types through a round-trip.
 
@@ -13,11 +13,11 @@ If your API returns JavaScript types that `JSON.stringify` can't handle, devalue
 
 ```ts twoslash
 // @noErrors
-JSON.stringify(new Date("2026-01-01"))  // "2026-01-01T00:00:00.000Z" (string, not Date)
-JSON.stringify(new Map([["a", 1]]))     // "{}" (empty object)
-JSON.stringify(new Set([1, 2, 3]))      // "{}" (empty object)
-JSON.stringify(42n)                      // throws TypeError
-JSON.stringify({ x: undefined })         // "{}" (key is dropped)
+JSON.stringify(new Date('2026-01-01')) // "2026-01-01T00:00:00.000Z" (string, not Date)
+JSON.stringify(new Map([['a', 1]])) // "{}" (empty object)
+JSON.stringify(new Set([1, 2, 3])) // "{}" (empty object)
+JSON.stringify(42n) // throws TypeError
+JSON.stringify({ x: undefined }) // "{}" (key is dropped)
 ```
 
 If your procedure returns any of these types, the client receives broken data with plain JSON.
@@ -28,13 +28,13 @@ If your procedure returns any of these types, the client receives broken data wi
 
 ```ts twoslash
 // @noErrors
-import { encode, decode } from "katman/devalue"
+import { encode, decode } from 'katman/devalue'
 
 const original = {
-  users: new Map([["alice", { id: 1 }]]),
-  tags: new Set(["admin", "user"]),
+  users: new Map([['alice', { id: 1 }]]),
+  tags: new Set(['admin', 'user']),
   count: 9007199254740993n,
-  created: new Date("2026-01-01"),
+  created: new Date('2026-01-01'),
   pattern: /test/gi,
   optional: undefined,
 }
@@ -42,27 +42,27 @@ const original = {
 const encoded = encode(original) // JSON string with type info
 const decoded = decode(encoded)
 
-decoded.users    // Map { "alice" => { id: 1 } }  -- not an empty object
-decoded.tags     // Set { "admin", "user" }        -- not an empty object
-decoded.count    // 9007199254740993n              -- BigInt preserved
-decoded.created  // Date 2026-01-01T00:00:00.000Z -- Date object, not string
-decoded.pattern  // /test/gi                       -- RegExp preserved
+decoded.users // Map { "alice" => { id: 1 } }  -- not an empty object
+decoded.tags // Set { "admin", "user" }        -- not an empty object
+decoded.count // 9007199254740993n              -- BigInt preserved
+decoded.created // Date 2026-01-01T00:00:00.000Z -- Date object, not string
+decoded.pattern // /test/gi                       -- RegExp preserved
 decoded.optional // undefined                      -- not missing
 ```
 
 ## Supported types
 
-| Type | JSON | devalue |
-|---|---|---|
-| String, Number, Boolean, null | Yes | Yes |
-| Object, Array | Yes | Yes |
-| **Date** | Becomes string | Preserved |
-| **Map** | Becomes `{}` | Preserved |
-| **Set** | Becomes `{}` | Preserved |
-| **BigInt** | Throws | Preserved |
-| **RegExp** | Becomes `{}` | Preserved |
-| **undefined** | Dropped | Preserved |
-| **Circular references** | Throws | Preserved |
+| Type                          | JSON           | devalue   |
+| ----------------------------- | -------------- | --------- |
+| String, Number, Boolean, null | Yes            | Yes       |
+| Object, Array                 | Yes            | Yes       |
+| **Date**                      | Becomes string | Preserved |
+| **Map**                       | Becomes `{}`   | Preserved |
+| **Set**                       | Becomes `{}`   | Preserved |
+| **BigInt**                    | Throws         | Preserved |
+| **RegExp**                    | Becomes `{}`   | Preserved |
+| **undefined**                 | Dropped        | Preserved |
+| **Circular references**       | Throws         | Preserved |
 
 ## Server integration
 
@@ -78,18 +78,19 @@ Both `serve()` and `handler()` support this out of the box. No configuration nee
 
 ## When to use devalue vs MessagePack
 
-| Scenario | Recommended format |
-|---|---|
-| Standard APIs (strings, numbers, arrays) | JSON (default) |
-| Smaller payloads, mobile, bandwidth | [MessagePack](/docs/protocols/msgpack) |
-| **Returning Date, Map, Set, BigInt** | **devalue** |
-| **Circular references in data** | **devalue** |
-| Need binary + Date support | MessagePack |
+| Scenario                                 | Recommended format                     |
+| ---------------------------------------- | -------------------------------------- |
+| Standard APIs (strings, numbers, arrays) | JSON (default)                         |
+| Smaller payloads, mobile, bandwidth      | [MessagePack](/docs/protocols/msgpack) |
+| **Returning Date, Map, Set, BigInt**     | **devalue**                            |
+| **Circular references in data**          | **devalue**                            |
+| Need binary + Date support               | MessagePack                            |
 
 If you only need `Date` support and smaller payloads, MessagePack is a better choice. If you need `Map`, `Set`, `BigInt`, or circular references, devalue is the way to go.
 
 <Callout>
-devalue is text-based (the output is a JSON string), so it doesn't save bandwidth like MessagePack. Its advantage is type fidelity, not size.
+  devalue is text-based (the output is a JSON string), so it doesn't save bandwidth like MessagePack. Its advantage is
+  type fidelity, not size.
 </Callout>
 
 ## Direct API
@@ -98,10 +99,10 @@ If you need to use devalue outside of the client/server flow:
 
 ```ts twoslash
 // @noErrors
-import { encode, decode } from "katman/devalue"
+import { encode, decode } from 'katman/devalue'
 
 const str = encode(myData) // returns a string
-const data = decode(str)   // returns the original value with types intact
+const data = decode(str) // returns the original value with types intact
 ```
 
 ## What's next?

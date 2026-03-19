@@ -3,7 +3,7 @@ title: Publisher/PubSub
 description: Event pub/sub with pluggable backends — publish from mutations, subscribe via SSE.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
+import { Callout } from 'fumadocs-ui/components/callout'
 
 Publish events from any procedure and subscribe to them via SSE or WebSocket. Built-in memory backend, pluggable for Redis/Upstash.
 
@@ -11,7 +11,7 @@ Publish events from any procedure and subscribe to them via SSE or WebSocket. Bu
 
 ```ts twoslash
 // @noErrors
-import { createPublisher, MemoryPubSub } from "katman/plugins"
+import { createPublisher, MemoryPubSub } from 'katman/plugins'
 
 const pubsub = createPublisher(new MemoryPubSub())
 ```
@@ -24,7 +24,7 @@ const createUser = k.mutation({
   input: z.object({ name: z.string(), email: z.string().email() }),
   resolve: async ({ input, ctx }) => {
     const user = await ctx.db.users.create(input)
-    await pubsub.publish("user:created", user)
+    await pubsub.publish('user:created', user)
     return user
   },
 })
@@ -37,7 +37,7 @@ const createUser = k.mutation({
 ```ts twoslash
 // @noErrors
 const onUserCreated = k.subscription(async function* () {
-  yield* pubsub.subscribe("user:created")
+  yield* pubsub.subscribe('user:created')
 })
 ```
 
@@ -49,8 +49,8 @@ Implement the `PubSubBackend` interface for Redis, Upstash, or any message broke
 
 ```ts twoslash
 // @noErrors
-import type { PubSubBackend } from "katman/plugins"
-import Redis from "ioredis"
+import type { PubSubBackend } from 'katman/plugins'
+import Redis from 'ioredis'
 
 class RedisPubSub implements PubSubBackend {
   #pub = new Redis()
@@ -65,10 +65,10 @@ class RedisPubSub implements PubSubBackend {
     const handler = (ch: string, msg: string) => {
       if (ch === channel) callback(JSON.parse(msg))
     }
-    this.#sub.on("message", handler)
+    this.#sub.on('message', handler)
     return () => {
       this.#sub.unsubscribe(channel)
-      this.#sub.off("message", handler)
+      this.#sub.off('message', handler)
     }
   }
 }
@@ -76,8 +76,8 @@ class RedisPubSub implements PubSubBackend {
 const pubsub = createPublisher(new RedisPubSub())
 ```
 
-<Callout type="info">
-`MemoryPubSub` is single-process only. For multi-server deployments, use Redis or a similar shared backend.
+<Callout type='info'>
+  `MemoryPubSub` is single-process only. For multi-server deployments, use Redis or a similar shared backend.
 </Callout>
 
 ## What's next?

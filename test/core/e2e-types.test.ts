@@ -2,7 +2,7 @@
  * E2E type safety test — full client → server roundtrip.
  */
 
-import { createServer, type Server } from 'node:http'
+import { createServer } from 'node:http'
 
 import { describe, it, expect, expectTypeOf, beforeAll, afterAll } from 'vitest'
 import { z } from 'zod'
@@ -12,6 +12,7 @@ import { createClient } from '#src/client/client.ts'
 import { katman } from '#src/katman.ts'
 
 import type { InferClient } from '#src/types.ts'
+import type { Server } from 'node:http'
 
 // ── Server ─────────────────────────────────────────
 

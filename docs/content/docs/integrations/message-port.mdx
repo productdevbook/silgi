@@ -11,8 +11,8 @@ Attach your router to a port:
 
 ```ts twoslash
 // @noErrors
-import { katmanMessagePort } from "katman/message-port"
-import { appRouter } from "./router"
+import { katmanMessagePort } from 'katman/message-port'
+import { appRouter } from './router'
 
 const port = getPort() // MessagePort, Worker, chrome.runtime.Port, etc.
 
@@ -29,9 +29,9 @@ Connect to the same port from the other end:
 
 ```ts twoslash
 // @noErrors
-import { MessagePortLink } from "katman/message-port"
-import { createClient } from "katman/client"
-import type { AppRouter } from "./router"
+import { MessagePortLink } from 'katman/message-port'
+import { createClient } from 'katman/client'
+import type { AppRouter } from './router'
 
 const port = getPort()
 
@@ -47,20 +47,20 @@ const users = await client.users.list()
 ```ts twoslash
 // @noErrors
 // main.ts (main process)
-import { katmanMessagePort } from "katman/message-port"
+import { katmanMessagePort } from 'katman/message-port'
 
-ipcMain.handle("rpc-port", (event) => {
+ipcMain.handle('rpc-port', (event) => {
   const { port1, port2 } = new MessageChannelMain()
   katmanMessagePort(appRouter, port1, { context: () => ({}) })
-  event.senderFrame.postMessage("rpc-port", null, [port2])
+  event.senderFrame.postMessage('rpc-port', null, [port2])
 })
 ```
 
 ```ts twoslash
 // @noErrors
 // renderer.ts (renderer process)
-import { MessagePortLink } from "katman/message-port"
-import { createClient } from "katman/client"
+import { MessagePortLink } from 'katman/message-port'
+import { createClient } from 'katman/client'
 
 const port = await getElectronPort()
 const client = createClient<AppRouter>({

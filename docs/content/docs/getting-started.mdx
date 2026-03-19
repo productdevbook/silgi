@@ -3,28 +3,16 @@ title: Getting Started
 description: Install Katman and build your first type-safe API in 5 minutes.
 ---
 
-import { Step, Steps } from 'fumadocs-ui/components/steps';
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
-import { File, Folder, Files } from 'fumadocs-ui/components/files';
+import { Step, Steps } from 'fumadocs-ui/components/steps'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
+import { File, Folder, Files } from 'fumadocs-ui/components/files'
 
 ## Install
 
 <Tabs items={['npm', 'pnpm', 'bun']}>
-  <Tab value="npm">
-  ```bash
-  npm install katman zod
-  ```
-  </Tab>
-  <Tab value="pnpm">
-  ```bash
-  pnpm add katman zod
-  ```
-  </Tab>
-  <Tab value="bun">
-  ```bash
-  bun add katman zod
-  ```
-  </Tab>
+  <Tab value='npm'>```bash npm install katman zod ```</Tab>
+  <Tab value='pnpm'>```bash pnpm add katman zod ```</Tab>
+  <Tab value='bun'>```bash bun add katman zod ```</Tab>
 </Tabs>
 
 You also need a validator. We use Zod here, but Valibot and ArkType also work.
@@ -39,11 +27,11 @@ A small API with two endpoints:
 ## Project structure
 
 <Files>
-  <Folder name="src" defaultOpen>
-    <File name="rpc.ts" />
-    <File name="server.ts" />
+  <Folder name='src' defaultOpen>
+    <File name='rpc.ts' />
+    <File name='server.ts' />
   </Folder>
-  <File name="package.json" />
+  <File name='package.json' />
 </Files>
 
 Two files. That's all you need to get started.
@@ -59,7 +47,7 @@ This is where you tell Katman how to build the context for each request. The con
 
 ```ts twoslash title="src/rpc.ts"
 // @noErrors
-import { katman } from "katman"
+import { katman } from 'katman'
 
 const k = katman({
   context: (req) => ({
@@ -86,25 +74,22 @@ A **procedure** is a single API endpoint. There are two kinds:
 
 ```ts twoslash title="src/server.ts"
 // @noErrors
-import { k, query, mutation, guard, router } from "./rpc"
-import { KatmanError } from "katman"
-import { z } from "zod"
+import { k, query, mutation, guard, router } from './rpc'
+import { KatmanError } from 'katman'
+import { z } from 'zod'
 
 // A guard checks something before the procedure runs.
 // If it returns an object, that object is added to the context.
 const auth = guard((ctx) => {
   const token = ctx.headers?.authorization
-  if (!token) throw new KatmanError("UNAUTHORIZED")
+  if (!token) throw new KatmanError('UNAUTHORIZED')
   return { userId: 1 }
 })
 
 // A query with input validation
-const listUsers = query(
-  z.object({ limit: z.number().min(1).max(100).optional() }),
-  ({ input, ctx }) => {
-    return ctx.db.users.findMany({ take: input.limit ?? 10 })
-  },
-)
+const listUsers = query(z.object({ limit: z.number().min(1).max(100).optional() }), ({ input, ctx }) => {
+  return ctx.db.users.findMany({ take: input.limit ?? 10 })
+})
 
 // A mutation that requires authentication
 const createUser = mutation({
@@ -163,18 +148,18 @@ Scalar API Reference at http://127.0.0.1:3000/reference
 
 ```ts twoslash
 // @noErrors
-import { createClient } from "katman/client"
-import { createLink } from "katman/client/ofetch"
+import { createClient } from 'katman/client'
+import { createLink } from 'katman/client/ofetch'
 
 // The link tells the client how to talk to the server
-const link = createLink({ url: "http://localhost:3000" })
+const link = createLink({ url: 'http://localhost:3000' })
 
 // InferClient gives you the types from the router
 const client = createClient<any>(link)
 
 // Now you have full autocomplete
 const users = await client.users.list({ limit: 5 })
-const newUser = await client.users.create({ name: "Alice", email: "alice@example.com" })
+const newUser = await client.users.create({ name: 'Alice', email: 'alice@example.com' })
 ```
 
 In a real project, you would import the router type and use `InferClient<typeof appRouter>` instead of `any`. See the [Client](/docs/client) page for the full setup.

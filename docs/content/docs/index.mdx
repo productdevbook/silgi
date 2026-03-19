@@ -3,7 +3,7 @@ title: Introduction
 description: What is Katman and why should you use it?
 ---
 
-import { Cards, Card } from 'fumadocs-ui/components/card';
+import { Cards, Card } from 'fumadocs-ui/components/card'
 
 ## What is Katman?
 
@@ -17,8 +17,8 @@ You write functions on the server. Katman compiles them into a fast pipeline at 
 
 ```ts twoslash
 // @noErrors
-import { katman } from "katman"
-import { z } from "zod"
+import { katman } from 'katman'
+import { z } from 'zod'
 
 // 1. Create an instance
 const k = katman({
@@ -26,9 +26,8 @@ const k = katman({
 })
 
 // 2. Define a procedure
-const getUsers = k.query(
-  z.object({ limit: z.number().optional() }),
-  ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
+const getUsers = k.query(z.object({ limit: z.number().optional() }), ({ input, ctx }) =>
+  ctx.db.users.findMany({ take: input.limit }),
 )
 
 // 3. Create a router
@@ -53,8 +52,8 @@ That's it. The client gets full types automatically.
 ## Next steps
 
 <Cards>
-  <Card title="Getting Started" description="Install Katman and build your first API." href="/docs/getting-started" />
-  <Card title="Core Concepts" description="Understand procedures, guards, wraps, and hooks." href="/docs/concepts" />
-  <Card title="Server" description="Learn about serve(), handler(), and deployment." href="/docs/server" />
-  <Card title="Client" description="Set up the type-safe client." href="/docs/client" />
+  <Card title='Getting Started' description='Install Katman and build your first API.' href='/docs/getting-started' />
+  <Card title='Core Concepts' description='Understand procedures, guards, wraps, and hooks.' href='/docs/concepts' />
+  <Card title='Server' description='Learn about serve(), handler(), and deployment.' href='/docs/server' />
+  <Card title='Client' description='Set up the type-safe client.' href='/docs/client' />
 </Cards>

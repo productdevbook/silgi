@@ -3,8 +3,8 @@ title: Middleware
 description: Guards and wraps — the two kinds of middleware in Katman, when to use each, and how they execute.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 
 Middleware lets you run code before (and sometimes after) a procedure. Katman has two kinds: **guards** and **wraps**. They solve different problems, so understanding the difference is important.
 
@@ -18,7 +18,7 @@ A guard is a function that receives the current context and either:
 
 ```ts twoslash
 // @noErrors
-import { katman, KatmanError } from "katman"
+import { katman, KatmanError } from 'katman'
 
 const k = katman({
   context: (req) => ({
@@ -29,8 +29,8 @@ const { guard, query } = k
 
 // This guard verifies a token and adds `user` to the context
 const auth = guard(async (ctx) => {
-  const token = ctx.headers.authorization?.replace("Bearer ", "")
-  if (!token) throw new KatmanError("UNAUTHORIZED")
+  const token = ctx.headers.authorization?.replace('Bearer ', '')
+  if (!token) throw new KatmanError('UNAUTHORIZED')
 
   const user = await verifyToken(token)
   return { user } // now ctx.user is available downstream
@@ -56,15 +56,16 @@ If you don't need to add anything to the context, just don't return anything. Th
 ```ts twoslash
 // @noErrors
 const adminOnly = guard((ctx) => {
-  if (ctx.user.role !== "admin") {
-    throw new KatmanError("FORBIDDEN")
+  if (ctx.user.role !== 'admin') {
+    throw new KatmanError('FORBIDDEN')
   }
   // no return — ctx is unchanged
 })
 ```
 
-<Callout type="info">
-Guards can be synchronous or asynchronous. When they're sync, Katman skips the async overhead entirely — no Promises are created.
+<Callout type='info'>
+  Guards can be synchronous or asynchronous. When they're sync, Katman skips the async overhead entirely — no Promises
+  are created.
 </Callout>
 
 ## Wraps
@@ -102,22 +103,23 @@ const withSentry = k.wrap(async (ctx, next) => {
 ```
 
 <Callout>
-Wraps are always asynchronous because they need to `await next()`. If you only need to run code *before* a procedure and don't need the result, use a guard instead — it's faster.
+  Wraps are always asynchronous because they need to `await next()`. If you only need to run code *before* a procedure
+  and don't need the result, use a guard instead — it's faster.
 </Callout>
 
 ## When to use which
 
-| Need | Use |
-|---|---|
-| Check authentication | Guard |
-| Add data to context (user, session, tenant) | Guard |
-| Validate a precondition (throw if invalid) | Guard |
-| Measure timing | Wrap |
-| Catch and report errors | Wrap |
-| Transform the result after the procedure runs | Wrap |
-| Run code both before and after | Wrap |
+| Need                                          | Use   |
+| --------------------------------------------- | ----- |
+| Check authentication                          | Guard |
+| Add data to context (user, session, tenant)   | Guard |
+| Validate a precondition (throw if invalid)    | Guard |
+| Measure timing                                | Wrap  |
+| Catch and report errors                       | Wrap  |
+| Transform the result after the procedure runs | Wrap  |
+| Run code both before and after                | Wrap  |
 
-The rule of thumb: if you need the *result* of the procedure, use a wrap. Otherwise, use a guard.
+The rule of thumb: if you need the _result_ of the procedure, use a wrap. Otherwise, use a guard.
 
 ## Execution order
 
@@ -169,7 +171,7 @@ export const auth = guard(async (ctx) => {
 })
 
 export const adminOnly = guard((ctx) => {
-  if (ctx.user.role !== "admin") throw new KatmanError("FORBIDDEN")
+  if (ctx.user.role !== 'admin') throw new KatmanError('FORBIDDEN')
 })
 
 export const timing = wrap(async (ctx, next) => {
@@ -184,7 +186,7 @@ Then use them wherever you need:
 
 ```ts twoslash
 // @noErrors
-import { auth, adminOnly, timing } from "./middleware"
+import { auth, adminOnly, timing } from './middleware'
 
 const listUsers = query({
   use: [auth, timing],
@@ -203,10 +205,10 @@ Instead of writing try/catch/finally in every wrap, use `lifecycleWrap` for a de
 
 ```ts twoslash
 // @noErrors
-import { lifecycleWrap } from "katman"
+import { lifecycleWrap } from 'katman'
 
 const logging = lifecycleWrap({
-  onStart: ({ ctx }) => console.log("started"),
+  onStart: ({ ctx }) => console.log('started'),
   onSuccess: ({ output, durationMs }) => console.log(`done in ${durationMs}ms`),
   onError: ({ error }) => reportToSentry(error),
   onFinish: ({ durationMs }) => metrics.record(durationMs),
@@ -220,12 +222,12 @@ const listUsers = k.query({
 
 All four hooks are optional. They're purely for side effects — the procedure result is never modified.
 
-| Hook | When it fires |
-|---|---|
-| `onStart` | Before the procedure runs |
-| `onSuccess` | After a successful return |
-| `onError` | When the procedure throws (error is re-thrown after the hook) |
-| `onFinish` | Always — success or failure (like `finally`) |
+| Hook        | When it fires                                                 |
+| ----------- | ------------------------------------------------------------- |
+| `onStart`   | Before the procedure runs                                     |
+| `onSuccess` | After a successful return                                     |
+| `onError`   | When the procedure throws (error is re-thrown after the hook) |
+| `onFinish`  | Always — success or failure (like `finally`)                  |
 
 This is different from the global [lifecycle hooks](/docs/server#lifecycle-hooks) on the katman instance — `lifecycleWrap` applies per-procedure via the `use` array.
 
@@ -235,7 +237,7 @@ Transform the input shape before a procedure runs with `mapInput`:
 
 ```ts twoslash
 // @noErrors
-import { mapInput } from "katman"
+import { mapInput } from 'katman'
 
 const renameUserId = mapInput((input: { userId: string }) => ({
   id: input.userId,

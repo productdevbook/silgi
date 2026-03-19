@@ -1,7 +1,7 @@
 <script lang="ts">
   let health = $state<{ status: string; framework: string } | null>(null);
   let greeting = $state("");
-  let name = $state("World");
+  const name = $state("World");
 
   async function loadHealth() {
     const res = await fetch("/api/rpc/health", { method: "POST" });

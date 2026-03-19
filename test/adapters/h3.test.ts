@@ -1,9 +1,11 @@
-import { createServer, type Server } from 'node:http'
+import { createServer } from 'node:http'
 
 import { describe, it, expect, afterAll } from 'vitest'
 import { z } from 'zod'
 
 import { katman, KatmanError } from '#src/katman.ts'
+
+import type { Server } from 'node:http'
 
 const k = katman({ context: () => ({ db: 'test' }) })
 

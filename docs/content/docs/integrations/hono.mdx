@@ -9,21 +9,24 @@ description: Use Katman with Hono on any runtime — Node.js, Bun, Deno, Cloudfl
 
 ```ts twoslash
 // @noErrors
-import { Hono } from "hono"
-import { katmanHono } from "katman/hono"
+import { Hono } from 'hono'
+import { katmanHono } from 'katman/hono'
 
 const app = new Hono()
 
 // Existing routes
-app.get("/api/health", (c) => c.json({ status: "ok" }))
+app.get('/api/health', (c) => c.json({ status: 'ok' }))
 
 // Katman RPC
-app.all("/rpc/*", katmanHono(appRouter, {
-  context: (c) => ({
-    db: getDB(),
-    user: c.get("user"),
+app.all(
+  '/rpc/*',
+  katmanHono(appRouter, {
+    context: (c) => ({
+      db: getDB(),
+      user: c.get('user'),
+    }),
   }),
-}))
+)
 
 export default app
 ```
@@ -36,9 +39,9 @@ The `context` function receives Hono's `Context` object. Access middleware data 
 // @noErrors
 katmanHono(appRouter, {
   context: (c) => ({
-    user: c.get("user"),           // from Hono middleware
-    requestId: c.get("requestId"),
-    env: c.env,                     // Cloudflare Workers bindings
+    user: c.get('user'), // from Hono middleware
+    requestId: c.get('requestId'),
+    env: c.env, // Cloudflare Workers bindings
   }),
 })
 ```
@@ -47,13 +50,16 @@ katmanHono(appRouter, {
 
 ```ts twoslash
 // @noErrors
-import { Hono } from "hono"
-import { katmanHono } from "katman/hono"
+import { Hono } from 'hono'
+import { katmanHono } from 'katman/hono'
 
 const app = new Hono()
-app.all("/rpc/*", katmanHono(appRouter, {
-  context: (c) => ({ db: c.env.DB }),
-}))
+app.all(
+  '/rpc/*',
+  katmanHono(appRouter, {
+    context: (c) => ({ db: c.env.DB }),
+  }),
+)
 
 export default app
 ```

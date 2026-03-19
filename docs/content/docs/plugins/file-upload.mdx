@@ -3,7 +3,7 @@ title: File Upload
 description: Type-safe file upload handling — validate size, MIME type, and access files in procedures.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
+import { Callout } from 'fumadocs-ui/components/callout'
 
 Parse multipart file uploads with size and MIME type validation. Files are available in the procedure context.
 
@@ -11,13 +11,15 @@ Parse multipart file uploads with size and MIME type validation. Files are avail
 
 ```ts twoslash
 // @noErrors
-import { fileGuard } from "katman/plugins"
+import { fileGuard } from 'katman/plugins'
 
 const uploadAvatar = k.mutation({
-  use: [fileGuard({
-    maxFileSize: 5 * 1024 * 1024, // 5 MB
-    allowedTypes: ["image/*"],
-  })],
+  use: [
+    fileGuard({
+      maxFileSize: 5 * 1024 * 1024, // 5 MB
+      allowedTypes: ['image/*'],
+    }),
+  ],
   resolve: async ({ ctx }) => {
     const file = ctx.file
     const buffer = await file.arrayBuffer()
@@ -28,12 +30,12 @@ const uploadAvatar = k.mutation({
 
 ## Options
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `maxFileSize` | `number` | `10485760` (10 MB) | Maximum file size in bytes |
-| `allowedTypes` | `string[]` | all | Allowed MIME types (supports `image/*` wildcards) |
-| `maxFiles` | `number` | `1` | Maximum number of files |
-| `fieldName` | `string` | `"file"` | Form field name |
+| Option         | Type       | Default            | Description                                       |
+| -------------- | ---------- | ------------------ | ------------------------------------------------- |
+| `maxFileSize`  | `number`   | `10485760` (10 MB) | Maximum file size in bytes                        |
+| `allowedTypes` | `string[]` | all                | Allowed MIME types (supports `image/*` wildcards) |
+| `maxFiles`     | `number`   | `1`                | Maximum number of files                           |
+| `fieldName`    | `string`   | `"file"`           | Form field name                                   |
 
 ## Multiple files
 
@@ -42,9 +44,9 @@ Set `maxFiles` to allow multiple uploads. Files are available as `ctx.files`:
 ```ts twoslash
 // @noErrors
 const uploadPhotos = k.mutation({
-  use: [fileGuard({ maxFiles: 10, allowedTypes: ["image/*"] })],
+  use: [fileGuard({ maxFiles: 10, allowedTypes: ['image/*'] })],
   resolve: async ({ ctx }) => {
-    return ctx.files.map(f => ({ name: f.name, size: f.size }))
+    return ctx.files.map((f) => ({ name: f.name, size: f.size }))
   },
 })
 ```
@@ -55,7 +57,7 @@ For custom file handling, use `parseMultipart()` directly:
 
 ```ts twoslash
 // @noErrors
-import { parseMultipart } from "katman/plugins"
+import { parseMultipart } from 'katman/plugins'
 
 const upload = k.mutation({
   resolve: async ({ ctx }) => {
@@ -65,8 +67,9 @@ const upload = k.mutation({
 })
 ```
 
-<Callout type="info">
-The file guard validates before the procedure runs. If a file exceeds the size limit or has a disallowed MIME type, the request is rejected with 400 or 413 immediately.
+<Callout type='info'>
+  The file guard validates before the procedure runs. If a file exceeds the size limit or has a disallowed MIME type,
+  the request is rejected with 400 or 413 immediately.
 </Callout>
 
 ## What's next?

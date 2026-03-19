@@ -4,12 +4,14 @@
  * Tests the Node.js HTTP server created by katman().serve().
  */
 
-import { createServer, type Server } from 'node:http'
+import { createServer } from 'node:http'
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { z } from 'zod'
 
 import { katman } from '#src/katman.ts'
+
+import type { Server } from 'node:http'
 
 // ── Setup ──────────────────────────────────────────
 

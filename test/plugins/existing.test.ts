@@ -8,9 +8,12 @@ import { z } from 'zod'
 import { compileProcedure } from '#src/compile.ts'
 import { katman } from '#src/katman.ts'
 import { corsHeaders } from '#src/plugins/cors.ts'
-import { otelWrap, type Tracer, type Span } from '#src/plugins/otel.ts'
-import { loggingHooks, type Logger } from '#src/plugins/pino.ts'
+import { otelWrap } from '#src/plugins/otel.ts'
+import { loggingHooks } from '#src/plugins/pino.ts'
 import { rateLimitGuard, MemoryRateLimiter } from '#src/plugins/ratelimit.ts'
+
+import type { Tracer, Span } from '#src/plugins/otel.ts'
+import type { Logger } from '#src/plugins/pino.ts'
 
 // ── CORS ────────────────────────────────────────────
 

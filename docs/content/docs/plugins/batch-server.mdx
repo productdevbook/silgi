@@ -3,7 +3,7 @@ title: Server Batch
 description: Handle multiple RPC calls in a single HTTP request — pairs with the client-side BatchLink.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
+import { Callout } from 'fumadocs-ui/components/callout'
 
 The batch handler processes multiple procedure calls in one HTTP round-trip. It pairs with the client-side `BatchLink` to reduce network overhead when your UI makes many calls at once.
 
@@ -11,7 +11,7 @@ The batch handler processes multiple procedure calls in one HTTP round-trip. It 
 
 ```ts twoslash
 // @noErrors
-import { createBatchHandler } from "katman/plugins"
+import { createBatchHandler } from 'katman/plugins'
 
 const batchHandler = createBatchHandler(appRouter, {
   context: (req) => ({ db: getDB() }),
@@ -29,7 +29,7 @@ const handle = k.handler(appRouter)
 export default {
   async fetch(request: Request) {
     const url = new URL(request.url)
-    if (url.pathname === "/batch") return batchHandler(request)
+    if (url.pathname === '/batch') return batchHandler(request)
     return handle(request)
   },
 }
@@ -49,10 +49,7 @@ The client sends a `POST` with a JSON array of calls:
 The server returns a JSON array of results (same order):
 
 ```json
-[
-  { "data": [{ "id": 1, "name": "Alice" }] },
-  { "data": { "id": 1, "name": "Alice", "email": "alice@example.com" } }
-]
+[{ "data": [{ "id": 1, "name": "Alice" }] }, { "data": { "id": 1, "name": "Alice", "email": "alice@example.com" } }]
 ```
 
 If a call fails, its entry has an `error` instead of `data`:
@@ -66,15 +63,16 @@ If a call fails, its entry has an `error` instead of `data`:
 
 ## Options
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `context` | `(req) => TCtx` | (required) | Context factory — called once per batch |
-| `maxBatchSize` | `number` | `50` | Maximum calls per batch |
+| Option         | Type            | Default    | Description                             |
+| -------------- | --------------- | ---------- | --------------------------------------- |
+| `context`      | `(req) => TCtx` | (required) | Context factory — called once per batch |
+| `maxBatchSize` | `number`        | `50`       | Maximum calls per batch                 |
 
 All calls in a batch share the same context (computed once from the HTTP request). Each call runs the full compiled pipeline including guards, wraps, and validation.
 
-<Callout type="info">
-The batch handler executes all calls concurrently with `Promise.all`. If you need sequential execution, use separate requests or implement a custom batch handler.
+<Callout type='info'>
+  The batch handler executes all calls concurrently with `Promise.all`. If you need sequential execution, use separate
+  requests or implement a custom batch handler.
 </Callout>
 
 ## Client setup
@@ -83,11 +81,11 @@ Use `BatchLink` from the client plugins:
 
 ```ts twoslash
 // @noErrors
-import { BatchLink } from "katman/client/plugins"
+import { BatchLink } from 'katman/client/plugins'
 
 const link = new BatchLink({
-  url: "http://localhost:3000",
-  batchEndpoint: "/batch",
+  url: 'http://localhost:3000',
+  batchEndpoint: '/batch',
   maxBatchSize: 10,
 })
 ```

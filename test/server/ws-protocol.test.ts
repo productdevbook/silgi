@@ -2,7 +2,7 @@
  * WebSocket RPC adapter — integration tests.
  */
 
-import { createServer, type Server } from 'node:http'
+import { createServer } from 'node:http'
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { WebSocket } from 'ws'
@@ -11,6 +11,8 @@ import { z } from 'zod'
 import { compileRouter } from '#src/compile.ts'
 import { katman } from '#src/katman.ts'
 import { attachWebSocket } from '#src/ws.ts'
+
+import type { Server } from 'node:http'
 
 // ── Setup ──────────────────────────────────────────
 

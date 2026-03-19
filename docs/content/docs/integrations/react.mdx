@@ -3,7 +3,7 @@ title: React Server Actions
 description: Call Katman procedures as React Server Actions — type-safe [error, data] tuples instead of try/catch.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
+import { Callout } from 'fumadocs-ui/components/callout'
 
 React Server Actions let you call server-side code directly from React components. Katman wraps your procedures as actions that return `[error, data]` tuples instead of throwing, making error handling straightforward in your UI code.
 
@@ -22,9 +22,9 @@ Define the action in a file with `"use server"`:
 ```ts twoslash
 // @noErrors
 // app/actions.ts
-"use server"
-import { createAction } from "katman/react"
-import { appRouter } from "../router"
+'use server'
+import { createAction } from 'katman/react'
+import { appRouter } from '../router'
 
 export const listUsers = createAction(appRouter.users.list)
 export const createUser = createAction(appRouter.users.create)
@@ -34,7 +34,7 @@ Use it in a component:
 
 ```tsx
 // app/page.tsx
-import { listUsers } from "./actions"
+import { listUsers } from './actions'
 
 export default async function Page() {
   const [error, users] = await listUsers({ limit: 10 })
@@ -45,7 +45,9 @@ export default async function Page() {
 
   return (
     <ul>
-      {users.map(u => <li key={u.id}>{u.name}</li>)}
+      {users.map((u) => (
+        <li key={u.id}>{u.name}</li>
+      ))}
     </ul>
   )
 }
@@ -66,9 +68,9 @@ Converts an entire router into actions at once. The result mirrors your router s
 
 ```ts twoslash
 // @noErrors
-"use server"
-import { createActions } from "katman/react"
-import { appRouter } from "../router"
+'use server'
+import { createActions } from 'katman/react'
+import { appRouter } from '../router'
 
 export const actions = createActions(appRouter)
 ```
@@ -77,7 +79,7 @@ export const actions = createActions(appRouter)
 // @noErrors
 // In a component or server function
 const [err, users] = await actions.users.list({ limit: 10 })
-const [err2, user] = await actions.users.create({ name: "Alice" })
+const [err2, user] = await actions.users.create({ name: 'Alice' })
 ```
 
 This is convenient when you have many procedures and don't want to export each one individually.
@@ -89,17 +91,17 @@ For HTML `<form>` submissions, `createFormAction` accepts `FormData` and convert
 ```ts twoslash
 // @noErrors
 // app/actions.ts
-"use server"
-import { createFormAction } from "katman/react"
+'use server'
+import { createFormAction } from 'katman/react'
 
 export const submitUser = createFormAction(appRouter.users.create)
 ```
 
 ```tsx
 <form action={submitUser}>
-  <input name="name" required />
-  <input name="email" type="email" required />
-  <button type="submit">Create User</button>
+  <input name='name' required />
+  <input name='email' type='email' required />
+  <button type='submit'>Create User</button>
 </form>
 ```
 
@@ -108,8 +110,7 @@ export const submitUser = createFormAction(appRouter.users.create)
 Bracket notation in field names is automatically parsed into nested objects:
 
 ```html
-<input name="user[name]" value="Alice" />
-<input name="user[email]" value="alice@example.com" />
+<input name="user[name]" value="Alice" /> <input name="user[email]" value="alice@example.com" />
 ```
 
 Becomes:
@@ -128,8 +129,8 @@ If the default FormData parser doesn't match your needs, provide your own:
 // @noErrors
 const submitUser = createFormAction(appRouter.users.create, {
   parseFormData: (formData) => ({
-    name: formData.get("name"),
-    email: formData.get("email"),
+    name: formData.get('name'),
+    email: formData.get('email'),
   }),
 })
 ```
@@ -145,7 +146,8 @@ Katman automatically detects and rethrows framework-specific errors:
 These errors pass through untouched — they won't be caught as `[error, data]` tuples.
 
 <Callout>
-This means `redirect("/login")` inside a procedure works as expected in Next.js. The redirect happens, and the action doesn't return an error tuple.
+  This means `redirect("/login")` inside a procedure works as expected in Next.js. The redirect happens, and the action
+  doesn't return an error tuple.
 </Callout>
 
 ## useServerAction
@@ -153,15 +155,15 @@ This means `redirect("/login")` inside a procedure works as expected in Next.js.
 A React hook that wraps a server action with loading and error state:
 
 ```tsx
-import { useServerAction } from "katman/react"
+import { useServerAction } from 'katman/react'
 
 function CreateUserButton() {
   const { execute, data, error, isPending, reset } = useServerAction(createUser)
 
   return (
     <div>
-      <button onClick={() => execute({ name: "Alice" })} disabled={isPending}>
-        {isPending ? "Creating..." : "Create User"}
+      <button onClick={() => execute({ name: 'Alice' })} disabled={isPending}>
+        {isPending ? 'Creating...' : 'Create User'}
       </button>
       {error && <p>Error: {error.message}</p>}
       {data && <p>Created: {data.name}</p>}
@@ -177,7 +179,7 @@ function CreateUserButton() {
 Like `useServerAction`, but applies an optimistic update immediately while the server call is in flight:
 
 ```tsx
-import { useOptimisticServerAction } from "katman/react"
+import { useOptimisticServerAction } from 'katman/react'
 
 function UserName({ user }) {
   const { execute, displayData, isPending } = useOptimisticServerAction(updateUser, {
@@ -187,7 +189,7 @@ function UserName({ user }) {
   return (
     <div>
       <span>{displayData?.name ?? user.name}</span>
-      <button onClick={() => execute({ name: "Bob" })}>Rename</button>
+      <button onClick={() => execute({ name: 'Bob' })}>Rename</button>
     </div>
   )
 }

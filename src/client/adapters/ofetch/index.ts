@@ -5,13 +5,13 @@
  * Replaces manual fetch + retry/dedupe plugins with a single link.
  */
 
-import { ofetch, FetchError } from 'ofetch';
-import type { FetchOptions, FetchContext } from 'ofetch';
+import { ofetch, FetchError } from 'ofetch'
 
 import { encode as msgpackEncode, decode as msgpackDecode, MSGPACK_CONTENT_TYPE } from '../../../codec/msgpack.ts'
 import { KatmanError, isKatmanErrorJSON, fromKatmanErrorJSON, isErrorStatus } from '../../../core/error.ts'
 
 import type { ClientLink, ClientContext, ClientOptions } from '../../types.ts'
+import type { FetchOptions, FetchContext } from 'ofetch'
 
 export interface KatmanLinkOptions<TClientContext extends ClientContext = ClientContext> {
   /** Server base URL (e.g. "http://localhost:3000") */

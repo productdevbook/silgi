@@ -3,9 +3,9 @@ title: Server
 description: Start your API with serve(), deploy anywhere with handler(), enable HTTP/2, and auto-generate API docs.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
-import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
+import { Step, Steps } from 'fumadocs-ui/components/steps'
 
 Katman gives you two ways to run your API: `serve()` for a quick Node.js server, and `handler()` for any runtime that supports the Fetch API (Bun, Deno, Cloudflare Workers, etc.).
 
@@ -15,15 +15,15 @@ The simplest way to get a server running. One call, and you have an HTTP server 
 
 ```ts twoslash
 // @noErrors
-import { katman } from "katman"
-import { z } from "zod"
+import { katman } from 'katman'
+import { z } from 'zod'
 
 const k = katman({
   context: (req) => ({ db: getDB() }),
 })
 
 const appRouter = k.router({
-  health: k.query(() => ({ status: "ok" })),
+  health: k.query(() => ({ status: 'ok' })),
 })
 
 k.serve(appRouter, {
@@ -42,24 +42,25 @@ Katman server running at http://127.0.0.1:3000
 ```ts twoslash
 // @noErrors
 k.serve(appRouter, {
-  port: 3000,               // auto-finds next available if busy
-  hostname: "0.0.0.0",      // bind to all interfaces
-  scalar: true,             // API docs at /reference
-  ws: true,                 // WebSocket RPC on the same port
-  http2: {                  // HTTP/2 with TLS
-    cert: "./certs/cert.pem",
-    key: "./certs/key.pem",
+  port: 3000, // auto-finds next available if busy
+  hostname: '0.0.0.0', // bind to all interfaces
+  scalar: true, // API docs at /reference
+  ws: true, // WebSocket RPC on the same port
+  http2: {
+    // HTTP/2 with TLS
+    cert: './certs/cert.pem',
+    key: './certs/key.pem',
   },
 })
 ```
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `port` | `number` | `3000` | Port to listen on. If it's taken, Katman automatically picks the next free port in 3000-3100. |
-| `hostname` | `string` | `"127.0.0.1"` | Network interface. Use `"0.0.0.0"` to accept connections from other machines. |
-| `scalar` | `boolean \| ScalarOptions` | `false` | Enable auto-generated API docs at `/reference`. |
-| `ws` | `boolean` | `false` | Enable WebSocket RPC on the same port. |
-| `http2` | `{ cert, key }` | `undefined` | Enable HTTP/2 with TLS certificates. Falls back to HTTP/1.1 for older clients. |
+| Option     | Type                       | Default       | Description                                                                                   |
+| ---------- | -------------------------- | ------------- | --------------------------------------------------------------------------------------------- |
+| `port`     | `number`                   | `3000`        | Port to listen on. If it's taken, Katman automatically picks the next free port in 3000-3100. |
+| `hostname` | `string`                   | `"127.0.0.1"` | Network interface. Use `"0.0.0.0"` to accept connections from other machines.                 |
+| `scalar`   | `boolean \| ScalarOptions` | `false`       | Enable auto-generated API docs at `/reference`.                                               |
+| `ws`       | `boolean`                  | `false`       | Enable WebSocket RPC on the same port.                                                        |
+| `http2`    | `{ cert, key }`            | `undefined`   | Enable HTTP/2 with TLS certificates. Falls back to HTTP/1.1 for older clients.                |
 
 ### Automatic port selection
 
@@ -84,18 +85,20 @@ This works everywhere the Web Fetch API exists:
 const handle = k.handler(appRouter)
 
 Bun.serve({
-  port: 3000,
-  fetch: handle,
+port: 3000,
+fetch: handle,
 })
-  ```
-  </Tab>
-  <Tab value="Deno">
-  ```ts twoslash
+
+````
+</Tab>
+<Tab value="Deno">
+```ts twoslash
 // @noErrors
 const handle = k.handler(appRouter)
 
 Deno.serve({ port: 3000 }, handle)
-  ```
+````
+
   </Tab>
   <Tab value="Cloudflare Workers">
   ```ts twoslash
@@ -109,19 +112,20 @@ export default {
   </Tab>
 </Tabs>
 
-<Callout type="info">
-`handler()` supports content negotiation automatically. If the client sends an `Accept: application/x-msgpack` header, the response is encoded as MessagePack. Same for devalue. JSON is the default fallback.
+<Callout type='info'>
+  `handler()` supports content negotiation automatically. If the client sends an `Accept: application/x-msgpack` header,
+  the response is encoded as MessagePack. Same for devalue. JSON is the default fallback.
 </Callout>
 
 ## Content negotiation
 
 Both `serve()` and `handler()` inspect the `Accept` header and respond in the format the client prefers:
 
-| Accept header | Response format | When to use |
-|---|---|---|
-| `application/json` (or none) | JSON | Default, works everywhere |
-| `application/x-msgpack` | MessagePack | Smaller payloads, binary |
-| `application/x-devalue+json` | devalue | Rich types (Date, Map, Set, BigInt) |
+| Accept header                | Response format | When to use                         |
+| ---------------------------- | --------------- | ----------------------------------- |
+| `application/json` (or none) | JSON            | Default, works everywhere           |
+| `application/x-msgpack`      | MessagePack     | Smaller payloads, binary            |
+| `application/x-devalue+json` | devalue         | Rich types (Date, Map, Set, BigInt) |
 
 The server also checks `Content-Type` on incoming POST requests to decode the body correctly. No configuration needed on the server side — it all happens automatically.
 
@@ -152,12 +156,12 @@ Pass an options object instead of `true`:
 // @noErrors
 k.serve(appRouter, {
   scalar: {
-    title: "My API",
-    description: "Built with Katman",
-    version: "2.0.0",
-    servers: [{ url: "https://api.example.com" }],
-    contact: { email: "dev@example.com" },
-    security: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+    title: 'My API',
+    description: 'Built with Katman',
+    version: '2.0.0',
+    servers: [{ url: 'https://api.example.com' }],
+    contact: { email: 'dev@example.com' },
+    security: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
   },
 })
 ```
@@ -171,9 +175,9 @@ The generated docs pull information from your procedure definitions. Add `route`
 const listUsers = k.query({
   input: z.object({ limit: z.number().optional() }),
   route: {
-    summary: "List all users",
-    description: "Returns a paginated list of users, ordered by creation date.",
-    tags: ["users"],
+    summary: 'List all users',
+    description: 'Returns a paginated list of users, ordered by creation date.',
+    tags: ['users'],
   },
   resolve: ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
 })
@@ -181,13 +185,13 @@ const listUsers = k.query({
 
 The `route` field accepts:
 
-| Property | Description |
-|---|---|
-| `summary` | Short description shown in the endpoint list |
-| `description` | Longer description shown in the detail view |
-| `tags` | Group endpoints by tag |
-| `deprecated` | Mark an endpoint as deprecated |
-| `successStatus` | Override the default 200 status |
+| Property             | Description                                    |
+| -------------------- | ---------------------------------------------- |
+| `summary`            | Short description shown in the endpoint list   |
+| `description`        | Longer description shown in the detail view    |
+| `tags`               | Group endpoints by tag                         |
+| `deprecated`         | Mark an endpoint as deprecated                 |
+| `successStatus`      | Override the default 200 status                |
 | `successDescription` | Describe what a successful response looks like |
 
 ## HTTP/2
@@ -199,8 +203,8 @@ For production deployments that benefit from multiplexing and header compression
 k.serve(appRouter, {
   port: 443,
   http2: {
-    cert: "./certs/cert.pem",
-    key: "./certs/key.pem",
+    cert: './certs/cert.pem',
+    key: './certs/key.pem',
   },
 })
 ```
@@ -215,7 +219,8 @@ Katman server running at https://127.0.0.1:443
 HTTP/2 requires TLS. Older clients that don't support HTTP/2 automatically fall back to HTTP/1.1 on the same port.
 
 <Callout>
-For local development, generate self-signed certificates with [mkcert](https://github.com/FiloSottile/mkcert). For production, use certificates from your hosting provider or Let's Encrypt.
+  For local development, generate self-signed certificates with [mkcert](https://github.com/FiloSottile/mkcert). For
+  production, use certificates from your hosting provider or Let's Encrypt.
 </Callout>
 
 ## WebSocket support
@@ -255,7 +260,7 @@ const k = katman({
     error: ({ path, error }) => {
       console.error(`ERR ${path}:`, error)
     },
-    "serve:start": ({ url, port, hostname }) => {
+    'serve:start': ({ url, port, hostname }) => {
       console.log(`Server ready at ${url}`)
     },
   },
@@ -267,21 +272,22 @@ You can also add or remove hooks after the instance is created:
 ```ts twoslash
 // @noErrors
 // Add a hook
-k.hook("error", ({ error }) => reportToSentry(error))
+k.hook('error', ({ error }) => reportToSentry(error))
 
 // Remove a hook
-k.removeHook("error", myHookFn)
+k.removeHook('error', myHookFn)
 ```
 
-| Hook | When it fires | Payload |
-|---|---|---|
-| `request` | Before a request is processed | `{ path, input }` |
-| `response` | After a successful response | `{ path, output, durationMs }` |
-| `error` | When any error occurs | `{ path, error }` |
-| `serve:start` | When the server starts listening | `{ url, port, hostname }` |
+| Hook          | When it fires                    | Payload                        |
+| ------------- | -------------------------------- | ------------------------------ |
+| `request`     | Before a request is processed    | `{ path, input }`              |
+| `response`    | After a successful response      | `{ path, output, durationMs }` |
+| `error`       | When any error occurs            | `{ path, error }`              |
+| `serve:start` | When the server starts listening | `{ url, port, hostname }`      |
 
-<Callout type="info">
-Hooks are for side effects like logging and metrics. They don't modify the request or response. For that, use [guards and wraps](/docs/middleware).
+<Callout type='info'>
+  Hooks are for side effects like logging and metrics. They don't modify the request or response. For that, use [guards
+  and wraps](/docs/middleware).
 </Callout>
 
 ## callable()
@@ -290,11 +296,10 @@ For server-side code where you need to call a procedure directly — without HTT
 
 ```ts twoslash
 // @noErrors
-import { callable } from "katman"
+import { callable } from 'katman'
 
-const getUsers = k.query(
-  z.object({ limit: z.number().optional() }),
-  ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
+const getUsers = k.query(z.object({ limit: z.number().optional() }), ({ input, ctx }) =>
+  ctx.db.users.findMany({ take: input.limit }),
 )
 
 const getUsersFn = callable(getUsers, {

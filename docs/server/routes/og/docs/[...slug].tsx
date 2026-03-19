@@ -1,6 +1,7 @@
-import { defineEventHandler, getRouterParam, setResponseHeader, createError } from 'h3';
-import { ImageResponse } from '@takumi-rs/image-response';
-import { source } from '../../../../src/lib/source';
+import { ImageResponse } from '@takumi-rs/image-response'
+import { defineEventHandler, getRouterParam, setResponseHeader, createError } from 'h3'
+
+import { source } from '../../../../src/lib/source'
 
 function KatmanOG({ title, description }: { title: string; description?: string }) {
   return (
@@ -32,8 +33,26 @@ function KatmanOG({ title, description }: { title: string; description?: string 
       />
 
       {/* Strata lines */}
-      <div style={{ position: 'absolute', top: '210px', left: 0, right: 0, height: '1px', backgroundColor: 'rgba(255,255,255,0.04)' }} />
-      <div style={{ position: 'absolute', top: '420px', left: 0, right: 0, height: '1px', backgroundColor: 'rgba(255,255,255,0.04)' }} />
+      <div
+        style={{
+          position: 'absolute',
+          top: '210px',
+          left: 0,
+          right: 0,
+          height: '1px',
+          backgroundColor: 'rgba(255,255,255,0.04)',
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          top: '420px',
+          left: 0,
+          right: 0,
+          height: '1px',
+          backgroundColor: 'rgba(255,255,255,0.04)',
+        }}
+      />
 
       {/* Logo + site name */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '48px' }}>
@@ -51,9 +70,7 @@ function KatmanOG({ title, description }: { title: string; description?: string 
         >
           <div style={{ width: '14px', height: '14px', borderRadius: '50%', backgroundColor: '#0a0908' }} />
         </div>
-        <span style={{ fontSize: '28px', fontWeight: 500, color: '#b5a892', letterSpacing: '-0.02em' }}>
-          Katman
-        </span>
+        <span style={{ fontSize: '28px', fontWeight: 500, color: '#b5a892', letterSpacing: '-0.02em' }}>Katman</span>
       </div>
 
       {/* Title */}
@@ -98,12 +115,12 @@ function KatmanOG({ title, description }: { title: string; description?: string 
           alignItems: 'center',
         }}
       >
-        <span style={{ fontSize: '18px', color: '#5e5549', fontFamily: 'Geist Mono, monospace', letterSpacing: '0.1em' }}>
+        <span
+          style={{ fontSize: '18px', color: '#5e5549', fontFamily: 'Geist Mono, monospace', letterSpacing: '0.1em' }}
+        >
           DOCS
         </span>
-        <span style={{ fontSize: '18px', color: '#5e5549' }}>
-          katman.productdevbook.com
-        </span>
+        <span style={{ fontSize: '18px', color: '#5e5549' }}>katman.productdevbook.com</span>
       </div>
 
       {/* Border */}
@@ -117,34 +134,28 @@ function KatmanOG({ title, description }: { title: string; description?: string 
         }}
       />
     </div>
-  );
+  )
 }
 
 export default defineEventHandler(async (event) => {
-  const slug = getRouterParam(event, 'slug') ?? '';
+  const slug = getRouterParam(event, 'slug') ?? ''
   const slugs = slug
     .split('/')
     .filter((v: string) => v.length > 0)
-    .slice(0, -1);
+    .slice(0, -1)
 
-  const page = source.getPage(slugs);
+  const page = source.getPage(slugs)
   if (!page) {
-    throw createError({ statusCode: 404, message: 'Page not found' });
+    throw createError({ statusCode: 404, message: 'Page not found' })
   }
 
-  const response = new ImageResponse(
-    <KatmanOG
-      title={page.data.title}
-      description={page.data.description}
-    />,
-    {
-      width: 1200,
-      height: 630,
-      format: 'webp',
-    },
-  );
+  const response = new ImageResponse(<KatmanOG title={page.data.title} description={page.data.description} />, {
+    width: 1200,
+    height: 630,
+    format: 'webp',
+  })
 
-  setResponseHeader(event, 'content-type', response.headers.get('content-type') ?? 'image/webp');
-  setResponseHeader(event, 'cache-control', 'public, max-age=86400');
-  return response.body;
-});
+  setResponseHeader(event, 'content-type', response.headers.get('content-type') ?? 'image/webp')
+  setResponseHeader(event, 'cache-control', 'public, max-age=86400')
+  return response.body
+})

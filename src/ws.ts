@@ -13,11 +13,11 @@
 import nodeAdapter from 'crossws/adapters/node'
 
 import { encode as msgpackEncode, decode as msgpackDecode } from './codec/msgpack.ts'
-import { compileRouter } from './compile.ts';
-import type { FlatRouter } from './compile.ts';
+import { compileRouter } from './compile.ts'
 import { KatmanError, toKatmanError } from './core/error.ts'
 import { stringifyJSON } from './core/utils.ts'
 
+import type { FlatRouter } from './compile.ts'
 import type { RouterDef } from './types.ts'
 import type { Peer, Message } from 'crossws'
 import type { Server as HttpServer } from 'node:http'

@@ -3,8 +3,8 @@ title: TanStack Query
 description: Generate type-safe queryOptions, mutationOptions, and cache keys from your Katman client.
 ---
 
-import { Callout } from 'fumadocs-ui/components/callout';
-import { Step, Steps } from 'fumadocs-ui/components/steps';
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Step, Steps } from 'fumadocs-ui/components/steps'
 
 [TanStack Query](https://tanstack.com/query) is the most popular data-fetching library for React, Vue, Solid, and Svelte. Katman provides `createQueryUtils`, a utility that generates type-safe `queryOptions` and `mutationOptions` from your client — so you don't have to write query keys or fetch functions by hand.
 
@@ -27,8 +27,8 @@ npm install @tanstack/react-query
 
 ```ts twoslash
 // @noErrors
-import { createQueryUtils } from "katman/tanstack-query"
-import { client } from "./client" // your Katman client
+import { createQueryUtils } from 'katman/tanstack-query'
+import { client } from './client' // your Katman client
 
 const utils = createQueryUtils(client)
 ```
@@ -41,15 +41,19 @@ The `utils` object mirrors your client's structure. If your client has `client.u
 ### Use in components
 
 ```tsx
-import { useQuery } from "@tanstack/react-query"
+import { useQuery } from '@tanstack/react-query'
 
 function UserList() {
-  const { data, isLoading } = useQuery(
-    utils.users.list.queryOptions({ input: { limit: 10 } })
-  )
+  const { data, isLoading } = useQuery(utils.users.list.queryOptions({ input: { limit: 10 } }))
 
   if (isLoading) return <p>Loading...</p>
-  return <ul>{data?.map(u => <li key={u.id}>{u.name}</li>)}</ul>
+  return (
+    <ul>
+      {data?.map((u) => (
+        <li key={u.id}>{u.name}</li>
+      ))}
+    </ul>
+  )
 }
 ```
 
@@ -64,10 +68,10 @@ function UserList() {
 // @noErrors
 const options = utils.users.list.queryOptions({
   input: { limit: 10 },
-  staleTime: 5000,        // data is fresh for 5 seconds
-  gcTime: 60_000,         // garbage collect after 1 minute
+  staleTime: 5000, // data is fresh for 5 seconds
+  gcTime: 60_000, // garbage collect after 1 minute
   refetchInterval: 30_000, // refetch every 30 seconds
-  enabled: isLoggedIn,     // only fetch when logged in
+  enabled: isLoggedIn, // only fetch when logged in
 })
 
 // options contains:
@@ -86,9 +90,7 @@ Or prefetch on the server:
 
 ```ts twoslash
 // @noErrors
-await queryClient.prefetchQuery(
-  utils.users.list.queryOptions({ input: { limit: 10 } })
-)
+await queryClient.prefetchQuery(utils.users.list.queryOptions({ input: { limit: 10 } }))
 ```
 
 ## Mutations
@@ -96,7 +98,7 @@ await queryClient.prefetchQuery(
 `mutationOptions` returns everything `useMutation` needs:
 
 ```tsx
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 function CreateUser() {
   const queryClient = useQueryClient()
@@ -109,12 +111,12 @@ function CreateUser() {
           queryKey: utils.users.key(),
         })
       },
-    })
+    }),
   )
 
   return (
-    <button onClick={() => mutate({ name: "Alice" })} disabled={isPending}>
-      {isPending ? "Creating..." : "Create User"}
+    <button onClick={() => mutate({ name: 'Alice' })} disabled={isPending}>
+      {isPending ? 'Creating...' : 'Create User'}
     </button>
   )
 }
@@ -150,10 +152,7 @@ If you need to call a procedure outside of React (in a loader, a utility functio
 
 ```ts twoslash
 // @noErrors
-const users = await utils.users.list.call(
-  { limit: 10 },
-  { signal: controller.signal },
-)
+const users = await utils.users.list.call({ limit: 10 }, { signal: controller.signal })
 ```
 
 This is the same as calling the client directly, but it's convenient when you're already working with the utils.
@@ -162,23 +161,24 @@ This is the same as calling the client directly, but it's convenient when you're
 
 Each procedure-level util provides:
 
-| Method | Returns | Description |
-|---|---|---|
-| `queryOptions(opts)` | `{ queryKey, queryFn, ... }` | Full options for `useQuery` |
-| `infiniteOptions(opts)` | `{ queryKey, queryFn, ... }` | Full options for `useInfiniteQuery` |
-| `mutationOptions(opts?)` | `{ mutationKey, mutationFn, ... }` | Full options for `useMutation` |
-| `queryKey(input?)` | `[path, { type, input }]` | Query key for cache operations |
-| `mutationKey()` | `[path, { type }]` | Mutation key for cache operations |
-| `call(input, opts?)` | `Promise<TOutput>` | Direct procedure call |
+| Method                   | Returns                            | Description                         |
+| ------------------------ | ---------------------------------- | ----------------------------------- |
+| `queryOptions(opts)`     | `{ queryKey, queryFn, ... }`       | Full options for `useQuery`         |
+| `infiniteOptions(opts)`  | `{ queryKey, queryFn, ... }`       | Full options for `useInfiniteQuery` |
+| `mutationOptions(opts?)` | `{ mutationKey, mutationFn, ... }` | Full options for `useMutation`      |
+| `queryKey(input?)`       | `[path, { type, input }]`          | Query key for cache operations      |
+| `mutationKey()`          | `[path, { type }]`                 | Mutation key for cache operations   |
+| `call(input, opts?)`     | `Promise<TOutput>`                 | Direct procedure call               |
 
 Each router-level util provides:
 
-| Method | Returns | Description |
-|---|---|---|
+| Method        | Returns            | Description                      |
+| ------------- | ------------------ | -------------------------------- |
 | `key(input?)` | `[path, options?]` | Key prefix for bulk invalidation |
 
-<Callout type="info">
-This works with `@tanstack/react-query`, `@tanstack/vue-query`, `@tanstack/solid-query`, and `@tanstack/svelte-query`. Same API, same types, different framework bindings.
+<Callout type='info'>
+  This works with `@tanstack/react-query`, `@tanstack/vue-query`, `@tanstack/solid-query`, and `@tanstack/svelte-query`.
+  Same API, same types, different framework bindings.
 </Callout>
 
 ## Infinite queries
@@ -186,7 +186,7 @@ This works with `@tanstack/react-query`, `@tanstack/vue-query`, `@tanstack/solid
 Use `infiniteOptions` for paginated data. It works like `queryOptions` but returns everything `useInfiniteQuery` needs:
 
 ```tsx
-import { useInfiniteQuery } from "@tanstack/react-query"
+import { useInfiniteQuery } from '@tanstack/react-query'
 
 function UserList() {
   const { data, fetchNextPage, hasNextPage } = useInfiniteQuery(
@@ -194,12 +194,16 @@ function UserList() {
       input: (pageParam) => ({ cursor: pageParam, limit: 10 }),
       initialPageParam: 0,
       getNextPageParam: (lastPage) => lastPage.nextCursor,
-    })
+    }),
   )
 
   return (
     <>
-      {data?.pages.flatMap(p => p.items).map(u => <p key={u.id}>{u.name}</p>)}
+      {data?.pages
+        .flatMap((p) => p.items)
+        .map((u) => (
+          <p key={u.id}>{u.name}</p>
+        ))}
       {hasNextPage && <button onClick={() => fetchNextPage()}>Load more</button>}
     </>
   )
@@ -213,15 +217,15 @@ The `input` option is a function that receives the current page parameter and re
 Use `skipToken` to conditionally disable a query. This is the type-safe alternative to `enabled: false` — it tells both TanStack Query and TypeScript that the query should not run:
 
 ```tsx
-import { skipToken } from "katman/tanstack-query"
-import { useQuery } from "@tanstack/react-query"
+import { skipToken } from 'katman/tanstack-query'
+import { useQuery } from '@tanstack/react-query'
 
 function UserProfile({ userId }: { userId: string | null }) {
   // Query is disabled until userId is available
   const { data } = useQuery(
     utils.users.get.queryOptions({
       input: userId ? { id: userId } : skipToken,
-    })
+    }),
   )
 
   return data ? <p>{data.name}</p> : <p>Select a user</p>
@@ -239,12 +243,14 @@ function EventLog() {
   const { data: events } = useQuery(
     utils.stream.updates.streamedOptions({
       input: {},
-    })
+    }),
   )
 
   return (
     <ul>
-      {events?.map((e, i) => <li key={i}>{JSON.stringify(e)}</li>)}
+      {events?.map((e, i) => (
+        <li key={i}>{JSON.stringify(e)}</li>
+      ))}
     </ul>
   )
 }
@@ -262,7 +268,7 @@ function ServerStatus() {
     utils.health.liveOptions({
       input: undefined,
       refetchInterval: 5000, // poll every 5 seconds
-    })
+    }),
   )
 
   return <p>Uptime: {data?.uptime}s</p>

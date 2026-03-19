@@ -12,11 +12,11 @@ Create a catch-all API route:
 ```ts twoslash
 // @noErrors
 // src/routes/api/rpc/[...path].ts
-import { katmanSolidStart } from "katman/solidstart"
-import { appRouter } from "~/server/rpc"
+import { katmanSolidStart } from 'katman/solidstart'
+import { appRouter } from '~/server/rpc'
 
 const handler = katmanSolidStart(appRouter, {
-  prefix: "/api/rpc",
+  prefix: '/api/rpc',
   context: (event) => ({
     db: getDB(),
     headers: Object.fromEntries(event.request.headers),

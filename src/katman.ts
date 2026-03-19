@@ -12,8 +12,7 @@
 
 import { defu } from 'defu'
 import { getPort } from 'get-port-please'
-import { createHooks } from 'hookable';
-import type { Hookable, HookCallback } from 'hookable';
+import { createHooks } from 'hookable'
 
 import {
   encode as devalueEncode,
@@ -29,16 +28,16 @@ import {
   isMsgpack,
   MSGPACK_CONTENT_TYPE,
 } from './codec/msgpack.ts'
-import { compileProcedure, compileRouter, ContextPool } from './compile.ts';
-import type { CompiledHandler, FlatRouter } from './compile.ts';
+import { compileProcedure, compileRouter, ContextPool } from './compile.ts'
 import { KatmanError, toKatmanError, isErrorStatus } from './core/error.ts'
 import { ValidationError, validateSchema } from './core/schema.ts'
 import { iteratorToEventStream } from './core/sse.ts'
 import { stringifyJSON, parseEmptyableJSON, once } from './core/utils.ts'
-import { generateOpenAPI, scalarHTML } from './scalar.ts';
-import type { ScalarOptions } from './scalar.ts';
+import { generateOpenAPI, scalarHTML } from './scalar.ts'
 
+import type { CompiledHandler, FlatRouter } from './compile.ts'
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
+import type { ScalarOptions } from './scalar.ts'
 import type {
   ProcedureDef,
   ProcedureType,
@@ -53,6 +52,7 @@ import type {
   RouterDef,
   InferContextFromUse,
 } from './types.ts'
+import type { Hookable, HookCallback } from 'hookable'
 
 // ── Lifecycle Hooks ─────────────────────────────────
 

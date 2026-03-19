@@ -9,21 +9,21 @@ Use `OpenAPILink` to consume any OpenAPI-described API through the Katman client
 
 ```ts twoslash
 // @noErrors
-import { OpenAPILink } from "katman/client/openapi"
-import { createClient } from "katman/client"
-import type { PetStore } from "./petstore.types" // generated types
+import { OpenAPILink } from 'katman/client/openapi'
+import { createClient } from 'katman/client'
+import type { PetStore } from './petstore.types' // generated types
 
 const client = createClient<PetStore>({
   links: [
     new OpenAPILink({
-      url: "https://petstore.example.com",
-      spec: import("./petstore.json"),
+      url: 'https://petstore.example.com',
+      spec: import('./petstore.json'),
     }),
   ],
 })
 
 const pets = await client.pets.list()
-const pet = await client.pets.get({ id: "1" })
+const pet = await client.pets.get({ id: '1' })
 ```
 
 ## Inline spec
@@ -32,10 +32,10 @@ Pass the spec object directly if you already have it:
 
 ```ts twoslash
 // @noErrors
-import spec from "./petstore.json"
+import spec from './petstore.json'
 
 new OpenAPILink({
-  url: "https://petstore.example.com",
+  url: 'https://petstore.example.com',
   spec,
 })
 ```
@@ -45,8 +45,8 @@ new OpenAPILink({
 ```ts twoslash
 // @noErrors
 new OpenAPILink({
-  url: "https://api.example.com",
-  spec: import("./spec.json"),
+  url: 'https://api.example.com',
+  spec: import('./spec.json'),
   headers: () => ({
     Authorization: `Bearer ${getToken()}`,
   }),
