@@ -255,7 +255,7 @@ function emitParamBranch(
         if (entry.catchAll) {
           const pn = pmName(entry.paramMap[0]!)
           const {po, ro} = allocP(pre, uid, entry.paramMap)
-          code += `if(${g}p.length>=${offset}){${po}.${safe(pn)}=p.slice(${offset});${ro}.data=$${d};return ${ro}}`
+          code += `if(${g}p.length>=${offset}){${po}${safe(pn)}=p.slice(${offset});${ro}.data=$${d};return ${ro}}`
           continue
         }
 
@@ -264,9 +264,9 @@ function emitParamBranch(
           const {po, ro} = allocP(pre, uid, entry.paramMap)
           if (entry.paramMap[0]![2]) {
             // Optional
-            code += `if(${g}p.indexOf("/",${offset})===-1){${po}.${safe(pn)}=p.length>${offset}?p.slice(${offset}):"";${ro}.data=$${d};return ${ro}}`
+            code += `if(${g}p.indexOf("/",${offset})===-1){${po}${safe(pn)}=p.length>${offset}?p.slice(${offset}):"";${ro}.data=$${d};return ${ro}}`
           } else {
-            code += `if(${g}p.indexOf("/",${offset})===-1&&p.length>${offset}){${po}.${safe(pn)}=p.slice(${offset});${ro}.data=$${d};return ${ro}}`
+            code += `if(${g}p.indexOf("/",${offset})===-1&&p.length>${offset}){${po}${safe(pn)}=p.slice(${offset});${ro}.data=$${d};return ${ro}}`
           }
         }
       }
@@ -347,9 +347,9 @@ function emitParamBranch(
       if (entry.paramMap?.length) {
         const names = entry.paramMap.map(pm => pmName(pm))
         const {po, ro} = allocP(pre, uid, entry.paramMap)
-        let asgn = `${po}.${safe(names[0]!)}=p.slice(${offset},${eVar});`
+        let asgn = `${po}${safe(names[0]!)}=p.slice(${offset},${eVar});`
         if (names.length > 1) {
-          asgn += `${po}.${safe(names[names.length - 1]!)}=p.slice(${eVar}+1);`
+          asgn += `${po}${safe(names[names.length - 1]!)}=p.slice(${eVar}+1);`
         }
         deepCode += `${g}{${asgn}${ro}.data=$${d};return ${ro}}`
       } else {
@@ -386,7 +386,7 @@ function emitParamTerminal(
       if (entry.paramMap?.length) {
         const pn = pmName(entry.paramMap[0]!)
         const {po, ro} = allocP(pre, uid, [[0, pn, false]])
-        code += `if(${g}${lengthCheck}){${po}.${safe(pn)}=p.slice(${paramStart},${paramEndVar});${ro}.data=$${d};return ${ro}}`
+        code += `if(${g}${lengthCheck}){${po}${safe(pn)}=p.slice(${paramStart},${paramEndVar});${ro}.data=$${d};return ${ro}}`
       } else {
         code += `if(${g}${lengthCheck}){_rs.data=$${d};return _rs}`
       }
@@ -421,8 +421,8 @@ function emitDeepParam(
         if (entry.catchAll) {
           const names = entry.paramMap.map(pm => pmName(pm))
           const {po, ro} = allocP(pre, uid, entry.paramMap)
-          let asgn = `${po}.${safe(names[0]!)}=p.slice(${p1Start},${p1EndVar});`
-          if (names.length >= 2) asgn += `${po}.${safe(names[names.length - 1]!)}=p.slice(${p2Start});`
+          let asgn = `${po}${safe(names[0]!)}=p.slice(${p1Start},${p1EndVar});`
+          if (names.length >= 2) asgn += `${po}${safe(names[names.length - 1]!)}=p.slice(${p2Start});`
           code += `if(${g}p.length>=${p2Start}){${asgn}${ro}.data=$${d};return ${ro}}`
           continue
         }
@@ -430,8 +430,8 @@ function emitDeepParam(
         const names = entry.paramMap.map(pm => pmName(pm))
         const {po, ro} = allocP(pre, uid, entry.paramMap)
         code += `if(${g}p.indexOf("/",${p2Start})===-1&&p.length>${p2Start}){`
-        code += `${po}.${safe(names[0]!)}=p.slice(${p1Start},${p1EndVar});`
-        code += `${po}.${safe(names[1]!)}=p.slice(${p2Start});`
+        code += `${po}${safe(names[0]!)}=p.slice(${p1Start},${p1EndVar});`
+        code += `${po}${safe(names[1]!)}=p.slice(${p2Start});`
         code += `${ro}.data=$${d};return ${ro}}`
       }
     }
@@ -474,9 +474,9 @@ function emitDeepParam(
               const {po: po2, ro: ro2} = allocP(pre, uid, entry2.paramMap)
               const p3Start = `${e2Var}+${1 + keyLen + 1}`
               body += `if(${g2}p.indexOf("/",${p3Start})===-1&&p.length>${p3Start}){`
-              body += `${po2}.${safe(names2[0]!)}=p.slice(${p1Start},${p1EndVar});`
-              if (names2.length >= 2) body += `${po2}.${safe(names2[1]!)}=p.slice(${p2Start},${e2Var});`
-              if (names2.length >= 3) body += `${po2}.${safe(names2[2]!)}=p.slice(${p3Start});`
+              body += `${po2}${safe(names2[0]!)}=p.slice(${p1Start},${p1EndVar});`
+              if (names2.length >= 2) body += `${po2}${safe(names2[1]!)}=p.slice(${p2Start},${e2Var});`
+              if (names2.length >= 3) body += `${po2}${safe(names2[2]!)}=p.slice(${p3Start});`
               body += `${ro2}.data=$${d2};return ${ro2}}`
             }
           }
@@ -493,8 +493,8 @@ function emitDeepParam(
                 const names2 = entry2.paramMap.map(pm => pmName(pm))
                 const {po: po2, ro: ro2} = allocP(pre, uid, entry2.paramMap)
                 body += `if(${g2}p.length===${e2Var}+${1 + keyLen}){`
-                body += `${po2}.${safe(names2[0]!)}=p.slice(${p1Start},${p1EndVar});`
-                if (names2.length >= 2) body += `${po2}.${safe(names2[1]!)}=p.slice(${p2Start},${e2Var});`
+                body += `${po2}${safe(names2[0]!)}=p.slice(${p1Start},${p1EndVar});`
+                if (names2.length >= 2) body += `${po2}${safe(names2[1]!)}=p.slice(${p2Start},${e2Var});`
                 body += `${ro2}.data=$${d2};return ${ro2}}`
               }
             }
@@ -520,9 +520,9 @@ function emitDeepParam(
           if (entry2.catchAll) {
             const names2 = entry2.paramMap.map(pm => pmName(pm))
             const {po: po2, ro: ro2} = allocP(pre, uid, entry2.paramMap)
-            let asgn = `${po2}.${safe(names2[0]!)}=p.slice(${p1Start},${p1EndVar});`
-            if (names2.length >= 2) asgn += `${po2}.${safe(names2[1]!)}=p.slice(${p2Start},${e2Var});`
-            if (names2.length >= 3) asgn += `${po2}.${safe(names2[names2.length - 1]!)}=p.slice(${e2Var}+1);`
+            let asgn = `${po2}${safe(names2[0]!)}=p.slice(${p1Start},${p1EndVar});`
+            if (names2.length >= 2) asgn += `${po2}${safe(names2[1]!)}=p.slice(${p2Start},${e2Var});`
+            if (names2.length >= 3) asgn += `${po2}${safe(names2[names2.length - 1]!)}=p.slice(${e2Var}+1);`
             e2Code += `if(${g2}p.length>${e2Var}+1){${asgn}${ro2}.data=$${d2};return ${ro2}}`
             continue
           }
@@ -531,9 +531,9 @@ function emitDeepParam(
           const names2 = entry2.paramMap.map(pm => pmName(pm))
           const {po: po2, ro: ro2} = allocP(pre, uid, entry2.paramMap)
           e2Code += `if(${g2}p.indexOf("/",${p3Start})===-1&&p.length>${p3Start}){`
-          e2Code += `${po2}.${safe(names2[0]!)}=p.slice(${p1Start},${p1EndVar});`
-          if (names2.length >= 2) e2Code += `${po2}.${safe(names2[1]!)}=p.slice(${p2Start},${e2Var});`
-          if (names2.length >= 3) e2Code += `${po2}.${safe(names2[2]!)}=p.slice(${p3Start});`
+          e2Code += `${po2}${safe(names2[0]!)}=p.slice(${p1Start},${p1EndVar});`
+          if (names2.length >= 2) e2Code += `${po2}${safe(names2[1]!)}=p.slice(${p2Start},${e2Var});`
+          if (names2.length >= 3) e2Code += `${po2}${safe(names2[2]!)}=p.slice(${p3Start});`
           e2Code += `${ro2}.data=$${d2};return ${ro2}}`
         }
       }
@@ -588,7 +588,7 @@ function emitDeepStatic(
           const names = entry.paramMap.map(pm => pmName(pm))
           const {po, ro} = allocP(pre, uid, entry.paramMap)
           code += `if(${g}${charCheck}&&p.length===${endPos}){`
-          code += `${po}.${safe(names[0]!)}=p.slice(${p1Start},${p1EndVar});`
+          code += `${po}${safe(names[0]!)}=p.slice(${p1Start},${p1EndVar});`
           code += `${ro}.data=$${d};return ${ro}}`
         } else {
           code += `if(${g}${charCheck}&&p.length===${endPos}){_rs.data=$${d};return _rs}`
@@ -622,9 +622,9 @@ function emitDeepWildcard(
     if (entry.paramMap?.length) {
       const names = entry.paramMap.map(pm => pmName(pm))
       const {po, ro} = allocP(pre, uid, entry.paramMap)
-      let asgn = `${po}.${safe(names[0]!)}=p.slice(${p1Start},${p1EndVar});`
+      let asgn = `${po}${safe(names[0]!)}=p.slice(${p1Start},${p1EndVar});`
       if (names.length > 1) {
-        asgn += `${po}.${safe(names[names.length - 1]!)}=p.slice(${wcStart});`
+        asgn += `${po}${safe(names[names.length - 1]!)}=p.slice(${wcStart});`
       }
       code += `${g}{${asgn}${ro}.data=$${d};return ${ro}}`
     } else {
@@ -659,9 +659,9 @@ function emitDeepParamChain(
       if (entry.catchAll) {
         const names = entry.paramMap.map(pm => pmName(pm))
         const {po, ro} = allocP(pre, uid, entry.paramMap)
-        let asgn = `${po}.${safe(names[0]!)}=p.slice(${p1Start},${p1EndVar});`
+        let asgn = `${po}${safe(names[0]!)}=p.slice(${p1Start},${p1EndVar});`
         if (names.length > 1) {
-          asgn += `${po}.${safe(names[names.length - 1]!)}=p.slice(${p2Start});`
+          asgn += `${po}${safe(names[names.length - 1]!)}=p.slice(${p2Start});`
         }
         code += `if(${g}p.length>${p2Start}){${asgn}${ro}.data=$${d};return ${ro}}`
         continue
@@ -670,8 +670,8 @@ function emitDeepParamChain(
       const names = entry.paramMap.map(pm => pmName(pm))
       const {po, ro} = allocP(pre, uid, entry.paramMap)
       code += `if(${g}p.indexOf("/",${p2Start})===-1&&p.length>${p2Start}){`
-      code += `${po}.${safe(names[0]!)}=p.slice(${p1Start},${p1EndVar});`
-      code += `${po}.${safe(names[1]!)}=p.slice(${p2Start});`
+      code += `${po}${safe(names[0]!)}=p.slice(${p1Start},${p1EndVar});`
+      code += `${po}${safe(names[1]!)}=p.slice(${p2Start});`
       code += `${ro}.data=$${d};return ${ro}}`
     }
   }
@@ -697,7 +697,7 @@ function emitWildcard(
     if (entry.paramMap?.length) {
       const nm = pmName(entry.paramMap[entry.paramMap.length - 1]!)
       const {po, ro} = allocP(pre, uid, [[0, nm, false]])
-      code += `${g}{${po}.${safe(nm)}=p.length>=${offset}?p.slice(${offset}):"";${ro}.data=$${d};return ${ro}}`
+      code += `${g}{${po}${safe(nm)}=p.length>=${offset}?p.slice(${offset}):"";${ro}.data=$${d};return ${ro}}`
     } else {
       code += `${g}{_rs.data=$${d};return _rs}`
     }
@@ -746,8 +746,14 @@ function pmName(pm: [number, string | RegExp, boolean]): string {
   return typeof pm[1] === 'string' ? pm[1] : String(pm[1])
 }
 
+/** Generate property access — dot notation for valid identifiers, bracket for others */
+function propAccess(obj: string, k: string): string {
+  return /^[a-zA-Z_$][\w$]*$/.test(k) ? `${obj}.${k}` : `${obj}[${JSON.stringify(k)}]`
+}
+
+/** @deprecated use propAccess */
 function safe(k: string): string {
-  return /^[a-zA-Z_$][\w$]*$/.test(k) ? k : `[${JSON.stringify(k)}]`
+  return /^[a-zA-Z_$][\w$]*$/.test(k) ? `.${k}` : `[${JSON.stringify(k)}]`
 }
 
 function addRef(refs: unknown[], v: unknown): number {
