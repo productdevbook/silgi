@@ -33,11 +33,13 @@ import { KatmanError, toKatmanError, isErrorStatus } from './core/error.ts'
 import { ValidationError, validateSchema } from './core/schema.ts'
 import { iteratorToEventStream } from './core/sse.ts'
 import { stringifyJSON, parseEmptyableJSON, once } from './core/utils.ts'
+import { createProcedureBuilder } from './builder.ts'
 import { generateOpenAPI, scalarHTML, resolveScalarLocal } from './scalar.ts'
 
 import type { CompiledHandler, FlatRouter } from './compile.ts'
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
 import type { ScalarOptions } from './scalar.ts'
+import type { ProcedureBuilder } from './builder.ts'
 import type {
   ProcedureDef,
   ProcedureType,
@@ -140,7 +142,10 @@ interface GuardFactory<TBaseCtx> {
 
 // ── Procedure Factories ──────────────────────────────
 
-interface QueryFactory<TBaseCtx> {
+interface QueryFactory<TBaseCtx extends Record<string, unknown>> {
+  // Builder: query() — returns chainable builder
+  (): ProcedureBuilder<'query', TBaseCtx>
+
   // Short: query(resolve)
   <TOutput>(
     resolve: (opts: ResolveContext<TBaseCtx, undefined, {}>) => Promise<TOutput> | TOutput,
@@ -199,7 +204,10 @@ interface QueryFactory<TBaseCtx> {
   >
 }
 
-interface MutationFactory<TBaseCtx> {
+interface MutationFactory<TBaseCtx extends Record<string, unknown>> {
+  // Builder: mutation() — returns chainable builder
+  (): ProcedureBuilder<'mutation', TBaseCtx>
+
   <TOutput>(
     resolve: (opts: ResolveContext<TBaseCtx, undefined, {}>) => Promise<TOutput> | TOutput,
   ): ProcedureDef<'mutation', undefined, TOutput, {}>
@@ -255,7 +263,10 @@ interface MutationFactory<TBaseCtx> {
   >
 }
 
-interface SubscriptionFactory<TBaseCtx> {
+interface SubscriptionFactory<TBaseCtx extends Record<string, unknown>> {
+  // Builder: subscription() — returns chainable builder
+  (): ProcedureBuilder<'subscription', TBaseCtx>
+
   <TOutput>(
     resolve: (opts: ResolveContext<TBaseCtx, undefined, {}>) => AsyncIterableIterator<TOutput>,
   ): ProcedureDef<'subscription', undefined, TOutput, {}>
@@ -313,7 +324,12 @@ interface SubscriptionFactory<TBaseCtx> {
 
 // ── Implementation ──────────────────────────────────
 
-function createProcedure(type: ProcedureType, ...args: unknown[]): ProcedureDef {
+function createProcedure(type: ProcedureType, ...args: unknown[]): ProcedureDef | ProcedureBuilder<any, any> {
+  // Builder form: no arguments → return chainable builder
+  if (args.length === 0) {
+    return createProcedureBuilder(type)
+  }
+
   // Short form: (resolve)
   if (args.length === 1 && typeof args[0] === 'function') {
     return {

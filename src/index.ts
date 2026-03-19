@@ -40,6 +40,9 @@
 export { katman } from './katman.ts'
 export type { KatmanInstance, KatmanConfig } from './katman.ts'
 
+// ── Builder ─────────────────────────────────────────
+export type { ProcedureBuilder, ProcedureBuilderWithOutput } from './builder.ts'
+
 // ── Types ───────────────────────────────────────────
 export type {
   ProcedureDef,

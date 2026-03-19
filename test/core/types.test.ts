@@ -219,6 +219,40 @@ describe('output schema enforces resolve return type', () => {
   })
 })
 
+// ── Builder pattern ─────────────────────────────────
+
+describe('builder pattern', () => {
+  const outputSchema = z.object({ id: z.number(), name: z.string() })
+
+  it('query() returns builder, .output().resolve() produces ProcedureDef', () => {
+    const proc = k.query()
+      .output(outputSchema)
+      .resolve(() => ({ id: 1, name: 'Alice' }))
+
+    expectTypeOf(proc).toMatchTypeOf<ProcedureDef<'query', undefined, { id: number; name: string }, {}>>()
+  })
+
+  it('mutation() builder with input + output + errors', () => {
+    const proc = k.mutation()
+      .input(z.object({ email: z.string() }))
+      .output(outputSchema)
+      .errors({ CONFLICT: 409 as const })
+      .resolve(({ input, fail }) => {
+        expectTypeOf(input).toEqualTypeOf<{ email: string }>()
+        return { id: 1, name: input.email }
+      })
+
+    expectTypeOf(proc).toMatchTypeOf<ProcedureDef<'mutation', { email: string }, { id: number; name: string }>>()
+  })
+
+  it('builder without output — resolve return freely inferred', () => {
+    const proc = k.query()
+      .resolve(() => ({ custom: true, count: 42 }))
+
+    expectTypeOf(proc).toMatchTypeOf<ProcedureDef<'query', undefined, { custom: boolean; count: number }, {}>>()
+  })
+})
+
 // ── Error / fail type inference ─────────────────────
 
 describe('error type inference', () => {
