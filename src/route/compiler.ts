@@ -77,6 +77,7 @@ function emitNode(
   uid: { n: number },
   depth: number,
   splitDone?: boolean,
+  prefixLen?: number, // known string offset (e.g. "/files/" = 7)
 ): string {
   let code = ''
   let hasIf = false
@@ -110,7 +111,8 @@ function emitNode(
       for (const [ch, entries] of byChar) {
         let inner = ''
         for (const [key, child] of entries) {
-          const childCode = emitNode(child, refs, pre, uid, depth + 1, true)
+          const childPrefixLen = 1 + key.length + 1 // "/" + segment + "/"
+          const childCode = emitNode(child, refs, pre, uid, depth + 1, true, childPrefixLen)
           if (!childCode) continue
           const cond = key.length > 1
             ? `s[1].charCodeAt(0)===${ch}&&s[1]===${JSON.stringify(key)}`
@@ -125,7 +127,8 @@ function emitNode(
     } else {
       for (const [key, child] of Object.entries(node.static)) {
         if (!child) continue
-        const inner = emitNode(child, refs, pre, uid, depth + 1, true)
+        const childPrefixLen = (prefixLen || 1) + key.length + 1
+        const inner = emitNode(child, refs, pre, uid, depth + 1, true, childPrefixLen)
         if (!inner) continue
         const ch = key.charCodeAt(0)
         const cond = key.length > 1
@@ -149,16 +152,9 @@ function emitNode(
     }
   }
 
-  // Wildcard child
+  // Wildcard child — never needs split, use p.slice(prefixLen) directly
   if (node.wildcard?.methods) {
-    const wcInner = emitWildcard(node.wildcard.methods, refs, pre, uid, depth)
-    if (wcInner) {
-      if (needsSplit) {
-        code += `{var s=s||p.split("/"),l=l||s.length;${wcInner}}`
-      } else {
-        code += wcInner
-      }
-    }
+    code += emitWildcard(node.wildcard.methods, refs, pre, uid, depth, !needsSplit, prefixLen)
   }
 
   return code
@@ -261,6 +257,8 @@ function emitWildcard(
   pre: string[],
   uid: { n: number },
   depth: number,
+  useSplit?: boolean,
+  prefixLen?: number,
 ): string {
   let code = ''
   for (const method in methods) {
@@ -274,7 +272,24 @@ function emitWildcard(
         ? entry.paramMap[entry.paramMap.length - 1]![1] as string : '_'
       const po = `_p${uid.n++}`
       pre.push(`var ${po}={${JSON.stringify(name)}:""}`)
-      code += `${g}{${po}[${JSON.stringify(name)}]=s.slice(${depth}).join("/");_r.data=$${d};_r.params=${po};return _r;}`
+      // Wildcard value extraction — compile-time offset when possible
+      let sliceExpr: string
+      if (prefixLen) {
+        // Known prefix length → hardcoded offset (fastest: single p.slice)
+        sliceExpr = `(p.length>${prefixLen - 1}?p.slice(${prefixLen}):"")`
+      } else {
+        // Fallback: indexOf chain
+        if (depth === 1) {
+          sliceExpr = `(p.indexOf("/",1)===-1?"":p.slice(p.indexOf("/",1)+1))`
+        } else {
+          let expr = 'p.indexOf("/",1)'
+          for (let d = 2; d <= depth; d++) {
+            expr = `p.indexOf("/",${expr}+1)`
+          }
+          sliceExpr = `(${expr}===-1?"":p.slice(${expr}+1))`
+        }
+      }
+      code += `${g}{${po}[${JSON.stringify(name)}]=${sliceExpr};_r.data=$${d};_r.params=${po};return _r;}`
     } else {
       code += `${g}{_r.data=$${d};_r.params=null;return _r;}`
     }
