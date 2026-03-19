@@ -1,0 +1,74 @@
+---
+title: Message Port
+description: Use Katman over MessagePort — Electron, browser extensions, Web Workers.
+---
+
+Katman can run over any `MessagePort`-compatible channel — Electron IPC, browser extension ports, Web Workers, iframes.
+
+## Server side
+
+Attach your router to a port:
+
+```ts twoslash
+// @noErrors
+import { katmanMessagePort } from "katman/message-port"
+import { appRouter } from "./router"
+
+const port = getPort() // MessagePort, Worker, chrome.runtime.Port, etc.
+
+katmanMessagePort(appRouter, port, {
+  context: () => ({
+    db: getDB(),
+  }),
+})
+```
+
+## Client side
+
+Connect to the same port from the other end:
+
+```ts twoslash
+// @noErrors
+import { MessagePortLink } from "katman/message-port"
+import { createClient } from "katman/client"
+import type { AppRouter } from "./router"
+
+const port = getPort()
+
+const client = createClient<AppRouter>({
+  links: [new MessagePortLink(port)],
+})
+
+const users = await client.users.list()
+```
+
+## Electron example
+
+```ts twoslash
+// @noErrors
+// main.ts (main process)
+import { katmanMessagePort } from "katman/message-port"
+
+ipcMain.handle("rpc-port", (event) => {
+  const { port1, port2 } = new MessageChannelMain()
+  katmanMessagePort(appRouter, port1, { context: () => ({}) })
+  event.senderFrame.postMessage("rpc-port", null, [port2])
+})
+```
+
+```ts twoslash
+// @noErrors
+// renderer.ts (renderer process)
+import { MessagePortLink } from "katman/message-port"
+import { createClient } from "katman/client"
+
+const port = await getElectronPort()
+const client = createClient<AppRouter>({
+  links: [new MessagePortLink(port)],
+})
+```
+
+## What's next?
+
+- [Client](/docs/client) — client configuration and links
+- [Integrations](/docs/integrations) — other available integrations

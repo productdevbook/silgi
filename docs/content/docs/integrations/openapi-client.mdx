@@ -1,0 +1,59 @@
+---
+title: OpenAPI Client
+description: Consume any OpenAPI endpoint as a typed Katman client.
+---
+
+Use `OpenAPILink` to consume any OpenAPI-described API through the Katman client interface. Bring your own spec — Katman maps operations to procedure calls.
+
+## Setup
+
+```ts twoslash
+// @noErrors
+import { OpenAPILink } from "katman/client/openapi"
+import { createClient } from "katman/client"
+import type { PetStore } from "./petstore.types" // generated types
+
+const client = createClient<PetStore>({
+  links: [
+    new OpenAPILink({
+      url: "https://petstore.example.com",
+      spec: import("./petstore.json"),
+    }),
+  ],
+})
+
+const pets = await client.pets.list()
+const pet = await client.pets.get({ id: "1" })
+```
+
+## Inline spec
+
+Pass the spec object directly if you already have it:
+
+```ts twoslash
+// @noErrors
+import spec from "./petstore.json"
+
+new OpenAPILink({
+  url: "https://petstore.example.com",
+  spec,
+})
+```
+
+## Custom headers
+
+```ts twoslash
+// @noErrors
+new OpenAPILink({
+  url: "https://api.example.com",
+  spec: import("./spec.json"),
+  headers: () => ({
+    Authorization: `Bearer ${getToken()}`,
+  }),
+})
+```
+
+## What's next?
+
+- [Client](/docs/client) — client configuration and links
+- [Integrations](/docs/integrations) — other available integrations

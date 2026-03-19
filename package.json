@@ -129,6 +129,26 @@
     "./tanstack-query/ssr": {
       "import": "./dist/integrations/tanstack-query/ssr.mjs",
       "types": "./dist/integrations/tanstack-query/ssr.d.mts"
+    },
+    "./remix": {
+      "import": "./dist/adapters/remix.mjs",
+      "types": "./dist/adapters/remix.d.mts"
+    },
+    "./astro": {
+      "import": "./dist/adapters/astro.mjs",
+      "types": "./dist/adapters/astro.d.mts"
+    },
+    "./solidstart": {
+      "import": "./dist/adapters/solidstart.mjs",
+      "types": "./dist/adapters/solidstart.d.mts"
+    },
+    "./message-port": {
+      "import": "./dist/adapters/message-port.mjs",
+      "types": "./dist/adapters/message-port.d.mts"
+    },
+    "./client/openapi": {
+      "import": "./dist/client/openapi.mjs",
+      "types": "./dist/client/openapi.d.mts"
     }
   },
   "files": [

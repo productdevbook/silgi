@@ -1,0 +1,54 @@
+---
+title: SolidStart
+description: Use Katman with SolidStart API routes.
+---
+
+[SolidStart](https://start.solidjs.com) uses file-based API routes powered by Nitro. Katman integrates via a catch-all endpoint.
+
+## Setup
+
+Create a catch-all API route:
+
+```ts twoslash
+// @noErrors
+// src/routes/api/rpc/[...path].ts
+import { katmanSolidStart } from "katman/solidstart"
+import { appRouter } from "~/server/rpc"
+
+const handler = katmanSolidStart(appRouter, {
+  prefix: "/api/rpc",
+  context: (event) => ({
+    db: getDB(),
+    headers: Object.fromEntries(event.request.headers),
+  }),
+})
+
+export const GET = handler
+export const POST = handler
+```
+
+Procedures are accessible at:
+
+```
+POST /api/rpc/users/list
+POST /api/rpc/users/create
+GET  /api/rpc/health
+```
+
+## Context from SolidStart middleware
+
+Access middleware data through the event object:
+
+```ts twoslash
+// @noErrors
+katmanSolidStart(appRouter, {
+  context: (event) => ({
+    user: event.locals.user,
+  }),
+})
+```
+
+## What's next?
+
+- [Server](/docs/server) — standalone `serve()` as an alternative
+- [Integrations](/docs/integrations) — other available integrations
