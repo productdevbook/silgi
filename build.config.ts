@@ -34,6 +34,8 @@ export default defineBuildConfig({
         "./src/adapters/astro.ts",
         "./src/adapters/solidstart.ts",
         "./src/adapters/message-port.ts",
+        "./src/adapters/nestjs.ts",
+        "./src/adapters/peer.ts",
         "./src/client/openapi.ts",
         "./src/contract.ts",
         "./src/trpc-interop.ts",

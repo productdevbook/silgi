@@ -28,8 +28,8 @@ oRPC ile karsilastirildiginda tamamlanan ve kalan ozellikler.
 - [x] SolidStart — `katmanSolidStart()`
 - [x] AWS Lambda — `katmanLambda()`
 - [x] Message Port — `katmanMessagePort()` + `MessagePortLink`
-- [ ] NestJS
-- [ ] Peer-to-peer (Standard Server Peer)
+- [x] NestJS — `katmanNestHandler()`
+- [x] Peer-to-peer — `createPeer()` (bidirectional RPC over MessagePort)
 
 ## Plugin / Guvenlik — TAMAMLANDI
 
@@ -77,8 +77,8 @@ oRPC ile karsilastirildiginda tamamlanan ve kalan ozellikler.
 
 ---
 
-**Tamamlanan: 44 ozellik**
-**Kalan: 4 (NestJS, Peer-to-peer, Durable Iterator, Hibernation — dusuk oncelikli)**
+**Tamamlanan: 46 ozellik**
+**Kalan: 2 (CF Durable Iterator, CF Hibernation — Cloudflare-specific)**
 
 **Katman'in avantajlari:**
 - Single package (35+ paket yerine 1)

@@ -34,6 +34,7 @@ export interface MessagePortAdapterOptions<TCtx extends Record<string, unknown>>
 
 interface RPCMessage {
   __katman: true;
+  __type: "request";
   id: string;
   path: string;
   input?: unknown;
@@ -41,6 +42,7 @@ interface RPCMessage {
 
 interface RPCResponse {
   __katman: true;
+  __type: "response";
   id: string;
   result?: unknown;
   error?: { code: string; status: number; message: string; data?: unknown };
@@ -61,12 +63,13 @@ export function katmanMessagePort<TCtx extends Record<string, unknown>>(
 
   const handler = async (event: { data: unknown }) => {
     const msg = event.data as RPCMessage;
-    if (!msg || typeof msg !== "object" || !msg.__katman) return;
+    if (!msg || typeof msg !== "object" || !msg.__katman || msg.__type !== "request") return;
 
     const route = flatRouter.get(msg.path);
     if (!route) {
       port.postMessage({
         __katman: true,
+        __type: "response",
         id: msg.id,
         error: { code: "NOT_FOUND", status: 404, message: `Procedure not found: ${msg.path}` },
       } satisfies RPCResponse);
@@ -82,14 +85,14 @@ export function katmanMessagePort<TCtx extends Record<string, unknown>>(
       }
 
       const result = await route.handler(ctx, msg.input, signal);
-      port.postMessage({ __katman: true, id: msg.id, result } satisfies RPCResponse);
+      port.postMessage({ __katman: true, __type: "response", id: msg.id, result } satisfies RPCResponse);
     } catch (error) {
       const e = error instanceof ValidationError
         ? { code: "BAD_REQUEST", status: 400, message: error.message, data: { issues: error.issues } }
         : error instanceof KatmanError
           ? error.toJSON()
           : toKatmanError(error).toJSON();
-      port.postMessage({ __katman: true, id: msg.id, error: e } satisfies RPCResponse);
+      port.postMessage({ __katman: true, __type: "response", id: msg.id, error: e } satisfies RPCResponse);
     }
   };
 
@@ -111,7 +114,7 @@ export class MessagePortLink<TCtx extends ClientContext = ClientContext>
     this.#port = port;
     port.addEventListener("message", (event: { data: unknown }) => {
       const msg = event.data as RPCResponse;
-      if (!msg || typeof msg !== "object" || !msg.__katman) return;
+      if (!msg || typeof msg !== "object" || !msg.__katman || msg.__type !== "response") return;
       const pending = this.#pending.get(msg.id);
       if (!pending) return;
       this.#pending.delete(msg.id);
@@ -133,6 +136,7 @@ export class MessagePortLink<TCtx extends ClientContext = ClientContext>
       this.#pending.set(id, { resolve, reject });
       this.#port.postMessage({
         __katman: true,
+        __type: "request",
         id,
         path: path.join("/"),
         input,

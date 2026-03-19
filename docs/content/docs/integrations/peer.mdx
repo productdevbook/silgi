@@ -1,0 +1,53 @@
+---
+title: Peer-to-Peer
+description: Bidirectional RPC between two Katman instances — Electron, Web Workers, browser extensions.
+---
+
+Two peers that can call each other's procedures simultaneously. Uses MessagePort or any bidirectional channel.
+
+## Setup
+
+```ts twoslash
+// @noErrors
+import { createPeer } from "katman/peer"
+
+// Peer A (e.g., Electron main process)
+const peerA = createPeer(mainRouter, channel.port1)
+
+// Peer B (e.g., Electron renderer)
+const peerB = createPeer(rendererRouter, channel.port2)
+
+// A calls B's procedures
+const data = await peerA.client.getRendererState()
+
+// B calls A's procedures
+const files = await peerB.client.readFiles({ dir: "/tmp" })
+```
+
+## Use cases
+
+- **Electron**: main ↔ renderer communication with typed RPC
+- **Web Workers**: main thread ↔ worker thread
+- **Browser extensions**: background ↔ popup/content scripts
+- **Node.js Worker Threads**: parent ↔ child
+
+## How it works
+
+`createPeer()` does two things on the same port:
+1. **Serves** your local router (handles incoming requests)
+2. **Creates** a typed client for the remote peer's router
+
+Messages are tagged with `__type: "request"` or `__type: "response"` so they don't conflict.
+
+## Cleanup
+
+```ts twoslash
+// @noErrors
+peerA.dispose() // stop listening
+peerB.dispose()
+```
+
+## What's next?
+
+- [Message Port](/docs/integrations/message-port) — one-way RPC (server + client on separate ports)
+- [Integrations](/docs/integrations) — other available integrations

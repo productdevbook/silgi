@@ -149,6 +149,14 @@
     "./client/openapi": {
       "import": "./dist/client/openapi.mjs",
       "types": "./dist/client/openapi.d.mts"
+    },
+    "./nestjs": {
+      "import": "./dist/adapters/nestjs.mjs",
+      "types": "./dist/adapters/nestjs.d.mts"
+    },
+    "./peer": {
+      "import": "./dist/adapters/peer.mjs",
+      "types": "./dist/adapters/peer.d.mts"
     }
   },
   "files": [

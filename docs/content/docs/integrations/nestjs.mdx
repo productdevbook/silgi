@@ -1,0 +1,61 @@
+---
+title: NestJS
+description: Use Katman as a NestJS controller — Express or Fastify under the hood.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Register Katman as a NestJS controller. Works with both Express and Fastify adapters.
+
+## Setup
+
+```ts twoslash
+// @noErrors
+// rpc.controller.ts
+import { Controller, All, Req, Res } from "@nestjs/common"
+import { katmanNestHandler } from "katman/nestjs"
+import { appRouter } from "./rpc"
+
+const rpcHandler = katmanNestHandler(appRouter, {
+  context: (req) => ({ db: getDB(), user: req.user }),
+})
+
+@Controller("rpc")
+export class RpcController {
+  @All("*")
+  async handle(@Req() req: Request, @Res() res: Response) {
+    return rpcHandler(req, res)
+  }
+}
+```
+
+Procedures are accessible at:
+
+```
+POST /rpc/users/list
+POST /rpc/users/create
+```
+
+## Context from NestJS
+
+The context factory receives the Express/Fastify request. Access guards, pipes, and other NestJS features through the request:
+
+```ts twoslash
+// @noErrors
+katmanNestHandler(appRouter, {
+  context: (req) => ({
+    user: req.user,       // from NestJS AuthGuard
+    ip: req.ip,
+    headers: req.headers,
+  }),
+})
+```
+
+<Callout type="info">
+NestJS's own dependency injection, guards, and interceptors run before the Katman handler. You can use `@UseGuards()`, `@UseInterceptors()`, etc. alongside Katman.
+</Callout>
+
+## What's next?
+
+- [Express](/docs/integrations/express) — if you don't need NestJS's DI
+- [Integrations](/docs/integrations) — other available integrations

@@ -460,6 +460,87 @@ describe("katmanElysia() — real Elysia", () => {
 });
 
 // ═══════════════════════════════════════════════════
+//  NestJS (Express-based handler — test with real Express)
+// ═══════════════════════════════════════════════════
+
+describe("katmanNestHandler() — real Express server", () => {
+  let url: string;
+  let close: () => void;
+
+  afterAll(() => close?.());
+
+  it("starts and handles requests like a NestJS controller", async () => {
+    const express = (await import("express")).default;
+    const { katmanNestHandler } = await import("../src/adapters/nestjs.ts");
+
+    const rpcHandler = katmanNestHandler(testRouter, {
+      context: (req: any) => ({ ip: req.ip }),
+    });
+
+    const app = express();
+    app.use(express.json());
+    // Express v5: {*name} for catch-all
+    app.use("/rpc", (req: any, res: any) => {
+      req.params = [req.path.slice(1)]; // strip leading /
+      rpcHandler(req, res);
+    });
+
+    const server = app.listen(5104, "127.0.0.1");
+    url = "http://127.0.0.1:5104";
+    close = () => server.close();
+    await new Promise(r => setTimeout(r, 100));
+
+    const r1 = await post(`${url}/rpc/health`);
+    expect(r1.status).toBe(200);
+    expect(r1.data).toEqual({ status: "ok" });
+
+    const r2 = await post(`${url}/rpc/echo`, { msg: "nestjs" });
+    expect(r2.status).toBe(200);
+    expect(r2.data).toEqual({ echo: "nestjs" });
+
+    const r3 = await post(`${url}/rpc/fail`);
+    expect(r3.status).toBe(404);
+    expect(r3.data.code).toBe("NOT_FOUND");
+  });
+});
+
+// ═══════════════════════════════════════════════════
+//  Peer-to-peer (real MessageChannel)
+// ═══════════════════════════════════════════════════
+
+describe("createPeer() — bidirectional RPC", () => {
+  it("two peers call each other's procedures", async () => {
+    const { createPeer } = await import("../src/adapters/peer.ts");
+
+    const routerA = k.router({
+      ping: k.query(() => ({ from: "A", msg: "pong" })),
+    });
+
+    const routerB = k.router({
+      hello: k.query(() => ({ from: "B", msg: "world" })),
+    });
+
+    const channel = new MessageChannel();
+
+    const peerA = createPeer(routerA, channel.port1);
+    const peerB = createPeer(routerB, channel.port2);
+
+    // Peer A calls Peer B
+    const fromB = await (peerA.client as any).hello();
+    expect(fromB).toEqual({ from: "B", msg: "world" });
+
+    // Peer B calls Peer A
+    const fromA = await (peerB.client as any).ping();
+    expect(fromA).toEqual({ from: "A", msg: "pong" });
+
+    peerA.dispose();
+    peerB.dispose();
+    channel.port1.close();
+    channel.port2.close();
+  });
+});
+
+// ═══════════════════════════════════════════════════
 //  Katman handler() — baseline (Nitro direct mode uses this)
 // ═══════════════════════════════════════════════════
 
