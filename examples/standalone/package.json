@@ -1,0 +1,13 @@
+{
+  "name": "katman-example-standalone",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --experimental-strip-types server.ts"
+  },
+  "dependencies": {
+    "katman": "latest",
+    "zod": "^4.3.6"
+  }
+}

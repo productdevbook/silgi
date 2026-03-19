@@ -9,7 +9,7 @@
     "start": "node .output/server/index.mjs"
   },
   "dependencies": {
-    "katman": "workspace:*",
+    "katman": "latest",
     "zod": "^4.3.6"
   },
   "devDependencies": {

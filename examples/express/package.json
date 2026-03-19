@@ -1,18 +1,17 @@
 {
-  "name": "katman-playground-nitro",
+  "name": "katman-example-express",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "nitro dev",
-    "build": "nitro build",
-    "start": "node .output/server/index.mjs"
+    "dev": "node --experimental-strip-types server.ts"
   },
   "dependencies": {
     "katman": "latest",
+    "express": "^5.2.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "nitro": "^3.0.260311-beta"
+    "@types/express": "^5.0.3"
   }
 }

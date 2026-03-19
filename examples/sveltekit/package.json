@@ -1,0 +1,23 @@
+{
+  "name": "katman-example-sveltekit",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "katman": "latest",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-auto": "^6.0.1",
+    "@sveltejs/kit": "^2.21.2",
+    "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "svelte": "^5.34.7",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  }
+}
