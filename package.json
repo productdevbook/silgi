@@ -109,6 +109,26 @@
     "./aws-lambda": {
       "import": "./dist/adapters/aws-lambda.mjs",
       "types": "./dist/adapters/aws-lambda.d.mts"
+    },
+    "./elysia": {
+      "import": "./dist/adapters/elysia.mjs",
+      "types": "./dist/adapters/elysia.d.mts"
+    },
+    "./nextjs": {
+      "import": "./dist/adapters/nextjs.mjs",
+      "types": "./dist/adapters/nextjs.d.mts"
+    },
+    "./sveltekit": {
+      "import": "./dist/adapters/sveltekit.mjs",
+      "types": "./dist/adapters/sveltekit.d.mts"
+    },
+    "./trpc": {
+      "import": "./dist/trpc-interop.mjs",
+      "types": "./dist/trpc-interop.d.mts"
+    },
+    "./tanstack-query/ssr": {
+      "import": "./dist/integrations/tanstack-query/ssr.mjs",
+      "types": "./dist/integrations/tanstack-query/ssr.d.mts"
     }
   },
   "files": [

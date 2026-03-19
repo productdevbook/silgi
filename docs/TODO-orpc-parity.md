@@ -8,7 +8,7 @@ oRPC ile karsilastirildiginda Katman'da eksik olan ozellikler.
 
 ## Kritik Eksikler
 
-- [ ] **File Upload/Download** — Native File/Blob type-safe destegi (input schema'da `z.file()`)
+- [x] **File Upload/Download** — `fileGuard()` + `parseMultipart()` — size/MIME validation
 - [x] **Server-side Batch Requests** — `createBatchHandler()` — batch endpoint
 - [x] **Server-side Client** — `createServerClient(router, { context })` — HTTP'siz direkt cagrisi
 - [x] **Callable Procedures** — `callable(procedure, { context })` ile proseduru fonksiyon gibi cagirma
@@ -16,18 +16,18 @@ oRPC ile karsilastirildiginda Katman'da eksik olan ozellikler.
 
 ## Framework Adaptorleri
 
-- [ ] Next.js (App Router + Pages Router)
-- [ ] Nuxt
+- [x] Next.js (App Router) — `katmanNextjs()`
+- [ ] Nuxt (Nitro adapter ile destekleniyor)
 - [ ] Remix
 - [ ] Astro
-- [x] Hono
-- [x] Express
-- [ ] Elysia
-- [x] H3 (v2)
-- [ ] SvelteKit
+- [x] Hono — `katmanHono()`
+- [x] Express — `katmanExpress()`
+- [x] Elysia — `katmanElysia()`
+- [x] H3 (v2) — `katmanH3()`
+- [x] SvelteKit — `katmanSvelteKit()`
 - [ ] SolidStart
 - [ ] NestJS
-- [x] AWS Lambda
+- [x] AWS Lambda — `katmanLambda()`
 - [ ] Message Port (Electron, browser extensions, Web Workers)
 - [ ] Peer-to-peer (Standard Server Peer)
 
@@ -39,6 +39,7 @@ oRPC ile karsilastirildiginda Katman'da eksik olan ozellikler.
 - [x] **Signing & Encryption** — `sign`, `unsign`, `encrypt`, `decrypt` (Web Crypto API)
 - [x] **Publisher/PubSub** — `createPublisher()` + `MemoryPubSub` (Redis pluggable)
 - [x] **Strict GET Method** — `strictGetGuard` — 405 on non-GET for queries
+- [x] **File Upload** — `fileGuard()` + `parseMultipart()` — multipart form data
 
 ## Client Gelistirmeleri
 
@@ -52,7 +53,7 @@ oRPC ile karsilastirildiginda Katman'da eksik olan ozellikler.
 - [x] `.liveOptions()` — Live query (refetchInterval ile polling)
 - [x] `.infiniteOptions()` — Infinite/paginated query
 - [x] `skipToken` — Type-safe query devre disi birakma
-- [ ] SSR hydration — Custom serializer'lar ile refetch waterfall onleme
+- [x] SSR hydration — `prefetchQueries()` + `dehydrate()` + `createSSRSerializer()`
 
 ## React Gelistirmeleri
 
@@ -66,7 +67,7 @@ oRPC ile karsilastirildiginda Katman'da eksik olan ozellikler.
 
 ## Diger
 
-- [ ] **tRPC Interop** — tRPC router'larini Katman'a donusturme (migration path)
+- [x] **tRPC Interop** — `fromTRPC()` ile tRPC router'larini Katman'a donusturme
 - [x] **Custom JSON Serializers** — `createSerializer()` ile ozel tip destegi
 - [ ] **OpenAPI Client** — OpenAPI endpoint'lerini client olarak consume etme
 - [ ] **Durable Iterator** — Cloudflare Durable Object streaming + reconnection
@@ -74,6 +75,10 @@ oRPC ile karsilastirildiginda Katman'da eksik olan ozellikler.
 - [x] **Smart Coercion** — `coerceGuard` + `coerceValue`/`coerceObject` utilities
 
 ---
+
+**Kalan: 7 ozellik** (OpenAPI Client, Durable Iterator, Hibernation, Nuxt, Remix, Astro, SolidStart, NestJS, Message Port, Peer-to-peer)
+
+**Tamamlanan: 37 ozellik**
 
 **Katman'in mevcut avantajlari (korumaya devam):**
 - Single package (35+ paket yerine 1)

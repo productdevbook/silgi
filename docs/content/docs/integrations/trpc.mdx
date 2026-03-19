@@ -1,0 +1,53 @@
+---
+title: tRPC Interop
+description: Convert tRPC routers to Katman — incremental migration path.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Migrate from tRPC to Katman incrementally. Convert your existing tRPC router and serve it with Katman's pipeline.
+
+## Usage
+
+```ts twoslash
+// @noErrors
+import { fromTRPC } from "katman/trpc"
+import { trpcRouter } from "./trpc-router"
+
+const katmanRouter = fromTRPC(trpcRouter)
+
+// Now use with Katman's serve(), handler(), etc.
+k.serve(katmanRouter, { port: 3000 })
+```
+
+## What gets converted
+
+| tRPC | Katman |
+|---|---|
+| `query` procedure | `query` ProcedureDef |
+| `mutation` procedure | `mutation` ProcedureDef |
+| `subscription` procedure | `subscription` ProcedureDef |
+| Input schemas (Zod) | Passed through as-is |
+| Nested routers | Nested RouterDef |
+
+## What doesn't convert
+
+- **tRPC middleware** runs inside tRPC, not Katman's guard/wrap pipeline
+- **tRPC context** — use Katman's `context` factory instead
+- **tRPC links** — use Katman's client links
+
+<Callout type="info">
+`fromTRPC` wraps each procedure's resolver. tRPC middleware still runs inside the tRPC procedure — it's not converted to Katman guards/wraps. For full Katman features, rewrite procedures natively.
+</Callout>
+
+## Migration strategy
+
+1. Convert with `fromTRPC()` — everything works immediately
+2. Rewrite procedures one by one to native Katman (add guards, wraps, typed errors)
+3. Remove tRPC dependency when done
+
+## What's next?
+
+- [Getting Started](/docs/getting-started) — Katman from scratch
+- [Middleware](/docs/middleware) — guards and wraps (Katman's equivalent of tRPC middleware)
+- [Integrations](/docs/integrations) — other available integrations

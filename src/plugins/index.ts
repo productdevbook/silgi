@@ -24,3 +24,4 @@ export { coerceGuard, coerceValue, coerceObject } from "./coerce.ts";
 export { createBatchHandler, type BatchHandlerOptions } from "./batch-server.ts";
 export { createPublisher, MemoryPubSub, type Publisher, type PubSubBackend } from "./pubsub.ts";
 export { createSerializer, type Serializer, type TypeHandler } from "./custom-serializer.ts";
+export { fileGuard, parseMultipart, type FileGuardOptions, type UploadedFile } from "./file-upload.ts";

@@ -1,0 +1,44 @@
+---
+title: Elysia
+description: Use Katman with Elysia on Bun — register as an Elysia plugin.
+---
+
+[Elysia](https://elysiajs.com) is a fast web framework for Bun. Katman integrates as an Elysia plugin.
+
+## Setup
+
+```ts twoslash
+// @noErrors
+import { Elysia } from "elysia"
+import { katmanElysia } from "katman/elysia"
+
+const app = new Elysia()
+  .get("/", () => "Hello from Elysia")
+  .use(katmanElysia(appRouter, {
+    prefix: "/rpc",
+    context: (ctx) => ({
+      db: getDB(),
+      user: ctx.store?.user,
+    }),
+  }))
+  .listen(3000)
+```
+
+## Context
+
+The context factory receives the Elysia context — access `store`, `request`, `query`, etc.:
+
+```ts twoslash
+// @noErrors
+katmanElysia(appRouter, {
+  context: (ctx) => ({
+    user: ctx.store?.user,
+    ip: ctx.request.headers.get("x-forwarded-for"),
+  }),
+})
+```
+
+## What's next?
+
+- [Hono](/docs/integrations/hono) — another Bun-compatible framework option
+- [Integrations](/docs/integrations) — other available integrations

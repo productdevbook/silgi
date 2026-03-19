@@ -1,0 +1,54 @@
+---
+title: SvelteKit
+description: Use Katman with SvelteKit API routes — catch-all endpoint with full type safety.
+---
+
+[SvelteKit](https://kit.svelte.dev) uses file-based API routes. Katman integrates via a catch-all `+server.ts`.
+
+## Setup
+
+```ts twoslash
+// @noErrors
+// src/routes/api/rpc/[...path]/+server.ts
+import { katmanSvelteKit } from "katman/sveltekit"
+import { appRouter } from "$lib/server/rpc"
+
+const handler = katmanSvelteKit(appRouter, {
+  prefix: "/api/rpc",
+  context: (event) => ({
+    db: getDB(),
+    user: event.locals.user,
+  }),
+})
+
+export const GET = handler
+export const POST = handler
+```
+
+## Context from SvelteKit hooks
+
+Use SvelteKit's `handle` hook to set `event.locals`, then access in the context factory:
+
+```ts twoslash
+// @noErrors
+// src/hooks.server.ts
+export async function handle({ event, resolve }) {
+  event.locals.user = await getUser(event.cookies.get("session"))
+  return resolve(event)
+}
+```
+
+```ts twoslash
+// @noErrors
+// src/routes/api/rpc/[...path]/+server.ts
+const handler = katmanSvelteKit(appRouter, {
+  context: (event) => ({
+    user: event.locals.user,
+  }),
+})
+```
+
+## What's next?
+
+- [Server](/docs/server) — standalone `serve()` as an alternative
+- [Integrations](/docs/integrations) — other available integrations

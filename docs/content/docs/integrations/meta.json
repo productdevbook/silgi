@@ -1,4 +1,4 @@
 {
   "title": "Integrations",
-  "pages": ["index", "fastify", "h3", "nitro", "hono", "express", "aws-lambda", "react", "tanstack-query", "ai-sdk"]
+  "pages": ["index", "fastify", "h3", "nitro", "hono", "express", "elysia", "nextjs", "sveltekit", "aws-lambda", "trpc", "react", "tanstack-query", "ai-sdk"]
 }
