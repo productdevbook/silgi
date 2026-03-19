@@ -8,14 +8,13 @@
  * ```ts
  * import { fileInput, fileGuard } from "katman/plugins"
  *
- * const uploadAvatar = k.mutation({
- *   use: [fileGuard({ maxFileSize: 5 * 1024 * 1024, allowedTypes: ["image/*"] })],
- *   resolve: async ({ ctx }) => {
+ * const uploadAvatar = k.mutation()
+ *   .$use(fileGuard({ maxFileSize: 5 * 1024 * 1024, allowedTypes: ["image/*"] }))
+ *   .$resolve(async ({ ctx }) => {
  *     const file = ctx.file
  *     const buffer = await file.arrayBuffer()
  *     return { name: file.name, size: file.size, type: file.type }
- *   },
- * })
+ *   })
  * ```
  */
 

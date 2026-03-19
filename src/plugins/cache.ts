@@ -17,10 +17,9 @@
  * import { cacheQuery, setCacheStorage } from 'katman/cache'
  *
  * // Basic: cache for 60 seconds with SWR
- * const listUsers = k.query({
- *   use: [cacheQuery({ maxAge: 60 })],
- *   resolve: ({ ctx }) => ctx.db.users.findMany(),
- * })
+ * const listUsers = k.query()
+ *   .$use(cacheQuery({ maxAge: 60 }))
+ *   .$resolve(({ ctx }) => ctx.db.users.findMany())
  *
  * // With unstorage backend (Redis)
  * import { createUnstorageAdapter } from 'katman/cache'
@@ -131,14 +130,13 @@ export interface CacheQueryOptions<T = unknown> {
  *
  * @example
  * ```ts
- * const listUsers = k.query({
- *   use: [cacheQuery({ maxAge: 60 })],
- *   resolve: ({ ctx }) => ctx.db.users.findMany(),
- * })
+ * const listUsers = k.query()
+ *   .$use(cacheQuery({ maxAge: 60 }))
+ *   .$resolve(({ ctx }) => ctx.db.users.findMany())
  *
  * // Advanced: bypass cache for admin, custom validation
- * const listPosts = k.query({
- *   use: [cacheQuery({
+ * const listPosts = k.query()
+ *   .$use(cacheQuery({
  *     maxAge: 300,
  *     swr: true,
  *     staleMaxAge: 600,
@@ -146,9 +144,8 @@ export interface CacheQueryOptions<T = unknown> {
  *     shouldInvalidateCache: (input) => (input as any)?.refresh,
  *     validate: (entry) => Array.isArray(entry.value),
  *     onError: (err) => console.error('[cache]', err),
- *   })],
- *   resolve: ({ ctx }) => ctx.db.posts.findMany(),
- * })
+ *   }))
+ *   .$resolve(({ ctx }) => ctx.db.posts.findMany())
  * ```
  */
 export function cacheQuery<T = unknown>(options: CacheQueryOptions<T> = {}): WrapDef {
@@ -225,12 +222,10 @@ export function cacheQuery<T = unknown>(options: CacheQueryOptions<T> = {}): Wra
  *
  * @example
  * ```ts
- * const createUser = k.mutation({
- *   resolve: async ({ input, ctx }) => {
- *     const user = await ctx.db.users.create(input)
- *     await invalidateQueryCache('users_list')
- *     return user
- *   },
+ * const createUser = k.mutation(async ({ input, ctx }) => {
+ *   const user = await ctx.db.users.create(input)
+ *   await invalidateQueryCache('users_list')
+ *   return user
  * })
  * ```
  */

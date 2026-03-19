@@ -92,16 +92,15 @@ const listUsers = query(z.object({ limit: z.number().min(1).max(100).optional() 
 })
 
 // A mutation that requires authentication
-const createUser = mutation({
-  use: [auth],
-  input: z.object({
+const createUser = mutation()
+  .$use(auth)
+  .$input(z.object({
     name: z.string().min(1),
     email: z.string().email(),
-  }),
-  resolve: ({ input, ctx }) => {
+  }))
+  .$resolve(({ input, ctx }) => {
     return ctx.db.users.create({ ...input, createdBy: ctx.userId })
-  },
-})
+  })
 ```
 
 </Step>
@@ -172,6 +171,6 @@ In a real project, you would import the router type and use `InferClient<typeof 
 Now that you have a working API, learn about the building blocks:
 
 - [Core Concepts](/docs/concepts) — how context, guards, and wraps work together
-- [Procedures](/docs/procedures) — the two forms: short and full config
+- [Procedures](/docs/procedures) — the two forms: short and builder
 - [Server](/docs/server) — serve(), handler(), HTTP/2, Scalar
 - [Client](/docs/client) — ofetch link, binary mode, interceptors

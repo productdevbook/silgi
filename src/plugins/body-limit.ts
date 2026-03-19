@@ -7,10 +7,9 @@
  * ```ts
  * import { bodyLimitGuard } from "katman/plugins"
  *
- * const upload = k.mutation({
- *   use: [bodyLimitGuard({ maxBytes: 5 * 1024 * 1024 })], // 5 MB
- *   resolve: ({ input }) => processUpload(input),
- * })
+ * const upload = k.mutation()
+ *   .$use(bodyLimitGuard({ maxBytes: 5 * 1024 * 1024 })) // 5 MB
+ *   .$resolve(({ input }) => processUpload(input))
  * ```
  */
 

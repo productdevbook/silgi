@@ -41,12 +41,11 @@ When a procedure uses this guard, TypeScript knows that `ctx.user` exists:
 
 ```ts twoslash
 // @noErrors
-const me = query({
-  use: [auth],
-  resolve: ({ ctx }) => {
+const me = query()
+  .$use(auth)
+  .$resolve(({ ctx }) => {
     return ctx.user // typed as User — no cast needed
-  },
-})
+  })
 ```
 
 ### Validation-only guards
@@ -79,14 +78,13 @@ const auth = guard({
 })
 
 // In the procedure, fail() knows about 'UNAUTHORIZED' from the guard
-const createPost = k.mutation({
-  use: [auth],
-  errors: { CONFLICT: 409 },
-  resolve: ({ fail }) => {
+const createPost = k.mutation()
+  .$use(auth)
+  .$errors({ CONFLICT: 409 })
+  .$resolve(({ fail }) => {
     // TypeScript allows both 'UNAUTHORIZED' and 'CONFLICT'
     fail('CONFLICT')
-  },
-})
+  })
 ```
 
 The simple `guard(fn)` form still works exactly as before. Use `guard({ errors, fn })` when you want the guard's errors to be part of the typed API contract. See [Typed Errors](/docs/errors#typed-guard-errors) for more details.
@@ -151,17 +149,16 @@ The rule of thumb: if you need the _result_ of the procedure, use a wrap. Otherw
 
 ## Execution order
 
-When you stack middleware in the `use` array, guards always run first (in order), then wraps form an onion around the resolver:
+When you stack middleware via `.$use()`, guards always run first (in order), then wraps form an onion around the resolver:
 
 ```ts twoslash
 // @noErrors
-const proc = k.mutation({
-  use: [auth, rateLimit, adminOnly, timing, withSentry],
+const proc = k.mutation()
+  .$use(auth, rateLimit, adminOnly, timing, withSentry)
   //    ────── guards ──────────   ────── wraps ──────
-  resolve: ({ ctx, input }) => {
+  .$resolve(({ ctx, input }) => {
     // your handler
-  },
-})
+  })
 ```
 
 Here's what happens when a request comes in:
@@ -216,15 +213,13 @@ Then use them wherever you need:
 // @noErrors
 import { auth, adminOnly, timing } from './middleware'
 
-const listUsers = query({
-  use: [auth, timing],
-  resolve: ({ ctx }) => ctx.db.users.findMany(),
-})
+const listUsers = query()
+  .$use(auth, timing)
+  .$resolve(({ ctx }) => ctx.db.users.findMany())
 
-const deleteUser = mutation({
-  use: [auth, adminOnly, timing],
-  resolve: ({ ctx, input }) => ctx.db.users.delete(input.id),
-})
+const deleteUser = mutation()
+  .$use(auth, adminOnly, timing)
+  .$resolve(({ ctx, input }) => ctx.db.users.delete(input.id))
 ```
 
 ## Lifecycle hooks
@@ -242,10 +237,9 @@ const logging = lifecycleWrap({
   onFinish: ({ durationMs }) => metrics.record(durationMs),
 })
 
-const listUsers = k.query({
-  use: [logging],
-  resolve: ({ ctx }) => ctx.db.users.findMany(),
-})
+const listUsers = k.query()
+  .$use(logging)
+  .$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
 
 All four hooks are optional. They're purely for side effects — the procedure result is never modified.
@@ -257,7 +251,7 @@ All four hooks are optional. They're purely for side effects — the procedure r
 | `onError`   | When the procedure throws (error is re-thrown after the hook) |
 | `onFinish`  | Always — success or failure (like `finally`)                  |
 
-This is different from the global [lifecycle hooks](/docs/server#lifecycle-hooks) on the katman instance — `lifecycleWrap` applies per-procedure via the `use` array.
+This is different from the global [lifecycle hooks](/docs/server#lifecycle-hooks) on the katman instance — `lifecycleWrap` applies per-procedure via `.$use()`.
 
 ## Input mapping
 
@@ -271,10 +265,9 @@ const renameUserId = mapInput((input: { userId: string }) => ({
   id: input.userId,
 }))
 
-const getUser = k.query({
-  use: [renameUserId],
-  resolve: ({ input }) => db.users.find(input.id),
-})
+const getUser = k.query()
+  .$use(renameUserId)
+  .$resolve(({ input }) => db.users.find(input.id))
 ```
 
 Useful for adapting between client and server naming conventions, or pre-processing input in a reusable way.
@@ -282,5 +275,5 @@ Useful for adapting between client and server naming conventions, or pre-process
 ## What's next?
 
 - [Typed Errors](/docs/errors) — define error maps and use `fail()` for type-safe error handling
-- [Procedures](/docs/procedures) — learn about the short form and full config for defining endpoints
+- [Procedures](/docs/procedures) — learn about the short form and builder for defining endpoints
 - [Plugins](/docs/plugins) — pre-built guards and wraps for rate limiting, OpenTelemetry, and logging

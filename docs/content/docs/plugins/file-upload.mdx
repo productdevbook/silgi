@@ -13,19 +13,16 @@ Parse multipart file uploads with size and MIME type validation. Files are avail
 // @noErrors
 import { fileGuard } from 'katman/plugins'
 
-const uploadAvatar = k.mutation({
-  use: [
-    fileGuard({
-      maxFileSize: 5 * 1024 * 1024, // 5 MB
-      allowedTypes: ['image/*'],
-    }),
-  ],
-  resolve: async ({ ctx }) => {
+const uploadAvatar = k.mutation()
+  .$use(fileGuard({
+    maxFileSize: 5 * 1024 * 1024, // 5 MB
+    allowedTypes: ['image/*'],
+  }))
+  .$resolve(async ({ ctx }) => {
     const file = ctx.file
     const buffer = await file.arrayBuffer()
     return { name: file.name, size: file.size, type: file.type }
-  },
-})
+  })
 ```
 
 ## Options
@@ -43,12 +40,11 @@ Set `maxFiles` to allow multiple uploads. Files are available as `ctx.files`:
 
 ```ts twoslash
 // @noErrors
-const uploadPhotos = k.mutation({
-  use: [fileGuard({ maxFiles: 10, allowedTypes: ['image/*'] })],
-  resolve: async ({ ctx }) => {
+const uploadPhotos = k.mutation()
+  .$use(fileGuard({ maxFiles: 10, allowedTypes: ['image/*'] }))
+  .$resolve(async ({ ctx }) => {
     return ctx.files.map((f) => ({ name: f.name, size: f.size }))
-  },
-})
+  })
 ```
 
 ## Manual parsing
@@ -59,11 +55,9 @@ For custom file handling, use `parseMultipart()` directly:
 // @noErrors
 import { parseMultipart } from 'katman/plugins'
 
-const upload = k.mutation({
-  resolve: async ({ ctx }) => {
-    const { files, fields } = await parseMultipart(ctx.__request)
-    return { fileCount: files.length, caption: fields.caption }
-  },
+const upload = k.mutation(async ({ ctx }) => {
+  const { files, fields } = await parseMultipart(ctx.__request)
+  return { fileCount: files.length, caption: fields.caption }
 })
 ```
 

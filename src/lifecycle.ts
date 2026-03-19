@@ -15,10 +15,9 @@
  *   onFinish: () => cleanup(),
  * })
  *
- * const listUsers = k.query({
- *   use: [logging],
- *   resolve: ({ ctx }) => ctx.db.users.findMany(),
- * })
+ * const listUsers = k.query()
+ *   .$use(logging)
+ *   .$resolve(({ ctx }) => ctx.db.users.findMany())
  * ```
  */
 

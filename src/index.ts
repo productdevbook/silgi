@@ -22,15 +22,14 @@
  *   async ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
  * )
  *
- * const createUser = mutation({
- *   use: [auth],
- *   input: z.object({ name: z.string() }),
- *   errors: { CONFLICT: 409 },
- *   resolve: async ({ input, ctx, fail }) => {
+ * const createUser = mutation()
+ *   .$use(auth)
+ *   .$input(z.object({ name: z.string() }))
+ *   .$errors({ CONFLICT: 409 })
+ *   .$resolve(async ({ input, ctx, fail }) => {
  *     if (await exists(input.email)) fail("CONFLICT")
  *     return ctx.db.users.create(input)
- *   },
- * })
+ *   })
  *
  * export default handler(router({ users: { list: listUsers, create: createUser } }))
  * ```

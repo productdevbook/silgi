@@ -14,11 +14,10 @@
  *   id: input.userId,
  * }))
  *
- * const getUser = k.query({
- *   use: [mapUserId],
- *   resolve: ({ input }) => db.users.find(input.id),
+ * const getUser = k.query()
+ *   .$use(mapUserId)
+ *   .$resolve(({ input }) => db.users.find(input.id))
  *   // input is { id: string } after mapping
- * })
  * ```
  */
 

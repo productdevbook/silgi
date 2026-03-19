@@ -91,10 +91,9 @@ export interface RateLimitGuardOptions {
  *   keyFn: (ctx) => (ctx as any).ip ?? "anonymous",
  * })
  *
- * const proc = k.query({
- *   use: [rateLimit],
- *   resolve: () => ({ ok: true }),
- * })
+ * const proc = k.query()
+ *   .$use(rateLimit)
+ *   .$resolve(() => ({ ok: true }))
  * ```
  */
 export function rateLimitGuard(options: RateLimitGuardOptions): GuardDef<any, any> {

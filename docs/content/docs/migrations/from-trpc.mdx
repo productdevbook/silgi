@@ -109,13 +109,12 @@ const auth = k.guard(async (ctx) => {
   return { user: ctx.session.user }
 })
 
-const createUser = k.mutation({
-  use: [auth],
-  input: z.object({ name: z.string() }),
-  resolve: ({ input, ctx }) => {
+const createUser = k.mutation()
+  .$use(auth)
+  .$input(z.object({ name: z.string() }))
+  .$resolve(({ input, ctx }) => {
     return ctx.db.users.create({ ...input, createdBy: ctx.user.id })
-  },
-})
+  })
 ````
 
   </Tab>
@@ -150,15 +149,14 @@ import { KatmanError } from "katman"
 throw new KatmanError("NOT_FOUND", { message: "User not found" })
 
 // Option 2: Typed errors with fail()
-const deleteUser = k.mutation({
-  errors: { NOT_FOUND: 404, FORBIDDEN: 403 },
-  resolve: ({ input, ctx, fail }) => {
+const deleteUser = k.mutation()
+  .$errors({ NOT_FOUND: 404, FORBIDDEN: 403 })
+  .$resolve(({ input, ctx, fail }) => {
     const user = ctx.db.users.find(input.id)
     if (!user) fail("NOT_FOUND")           // typed — only these codes allowed
     if (user.ownerId !== ctx.user.id) fail("FORBIDDEN")
     return ctx.db.users.delete(input.id)
-  },
-})
+  })
 ````
 
   </Tab>

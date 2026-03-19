@@ -48,11 +48,10 @@ Guards run as part of the compiled pipeline. Provide the context they need:
 
 ```ts twoslash
 // @noErrors
-const createUser = k.mutation({
-  use: [auth],
-  input: z.object({ name: z.string() }),
-  resolve: ({ input, ctx }) => ctx.db.users.create(input),
-})
+const createUser = k.mutation()
+  .$use(auth)
+  .$input(z.object({ name: z.string() }))
+  .$resolve(({ input, ctx }) => ctx.db.users.create(input))
 
 const createUserFn = callable(createUser, {
   context: () => ({

@@ -8,10 +8,9 @@
  * ```ts
  * import { strictGetGuard } from "katman/plugins"
  *
- * const listUsers = k.query({
- *   use: [strictGetGuard],
- *   resolve: ({ ctx }) => ctx.db.users.findMany(),
- * })
+ * const listUsers = k.query()
+ *   .$use(strictGetGuard)
+ *   .$resolve(({ ctx }) => ctx.db.users.findMany())
  * ```
  */
 

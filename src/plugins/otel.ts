@@ -30,10 +30,9 @@ export interface Tracer {
  *
  * const tracing = otelWrap(trace.getTracer("my-service"))
  *
- * const proc = k.query({
- *   use: [tracing],
- *   resolve: ({ ctx }) => ctx.db.find(),
- * })
+ * const proc = k.query()
+ *   .$use(tracing)
+ *   .$resolve(({ ctx }) => ctx.db.find())
  * ```
  */
 export function otelWrap(tracer: Tracer, spanName = 'rpc.call'): WrapDef {

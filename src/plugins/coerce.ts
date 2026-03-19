@@ -9,11 +9,10 @@
  * ```ts
  * import { coerceGuard } from "katman/plugins"
  *
- * const getUser = k.query({
- *   use: [coerceGuard],
- *   input: z.object({ id: z.number(), active: z.boolean().optional() }),
- *   resolve: ({ input }) => db.users.find(input.id),
- * })
+ * const getUser = k.query()
+ *   .$use(coerceGuard)
+ *   .$input(z.object({ id: z.number(), active: z.boolean().optional() }))
+ *   .$resolve(({ input }) => db.users.find(input.id))
  *
  * // GET /users/get?data={"id":"42","active":"true"}
  * // → input is coerced to { id: 42, active: true }

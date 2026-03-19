@@ -10,15 +10,15 @@ Most APIs handle errors with generic try/catch and status codes. Katman takes a 
 
 ## Error maps
 
-An error map is an object you pass to a procedure's `errors` field. Each key is an error code, and the value is either a status number or a full config:
+An error map is an object you pass to `.$errors()` on the builder. Each key is an error code, and the value is either a status number or a full config:
 
 ```ts twoslash
 // @noErrors
 import { z } from 'zod'
 
-const deleteUser = k.mutation({
-  input: z.object({ id: z.number() }),
-  errors: {
+const deleteUser = k.mutation()
+  .$input(z.object({ id: z.number() }))
+  .$errors({
     NOT_FOUND: 404, // just a status code
     FORBIDDEN: {
       // status + typed data
@@ -26,21 +26,20 @@ const deleteUser = k.mutation({
       message: "You don't own this resource",
       data: z.object({ reason: z.string() }),
     },
-  },
-  resolve: ({ input, ctx, fail }) => {
+  })
+  .$resolve(({ input, ctx, fail }) => {
     const user = ctx.db.users.findById(input.id)
     if (!user) fail('NOT_FOUND')
     if (user.ownerId !== ctx.user.id) {
       fail('FORBIDDEN', { reason: 'Not the owner' })
     }
     return ctx.db.users.delete(input.id)
-  },
-})
+  })
 ```
 
 ### What `fail()` does
 
-When you define an `errors` map, the `fail()` function in your resolver becomes fully typed:
+When you define errors via `.$errors()`, the `fail()` function in your resolver becomes fully typed:
 
 - It only accepts error codes you defined (like `"NOT_FOUND"` or `"FORBIDDEN"`)
 - If the error has a `data` schema, `fail()` requires a second argument matching that schema
@@ -49,7 +48,7 @@ When you define an `errors` map, the `fail()` function in your resolver becomes 
 `fail()` throws a `KatmanError` internally. It has a return type of `never`, so TypeScript knows that code after `fail()` won't run — no need for `return` after it.
 
 <Callout type='info'>
-  `fail()` is only typed when you provide the `errors` map. Without it, `fail()` still works but accepts any string
+  `fail()` is only typed when you use `.$errors()`. Without it, `fail()` still works but accepts any string
   code.
 </Callout>
 
@@ -194,7 +193,8 @@ The `safe()` function returns an object with:
 - `data` — the result if successful, or `undefined`
 - `isError` — `true` if the call failed
 - `isSuccess` — `true` if the call succeeded
-    </Tab>
+
+</Tab>
 </Tabs>
 
 ## Validation errors
@@ -253,14 +253,13 @@ const rateLimit = k.guard({
   },
 })
 
-const createUser = k.mutation({
-  use: [auth, rateLimit],
-  errors: { CONFLICT: 409 },
-  resolve: ({ fail }) => {
+const createUser = k.mutation()
+  .$use(auth, rateLimit)
+  .$errors({ CONFLICT: 409 })
+  .$resolve(({ fail }) => {
     // fail() accepts all three: 'UNAUTHORIZED' | 'RATE_LIMITED' | 'CONFLICT'
     fail('CONFLICT')
-  },
-})
+  })
 ```
 
 This gives you three things:
@@ -270,11 +269,11 @@ This gives you three things:
 - **Runtime** — `fail('UNAUTHORIZED')` produces the correct 401 status code
 
 <Callout type='info'>
-  The simple `k.guard(fn)` form still works. The config form `k.guard({ errors, fn })` is opt-in — use it when you want the guard's errors to be part of the typed contract.
+  The simple `k.guard(fn)` form still works. The `k.guard({ errors, fn })` form is opt-in — use it when you want the guard's errors to be part of the typed contract.
 </Callout>
 
 ## What's next?
 
 - [Middleware](/docs/middleware) — learn about guards and wraps in detail
 - [Client](/docs/client) — set up the client that receives these typed errors
-- [Procedures](/docs/procedures) — the full config form where error maps are defined
+- [Procedures](/docs/procedures) — the builder where error maps are defined

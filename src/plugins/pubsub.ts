@@ -11,12 +11,10 @@
  * const pubsub = createPublisher(new MemoryPubSub())
  *
  * // Publish from a mutation
- * const createUser = k.mutation({
- *   resolve: async ({ input, ctx }) => {
- *     const user = await ctx.db.users.create(input)
- *     await pubsub.publish("user:created", user)
- *     return user
- *   },
+ * const createUser = k.mutation(async ({ input, ctx }) => {
+ *   const user = await ctx.db.users.create(input)
+ *   await pubsub.publish("user:created", user)
+ *   return user
  * })
  *
  * // Subscribe via SSE

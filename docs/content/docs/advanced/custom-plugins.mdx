@@ -41,15 +41,14 @@ Use it in any procedure:
 
 ```ts twoslash
 // @noErrors
-const listUsers = k.query({
-  use: [tenantGuard],
-  resolve: ({ ctx }) => {
+const listUsers = k.query()
+  .$use(tenantGuard)
+  .$resolve(({ ctx }) => {
     // ctx.tenant is typed — TypeScript knows it exists
     return ctx.db.users.findMany({
       where: { tenantId: ctx.tenant.id },
     })
-  },
-})
+  })
 ```
 
 ### Making it configurable
@@ -119,10 +118,9 @@ Use it:
 // @noErrors
 const cacheOneMinute = createCacheWrap({ ttl: 60_000 })
 
-const listProducts = k.query({
-  use: [cacheOneMinute],
-  resolve: ({ ctx }) => ctx.db.products.findMany(),
-})
+const listProducts = k.query()
+  .$use(cacheOneMinute)
+  .$resolve(({ ctx }) => ctx.db.products.findMany())
 ```
 
 <Callout>
@@ -132,7 +130,7 @@ const listProducts = k.query({
 
 ## Custom lifecycle hooks
 
-For cross-cutting concerns that apply to every procedure, lifecycle hooks are cleaner than adding a wrap to every `use` array.
+For cross-cutting concerns that apply to every procedure, lifecycle hooks are cleaner than adding a wrap to every `.$use()` call.
 
 ```ts twoslash
 // @noErrors
@@ -159,10 +157,9 @@ Apply it per-procedure:
 // @noErrors
 const metrics = createMetricsPlugin(statsd)
 
-const listUsers = k.query({
-  use: [metrics],
-  resolve: ({ ctx }) => ctx.db.users.findMany(),
-})
+const listUsers = k.query()
+  .$use(metrics)
+  .$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
 
 Or apply it globally via instance-level hooks:
@@ -216,13 +213,12 @@ Use both:
 // @noErrors
 const { auditGuard, auditWrap } = createAuditPlugin({ logger })
 
-const deleteUser = k.mutation({
-  use: [auth, auditGuard, auditWrap],
-  resolve: ({ input, ctx }) => {
+const deleteUser = k.mutation()
+  .$use(auth, auditGuard, auditWrap)
+  .$resolve(({ input, ctx }) => {
     ctx.auditTrail.push(`Deleted user ${input.id}`)
     return ctx.db.users.delete(input.id)
-  },
-})
+  })
 ```
 
 ## Packaging for distribution

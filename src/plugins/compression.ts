@@ -8,10 +8,9 @@
  * ```ts
  * import { compressionWrap } from "katman/plugins"
  *
- * const listUsers = k.query({
- *   use: [compressionWrap()],
- *   resolve: ({ ctx }) => ctx.db.users.findMany(),
- * })
+ * const listUsers = k.query()
+ *   .$use(compressionWrap())
+ *   .$resolve(({ ctx }) => ctx.db.users.findMany())
  * ```
  */
 

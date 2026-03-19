@@ -45,15 +45,13 @@ const tracing = otelWrap(trace.getTracer('my-service'))
 
 ```ts twoslash
 // @noErrors
-const listUsers = k.query({
-  use: [tracing],
-  resolve: ({ ctx }) => ctx.db.users.findMany(),
-})
+const listUsers = k.query()
+  .$use(tracing)
+  .$resolve(({ ctx }) => ctx.db.users.findMany())
 
-const createUser = k.mutation({
-  use: [auth, tracing],
-  resolve: ({ ctx, input }) => ctx.db.users.create(input),
-})
+const createUser = k.mutation()
+  .$use(auth, tracing)
+  .$resolve(({ ctx, input }) => ctx.db.users.create(input))
 ```
 
 </Step>
@@ -96,11 +94,10 @@ const tracing = otelWrap(tracer, 'api.procedure')
 
 ```ts twoslash
 // @noErrors
-const createUser = k.mutation({
-  use: [auth, rateLimit, tracing],
+const createUser = k.mutation()
+  .$use(auth, rateLimit, tracing)
   //    guards first, then wraps
-  resolve: ({ ctx, input }) => ctx.db.users.create(input),
-})
+  .$resolve(({ ctx, input }) => ctx.db.users.create(input))
 ```
 
 Guards (`auth`, `rateLimit`) run before the span wraps around the resolver. If you want the span to include guard execution time, put `tracing` before the guards in the array.

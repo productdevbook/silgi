@@ -1,6 +1,6 @@
 ---
 title: Procedures
-description: Three ways to define an API endpoint — short form, config, and builder.
+description: Two ways to define an API endpoint — short form and builder.
 ---
 
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
@@ -25,38 +25,42 @@ const getUser = k.query(z.object({ id: z.number() }), ({ input, ctx }) => ctx.db
 
 The first argument is the input schema. Katman validates the input before your function runs. If validation fails, the client gets a 400 error automatically.
 
-## Full config
+## Builder
 
-When you need middleware, error definitions, or output validation, use an object:
+When you need middleware, error definitions, or output validation, use the builder pattern:
 
 ```ts twoslash
 // @noErrors
 import { z } from 'zod'
 
-const createUser = k.mutation({
-  use: [auth], // middleware
-  input: z.object({ name: z.string() }), // input validation
-  output: z.object({ id: z.number() }), // output validation (optional)
-  errors: { CONFLICT: 409 }, // typed errors
-  resolve: ({ input, ctx, fail }) => {
+const createUser = k.mutation()
+  .$use(auth) // middleware
+  .$input(z.object({ name: z.string() })) // input validation
+  .$output(z.object({ id: z.number() })) // output validation (optional)
+  .$errors({ CONFLICT: 409 }) // typed errors
+  .$resolve(({ input, ctx, fail }) => {
     if (ctx.db.users.exists(input.name)) {
       fail('CONFLICT') // typed — only codes from `errors`
     }
     return ctx.db.users.create(input)
-  },
-})
+  })
 ```
 
-### What each field does
+### Available builder methods
 
-| Field     | Required | Description                                                                     |
-| --------- | -------- | ------------------------------------------------------------------------------- |
-| `resolve` | Yes      | The function that does the work. Receives `{ input, ctx, fail, signal }`.       |
-| `input`   | No       | A schema that validates the incoming data.                                      |
-| `output`  | No       | A schema that validates the return value.                                       |
-| `use`     | No       | An array of guards and wraps to run before the procedure.                       |
-| `errors`  | No       | A map of error codes to HTTP status codes. Enables the typed `fail()` function. |
-| `route`   | No       | HTTP route metadata (method, path, description). Used by OpenAPI.               |
+| Method            | Required | Description                                                                     |
+| ----------------- | -------- | ------------------------------------------------------------------------------- |
+| `.$resolve(fn)`   | Yes      | The function that does the work. Receives `{ input, ctx, fail, signal }`.       |
+| `.$input(schema)` | No       | A schema that validates the incoming data.                                      |
+| `.$output(schema)`| No       | A schema that validates the return value.                                       |
+| `.$use(...mw)`    | No       | Add guards and wraps to run before the procedure.                               |
+| `.$errors({...})` | No       | A map of error codes to HTTP status codes. Enables the typed `fail()` function. |
+| `.$route({...})`  | No       | HTTP route metadata (method, path, description). Used by OpenAPI.               |
+| `.$meta({...})`   | No       | Set custom metadata.                                                            |
+
+<Callout type='info'>
+  `.$resolve()` must be called last — it finalizes the builder and returns a `ProcedureDef`.
+</Callout>
 
 ## The resolve function
 
@@ -64,14 +68,13 @@ Every procedure has a `resolve` function. It receives one object with four prope
 
 ```ts twoslash
 // @noErrors
-const myProcedure = k.query({
-  resolve: ({ input, ctx, fail, signal }) => {
+const myProcedure = k.query()
+  .$resolve(({ input, ctx, fail, signal }) => {
     // input  — the validated input (or undefined if no schema)
     // ctx    — the context object (from context factory + guards)
     // fail   — throws a typed error (only if `errors` is defined)
     // signal — AbortSignal for cancellation
-  },
-})
+  })
 ```
 
 ## Queries vs mutations
@@ -98,9 +101,9 @@ const countdown = k.subscription(async function* () {
 
 The client receives a stream of `{ count: 5 }`, `{ count: 4 }`, ... `{ count: 1 }`.
 
-## Builder form
+### IDE autocomplete with `$output`
 
-A chainable API that gives you IDE autocomplete when an `output` schema is set:
+When you set `.$output()`, the builder gives you IDE autocomplete on the return value of `.$resolve()`:
 
 ```ts twoslash
 // @noErrors
@@ -113,38 +116,14 @@ const PostSchema = z.object({
 })
 
 const createPost = k.mutation()
-  .input(z.object({ title: z.string(), body: z.string() }))
-  .output(PostSchema)
-  .errors({ CONFLICT: 409 })
-  .resolve(({ input }) => {
+  .$input(z.object({ title: z.string(), body: z.string() }))
+  .$output(PostSchema)
+  .$errors({ CONFLICT: 409 })
+  .$resolve(({ input }) => {
     return { id: 1, title: input.title, body: input.body }
     //     ^ IDE suggests id, title, body
   })
 ```
-
-The builder form and config form produce the same `ProcedureDef` — there is no runtime difference. Use whichever you prefer:
-
-| Feature | Config form | Builder form |
-| --- | --- | --- |
-| IDE autocomplete on return | No | **Yes** |
-| Less boilerplate for simple cases | **Yes** | No |
-| Middleware, errors, route | Config object | Chained methods |
-
-Available builder methods:
-
-| Method | Description |
-| --- | --- |
-| `.input(schema)` | Set input validation schema |
-| `.output(schema)` | Set output schema (enables return autocomplete) |
-| `.errors({ ... })` | Define typed error codes |
-| `.use(...middleware)` | Add guards and wraps |
-| `.route({ ... })` | Set HTTP route metadata |
-| `.meta({ ... })` | Set custom metadata |
-| `.resolve(fn)` | Set the handler function (always last) |
-
-<Callout type='info'>
-  `.resolve()` must be called last — it finalizes the builder and returns a `ProcedureDef`.
-</Callout>
 
 ## Routers
 
@@ -172,15 +151,14 @@ The nesting becomes the URL path:
 
 ## Metadata
 
-Attach custom key-value metadata to any procedure using the `meta` field:
+Attach custom key-value metadata to any procedure using `.$meta()`:
 
 ```ts twoslash
 // @noErrors
-const listUsers = k.query({
-  input: z.object({ limit: z.number().optional() }),
-  meta: { cacheable: true, rateLimit: 100 },
-  resolve: ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
-})
+const listUsers = k.query()
+  .$input(z.object({ limit: z.number().optional() }))
+  .$meta({ cacheable: true, rateLimit: 100 })
+  .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))
 ```
 
 Metadata is stored on the procedure definition and can be read by middleware:

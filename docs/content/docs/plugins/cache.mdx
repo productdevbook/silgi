@@ -16,10 +16,9 @@ Wrap a query with `cacheQuery()` to cache its results:
 // @noErrors
 import { cacheQuery } from 'katman/cache'
 
-const listUsers = k.query({
-  use: [cacheQuery({ maxAge: 60 })],
-  resolve: ({ ctx }) => ctx.db.users.findMany(),
-})
+const listUsers = k.query()
+  .$use(cacheQuery({ maxAge: 60 }))
+  .$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
 
 The first call runs the resolver and caches the result. Subsequent calls with the same input return the cached value for 60 seconds.
@@ -60,8 +59,8 @@ Skip the cache entirely for specific requests, or force a refresh:
 // @noErrors
 import { cacheQuery } from 'katman/cache'
 
-const listUsers = k.query({
-  use: [cacheQuery({
+const listUsers = k.query()
+  .$use(cacheQuery({
     maxAge: 300,
     // Admin users bypass cache
     shouldBypassCache: (input) => (input as any)?.asAdmin === true,
@@ -69,9 +68,8 @@ const listUsers = k.query({
     shouldInvalidateCache: (input) => (input as any)?.refresh === true,
     // Only cache non-empty arrays
     validate: (entry) => Array.isArray(entry.value) && entry.value.length > 0,
-  })],
-  resolve: ({ ctx }) => ctx.db.users.findMany(),
-})
+  }))
+  .$resolve(({ ctx }) => ctx.db.users.findMany())
 
 ## Invalidation
 
@@ -81,17 +79,14 @@ Invalidate cached queries by name — typically after a mutation:
 // @noErrors
 import { cacheQuery, invalidateQueryCache } from 'katman/cache'
 
-const listUsers = k.query({
-  use: [cacheQuery({ maxAge: 300, name: 'users_list' })],
-  resolve: ({ ctx }) => ctx.db.users.findMany(),
-})
+const listUsers = k.query()
+  .$use(cacheQuery({ maxAge: 300, name: 'users_list' }))
+  .$resolve(({ ctx }) => ctx.db.users.findMany())
 
-const createUser = k.mutation({
-  resolve: async ({ input, ctx }) => {
-    const user = await ctx.db.users.create(input)
-    await invalidateQueryCache('users_list') // clear the cache
-    return user
-  },
+const createUser = k.mutation(async ({ input, ctx }) => {
+  const user = await ctx.db.users.create(input)
+  await invalidateQueryCache('users_list') // clear the cache
+  return user
 })
 ```
 
