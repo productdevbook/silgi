@@ -21,5 +21,6 @@ export { createRouter } from './context.ts'
 export { addRoute } from './add.ts'
 export { findRoute } from './find.ts'
 export { removeRoute } from './remove.ts'
+export { compileRouter } from './compiler.ts'
 
 export type { RouterContext, MatchedRoute, RouteNode } from './types.ts'

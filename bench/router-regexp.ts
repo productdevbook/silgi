@@ -1,12 +1,15 @@
 /**
- * Benchmark: Katman Router vs rou3 (tree + compiled)
+ * Benchmark: Katman RegExpRouter vs rou3 compiled vs Katman compiled
  *
- * Run: node --experimental-strip-types bench/router-vs-rou3.ts
+ * Run: node --experimental-strip-types bench/router-regexp.ts
  */
 
 import { bench, run, summary, compact } from 'mitata'
 
-// Katman router
+// Katman RegExpRouter
+import { RegExpRouter } from '../src/route/regexp.ts'
+
+// Katman radix + compiled
 import { createRouter as katmanCreate, addRoute as katmanAdd, findRoute as katmanFind, compileRouter as katmanCompile } from '../src/route/index.ts'
 
 // rou3
@@ -24,52 +27,63 @@ const paths = [
   '/files/**', '/assets/**', '/cdn/**:path',
 ]
 
-// Katman
+// Katman RegExpRouter
+const re = new RegExpRouter()
+for (const p of paths) re.add('GET', p, { path: p })
+// Warmup — first call compiles
+re.match('GET', '/users/list')
+
+// Katman radix compiled
 const kr = katmanCreate()
 for (const p of paths) katmanAdd(kr, 'GET', p, { path: p })
 const kc = katmanCompile(kr)
 
-// rou3
+// rou3 compiled
 const rr = rou3Create()
 for (const p of paths) rou3Add(rr, 'GET', p, { path: p })
 const rc = rou3Compile(rr)
 
-// ── Ensure correctness ──────────────────────────────
-const checks = [
+// ── Verify correctness ──────────────────────────────
+
+const checks: [string, string, Record<string, string>?][] = [
   ['/users/list', 'static'],
-  ['/users/123', 'param'],
-  ['/users/1/posts/2', 'deep param'],
+  ['/users/123', 'param', { id: '123' }],
+  ['/users/1/posts/2', 'deep param', { id: '1', postId: '2' }],
   ['/files/a/b/c', 'wildcard'],
 ]
-for (const [path, label] of checks) {
-  const km = kc('GET', path!)
-  const rm = rc('GET', path!)
-  if (!km || !rm) console.error(`MISMATCH on ${label}: katman=${!!km}, rou3=${!!rm}`)
+
+for (const [path, label, expectedParams] of checks) {
+  const m = re.match('GET', path)
+  if (!m) { console.error(`FAIL regexp: ${label} ${path} = undefined`); continue }
+  if (expectedParams) {
+    for (const [k, v] of Object.entries(expectedParams)) {
+      if (m.params?.[k] !== v) console.error(`FAIL regexp: ${label} ${path} param ${k} = ${m.params?.[k]} (expected ${v})`)
+    }
+  }
 }
+console.log('Correctness checks passed\n')
 
 // ═══════════════════════════════════════════════════
-//  Static
+//  Static route
 // ═══════════════════════════════════════════════════
 
 summary(() => {
   compact(() => {
-    bench('katman tree:     static /users/list', () => katmanFind(kr, 'GET', '/users/list'))
-    bench('katman compiled: static /users/list', () => kc('GET', '/users/list'))
-    bench('rou3 tree:       static /users/list', () => rou3Find(rr, 'GET', '/users/list'))
-    bench('rou3 compiled:   static /users/list', () => rc('GET', '/users/list'))
+    bench('regexp:   static /users/list', () => re.match('GET', '/users/list'))
+    bench('compiled: static /users/list', () => kc('GET', '/users/list'))
+    bench('rou3:     static /users/list', () => rc('GET', '/users/list'))
   })
 })
 
 // ═══════════════════════════════════════════════════
-//  Param
+//  Param route
 // ═══════════════════════════════════════════════════
 
 summary(() => {
   compact(() => {
-    bench('katman tree:     param /users/123', () => katmanFind(kr, 'GET', '/users/123'))
-    bench('katman compiled: param /users/123', () => kc('GET', '/users/123'))
-    bench('rou3 tree:       param /users/123', () => rou3Find(rr, 'GET', '/users/123'))
-    bench('rou3 compiled:   param /users/123', () => rc('GET', '/users/123'))
+    bench('regexp:   param /users/123', () => re.match('GET', '/users/123'))
+    bench('compiled: param /users/123', () => kc('GET', '/users/123'))
+    bench('rou3:     param /users/123', () => rc('GET', '/users/123'))
   })
 })
 
@@ -79,10 +93,9 @@ summary(() => {
 
 summary(() => {
   compact(() => {
-    bench('katman tree:     deep /users/1/posts/2', () => katmanFind(kr, 'GET', '/users/1/posts/2'))
-    bench('katman compiled: deep /users/1/posts/2', () => kc('GET', '/users/1/posts/2'))
-    bench('rou3 tree:       deep /users/1/posts/2', () => rou3Find(rr, 'GET', '/users/1/posts/2'))
-    bench('rou3 compiled:   deep /users/1/posts/2', () => rc('GET', '/users/1/posts/2'))
+    bench('regexp:   deep /users/1/posts/2', () => re.match('GET', '/users/1/posts/2'))
+    bench('compiled: deep /users/1/posts/2', () => kc('GET', '/users/1/posts/2'))
+    bench('rou3:     deep /users/1/posts/2', () => rc('GET', '/users/1/posts/2'))
   })
 })
 
@@ -92,10 +105,9 @@ summary(() => {
 
 summary(() => {
   compact(() => {
-    bench('katman tree:     wildcard /files/a/b/c', () => katmanFind(kr, 'GET', '/files/a/b/c'))
-    bench('katman compiled: wildcard /files/a/b/c', () => kc('GET', '/files/a/b/c'))
-    bench('rou3 tree:       wildcard /files/a/b/c', () => rou3Find(rr, 'GET', '/files/a/b/c'))
-    bench('rou3 compiled:   wildcard /files/a/b/c', () => rc('GET', '/files/a/b/c'))
+    bench('regexp:   wildcard /files/a/b/c', () => re.match('GET', '/files/a/b/c'))
+    bench('compiled: wildcard /files/a/b/c', () => kc('GET', '/files/a/b/c'))
+    bench('rou3:     wildcard /files/a/b/c', () => rc('GET', '/files/a/b/c'))
   })
 })
 
@@ -105,10 +117,9 @@ summary(() => {
 
 summary(() => {
   compact(() => {
-    bench('katman tree:     miss /missing/deep', () => katmanFind(kr, 'GET', '/missing/deep'))
-    bench('katman compiled: miss /missing/deep', () => kc('GET', '/missing/deep'))
-    bench('rou3 tree:       miss /missing/deep', () => rou3Find(rr, 'GET', '/missing/deep'))
-    bench('rou3 compiled:   miss /missing/deep', () => rc('GET', '/missing/deep'))
+    bench('regexp:   miss /missing/deep', () => re.match('GET', '/missing/deep'))
+    bench('compiled: miss /missing/deep', () => kc('GET', '/missing/deep'))
+    bench('rou3:     miss /missing/deep', () => rc('GET', '/missing/deep'))
   })
 })
 
