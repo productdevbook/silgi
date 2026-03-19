@@ -43,6 +43,7 @@ export default defineBuildConfig({
         './src/integrations/tanstack-query/ssr.ts',
         './src/client/server.ts',
         './src/plugins/cookies.ts',
+        './src/plugins/cache.ts',
       ],
     },
   ],

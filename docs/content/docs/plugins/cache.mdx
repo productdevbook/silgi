@@ -1,0 +1,154 @@
+---
+title: Cache
+description: Production-grade response caching with TTL, SWR, request deduplication, and pluggable backends.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
+
+Cache query results in memory, Redis, Cloudflare KV, or any storage backend. Powered by [ocache](https://github.com/unjs/ocache) with built-in TTL, stale-while-revalidate, and request deduplication.
+
+## Basic usage
+
+Wrap a query with `cacheQuery()` to cache its results:
+
+```ts twoslash
+// @noErrors
+import { cacheQuery } from 'katman/cache'
+
+const listUsers = k.query({
+  use: [cacheQuery({ maxAge: 60 })],
+  resolve: ({ ctx }) => ctx.db.users.findMany(),
+})
+```
+
+The first call runs the resolver and caches the result. Subsequent calls with the same input return the cached value for 60 seconds.
+
+## Options
+
+```ts twoslash
+// @noErrors
+cacheQuery({
+  maxAge: 60,           // TTL in seconds (default: 60)
+  swr: true,            // stale-while-revalidate (default: true)
+  staleMaxAge: 60,      // max stale age in seconds (default: maxAge)
+  name: 'users_list',   // cache key prefix (default: auto-generated)
+  getKey: (input) => input.id, // custom cache key from input
+})
+```
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `maxAge` | `number` | `60` | Cache TTL in seconds |
+| `swr` | `boolean` | `true` | Return stale data while revalidating in the background |
+| `staleMaxAge` | `number` | `maxAge` | Maximum seconds to serve stale data during SWR |
+| `name` | `string` | auto | Cache key prefix for invalidation |
+| `getKey` | `(input) => string` | hash | Custom cache key generator |
+
+## Invalidation
+
+Invalidate cached queries by name — typically after a mutation:
+
+```ts twoslash
+// @noErrors
+import { cacheQuery, invalidateQueryCache } from 'katman/cache'
+
+const listUsers = k.query({
+  use: [cacheQuery({ maxAge: 300, name: 'users_list' })],
+  resolve: ({ ctx }) => ctx.db.users.findMany(),
+})
+
+const createUser = k.mutation({
+  resolve: async ({ input, ctx }) => {
+    const user = await ctx.db.users.create(input)
+    await invalidateQueryCache('users_list') // clear the cache
+    return user
+  },
+})
+```
+
+## Storage backends
+
+By default, cache lives in memory. For production, plug in any storage backend via [unstorage](https://unstorage.unjs.io).
+
+<Tabs items={['pnpm', 'npm', 'bun']}>
+  <Tab value='pnpm'>
+  ```bash
+  pnpm add unstorage
+  ```
+  </Tab>
+  <Tab value='npm'>
+  ```bash
+  npm install unstorage
+  ```
+  </Tab>
+  <Tab value='bun'>
+  ```bash
+  bun add unstorage
+  ```
+  </Tab>
+</Tabs>
+
+### Redis
+
+```ts twoslash
+// @noErrors
+import { setCacheStorage, createUnstorageAdapter } from 'katman/cache'
+import { createStorage } from 'unstorage'
+import redisDriver from 'unstorage/drivers/redis'
+
+const storage = createStorage({
+  driver: redisDriver({ url: 'redis://localhost:6379' }),
+})
+
+setCacheStorage(createUnstorageAdapter(storage))
+```
+
+### Cloudflare KV
+
+```ts twoslash
+// @noErrors
+import { setCacheStorage, createUnstorageAdapter } from 'katman/cache'
+import { createStorage } from 'unstorage'
+import cfKvDriver from 'unstorage/drivers/cloudflare-kv-binding'
+
+const storage = createStorage({
+  driver: cfKvDriver({ binding: 'MY_KV' }),
+})
+
+setCacheStorage(createUnstorageAdapter(storage))
+```
+
+### Custom storage
+
+Any object with `get` and `set` methods works:
+
+```ts twoslash
+// @noErrors
+import { setCacheStorage } from 'katman/cache'
+
+setCacheStorage({
+  get: (key) => myStore.get(key),
+  set: (key, value, opts) => myStore.set(key, value, opts?.ttl),
+})
+```
+
+## How it works
+
+1. `cacheQuery()` wraps the procedure as onion middleware
+2. On each call, input is hashed to produce a cache key
+3. Cache hit → return immediately (zero resolver overhead)
+4. Cache miss → run resolver, store result, return
+5. With SWR → return stale data immediately, revalidate in background
+6. Concurrent identical requests share one in-flight promise (deduplication)
+7. Cache entries auto-expire after `maxAge` seconds
+
+<Callout type='info'>
+  The cache key is computed from the serialized input using [ohash](https://github.com/unjs/ohash). Two calls with the same input always produce the same key, regardless of property order.
+</Callout>
+
+## What's next?
+
+- [Rate Limiting](/docs/plugins/ratelimit) — protect endpoints from abuse
+- [Server](/docs/server#caching) — HTTP-level `Cache-Control` headers via `route.cache`
+- [Plugins](/docs/plugins) — all available plugins

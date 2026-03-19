@@ -35,6 +35,9 @@ importers:
       msgpackr:
         specifier: ^1.11.9
         version: 1.11.9
+      ocache:
+        specifier: ^0.1.2
+        version: 0.1.2
       ofetch:
         specifier: 2.0.0-alpha.3
         version: 2.0.0-alpha.3

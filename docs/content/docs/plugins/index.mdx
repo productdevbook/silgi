@@ -18,6 +18,11 @@ All plugins ship as subpath imports from the `katman` package. You only import w
 
 <Cards>
   <Card
+    title='Cache'
+    description='Response caching with TTL, SWR, deduplication, and pluggable backends (Redis, Cloudflare KV).'
+    href='/docs/plugins/cache'
+  />
+  <Card
     title='CORS'
     description='Cross-origin headers — static origin, origin list, or dynamic matching with a function.'
     href='/docs/plugins/cors'
@@ -88,6 +93,7 @@ All plugins ship as subpath imports from the `katman` package. You only import w
 
 | Plugin             | Type              | How to use                                             |
 | ------------------ | ----------------- | ------------------------------------------------------ |
+| Cache              | Wrap middleware    | Add `cacheQuery(...)` for response caching with SWR    |
 | CORS               | Header helper     | Call `corsHeaders()` to get a headers object           |
 | OpenTelemetry      | Wrap middleware   | Add `otelWrap(tracer)` to a procedure's `use` array    |
 | Pino Logging       | Lifecycle hooks   | Pass `loggingHooks({ logger })` to the `hooks` option  |

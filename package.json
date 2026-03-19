@@ -87,6 +87,10 @@
       "import": "./dist/plugins/index.mjs",
       "types": "./dist/plugins/index.d.mts"
     },
+    "./cache": {
+      "import": "./dist/plugins/cache.mjs",
+      "types": "./dist/plugins/cache.d.mts"
+    },
     "./cors": {
       "import": "./dist/plugins/cors.mjs",
       "types": "./dist/plugins/cors.d.mts"
@@ -219,6 +223,7 @@
     "get-port-please": "^3.2.0",
     "hookable": "^6.1.0",
     "msgpackr": "^1.11.9",
+    "ocache": "^0.1.2",
     "ofetch": "2.0.0-alpha.3",
     "ohash": "^2.0.11"
   },
@@ -250,10 +255,14 @@
     "zod": "^4.3.6"
   },
   "peerDependencies": {
-    "@scalar/api-reference": ">=1.0.0"
+    "@scalar/api-reference": ">=1.0.0",
+    "unstorage": ">=2.0.0"
   },
   "peerDependenciesMeta": {
     "@scalar/api-reference": {
+      "optional": true
+    },
+    "unstorage": {
       "optional": true
     }
   },
