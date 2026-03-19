@@ -1,16 +1,11 @@
 /**
- * Compiled Router v4 — Hybrid: split + pre-allocated objects.
+ * Compiled Router — Zero-overhead JIT compiler.
  *
- * Combines best of both worlds:
- * 1. switch() for static routes — O(1), no split needed
- * 2. split() for dynamic routes — same as rou3 (V8 optimizes well)
- * 3. Pre-allocated result + params objects — ZERO allocation per match
- *    (rou3 creates new objects on every match)
- * 4. charCodeAt first-char dispatch — fast reject
- *
- * The key advantage over rou3: rou3 does `return { data, params: { id: s[2] } }`
- * on every match (2 allocations). We do `_p.id = s[2]; _r.data = $0; return _r`
- * (0 allocations, just property writes).
+ * Generates a specialized lookup function:
+ * - switch for static routes (V8 jump table)
+ * - charCodeAt(1) dispatch before split (miss = 5ns)
+ * - p.slice(constant) for wildcards (no split+join)
+ * - Pre-allocated result/params objects (zero allocation)
  */
 
 import type { RouterContext, RouteNode, MethodEntry, MatchedRoute } from './types.ts'
@@ -19,33 +14,24 @@ export function compileRouter<T>(
   ctx: RouterContext<T>,
 ): (method: string, path: string) => MatchedRoute<T> | undefined {
   const refs: unknown[] = []
-  const prealloc: string[] = []
+  const pre: string[] = ['var _r={data:null,params:null}']
   const uid = { n: 0 }
 
-  prealloc.push('var _r={data:null,params:null}')
-
-  // Static switch
-  const sw = buildSwitch(ctx, refs)
-
-  // Dynamic tree with split
-  const dyn = emitNode(ctx.root, refs, prealloc, uid, 1)
+  const sw = emitSwitch(ctx, refs)
+  const dyn = emitRoot(ctx.root, refs, pre, uid)
 
   if (!sw && !dyn) return () => undefined
 
-  const normalize = 'if(p.length>1&&p.charCodeAt(p.length-1)===47)p=p.slice(0,-1);'
-  let body = normalize
+  let body = 'if(p.length>1&&p.charCodeAt(p.length-1)===47)p=p.slice(0,-1);'
   if (sw) body += sw
-  // Split lazily — only when dynamic route has a chance to match
-  // First char of segment 1 is checked BEFORE split
   if (dyn) body += dyn
 
-  const src = `${prealloc.join(';')};return(m,p)=>{${body}}`
-  return new Function(...refs.map((_, i) => `$${i}`), src)(...refs)
+  return new Function(...refs.map((_, i) => `$${i}`), `${pre.join(';')};return(m,p)=>{${body}}`)(...refs)
 }
 
-// ── Static switch ───────────────────────────────────
+// ── Switch for static routes ────────────────────────
 
-function buildSwitch(ctx: RouterContext<any>, refs: unknown[]): string {
+function emitSwitch(ctx: RouterContext<any>, refs: unknown[]): string {
   const seen = new Set<string>()
   const cases: string[] = []
   for (const key in ctx.static) {
@@ -54,202 +40,212 @@ function buildSwitch(ctx: RouterContext<any>, refs: unknown[]): string {
     const norm = key.endsWith('/') && key.length > 1 ? key.slice(0, -1) : key
     if (seen.has(norm)) continue
     seen.add(norm)
-    let c = `case ${JSON.stringify(norm)}:`
     for (const method in node.methods) {
       const e = node.methods[method]?.[0]
       if (!e) continue
-      const d = ref(refs, e.data)
-      c += method
-        ? `if(m===${JSON.stringify(method)}){_r.data=$${d};_r.params=null;return _r;}`
-        : `_r.data=$${d};_r.params=null;return _r;`
+      const d = addRef(refs, e.data)
+      const g = method ? `if(m===${JSON.stringify(method)})` : ''
+      cases.push(`case ${JSON.stringify(norm)}:${g}{_r.data=$${d};_r.params=null;return _r;}break;`)
     }
-    cases.push(c)
   }
   return cases.length ? `switch(p){${cases.join('')}}` : ''
 }
 
-// ── Dynamic tree → split-based if/else ──────────────
+// ── Root level: charCodeAt dispatch → lazy split ────
 
-function emitNode(
+function emitRoot(
+  root: RouteNode<any>,
+  refs: unknown[],
+  pre: string[],
+  uid: { n: number },
+): string {
+  if (!root.static && !root.param && !root.wildcard) return ''
+
+  let code = ''
+  let hasIf = false
+
+  if (root.static) {
+    // Group by first char
+    const byChar = new Map<number, Array<[string, RouteNode<any>]>>()
+    for (const [key, child] of Object.entries(root.static)) {
+      if (!child) continue
+      const ch = key.charCodeAt(0)
+      if (!byChar.has(ch)) byChar.set(ch, [])
+      byChar.get(ch)!.push([key, child])
+    }
+
+    for (const [ch, entries] of byChar) {
+      // charCodeAt dispatch — if miss, no split
+      let branchCode = 'var s=p.split("/"),l=s.length;'
+
+      let innerIf = false
+      for (const [key, child] of entries) {
+        const subtree = emitSubtree(child, refs, pre, uid, 2, 1 + key.length + 1)
+        if (!subtree) continue
+        const cond = `s[1]===${JSON.stringify(key)}`
+        branchCode += `${innerIf ? 'else ' : ''}if(${cond}){${subtree}}`
+        innerIf = true
+      }
+
+      code += `${hasIf ? 'else ' : ''}if(p.charCodeAt(1)===${ch}){${branchCode}}`
+      hasIf = true
+    }
+  }
+
+  // Root-level param
+  if (root.param) {
+    const paramCode = emitParamNode(root.param, refs, pre, uid, 1, 0)
+    if (paramCode) {
+      code += `{var s=s||p.split("/"),l=l||s.length;${paramCode}}`
+    }
+  }
+
+  // Root-level wildcard
+  if (root.wildcard?.methods) {
+    code += emitWildcard(root.wildcard.methods, refs, pre, uid, 1, undefined)
+  }
+
+  return code
+}
+
+// ── Subtree: already inside split ───────────────────
+
+function emitSubtree(
   node: RouteNode<any>,
   refs: unknown[],
   pre: string[],
   uid: { n: number },
   depth: number,
-  splitDone?: boolean,
-  prefixLen?: number, // known string offset (e.g. "/files/" = 7)
+  prefixLen: number,
 ): string {
   let code = ''
-  let hasIf = false
 
-  // At depth 1 (root children): lazy split per branch
-  const needsSplit = depth === 1 && !splitDone
-
-  // Terminal match
-  if (node.methods && depth > 1) {
-    const term = emitTerminal(node.methods, refs, depth, node.key === '*')
-    if (term) {
-      const optCheck = node.key === '*' ? `||l===${depth - 1}` : ''
-      code += `if(l===${depth}${optCheck}){${term}}`
-      hasIf = true
-    }
+  // Terminal match at this node
+  if (node.methods) {
+    code += emitTerminal(node.methods, refs, `l===${depth}`)
   }
+
+  let hasIf = false
 
   // Static children
   if (node.static) {
-    if (needsSplit) {
-      // Depth 1: group by first char → split inside each group
-      // Miss = 1 charCodeAt check (~1ns). Match = split + compare (~25ns)
-      const byChar = new Map<number, Array<[string, RouteNode<any>]>>()
-      for (const [key, child] of Object.entries(node.static)) {
-        if (!child) continue
-        const ch = key.charCodeAt(0)
-        if (!byChar.has(ch)) byChar.set(ch, [])
-        byChar.get(ch)!.push([key, child])
-      }
-
-      for (const [ch, entries] of byChar) {
-        let inner = ''
-        for (const [key, child] of entries) {
-          const childPrefixLen = 1 + key.length + 1 // "/" + segment + "/"
-          const childCode = emitNode(child, refs, pre, uid, depth + 1, true, childPrefixLen)
-          if (!childCode) continue
-          const cond = key.length > 1
-            ? `s[1].charCodeAt(0)===${ch}&&s[1]===${JSON.stringify(key)}`
-            : `s[1]===${JSON.stringify(key)}`
-          inner += `${inner ? 'else ' : ''}if(${cond}){${childCode}}`
-        }
-        if (inner) {
-          code += `${hasIf ? 'else ' : ''}if(p.charCodeAt(1)===${ch}){var s=p.split("/"),l=s.length;${inner}}`
-          hasIf = true
-        }
-      }
-    } else {
-      for (const [key, child] of Object.entries(node.static)) {
-        if (!child) continue
-        const childPrefixLen = (prefixLen || 1) + key.length + 1
-        const inner = emitNode(child, refs, pre, uid, depth + 1, true, childPrefixLen)
-        if (!inner) continue
-        const ch = key.charCodeAt(0)
-        const cond = key.length > 1
-          ? `s[${depth}].charCodeAt(0)===${ch}&&s[${depth}]===${JSON.stringify(key)}`
-          : `s[${depth}]===${JSON.stringify(key)}`
-        code += `${hasIf ? 'else ' : ''}if(${cond}){${inner}}`
-        hasIf = true
-      }
+    for (const [key, child] of Object.entries(node.static)) {
+      if (!child) continue
+      const childPrefix = prefixLen + key.length + 1
+      const subtree = emitSubtree(child, refs, pre, uid, depth + 1, childPrefix)
+      if (!subtree) continue
+      code += `${hasIf ? 'else ' : ''}if(s[${depth}]===${JSON.stringify(key)}){${subtree}}`
+      hasIf = true
     }
   }
 
   // Param child
   if (node.param) {
-    const paramInner = emitParam(node.param, refs, pre, uid, depth)
-    if (paramInner) {
-      if (needsSplit) {
-        code += `{var s=s||p.split("/"),l=l||s.length;${paramInner}}`
-      } else {
-        code += paramInner
-      }
-    }
+    code += emitParamNode(node.param, refs, pre, uid, depth, prefixLen)
   }
 
-  // Wildcard child — never needs split, use p.slice(prefixLen) directly
+  // Wildcard child — use compile-time offset
   if (node.wildcard?.methods) {
-    code += emitWildcard(node.wildcard.methods, refs, pre, uid, depth, !needsSplit, prefixLen)
+    code += emitWildcard(node.wildcard.methods, refs, pre, uid, depth, prefixLen)
   }
 
   return code
 }
 
-function emitTerminal(
-  methods: Record<string, MethodEntry<any>[] | undefined>,
-  refs: unknown[],
-  depth: number,
-  isOptional: boolean,
-): string {
-  let code = ''
-  for (const method in methods) {
-    const e = methods[method]?.[0]
-    if (!e) continue
-    const d = ref(refs, e.data)
-    const g = method ? `m===${JSON.stringify(method)}&&` : ''
-    code += `if(${g}1){_r.data=$${d};_r.params=null;return _r;}`
-  }
-  return code
-}
+// ── Param node emission ─────────────────────────────
 
-function emitParam(
+function emitParamNode(
   node: RouteNode<any>,
   refs: unknown[],
   pre: string[],
   uid: { n: number },
   depth: number,
+  prefixLen: number,
 ): string {
   let code = ''
 
-  // Terminal: param is the value at s[depth]
+  // Terminal: param handlers at this depth
   if (node.methods) {
     for (const method in node.methods) {
       const entries = node.methods[method]
       if (!entries) continue
       for (const entry of entries) {
         if (!entry.paramMap?.length) continue
-        const d = ref(refs, entry.data)
+        const d = addRef(refs, entry.data)
         const g = method ? `m===${JSON.stringify(method)}&&` : ''
 
-        // Pre-allocate param object
-        const po = `_p${uid.n++}`
-        const fields = entry.paramMap.map(([, n]) => `${JSON.stringify(typeof n === 'string' ? n : String(n))}:""`)
-        pre.push(`var ${po}={${fields.join(',')}}`)
+        const po = allocParams(pre, uid, entry.paramMap)
 
         if (entry.catchAll) {
-          // Wildcard param — join remaining
+          // Catch-all param
           const pname = typeof entry.paramMap[0]![1] === 'string' ? entry.paramMap[0]![1] : '_'
-          code += `{${po}[${JSON.stringify(pname)}]=s.slice(${depth}).join("/");_r.data=$${d};_r.params=${po};return _r;}`
-          continue
-        }
-
-        // Conditions
-        const conds: string[] = []
-        if (g) conds.push(g.slice(0, -2))
-
-        // Length check
-        const lastPM = entry.paramMap[entry.paramMap.length - 1]!
-        if (!lastPM[2] /* not optional */) {
-          conds.push(`l===${depth + entry.paramMap.length}`)
+          code += `if(${g}l>=${depth + 1}){${po}.${safeKey(pname)}=s.slice(${depth}).join("/");_r.data=$${d};_r.params=${po};return _r;}`
         } else {
-          conds.push(`(l===${depth + entry.paramMap.length}||l===${depth + entry.paramMap.length - 1})`)
-        }
+          // Regular params — assign from split array
+          const paramCount = entry.paramMap.length
+          const lastOptional = entry.paramMap[paramCount - 1]![2]
+          // Length check based on the last param's actual segment index
+          const lastSegIdx = entry.paramMap[paramCount - 1]![0]
+          const expectedLen = lastSegIdx + 2 // +1 for leading "", +1 for the param itself
+          const lenCheck = lastOptional
+            ? `(l===${expectedLen}||l===${expectedLen - 1})`
+            : `l===${expectedLen}`
 
-        // Regex constraints
-        for (let i = 0; i < (entry.paramRegex?.length || 0); i++) {
-          if (entry.paramRegex[i]) {
-            const pmEntry = entry.paramMap[i]
-            if (pmEntry) {
-              conds.push(`${entry.paramRegex[i]!.toString()}.test(s[${depth + i}])`)
+          // Regex checks
+          let regexCond = ''
+          for (let i = 0; i < (entry.paramRegex?.length || 0); i++) {
+            if (entry.paramRegex[i]) {
+              const pmIdx = entry.paramMap.findIndex(([idx]) => idx === i)
+              if (pmIdx !== -1) {
+                regexCond += `&&${entry.paramRegex[i]!.toString()}.test(s[${depth + pmIdx}])`
+              }
             }
           }
-        }
 
-        // Assign params
-        let assigns = ''
-        for (let i = 0; i < entry.paramMap.length; i++) {
-          const [, name] = entry.paramMap[i]!
-          const pname = typeof name === 'string' ? name : String(i)
-          assigns += `${po}[${JSON.stringify(pname)}]=s[${depth + i}];`
-        }
+          let assigns = ''
+          for (let i = 0; i < paramCount; i++) {
+            const [segIdx, name] = entry.paramMap[i]!
+            const pname = typeof name === 'string' ? name : String(i)
+            // Use the actual segment index from paramMap, offset by +1 for split (s[0] = "")
+            assigns += `${po}[${JSON.stringify(pname)}]=s[${segIdx + 1}];`
+          }
 
-        code += `if(${conds.join('&&')}){${assigns}_r.data=$${d};_r.params=${po};return _r;}`
+          code += `if(${g}${lenCheck}${regexCond}){${assigns}_r.data=$${d};_r.params=${po};return _r;}`
+        }
       }
     }
   }
 
-  // Deeper children from param node
+  // Deeper static/param/wildcard from param node
   if (node.static || node.param || node.wildcard) {
-    code += emitNode(node, refs, pre, uid, depth + 1)
+    code += emitSubtree(
+      { key: '*', static: node.static, param: node.param, wildcard: node.wildcard } as RouteNode<any>,
+      refs, pre, uid, depth + 1, 0, // prefix unknown after param
+    )
   }
 
   return code
 }
+
+// ── Terminal match ──────────────────────────────────
+
+function emitTerminal(
+  methods: Record<string, MethodEntry<any>[] | undefined>,
+  refs: unknown[],
+  endCheck: string,
+): string {
+  let code = ''
+  for (const method in methods) {
+    const e = methods[method]?.[0]
+    if (!e) continue
+    const d = addRef(refs, e.data)
+    const g = method ? `m===${JSON.stringify(method)}&&` : ''
+    code += `if(${g}${endCheck}){_r.data=$${d};_r.params=null;return _r;}`
+  }
+  return code
+}
+
+// ── Wildcard — compile-time p.slice(N) ──────────────
 
 function emitWildcard(
   methods: Record<string, MethodEntry<any>[] | undefined>,
@@ -257,14 +253,13 @@ function emitWildcard(
   pre: string[],
   uid: { n: number },
   depth: number,
-  useSplit?: boolean,
-  prefixLen?: number,
+  prefixLen: number | undefined,
 ): string {
   let code = ''
   for (const method in methods) {
     const entry = methods[method]?.[0]
     if (!entry) continue
-    const d = ref(refs, entry.data)
+    const d = addRef(refs, entry.data)
     const g = method ? `if(m===${JSON.stringify(method)})` : ''
 
     if (entry.paramMap?.length) {
@@ -272,24 +267,13 @@ function emitWildcard(
         ? entry.paramMap[entry.paramMap.length - 1]![1] as string : '_'
       const po = `_p${uid.n++}`
       pre.push(`var ${po}={${JSON.stringify(name)}:""}`)
-      // Wildcard value extraction — compile-time offset when possible
-      let sliceExpr: string
-      if (prefixLen) {
-        // Known prefix length → hardcoded offset (fastest: single p.slice)
-        sliceExpr = `(p.length>${prefixLen - 1}?p.slice(${prefixLen}):"")`
-      } else {
-        // Fallback: indexOf chain
-        if (depth === 1) {
-          sliceExpr = `(p.indexOf("/",1)===-1?"":p.slice(p.indexOf("/",1)+1))`
-        } else {
-          let expr = 'p.indexOf("/",1)'
-          for (let d = 2; d <= depth; d++) {
-            expr = `p.indexOf("/",${expr}+1)`
-          }
-          sliceExpr = `(${expr}===-1?"":p.slice(${expr}+1))`
-        }
-      }
-      code += `${g}{${po}[${JSON.stringify(name)}]=${sliceExpr};_r.data=$${d};_r.params=${po};return _r;}`
+
+      // Use compile-time offset if known, otherwise s.slice().join()
+      const valueExpr = prefixLen
+        ? `(p.length>=${prefixLen}?p.slice(${prefixLen}):"")`
+        : `s.slice(${depth}).join("/")`
+
+      code += `${g}{${po}[${JSON.stringify(name)}]=${valueExpr};_r.data=$${d};_r.params=${po};return _r;}`
     } else {
       code += `${g}{_r.data=$${d};_r.params=null;return _r;}`
     }
@@ -297,7 +281,24 @@ function emitWildcard(
   return code
 }
 
-function ref(refs: unknown[], val: unknown): number {
+// ── Helpers ─────────────────────────────────────────
+
+function allocParams(
+  pre: string[],
+  uid: { n: number },
+  paramMap: Array<[number, string | RegExp, boolean]>,
+): string {
+  const po = `_p${uid.n++}`
+  const fields = paramMap.map(([, n]) => `${JSON.stringify(typeof n === 'string' ? n : String(n))}:""`)
+  pre.push(`var ${po}={${fields.join(',')}}`)
+  return po
+}
+
+function safeKey(key: string): string {
+  return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key) ? key : `[${JSON.stringify(key)}]`
+}
+
+function addRef(refs: unknown[], val: unknown): number {
   let i = refs.indexOf(val)
   if (i === -1) { refs.push(val); i = refs.length - 1 }
   return i
