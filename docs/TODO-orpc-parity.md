@@ -27,7 +27,7 @@ oRPC ile karsilastirildiginda Katman'da eksik olan ozellikler.
 - [ ] SvelteKit
 - [ ] SolidStart
 - [ ] NestJS
-- [ ] AWS Lambda
+- [x] AWS Lambda
 - [ ] Message Port (Electron, browser extensions, Web Workers)
 - [ ] Peer-to-peer (Standard Server Peer)
 
@@ -37,7 +37,7 @@ oRPC ile karsilastirildiginda Katman'da eksik olan ozellikler.
 - [x] **Body Limit** — `bodyLimitGuard()` — 413 Payload Too Large guard
 - [x] **Cookie Helpers** — `getCookie`, `parseCookies`, `setCookie`, `deleteCookie` (katman/cookies)
 - [x] **Signing & Encryption** — `sign`, `unsign`, `encrypt`, `decrypt` (Web Crypto API)
-- [ ] **Publisher/PubSub** — Event pub/sub (Memory, Redis, Durable Objects adapterleri)
+- [x] **Publisher/PubSub** — `createPublisher()` + `MemoryPubSub` (Redis pluggable)
 - [x] **Strict GET Method** — `strictGetGuard` — 405 on non-GET for queries
 
 ## Client Gelistirmeleri
@@ -48,8 +48,8 @@ oRPC ile karsilastirildiginda Katman'da eksik olan ozellikler.
 
 ## TanStack Query Gelistirmeleri
 
-- [ ] `.streamedOptions()` — Streaming query destegi (data array'e eklenir)
-- [ ] `.liveOptions()` — Live query (son event oncekini degistirir)
+- [x] `.streamedOptions()` — Streaming query destegi (data array'e eklenir)
+- [x] `.liveOptions()` — Live query (refetchInterval ile polling)
 - [x] `.infiniteOptions()` — Infinite/paginated query
 - [x] `skipToken` — Type-safe query devre disi birakma
 - [ ] SSR hydration — Custom serializer'lar ile refetch waterfall onleme
@@ -67,7 +67,7 @@ oRPC ile karsilastirildiginda Katman'da eksik olan ozellikler.
 ## Diger
 
 - [ ] **tRPC Interop** — tRPC router'larini Katman'a donusturme (migration path)
-- [ ] **Custom JSON Serializers** — Ozel tip serializasyonu genisletme
+- [x] **Custom JSON Serializers** — `createSerializer()` ile ozel tip destegi
 - [ ] **OpenAPI Client** — OpenAPI endpoint'lerini client olarak consume etme
 - [ ] **Durable Iterator** — Cloudflare Durable Object streaming + reconnection
 - [ ] **Hibernation Plugin** — CF Durable Object WebSocket hibernation

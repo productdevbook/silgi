@@ -26,6 +26,7 @@ export default defineBuildConfig({
         "./src/adapters/hono.ts",
         "./src/adapters/express.ts",
         "./src/adapters/nitro.ts",
+        "./src/adapters/aws-lambda.ts",
         "./src/contract.ts",
         "./src/integrations/ai/index.ts",
         "./src/client/server.ts",

@@ -230,6 +230,45 @@ function UserProfile({ userId }: { userId: string | null }) {
 
 When `input` is `skipToken`, the query key is still generated (for prefetching later) but `queryFn` is never called.
 
+## Streamed queries
+
+For subscription-like data that accumulates over time, `streamedOptions` collects all events into an array:
+
+```tsx
+function EventLog() {
+  const { data: events } = useQuery(
+    utils.stream.updates.streamedOptions({
+      input: {},
+    })
+  )
+
+  return (
+    <ul>
+      {events?.map((e, i) => <li key={i}>{JSON.stringify(e)}</li>)}
+    </ul>
+  )
+}
+```
+
+Each SSE event is appended to the array. The query resolves when the stream ends.
+
+## Live queries
+
+`liveOptions` refetches at an interval — the latest result replaces the previous. Useful for dashboards and status pages:
+
+```tsx
+function ServerStatus() {
+  const { data } = useQuery(
+    utils.health.liveOptions({
+      input: undefined,
+      refetchInterval: 5000, // poll every 5 seconds
+    })
+  )
+
+  return <p>Uptime: {data?.uptime}s</p>
+}
+```
+
 ## What's next?
 
 - [Client](/docs/client) — set up the Katman client that powers the query utils

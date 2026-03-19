@@ -1,0 +1,87 @@
+---
+title: Publisher/PubSub
+description: Event pub/sub with pluggable backends — publish from mutations, subscribe via SSE.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Publish events from any procedure and subscribe to them via SSE or WebSocket. Built-in memory backend, pluggable for Redis/Upstash.
+
+## Setup
+
+```ts twoslash
+// @noErrors
+import { createPublisher, MemoryPubSub } from "katman/plugins"
+
+const pubsub = createPublisher(new MemoryPubSub())
+```
+
+## Publish from a mutation
+
+```ts twoslash
+// @noErrors
+const createUser = k.mutation({
+  input: z.object({ name: z.string(), email: z.string().email() }),
+  resolve: async ({ input, ctx }) => {
+    const user = await ctx.db.users.create(input)
+    await pubsub.publish("user:created", user)
+    return user
+  },
+})
+```
+
+## Subscribe via SSE
+
+`pubsub.subscribe()` returns an async generator — use it in a subscription:
+
+```ts twoslash
+// @noErrors
+const onUserCreated = k.subscription(async function* () {
+  yield* pubsub.subscribe("user:created")
+})
+```
+
+The client receives each published event as an SSE message in real time.
+
+## Custom backend
+
+Implement the `PubSubBackend` interface for Redis, Upstash, or any message broker:
+
+```ts twoslash
+// @noErrors
+import type { PubSubBackend } from "katman/plugins"
+import Redis from "ioredis"
+
+class RedisPubSub implements PubSubBackend {
+  #pub = new Redis()
+  #sub = new Redis()
+
+  async publish(channel: string, data: unknown) {
+    await this.#pub.publish(channel, JSON.stringify(data))
+  }
+
+  subscribe(channel: string, callback: (data: unknown) => void) {
+    this.#sub.subscribe(channel)
+    const handler = (ch: string, msg: string) => {
+      if (ch === channel) callback(JSON.parse(msg))
+    }
+    this.#sub.on("message", handler)
+    return () => {
+      this.#sub.unsubscribe(channel)
+      this.#sub.off("message", handler)
+    }
+  }
+}
+
+const pubsub = createPublisher(new RedisPubSub())
+```
+
+<Callout type="info">
+`MemoryPubSub` is single-process only. For multi-server deployments, use Redis or a similar shared backend.
+</Callout>
+
+## What's next?
+
+- [WebSocket](/docs/protocols/websocket) — bidirectional RPC for real-time
+- [Procedures](/docs/procedures) — subscriptions with async generators
+- [Plugins](/docs/plugins) — other available plugins

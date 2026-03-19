@@ -92,6 +92,25 @@ export interface ProcedureQueryUtils<TInput, TOutput, TError> {
     gcTime?: number;
   };
 
+  /** Generate streamed query options — data appends to array as events arrive */
+  streamedOptions: (options: QueryOptionsIn<TInput, TOutput[], TError>) => {
+    queryKey: OperationKey;
+    queryFn: (ctx: { signal: AbortSignal }) => Promise<TOutput[]>;
+    enabled?: boolean;
+    staleTime?: number;
+    gcTime?: number;
+  };
+
+  /** Generate live query options — latest event replaces previous data */
+  liveOptions: (options: QueryOptionsIn<TInput, TOutput, TError>) => {
+    queryKey: OperationKey;
+    queryFn: (ctx: { signal: AbortSignal }) => Promise<TOutput>;
+    refetchInterval: number;
+    enabled?: boolean;
+    staleTime?: number;
+    gcTime?: number;
+  };
+
   /** Generate a mutation key */
   mutationKey: () => OperationKey;
 
@@ -142,6 +161,39 @@ function createProcedureUtils<TInput, TOutput, TError>(
         client(options.input(pageParam), { signal } as any) as Promise<TOutput>,
       initialPageParam: options.initialPageParam,
       getNextPageParam: options.getNextPageParam,
+      ...(options.enabled !== undefined && { enabled: options.enabled }),
+      ...(options.staleTime !== undefined && { staleTime: options.staleTime }),
+      ...(options.gcTime !== undefined && { gcTime: options.gcTime }),
+    }),
+
+    streamedOptions: (options: any) => ({
+      queryKey: options.queryKey
+        ? (options.queryKey as OperationKey)
+        : generateKey(path, { type: "query", input: options.input }),
+      queryFn: async ({ signal }: { signal: AbortSignal }) => {
+        // Call the subscription/SSE endpoint and accumulate results into an array
+        const result = await client(options.input, { signal } as any);
+        if (result && typeof result === "object" && Symbol.asyncIterator in (result as object)) {
+          const items: unknown[] = [];
+          for await (const item of result as AsyncIterable<unknown>) {
+            items.push(item);
+          }
+          return items;
+        }
+        return Array.isArray(result) ? result : [result];
+      },
+      ...(options.enabled !== undefined && { enabled: options.enabled }),
+      ...(options.staleTime !== undefined && { staleTime: options.staleTime }),
+      ...(options.gcTime !== undefined && { gcTime: options.gcTime }),
+    }),
+
+    liveOptions: (options: any) => ({
+      queryKey: options.queryKey
+        ? (options.queryKey as OperationKey)
+        : generateKey(path, { type: "query", input: options.input }),
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        client(options.input, { signal } as any) as Promise<TOutput>,
+      refetchInterval: options.refetchInterval ?? 1000,
       ...(options.enabled !== undefined && { enabled: options.enabled }),
       ...(options.staleTime !== undefined && { staleTime: options.staleTime }),
       ...(options.gcTime !== undefined && { gcTime: options.gcTime }),

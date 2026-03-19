@@ -105,6 +105,10 @@
     "./nitro": {
       "import": "./dist/adapters/nitro.mjs",
       "types": "./dist/adapters/nitro.d.mts"
+    },
+    "./aws-lambda": {
+      "import": "./dist/adapters/aws-lambda.mjs",
+      "types": "./dist/adapters/aws-lambda.d.mts"
     }
   },
   "files": [

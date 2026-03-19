@@ -1,0 +1,68 @@
+---
+title: AWS Lambda
+description: Deploy Katman as an AWS Lambda function — API Gateway v1 and v2 compatible.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+Deploy your Katman router as a serverless function on AWS Lambda. Works with API Gateway REST (v1) and HTTP (v2) event formats.
+
+## Setup
+
+```ts twoslash
+// @noErrors
+import { katmanLambda } from "katman/aws-lambda"
+import { appRouter } from "./router"
+
+export const handler = katmanLambda(appRouter, {
+  context: (event) => ({
+    db: getDB(),
+    userId: event.requestContext?.authorizer?.userId,
+    ip: event.headers["x-forwarded-for"],
+  }),
+})
+```
+
+## API Gateway configuration
+
+Map a catch-all route to your Lambda:
+
+```
+ANY /rpc/{proxy+}  →  your-lambda-function
+```
+
+Then set the prefix in the adapter:
+
+```ts twoslash
+// @noErrors
+export const handler = katmanLambda(appRouter, {
+  prefix: "/rpc",
+  context: (event) => ({ db: getDB() }),
+})
+```
+
+## Input parsing
+
+- **POST/PUT/PATCH** — body is parsed as JSON
+- **GET** — input from `?data=` query parameter
+- Base64-encoded bodies (API Gateway binary mode) are decoded automatically
+
+## Cold start optimization
+
+Katman compiles the router once at module load time. The compiled pipeline is reused across Lambda invocations — no per-request compilation overhead.
+
+```ts twoslash
+// @noErrors
+// Router is compiled once, reused across invocations
+import { appRouter } from "./router"
+export const handler = katmanLambda(appRouter, { ... })
+```
+
+<Callout type="info">
+For minimal cold starts, keep your Lambda package small. Katman's single-package design helps — no 35+ scoped packages to load.
+</Callout>
+
+## What's next?
+
+- [Server](/docs/server) — `serve()` for non-serverless deployments
+- [Integrations](/docs/integrations) — other available integrations
