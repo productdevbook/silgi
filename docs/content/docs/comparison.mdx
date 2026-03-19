@@ -1,0 +1,108 @@
+---
+title: Comparison
+description: How Katman compares to oRPC, tRPC, and ts-rest.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+How does Katman stack up against other TypeScript RPC and API libraries? This page compares features, architecture, and tradeoffs.
+
+## Feature matrix
+
+| Feature | Katman | oRPC | tRPC | ts-rest |
+|---|---|---|---|---|
+| End-to-end type safety | Yes | Yes | Yes | Yes |
+| Single package | Yes | 7+ packages | 4+ packages | 3+ packages |
+| Middleware model | Guard + Wrap | Middleware chain | Middleware chain | None (decorators) |
+| JSON protocol | Yes | Yes | Yes | Yes |
+| MessagePack protocol | Yes | No | Via link | No |
+| devalue protocol | Yes | No | Via superjson | No |
+| Content negotiation | Automatic | No | No | No |
+| WebSocket RPC | Yes | No | Via subscription link | No |
+| Compiled pipeline | Yes | No | No | No |
+| Contract-first | Yes | Yes | No | Yes |
+| File upload | Built-in plugin | Manual | Via formdata link | Manual |
+| SSE / Streaming | Yes | Experimental | Via httpSubscriptionLink | No |
+| OpenAPI generation | Built-in | Plugin | Via trpc-openapi | Built-in |
+| React Server Actions | Built-in | Plugin | No | No |
+| TanStack Query | Built-in | Plugin | Via @trpc/react-query | Built-in |
+| AI SDK integration | Built-in | No | No | No |
+| Framework adapters | 15+ | 5+ | 4+ | 2 |
+
+## What sets Katman apart
+
+### Single package
+
+Install `katman`. That's it. Server, client, plugins, codecs, framework adapters, TanStack Query utils, React server actions, AI SDK tools — all in one package with subpath imports. Unused code is tree-shaken away.
+
+```bash
+npm install katman
+```
+
+Compare that to oRPC (`@orpc/server`, `@orpc/client`, `@orpc/react-query`, `@orpc/openapi`, `@orpc/zod`, ...) or tRPC (`@trpc/server`, `@trpc/client`, `@trpc/react-query`, `@trpc/next`, ...).
+
+### Guard / Wrap middleware model
+
+Most RPC libraries have a single middleware type. Katman splits the concept in two:
+
+```ts twoslash
+// @noErrors
+// Guards run BEFORE — add to context, throw to reject
+const auth = k.guard(async (ctx) => {
+  const user = await verifyToken(ctx.headers.authorization)
+  if (!user) throw new KatmanError("UNAUTHORIZED")
+  return { user }
+})
+
+// Wraps run BEFORE and AFTER — like an onion
+const timing = k.wrap(async (ctx, next) => {
+  const start = performance.now()
+  const result = await next()
+  console.log(`${performance.now() - start}ms`)
+  return result
+})
+```
+
+Guards are faster (no async overhead when sync) and semantically clear. You never need to wonder if a middleware modifies the response or just checks a precondition.
+
+### Compiled pipeline
+
+When your server starts, Katman pre-links all guards, wraps, and the resolver into a direct function chain. No closures are allocated per request, no middleware array is iterated at runtime.
+
+This is why Katman is **2x faster than Nitro** and significantly faster than other RPC libraries on the same runtime.
+
+### Content negotiation
+
+The server inspects `Accept` and `Content-Type` headers and automatically picks the right codec:
+
+| Client sends | Server responds with |
+|---|---|
+| `application/json` | JSON |
+| `application/x-msgpack` | MessagePack |
+| `application/x-devalue+json` | devalue (Date, Map, Set, BigInt) |
+
+No configuration needed. The client link sets the header, the server follows.
+
+### Built-in integrations
+
+Where other libraries require separate community packages, Katman ships:
+
+- **15+ framework adapters** — Fastify, Hono, Express, H3, Nitro, Elysia, Next.js, SvelteKit, Remix, Astro, SolidStart, AWS Lambda, NestJS, MessagePort, Peer
+- **React Server Actions** — `createAction()`, `createFormAction()`, `useServerAction()`
+- **TanStack Query** — `queryOptions`, `mutationOptions`, `infiniteOptions`, `streamedOptions`
+- **AI SDK** — `routerToTools()` turns your API into LLM-callable functions
+- **13 plugins** — CORS, OpenTelemetry, Pino, rate limiting, file upload, PubSub, signing, and more
+
+## When to use what
+
+| Scenario | Recommendation |
+|---|---|
+| New TypeScript API project | **Katman** — single package, fastest pipeline, most integrations |
+| Existing tRPC project | Start with [fromTRPC()](/docs/integrations/trpc), migrate incrementally |
+| Need OpenAPI-first contract | **Katman** or **ts-rest** — both support contract-first |
+| Existing Express/Fastify app | **Katman** — mount alongside existing routes via adapter |
+| Client-only (consuming external API) | **ts-rest** if the API has an OpenAPI spec; otherwise **Katman** with [OpenAPI Client](/docs/integrations/openapi-client) |
+
+<Callout>
+Katman is designed to be a superset. If another library does something well, Katman either matches it or provides an interop path (like `fromTRPC()`).
+</Callout>

@@ -1,0 +1,179 @@
+---
+title: SSR Optimization
+description: Prevent refetch waterfalls with server-side prefetching.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
+When you render on the server, data should already be in the cache when the client hydrates. Otherwise, TanStack Query refetches everything on mount — causing a visible loading flash.
+
+Katman provides `prefetchQueries` to solve this in one call.
+
+## The problem
+
+Without prefetching, this is what happens:
+
+1. Server renders the page with loading spinners
+2. HTML is sent to the client
+3. React hydrates
+4. TanStack Query fires all queries
+5. User sees loading spinners until data arrives
+
+With prefetching:
+
+1. Server fetches all data and seeds the query cache
+2. HTML is sent with the data already rendered
+3. React hydrates with cached data
+4. No loading spinners, no refetch waterfall
+
+## Setup
+
+<Steps>
+<Step>
+
+### Create a server-side query client
+
+Use `createServerClient` so prefetching runs in-process — no network round-trip.
+
+```ts twoslash title="server/query.ts"
+// @noErrors
+import { createServerClient } from "katman/client/server"
+import { createQueryUtils } from "katman/tanstack-query"
+import { appRouter } from "./router"
+
+export function createSSRUtils() {
+  const client = createServerClient(appRouter, {
+    context: (req) => ({ db: getDB() }),
+  })
+  return createQueryUtils(client)
+}
+```
+
+</Step>
+<Step>
+
+### Prefetch in your server component or loader
+
+<Tabs items={['Next.js', 'TanStack Start']}>
+  <Tab value="Next.js">
+  ```tsx title="app/users/page.tsx"
+  import { dehydrate, HydrationBoundary, QueryClient } from "@tanstack/react-query"
+  import { createSSRUtils } from "../../server/query"
+
+  export default async function UsersPage() {
+    const queryClient = new QueryClient()
+    const utils = createSSRUtils()
+
+    // Prefetch the data server-side
+    await queryClient.prefetchQuery(
+      utils.users.list.queryOptions({ input: { limit: 20 } })
+    )
+
+    return (
+      <HydrationBoundary state={dehydrate(queryClient)}>
+        <UserList />
+      </HydrationBoundary>
+    )
+  }
+  ```
+  </Tab>
+  <Tab value="TanStack Start">
+  ```tsx title="routes/users.tsx"
+  import { dehydrate, HydrationBoundary, QueryClient } from "@tanstack/react-query"
+  import { createSSRUtils } from "../server/query"
+  import { createFileRoute } from "@tanstack/react-router"
+
+  export const Route = createFileRoute("/users")({
+    loader: async () => {
+      const queryClient = new QueryClient()
+      const utils = createSSRUtils()
+
+      await queryClient.prefetchQuery(
+        utils.users.list.queryOptions({ input: { limit: 20 } })
+      )
+
+      return { dehydratedState: dehydrate(queryClient) }
+    },
+    component: UsersPage,
+  })
+
+  function UsersPage() {
+    const { dehydratedState } = Route.useLoaderData()
+    return (
+      <HydrationBoundary state={dehydratedState}>
+        <UserList />
+      </HydrationBoundary>
+    )
+  }
+  ```
+  </Tab>
+</Tabs>
+
+</Step>
+<Step>
+
+### Use the same query on the client
+
+The client component uses `useQuery` as normal. Because the data was prefetched, it is immediately available — no loading state.
+
+```tsx title="components/UserList.tsx"
+"use client"
+import { useQuery } from "@tanstack/react-query"
+import { utils } from "../client/query"
+
+export function UserList() {
+  // Data is already in the cache from SSR prefetching
+  const { data: users } = useQuery(
+    utils.users.list.queryOptions({ input: { limit: 20 } })
+  )
+
+  return (
+    <ul>
+      {users?.map(u => <li key={u.id}>{u.name}</li>)}
+    </ul>
+  )
+}
+```
+
+</Step>
+</Steps>
+
+<Callout>
+The query key must match exactly between server and client. Since both use `utils.users.list.queryOptions({ input: { limit: 20 } })`, TanStack Query recognizes the prefetched data and skips the refetch.
+</Callout>
+
+## Prefetching multiple queries
+
+Prefetch several queries in parallel with `Promise.all`:
+
+```ts twoslash
+// @noErrors
+await Promise.all([
+  queryClient.prefetchQuery(
+    utils.users.list.queryOptions({ input: { limit: 20 } })
+  ),
+  queryClient.prefetchQuery(
+    utils.stats.summary.queryOptions({ input: undefined })
+  ),
+])
+```
+
+This is faster than sequential prefetching. All queries run concurrently on the server.
+
+## When not to prefetch
+
+Skip prefetching for data that:
+
+- **Changes per user interaction** — search results, filtered lists
+- **Is very large** — the dehydrated state is serialized into the HTML
+- **Requires client-side context** — data that depends on browser state (localStorage, URL params)
+
+For these cases, let TanStack Query fetch on the client as usual.
+
+## What's next?
+
+- [TanStack Query](/docs/integrations/tanstack-query) — full query utils reference
+- [Client](/docs/client) — `createServerClient()` for in-process calls
+- [Testing](/docs/best-practices/testing) — use the same SSR utils in your test suite

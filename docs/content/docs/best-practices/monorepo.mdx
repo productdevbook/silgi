@@ -1,0 +1,180 @@
+---
+title: Monorepo Setup
+description: Share types between frontend and backend in a monorepo.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { File, Folder, Files } from 'fumadocs-ui/components/files';
+
+The contract-first pattern lets your frontend import types from a shared package without pulling in any server code.
+
+## Project structure
+
+<Files>
+  <Folder name="packages" defaultOpen>
+    <Folder name="api-contract" defaultOpen>
+      <File name="src/index.ts" />
+      <File name="package.json" />
+    </Folder>
+    <Folder name="api-server" defaultOpen>
+      <File name="src/server.ts" />
+      <File name="package.json" />
+    </Folder>
+    <Folder name="frontend" defaultOpen>
+      <File name="src/client.ts" />
+      <File name="package.json" />
+    </Folder>
+  </Folder>
+  <File name="package.json" />
+  <File name="pnpm-workspace.yaml" />
+</Files>
+
+Three packages, each with a single responsibility:
+
+| Package | Responsibility | Dependencies |
+|---|---|---|
+| `api-contract` | Shared types and schemas | `katman`, `zod` |
+| `api-server` | Implements the contract | `api-contract`, `katman`, `zod` |
+| `frontend` | Consumes the API | `api-contract`, `katman` |
+
+## 1. Define the contract
+
+The contract package exports input/output schemas and the router type. No server logic lives here.
+
+```ts twoslash title="packages/api-contract/src/index.ts"
+// @noErrors
+import { katman } from "katman"
+import { z } from "zod"
+
+const k = katman()
+
+// Input schemas — shared between server and client
+export const UserInput = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+})
+
+export const ListInput = z.object({
+  limit: z.number().min(1).max(100).optional(),
+})
+
+// Procedure definitions — schemas only, no implementation
+const listUsers = k.query({ input: ListInput, resolve: () => {} as any })
+const createUser = k.mutation({ input: UserInput, resolve: () => {} as any })
+
+export const contractRouter = k.router({
+  users: { list: listUsers, create: createUser },
+})
+
+// The type the frontend imports
+export type AppRouter = typeof contractRouter
+```
+
+<Callout>
+The contract uses placeholder resolvers (`() => {} as any`). They exist only for type inference — the actual implementation lives in `api-server`.
+</Callout>
+
+## 2. Implement on the server
+
+The server package imports the schemas from the contract and provides real implementations.
+
+```ts twoslash title="packages/api-server/src/server.ts"
+// @noErrors
+import { katman } from "katman"
+import { ListInput, UserInput } from "api-contract"
+
+const k = katman({
+  context: (req) => ({
+    db: getDB(),
+    headers: Object.fromEntries(req.headers),
+  }),
+})
+
+const listUsers = k.query(
+  ListInput,
+  ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit ?? 10 }),
+)
+
+const createUser = k.mutation({
+  use: [auth],
+  input: UserInput,
+  resolve: ({ input, ctx }) => ctx.db.users.create(input),
+})
+
+const appRouter = k.router({
+  users: { list: listUsers, create: createUser },
+})
+
+k.serve(appRouter, { port: 3000 })
+```
+
+## 3. Consume on the frontend
+
+The frontend imports only the `AppRouter` type from the contract. No server code leaks into the client bundle.
+
+```ts twoslash title="packages/frontend/src/client.ts"
+// @noErrors
+import { createClient } from "katman/client"
+import { createLink } from "katman/client/ofetch"
+import type { AppRouter } from "api-contract"
+
+const link = createLink({ url: "http://localhost:3000" })
+const client = createClient<AppRouter>(link)
+
+// Full autocomplete and type checking
+const users = await client.users.list({ limit: 10 })
+```
+
+<Callout type="info">
+Use `import type` for the router. This ensures the import is erased at build time and no server code is bundled into the frontend.
+</Callout>
+
+## InferContractClient
+
+For stricter typing without importing the full router, use `InferContractClient`:
+
+```ts twoslash
+// @noErrors
+import type { InferContractClient } from "katman"
+import type { AppRouter } from "api-contract"
+
+type Client = InferContractClient<AppRouter>
+// Client.users.list: (input: { limit?: number }) => Promise<User[]>
+// Client.users.create: (input: { name: string; email: string }) => Promise<User>
+```
+
+This is useful for typing props, return values, or utility functions that work with the client.
+
+## Workspace configuration
+
+```yaml title="pnpm-workspace.yaml"
+packages:
+  - "packages/*"
+```
+
+```json title="packages/api-server/package.json"
+{
+  "name": "api-server",
+  "dependencies": {
+    "api-contract": "workspace:*",
+    "katman": "latest",
+    "zod": "latest"
+  }
+}
+```
+
+```json title="packages/frontend/package.json"
+{
+  "name": "frontend",
+  "dependencies": {
+    "api-contract": "workspace:*",
+    "katman": "latest"
+  }
+}
+```
+
+## What's next?
+
+- [Client](/docs/client) — full client setup with links, interceptors, and binary mode
+- [Testing](/docs/best-practices/testing) — test procedures from the shared contract
+- [SSR Optimization](/docs/best-practices/ssr) — prefetch data server-side to avoid waterfalls

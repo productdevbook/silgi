@@ -3,6 +3,8 @@
   "pages": [
     "index",
     "getting-started",
+    "comparison",
+    "examples",
     "---",
     "concepts",
     "procedures",
@@ -14,6 +16,10 @@
     "---",
     "protocols",
     "plugins",
-    "integrations"
+    "integrations",
+    "---",
+    "best-practices",
+    "advanced",
+    "migrations"
   ]
 }
