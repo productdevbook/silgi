@@ -166,6 +166,32 @@ k.serve(appRouter, {
 })
 ```
 
+### Scalar UI source
+
+By default, the Scalar UI JavaScript is loaded from a CDN. You can change this with the `cdn` option:
+
+```ts twoslash
+// @noErrors
+k.serve(appRouter, {
+  scalar: {
+    title: 'My API',
+    cdn: 'local', // serve from node_modules (offline)
+  },
+})
+```
+
+| Value | Description |
+| --- | --- |
+| `'cdn'` (default) | Load from cdn.jsdelivr.net |
+| `'unpkg'` | Load from unpkg.com |
+| `'local'` | Serve from `node_modules` — no external requests, fully offline |
+| Custom URL | Any URL string, e.g. `'/assets/scalar.js'` for self-hosting |
+
+<Callout>
+  For `cdn: 'local'`, install the Scalar package first: `pnpm add @scalar/api-reference`.
+  If the package is not found, Katman falls back to CDN with a warning.
+</Callout>
+
 ### Adding metadata to procedures
 
 The generated docs pull information from your procedure definitions. Add `route` metadata to make the docs more useful:
