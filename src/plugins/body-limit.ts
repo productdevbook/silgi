@@ -29,7 +29,7 @@ export interface BodyLimitOptions {
  * Create a guard that rejects requests with bodies larger than `maxBytes`.
  * Checks the Content-Length header — zero overhead for GET requests.
  */
-export function bodyLimitGuard(options: BodyLimitOptions = {}): GuardDef {
+export function bodyLimitGuard(options: BodyLimitOptions = {}): GuardDef<Record<string, unknown>> {
   const { maxBytes = 1_048_576, message = 'Request body too large' } = options
 
   return {

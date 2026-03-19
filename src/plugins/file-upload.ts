@@ -49,7 +49,7 @@ export interface UploadedFile {
  * Adds `ctx.file` (single) or `ctx.files` (multiple) to the context.
  * Validates file size and MIME type before the procedure runs.
  */
-export function fileGuard(options: FileGuardOptions = {}): GuardDef {
+export function fileGuard(options: FileGuardOptions = {}): GuardDef<Record<string, unknown>> {
   const { maxFileSize = 10 * 1024 * 1024, allowedTypes, maxFiles = 1, fieldName = 'file' } = options
 
   return {

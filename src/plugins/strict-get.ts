@@ -23,7 +23,7 @@ import type { GuardDef } from '../types.ts'
  * Guard that rejects non-GET requests. Use on query procedures
  * to enforce RESTful method semantics and prevent CSRF.
  */
-export const strictGetGuard: GuardDef = {
+export const strictGetGuard: GuardDef<Record<string, unknown>> = {
   kind: 'guard',
   fn: (ctx: Record<string, unknown>) => {
     const method = ctx.method as string | undefined

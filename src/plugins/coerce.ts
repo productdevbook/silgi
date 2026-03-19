@@ -34,7 +34,7 @@ import type { GuardDef } from '../types.ts'
  * - "" → undefined (empty strings become undefined)
  * - Everything else → kept as-is
  */
-export const coerceGuard: GuardDef = {
+export const coerceGuard: GuardDef<Record<string, unknown>> = {
   kind: 'guard',
   fn: (ctx: Record<string, unknown>) => {
     const input = ctx.__rawInput

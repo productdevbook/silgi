@@ -66,13 +66,13 @@ export async function unsign(signed: string, secret: string): Promise<string | n
 
   const key = await getSigningKey(secret)
   const expected = fromHex(signature)
-  const valid = await crypto.subtle.verify('HMAC', key, expected, encoder.encode(value))
+  const valid = await crypto.subtle.verify('HMAC', key, expected as ArrayBufferView, encoder.encode(value))
   return valid ? value : null
 }
 
 // ── AES-GCM Encryption ─────────────────────────────
 
-async function getEncryptionKey(secret: string, salt: Uint8Array): Promise<CryptoKey> {
+async function getEncryptionKey(secret: string, salt: ArrayBufferView): Promise<CryptoKey> {
   const keyMaterial = await crypto.subtle.importKey('raw', encoder.encode(secret), 'PBKDF2', false, ['deriveKey'])
   return crypto.subtle.deriveKey(
     { name: 'PBKDF2', salt, iterations: 100_000, hash: 'SHA-256' },

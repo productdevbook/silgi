@@ -168,17 +168,16 @@ function createProcedureUtils<TInput, TOutput, TError>(
       queryKey: options.queryKey
         ? (options.queryKey as OperationKey)
         : generateKey(path, { type: 'query', input: options.input }),
-      queryFn: async ({ signal }: { signal: AbortSignal }) => {
-        // Call the subscription/SSE endpoint and accumulate results into an array
+      queryFn: async ({ signal }: { signal: AbortSignal }): Promise<TOutput[]> => {
         const result = await client(options.input, { signal } as any)
-        if (result && typeof result === 'object' && Symbol.asyncIterator in (result as object)) {
-          const items: unknown[] = []
-          for await (const item of result as AsyncIterable<unknown>) {
+        if (result && typeof result === 'object' && Symbol.asyncIterator in (result as any)) {
+          const items: TOutput[] = []
+          for await (const item of result as AsyncIterable<TOutput>) {
             items.push(item)
           }
           return items
         }
-        return Array.isArray(result) ? result : [result]
+        return (Array.isArray(result) ? result : [result]) as TOutput[]
       },
       ...(options.enabled !== undefined && { enabled: options.enabled }),
       ...(options.staleTime !== undefined && { staleTime: options.staleTime }),

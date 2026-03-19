@@ -99,7 +99,7 @@ export function createActions<T extends RouterDef>(router: T): ActionRouter<T> {
  */
 export function useServerAction<TInput, TOutput>(action: (input: TInput) => Promise<ActionResult<TOutput>>) {
   // These imports are inline to avoid breaking non-React environments
-  const { useState, useCallback, useRef } = require('react') as typeof import('react')
+  const { useState, useCallback, useRef } = require('react')
 
   const [data, setData] = useState<TOutput | undefined>(undefined)
   const [error, setError] = useState<ActionResult<TOutput>[0] | null>(null)
@@ -107,7 +107,7 @@ export function useServerAction<TInput, TOutput>(action: (input: TInput) => Prom
   const mountedRef = useRef(true)
 
   // Cleanup on unmount
-  const { useEffect } = require('react') as typeof import('react')
+  const { useEffect } = require('react')
   useEffect(() => {
     mountedRef.current = true
     return () => {
@@ -160,8 +160,8 @@ export function useOptimisticServerAction<TInput, TOutput>(
   action: (input: TInput) => Promise<ActionResult<TOutput>>,
   options: { optimistic: (input: TInput) => TOutput },
 ) {
-  const { useState, useCallback, useRef } = require('react') as typeof import('react')
-  const { useEffect } = require('react') as typeof import('react')
+  const { useState, useCallback, useRef } = require('react')
+  const { useEffect } = require('react')
 
   const [data, setData] = useState<TOutput | undefined>(undefined)
   const [optimisticData, setOptimisticData] = useState<TOutput | undefined>(undefined)
