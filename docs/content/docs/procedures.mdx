@@ -1,6 +1,6 @@
 ---
 title: Procedures
-description: The two ways to define an API endpoint — short form and full config.
+description: Three ways to define an API endpoint — short form, config, and builder.
 ---
 
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
@@ -97,6 +97,54 @@ const countdown = k.subscription(async function* () {
 ```
 
 The client receives a stream of `{ count: 5 }`, `{ count: 4 }`, ... `{ count: 1 }`.
+
+## Builder form
+
+A chainable API that gives you IDE autocomplete when an `output` schema is set:
+
+```ts twoslash
+// @noErrors
+import { z } from 'zod'
+
+const PostSchema = z.object({
+  id: z.number(),
+  title: z.string(),
+  body: z.string(),
+})
+
+const createPost = k.mutation()
+  .input(z.object({ title: z.string(), body: z.string() }))
+  .output(PostSchema)
+  .errors({ CONFLICT: 409 })
+  .resolve(({ input }) => {
+    return { id: 1, title: input.title, body: input.body }
+    //     ^ IDE suggests id, title, body
+  })
+```
+
+The builder form and config form produce the same `ProcedureDef` — there is no runtime difference. Use whichever you prefer:
+
+| Feature | Config form | Builder form |
+| --- | --- | --- |
+| IDE autocomplete on return | No | **Yes** |
+| Less boilerplate for simple cases | **Yes** | No |
+| Middleware, errors, route | Config object | Chained methods |
+
+Available builder methods:
+
+| Method | Description |
+| --- | --- |
+| `.input(schema)` | Set input validation schema |
+| `.output(schema)` | Set output schema (enables return autocomplete) |
+| `.errors({ ... })` | Define typed error codes |
+| `.use(...middleware)` | Add guards and wraps |
+| `.route({ ... })` | Set HTTP route metadata |
+| `.meta({ ... })` | Set custom metadata |
+| `.resolve(fn)` | Set the handler function (always last) |
+
+<Callout type='info'>
+  `.resolve()` must be called last — it finalizes the builder and returns a `ProcedureDef`.
+</Callout>
 
 ## Routers
 

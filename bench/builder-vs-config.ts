@@ -36,8 +36,8 @@ summary(() => {
 
     bench('builder: simple query', () => {
       k.query()
-        .input(inputSchema)
-        .resolve(({ input }) => ({ id: 1, ...input }))
+        .$input(inputSchema)
+        .$resolve(({ input }) => ({ id: 1, ...input }))
     })
   })
 })
@@ -56,11 +56,11 @@ summary(() => {
 
     bench('builder: full (use + input + output + errors)', () => {
       k.mutation()
-        .use(auth, timing)
-        .input(inputSchema)
-        .output(outputSchema)
-        .errors({ CONFLICT: 409 })
-        .resolve(({ input }) => ({ id: 1, name: input.name, age: input.age }))
+        .$use(auth, timing)
+        .$input(inputSchema)
+        .$output(outputSchema)
+        .$errors({ CONFLICT: 409 })
+        .$resolve(({ input }) => ({ id: 1, name: input.name, age: input.age }))
     })
   })
 })
@@ -78,11 +78,11 @@ const configProc = k.mutation({
 })
 
 const builderProc = k.mutation()
-  .use(auth, timing)
-  .input(inputSchema)
-  .output(outputSchema)
-  .errors({ CONFLICT: 409 })
-  .resolve(({ input }) => ({ id: 1, name: input.name, age: input.age }))
+  .$use(auth, timing)
+  .$input(inputSchema)
+  .$output(outputSchema)
+  .$errors({ CONFLICT: 409 })
+  .$resolve(({ input }) => ({ id: 1, name: input.name, age: input.age }))
 
 const configHandler = compileProcedure(configProc)
 const builderHandler = compileProcedure(builderProc)

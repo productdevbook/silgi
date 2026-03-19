@@ -37,24 +37,18 @@ describe('query/mutation input type inference', () => {
     expectTypeOf(proc).toMatchTypeOf<ProcedureDef<'mutation', UserInput, { created: boolean }, {}>>()
   })
 
-  it('config form: query({ input, resolve }) — input is inferred', () => {
-    const proc = k.query({
-      input: userSchema,
-      resolve: ({ input }) => {
-        expectTypeOf(input).toEqualTypeOf<UserOutput>()
-        return { ok: true }
-      },
+  it('short form: query(schema, resolve) — input is inferred (was config form)', () => {
+    const proc = k.query(userSchema, ({ input }) => {
+      expectTypeOf(input).toEqualTypeOf<UserOutput>()
+      return { ok: true }
     })
     expectTypeOf(proc).toMatchTypeOf<ProcedureDef<'query', UserInput, { ok: boolean }, {}>>()
   })
 
-  it('config form: mutation({ input, resolve }) — input is inferred', () => {
-    const proc = k.mutation({
-      input: userSchema,
-      resolve: ({ input }) => {
-        expectTypeOf(input).toEqualTypeOf<UserOutput>()
-        return { ok: true }
-      },
+  it('short form: mutation(schema, resolve) — input is inferred (was config form)', () => {
+    const proc = k.mutation(userSchema, ({ input }) => {
+      expectTypeOf(input).toEqualTypeOf<UserOutput>()
+      return { ok: true }
     })
     expectTypeOf(proc).toMatchTypeOf<ProcedureDef<'mutation', UserInput, { ok: boolean }, {}>>()
   })
@@ -82,28 +76,27 @@ describe('context type inference', () => {
   it('guard enriches context', () => {
     const auth = k.guard(() => ({ user: { id: 1, role: 'admin' as const } }))
 
-    k.query({
-      use: [auth],
-      resolve: ({ ctx }) => {
+    k.query()
+      .$use(auth)
+      .$resolve(({ ctx }) => {
         expectTypeOf(ctx.user).toEqualTypeOf<{ id: number; role: 'admin' }>()
         expectTypeOf(ctx.headers).toEqualTypeOf<Record<string, string>>()
         return true
-      },
-    })
+      })
   })
 
   it('multiple guards accumulate context', () => {
     const auth = k.guard(() => ({ user: { id: 1 } }))
     const org = k.guard(() => ({ orgId: 'abc' }))
 
-    k.query({
-      use: [auth, org],
-      resolve: ({ ctx }) => {
+    k.query()
+      .$use(auth)
+      .$use(org)
+      .$resolve(({ ctx }) => {
         expectTypeOf(ctx.user).toEqualTypeOf<{ id: number }>()
         expectTypeOf(ctx.orgId).toEqualTypeOf<string>()
         return true
-      },
-    })
+      })
   })
 })
 
@@ -116,15 +109,14 @@ describe('guard errors', () => {
       fn: () => ({ userId: 1 }),
     })
 
-    k.query({
-      use: [auth],
-      errors: { CONFLICT: 409 },
-      resolve: ({ fail }) => {
+    k.query()
+      .$use(auth)
+      .$errors({ CONFLICT: 409 })
+      .$resolve(({ fail }) => {
         // fail should accept both procedure errors AND guard errors
         expectTypeOf(fail).parameter(0).toEqualTypeOf<'CONFLICT' | 'UNAUTHORIZED'>()
         return true
-      },
-    })
+      })
   })
 
   it('multiple guards with errors — all merge', () => {
@@ -137,27 +129,26 @@ describe('guard errors', () => {
       fn: () => {},
     })
 
-    k.mutation({
-      use: [auth, rateLimit],
-      errors: { NOT_FOUND: 404 },
-      resolve: ({ fail }) => {
+    k.mutation()
+      .$use(auth)
+      .$use(rateLimit)
+      .$errors({ NOT_FOUND: 404 })
+      .$resolve(({ fail }) => {
         expectTypeOf(fail).parameter(0).toEqualTypeOf<'NOT_FOUND' | 'UNAUTHORIZED' | 'RATE_LIMITED'>()
         return true
-      },
-    })
+      })
   })
 
   it('guard without errors — no change to fail()', () => {
     const simple = k.guard(() => ({ extra: true }))
 
-    k.query({
-      use: [simple],
-      errors: { NOT_FOUND: 404 },
-      resolve: ({ fail }) => {
+    k.query()
+      .$use(simple)
+      .$errors({ NOT_FOUND: 404 })
+      .$resolve(({ fail }) => {
         expectTypeOf(fail).parameter(0).toEqualTypeOf<'NOT_FOUND'>()
         return true
-      },
-    })
+      })
   })
 
   it('guard with errors but no procedure errors — fail() has guard errors only', () => {
@@ -166,13 +157,12 @@ describe('guard errors', () => {
       fn: () => ({ userId: 1 }),
     })
 
-    k.query({
-      use: [auth],
-      resolve: ({ fail }) => {
+    k.query()
+      .$use(auth)
+      .$resolve(({ fail }) => {
         expectTypeOf(fail).parameter(0).toEqualTypeOf<'UNAUTHORIZED' | 'FORBIDDEN'>()
         return true
-      },
-    })
+      })
   })
 })
 
@@ -182,38 +172,33 @@ describe('output schema enforces resolve return type', () => {
   const outputSchema = z.object({ id: z.number(), name: z.string() })
 
   it('resolve must return output-compatible type when output is set', () => {
-    const proc = k.query({
-      output: outputSchema,
-      resolve: () => ({ id: 1, name: 'Alice' }),
-    })
+    const proc = k.query()
+      .$output(outputSchema)
+      .$resolve(() => ({ id: 1, name: 'Alice' }))
     // ProcedureDef TOutput is the schema output type, not the raw resolve return
     expectTypeOf(proc).toMatchTypeOf<ProcedureDef<'query', undefined, { id: number; name: string }, {}>>()
   })
 
   it('mutation output schema enforces return type', () => {
-    const proc = k.mutation({
-      input: z.object({ name: z.string() }),
-      output: outputSchema,
-      resolve: ({ input }) => ({ id: 1, name: input.name }),
-    })
+    const proc = k.mutation()
+      .$input(z.object({ name: z.string() }))
+      .$output(outputSchema)
+      .$resolve(({ input }) => ({ id: 1, name: input.name }))
     expectTypeOf(proc).toMatchTypeOf<
       ProcedureDef<'mutation', { name: string }, { id: number; name: string }, {}>
     >()
   })
 
   it('without output schema — resolve return type is inferred freely', () => {
-    const proc = k.query({
-      resolve: () => ({ custom: true, count: 42 }),
-    })
+    const proc = k.query(() => ({ custom: true, count: 42 }))
     expectTypeOf(proc).toMatchTypeOf<ProcedureDef<'query', undefined, { custom: boolean; count: number }, {}>>()
   })
 
   it('output with transform — resolve must match schema input type', () => {
     const schema = z.object({ id: z.number() }).transform((v) => ({ ...v, computed: true }))
-    const proc = k.query({
-      output: schema,
-      resolve: () => ({ id: 1 }), // returns schema INPUT type (pre-transform)
-    })
+    const proc = k.query()
+      .$output(schema)
+      .$resolve(() => ({ id: 1 })) // returns schema INPUT type (pre-transform)
     // ProcedureDef TOutput is the schema OUTPUT type (post-transform)
     expectTypeOf(proc).toMatchTypeOf<ProcedureDef<'query', undefined, { id: number; computed: boolean }, {}>>()
   })
@@ -224,20 +209,20 @@ describe('output schema enforces resolve return type', () => {
 describe('builder pattern', () => {
   const outputSchema = z.object({ id: z.number(), name: z.string() })
 
-  it('query() returns builder, .output().resolve() produces ProcedureDef', () => {
+  it('query() returns builder, .$output().$resolve() produces ProcedureDef', () => {
     const proc = k.query()
-      .output(outputSchema)
-      .resolve(() => ({ id: 1, name: 'Alice' }))
+      .$output(outputSchema)
+      .$resolve(() => ({ id: 1, name: 'Alice' }))
 
     expectTypeOf(proc).toMatchTypeOf<ProcedureDef<'query', undefined, { id: number; name: string }, {}>>()
   })
 
-  it('mutation() builder with input + output + errors', () => {
+  it('mutation() builder with $input + $output + $errors', () => {
     const proc = k.mutation()
-      .input(z.object({ email: z.string() }))
-      .output(outputSchema)
-      .errors({ CONFLICT: 409 as const })
-      .resolve(({ input, fail }) => {
+      .$input(z.object({ email: z.string() }))
+      .$output(outputSchema)
+      .$errors({ CONFLICT: 409 as const })
+      .$resolve(({ input, fail }) => {
         expectTypeOf(input).toEqualTypeOf<{ email: string }>()
         return { id: 1, name: input.email }
       })
@@ -245,9 +230,9 @@ describe('builder pattern', () => {
     expectTypeOf(proc).toMatchTypeOf<ProcedureDef<'mutation', { email: string }, { id: number; name: string }>>()
   })
 
-  it('builder without output — resolve return freely inferred', () => {
+  it('builder without $output — $resolve return freely inferred', () => {
     const proc = k.query()
-      .resolve(() => ({ custom: true, count: 42 }))
+      .$resolve(() => ({ custom: true, count: 42 }))
 
     expectTypeOf(proc).toMatchTypeOf<ProcedureDef<'query', undefined, { custom: boolean; count: number }, {}>>()
   })
@@ -257,17 +242,16 @@ describe('builder pattern', () => {
 
 describe('error type inference', () => {
   it('fail() is typed from errors config', () => {
-    k.query({
-      errors: {
+    k.query()
+      .$errors({
         NOT_FOUND: 404,
         BAD_INPUT: { status: 400, data: z.object({ field: z.string() }) },
-      },
-      resolve: ({ fail }) => {
+      })
+      .$resolve(({ fail }) => {
         // fail should accept error codes from the errors config
         expectTypeOf(fail).parameter(0).toEqualTypeOf<'NOT_FOUND' | 'BAD_INPUT'>()
         return true
-      },
-    })
+      })
   })
 })
 
@@ -295,13 +279,10 @@ describe('schema with transform', () => {
     expectTypeOf(proc).toMatchTypeOf<ProcedureDef<'query', string, string, {}>>()
   })
 
-  it('config form with transform schema', () => {
-    const proc = k.mutation({
-      input: dateSchema,
-      resolve: ({ input }) => {
-        expectTypeOf(input).toEqualTypeOf<Date>()
-        return { saved: true }
-      },
+  it('short form with transform schema (was config form)', () => {
+    const proc = k.mutation(dateSchema, ({ input }) => {
+      expectTypeOf(input).toEqualTypeOf<Date>()
+      return { saved: true }
     })
     expectTypeOf(proc).toMatchTypeOf<ProcedureDef<'mutation', string, { saved: boolean }, {}>>()
   })
@@ -311,19 +292,18 @@ describe('schema with transform', () => {
 
 describe('fail() data parameter typing', () => {
   it('fail with data schema requires typed second arg', () => {
-    k.query({
-      errors: {
+    k.query()
+      .$errors({
         VALIDATION: { status: 400, data: z.object({ field: z.string(), message: z.string() }) },
         NOT_FOUND: 404,
-      },
-      resolve: ({ fail }) => {
+      })
+      .$resolve(({ fail }) => {
         // fail("VALIDATION") should require data: { field: string, message: string }
         expectTypeOf(fail<'VALIDATION'>).parameters.toEqualTypeOf<['VALIDATION', { field: string; message: string }]>()
         // fail("NOT_FOUND") should NOT require data (number shorthand = no data schema)
         expectTypeOf(fail<'NOT_FOUND'>).parameters.toEqualTypeOf<['NOT_FOUND', ...([data?: unknown] | [])]>()
         return true
-      },
-    })
+      })
   })
 })
 
@@ -334,16 +314,15 @@ describe('guard + input combined', () => {
     const auth = k.guard(() => ({ userId: 123 }))
     const schema = z.object({ title: z.string() })
 
-    k.mutation({
-      use: [auth],
-      input: schema,
-      resolve: ({ ctx, input }) => {
+    k.mutation()
+      .$use(auth)
+      .$input(schema)
+      .$resolve(({ ctx, input }) => {
         expectTypeOf(ctx.userId).toEqualTypeOf<number>()
         expectTypeOf(ctx.headers).toEqualTypeOf<Record<string, string>>()
         expectTypeOf(input).toEqualTypeOf<{ title: string }>()
         return { created: true }
-      },
-    })
+      })
   })
 })
 
@@ -354,14 +333,14 @@ describe('wrap middleware', () => {
     const auth = k.guard(() => ({ user: { id: 1 } }))
     const timing = k.wrap(async (_ctx, next) => next())
 
-    k.query({
-      use: [auth, timing],
-      resolve: ({ ctx }) => {
+    k.query()
+      .$use(auth)
+      .$use(timing)
+      .$resolve(({ ctx }) => {
         expectTypeOf(ctx.user).toEqualTypeOf<{ id: number }>()
         expectTypeOf(ctx.headers).toEqualTypeOf<Record<string, string>>()
         return true
-      },
-    })
+      })
   })
 })
 

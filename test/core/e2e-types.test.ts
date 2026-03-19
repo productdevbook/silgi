@@ -23,14 +23,12 @@ const k = katman({
 const auth = k.guard(() => ({ userId: 1 }))
 
 const appRouter = k.router({
-  health: k.query({
-    route: { cache: 60 },
-    resolve: () => ({ status: 'ok' as const, uptime: 123 }),
-  }),
-  cached: k.query({
-    route: { cache: 'public, max-age=300, stale-while-revalidate=60' },
-    resolve: () => ({ data: 'cached' }),
-  }),
+  health: k.query()
+    .$route({ cache: 60 })
+    .$resolve(() => ({ status: 'ok' as const, uptime: 123 })),
+  cached: k.query()
+    .$route({ cache: 'public, max-age=300, stale-while-revalidate=60' })
+    .$resolve(() => ({ data: 'cached' })),
   users: {
     list: k.query(z.object({ limit: z.number().optional() }), ({ input, ctx }) =>
       ctx.db.users.slice(0, input.limit ?? 10),
@@ -40,12 +38,11 @@ const appRouter = k.router({
       if (!user) throw new Error('Not found')
       return user
     }),
-    create: k.mutation({
-      use: [auth],
-      input: z.object({ name: z.string(), email: z.string().email() }),
-      errors: { CONFLICT: 409 },
-      resolve: ({ input, ctx }) => ({ id: 2, ...input }),
-    }),
+    create: k.mutation()
+      .$use(auth)
+      .$input(z.object({ name: z.string(), email: z.string().email() }))
+      .$errors({ CONFLICT: 409 })
+      .$resolve(({ input, ctx }) => ({ id: 2, ...input })),
   },
   stream: {
     ticks: k.subscription(async function* () {

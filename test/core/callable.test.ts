@@ -17,10 +17,7 @@ describe('callable()', () => {
 
   it('runs guards in callable', async () => {
     const auth = k.guard(() => ({ userId: 42 }))
-    const proc = k.query({
-      use: [auth],
-      resolve: ({ ctx }) => ({ user: (ctx as any).userId }),
-    })
+    const proc = k.query().$use(auth).$resolve(({ ctx }) => ({ user: (ctx as any).userId }))
 
     const fn = callable(proc, { context: () => ({}) })
     const result = await fn()

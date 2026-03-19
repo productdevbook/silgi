@@ -27,10 +27,7 @@ describe('guard()', () => {
 
   it('sync guard merges context', async () => {
     const enrichIp = k.guard((ctx) => ({ ip: '1.2.3.4' }))
-    const proc = k.query({
-      use: [enrichIp],
-      resolve: async ({ ctx }) => (ctx as any).ip,
-    })
+    const proc = k.query().$use(enrichIp).$resolve(async ({ ctx }) => (ctx as any).ip)
 
     const pipeline = compileProcedure(proc)
     const ctx: Record<string, unknown> = {}
@@ -41,10 +38,7 @@ describe('guard()', () => {
 
   it('async guard merges context', async () => {
     const auth = k.guard(async () => ({ user: 'admin' }))
-    const proc = k.query({
-      use: [auth],
-      resolve: async ({ ctx }) => (ctx as any).user,
-    })
+    const proc = k.query().$use(auth).$resolve(async ({ ctx }) => (ctx as any).user)
 
     const pipeline = compileProcedure(proc)
     const ctx: Record<string, unknown> = {}
@@ -56,10 +50,7 @@ describe('guard()', () => {
     const enrichIp = k.guard((ctx: any) => {
       ctx.ip = '1.2.3.4' // direct mutation, no return
     })
-    const proc = k.query({
-      use: [enrichIp],
-      resolve: async ({ ctx }) => (ctx as any).ip,
-    })
+    const proc = k.query().$use(enrichIp).$resolve(async ({ ctx }) => (ctx as any).ip)
 
     const pipeline = compileProcedure(proc)
     const ctx: Record<string, unknown> = {}
@@ -69,10 +60,7 @@ describe('guard()', () => {
 
   it('only merges plain objects, not class instances', async () => {
     const badGuard = k.guard(() => new Date() as any)
-    const proc = k.query({
-      use: [badGuard],
-      resolve: async ({ ctx }) => Object.keys(ctx),
-    })
+    const proc = k.query().$use(badGuard).$resolve(async ({ ctx }) => Object.keys(ctx))
 
     const pipeline = compileProcedure(proc)
     const ctx: Record<string, unknown> = {}
@@ -86,14 +74,11 @@ describe('guard()', () => {
     const addB = k.guard(() => ({ b: 2 }))
     const addC = k.guard(async () => ({ c: 3 }))
 
-    const proc = k.query({
-      use: [addA, addB, addC],
-      resolve: async ({ ctx }) => ({
+    const proc = k.query().$use(addA, addB, addC).$resolve(async ({ ctx }) => ({
         a: (ctx as any).a,
         b: (ctx as any).b,
         c: (ctx as any).c,
-      }),
-    })
+      }))
 
     const pipeline = compileProcedure(proc)
     const ctx: Record<string, unknown> = {}
@@ -120,13 +105,10 @@ describe('wrap()', () => {
       return result
     })
 
-    const proc = k.query({
-      use: [mw],
-      resolve: async () => {
+    const proc = k.query().$use(mw).$resolve(async () => {
         order.push('handler')
         return 'ok'
-      },
-    })
+      })
 
     const pipeline = compileProcedure(proc)
     await pipeline({}, undefined, AbortSignal.timeout(5000))
@@ -144,13 +126,10 @@ describe('wrap()', () => {
       return next()
     })
 
-    const proc = k.query({
-      use: [g, w],
-      resolve: async () => {
+    const proc = k.query().$use(g, w).$resolve(async () => {
         order.push('handler')
         return 'ok'
-      },
-    })
+      })
 
     const pipeline = compileProcedure(proc)
     await pipeline({}, undefined, AbortSignal.timeout(5000))
@@ -174,16 +153,15 @@ describe('query() / mutation() / subscription()', () => {
     expect(proc.input).toBeDefined()
   })
 
-  it('config form: mutation({ use, input, errors, resolve })', () => {
+  it('builder form: mutation().$use(...).$input(...).$errors(...).$resolve(...)', () => {
     const auth = k.guard(async () => ({ user: 'admin' }))
-    const proc = k.mutation({
-      use: [auth],
-      input: z.object({ name: z.string() }) as any,
-      errors: { CONFLICT: 409 },
-      resolve: async ({ input, fail }: any) => {
+    const proc = k.mutation()
+      .$use(auth)
+      .$input(z.object({ name: z.string() }) as any)
+      .$errors({ CONFLICT: 409 })
+      .$resolve(async ({ input, fail }: any) => {
         return { id: 1, name: input.name }
-      },
-    })
+      })
     expect(proc.type).toBe('mutation')
     expect(proc.errors).toEqual({ CONFLICT: 409 })
     expect(proc.use).toHaveLength(1)
@@ -214,12 +192,11 @@ describe('query() / mutation() / subscription()', () => {
 
 describe('fail()', () => {
   it('throws KatmanError with defined=true', async () => {
-    const proc = k.mutation({
-      errors: { CONFLICT: 409 },
-      resolve: async ({ fail }: any) => {
+    const proc = k.mutation()
+      .$errors({ CONFLICT: 409 })
+      .$resolve(async ({ fail }: any) => {
         fail('CONFLICT')
-      },
-    })
+      })
 
     const pipeline = compileProcedure(proc)
     await expect(pipeline({}, undefined, AbortSignal.timeout(5000))).rejects.toMatchObject({
@@ -230,12 +207,11 @@ describe('fail()', () => {
   })
 
   it('fail with data', async () => {
-    const proc = k.mutation({
-      errors: { INVALID: { status: 422, message: 'Validation failed' } },
-      resolve: async ({ fail }: any) => {
+    const proc = k.mutation()
+      .$errors({ INVALID: { status: 422, message: 'Validation failed' } })
+      .$resolve(async ({ fail }: any) => {
         fail('INVALID', { field: 'email' })
-      },
-    })
+      })
 
     const pipeline = compileProcedure(proc)
     await expect(pipeline({}, undefined, AbortSignal.timeout(5000))).rejects.toMatchObject({
@@ -274,10 +250,9 @@ describe('input/output validation', () => {
   })
 
   it('validates output schema', async () => {
-    const proc = k.query({
-      output: z.object({ id: z.number() }) as any,
-      resolve: async () => ({ id: 'not-a-number' }), // wrong type
-    })
+    const proc = k.query()
+      .$output(z.object({ id: z.number() }) as any)
+      .$resolve(async () => ({ id: 'not-a-number' }))
 
     const pipeline = compileProcedure(proc)
     await expect(pipeline({}, undefined, AbortSignal.timeout(5000))).rejects.toThrow()
@@ -310,12 +285,11 @@ describe('handler()', () => {
     greet: k.query(z.object({ name: z.string() }) as any, async ({ input }: any) => ({
       message: `Hello, ${input.name}!`,
     })),
-    fail: k.mutation({
-      errors: { FORBIDDEN: 403 },
-      resolve: async ({ fail }: any) => {
+    fail: k.mutation()
+      .$errors({ FORBIDDEN: 403 })
+      .$resolve(async ({ fail }: any) => {
         fail('FORBIDDEN')
-      },
-    }),
+      }),
   })
 
   const handle = k.handler(router)
@@ -392,17 +366,16 @@ describe('E2E: Full CRUD', () => {
       list: k2.query(z.object({ limit: z.number().optional() }) as any, async ({ input }: any) =>
         db.slice(0, input?.limit ?? 10),
       ),
-      create: k2.mutation({
-        use: [auth],
-        input: z.object({ name: z.string(), email: z.string() }) as any,
-        errors: { CONFLICT: 409 },
-        resolve: async ({ input, ctx, fail }: any) => {
+      create: k2.mutation()
+        .$use(auth)
+        .$input(z.object({ name: z.string(), email: z.string() }) as any)
+        .$errors({ CONFLICT: 409 })
+        .$resolve(async ({ input, ctx, fail }: any) => {
           if (db.some((u) => u.email === input.email)) fail('CONFLICT')
           const user = { id: db.length + 1, ...input }
           db.push(user)
           return user
-        },
-      }),
+        }),
     },
   })
 

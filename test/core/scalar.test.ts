@@ -81,11 +81,10 @@ describe('generateOpenAPI', () => {
   it('includes error responses in spec', () => {
     const router = k.router({
       users: {
-        create: k.mutation({
-          input: z.object({ name: z.string() }),
-          errors: { CONFLICT: 409, VALIDATION: { status: 422, message: 'Invalid' } },
-          resolve: ({ input }) => ({ id: 1, name: input.name }),
-        }),
+        create: k.mutation()
+          .$input(z.object({ name: z.string() }))
+          .$errors({ CONFLICT: 409, VALIDATION: { status: 422, message: 'Invalid' } })
+          .$resolve(({ input }) => ({ id: 1, name: input.name })),
       },
     })
     const spec = generateOpenAPI(router)
@@ -102,12 +101,11 @@ describe('generateOpenAPI', () => {
 
     const router = k.router({
       users: {
-        create: k.mutation({
-          use: [auth],
-          input: z.object({ name: z.string() }),
-          errors: { CONFLICT: 409 },
-          resolve: ({ input }) => ({ id: 1, name: input.name }),
-        }),
+        create: k.mutation()
+          .$use(auth)
+          .$input(z.object({ name: z.string() }))
+          .$errors({ CONFLICT: 409 })
+          .$resolve(({ input }) => ({ id: 1, name: input.name })),
       },
     })
     const spec = generateOpenAPI(router)
@@ -124,10 +122,9 @@ describe('generateOpenAPI', () => {
     })
 
     const router = k.router({
-      secret: k.query({
-        use: [auth],
-        resolve: () => ({ data: 'secret' }),
-      }),
+      secret: k.query()
+        .$use(auth)
+        .$resolve(() => ({ data: 'secret' })),
     })
     const spec = generateOpenAPI(router)
     const secretOp = (spec.paths as any)['/secret']?.get

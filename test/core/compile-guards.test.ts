@@ -15,7 +15,7 @@ describe('compileProcedure guard count specialization', () => {
 
   it('1 guard', async () => {
     const g0 = k.guard(() => ({ a: 1 }))
-    const proc = k.query({ use: [g0], resolve: ({ ctx }) => (ctx as any).a })
+    const proc = k.query().$use(g0).$resolve(({ ctx }) => (ctx as any).a)
     const handler = compileProcedure(proc)
     const ctx: Record<string, unknown> = {}
     const result = await handler(ctx, undefined, AbortSignal.timeout(1000))
@@ -25,10 +25,7 @@ describe('compileProcedure guard count specialization', () => {
   it('2 guards', async () => {
     const g0 = k.guard(() => ({ a: 1 }))
     const g1 = k.guard(() => ({ b: 2 }))
-    const proc = k.query({
-      use: [g0, g1],
-      resolve: ({ ctx }) => (ctx as any).a + (ctx as any).b,
-    })
+    const proc = k.query().$use(g0).$use(g1).$resolve(({ ctx }) => (ctx as any).a + (ctx as any).b)
     const handler = compileProcedure(proc)
     const ctx: Record<string, unknown> = {}
     const result = await handler(ctx, undefined, AbortSignal.timeout(1000))
@@ -39,10 +36,7 @@ describe('compileProcedure guard count specialization', () => {
     const g0 = k.guard(() => ({ a: 1 }))
     const g1 = k.guard(() => ({ b: 2 }))
     const g2 = k.guard(() => ({ c: 3 }))
-    const proc = k.query({
-      use: [g0, g1, g2],
-      resolve: ({ ctx }) => (ctx as any).a + (ctx as any).b + (ctx as any).c,
-    })
+    const proc = k.query().$use(g0).$use(g1).$use(g2).$resolve(({ ctx }) => (ctx as any).a + (ctx as any).b + (ctx as any).c)
     const handler = compileProcedure(proc)
     const ctx: Record<string, unknown> = {}
     const result = await handler(ctx, undefined, AbortSignal.timeout(1000))
@@ -54,10 +48,7 @@ describe('compileProcedure guard count specialization', () => {
     const g1 = k.guard(() => ({ b: 2 }))
     const g2 = k.guard(() => ({ c: 3 }))
     const g3 = k.guard(() => ({ d: 4 }))
-    const proc = k.query({
-      use: [g0, g1, g2, g3],
-      resolve: ({ ctx }) => (ctx as any).a + (ctx as any).b + (ctx as any).c + (ctx as any).d,
-    })
+    const proc = k.query().$use(g0).$use(g1).$use(g2).$use(g3).$resolve(({ ctx }) => (ctx as any).a + (ctx as any).b + (ctx as any).c + (ctx as any).d)
     const handler = compileProcedure(proc)
     const ctx: Record<string, unknown> = {}
     const result = await handler(ctx, undefined, AbortSignal.timeout(1000))
@@ -66,14 +57,13 @@ describe('compileProcedure guard count specialization', () => {
 
   it('5+ guards — runGuardsN fallback', async () => {
     const guards = Array.from({ length: 6 }, (_, i) => k.guard(() => ({ [`g${i}`]: i })))
-    const proc = k.query({
-      use: guards,
-      resolve: ({ ctx }) => {
+    const proc = guards
+      .reduce((b: any, g) => b.$use(g), k.query())
+      .$resolve(({ ctx }: any) => {
         let sum = 0
-        for (let i = 0; i < 6; i++) sum += (ctx as any)[`g${i}`]
+        for (let i = 0; i < 6; i++) sum += ctx[`g${i}`]
         return sum
-      },
-    })
+      })
     const handler = compileProcedure(proc)
     const ctx: Record<string, unknown> = {}
     const result = await handler(ctx, undefined, AbortSignal.timeout(1000))
@@ -83,10 +73,7 @@ describe('compileProcedure guard count specialization', () => {
   it('async guards', async () => {
     const g0 = k.guard(async () => ({ a: 'async1' }))
     const g1 = k.guard(async () => ({ b: 'async2' }))
-    const proc = k.query({
-      use: [g0, g1],
-      resolve: ({ ctx }) => `${(ctx as any).a}-${(ctx as any).b}`,
-    })
+    const proc = k.query().$use(g0).$use(g1).$resolve(({ ctx }) => `${(ctx as any).a}-${(ctx as any).b}`)
     const handler = compileProcedure(proc)
     const ctx: Record<string, unknown> = {}
     const result = await handler(ctx, undefined, AbortSignal.timeout(1000))
@@ -108,13 +95,12 @@ describe('compileProcedure guard count specialization', () => {
     }
 
     const auth = k.guard(() => new AuthResult(42, 'admin'))
-    const proc = k.query({
-      use: [auth],
-      resolve: ({ ctx }) => ({
+    const proc = k.query()
+      .$use(auth)
+      .$resolve(({ ctx }) => ({
         userId: (ctx as any).userId,
         role: (ctx as any).role,
-      }),
-    })
+      }))
     const handler = compileProcedure(proc)
     const ctx: Record<string, unknown> = {}
     const result = (await handler(ctx, undefined, AbortSignal.timeout(1000))) as any
@@ -126,10 +112,7 @@ describe('compileProcedure guard count specialization', () => {
     const sideEffect = k.guard(() => {
       // side effect only, no return
     })
-    const proc = k.query({
-      use: [sideEffect],
-      resolve: () => 'ok',
-    })
+    const proc = k.query().$use(sideEffect).$resolve(() => 'ok')
     const handler = compileProcedure(proc)
     const ctx: Record<string, unknown> = {}
     const result = await handler(ctx, undefined, AbortSignal.timeout(1000))
@@ -138,10 +121,7 @@ describe('compileProcedure guard count specialization', () => {
 
   it('guard returning null — context unchanged', async () => {
     const g = k.guard(() => null as any)
-    const proc = k.query({
-      use: [g],
-      resolve: () => 'ok',
-    })
+    const proc = k.query().$use(g).$resolve(() => 'ok')
     const handler = compileProcedure(proc)
     const ctx: Record<string, unknown> = {}
     const result = await handler(ctx, undefined, AbortSignal.timeout(1000))
@@ -154,13 +134,12 @@ describe('compileProcedure guard count specialization', () => {
       fn: () => ({ userId: 1 }),
     })
 
-    const proc = k.mutation({
-      use: [auth],
-      errors: { CONFLICT: 409 },
-      resolve: ({ fail }) => {
+    const proc = k.mutation()
+      .$use(auth)
+      .$errors({ CONFLICT: 409 })
+      .$resolve(({ fail }) => {
         fail('UNAUTHORIZED')
-      },
-    })
+      })
 
     const handler = compileProcedure(proc)
     const ctx: Record<string, unknown> = {}
@@ -180,13 +159,12 @@ describe('compileProcedure guard count specialization', () => {
       fn: () => {},
     })
 
-    const proc = k.mutation({
-      use: [rateLimit],
-      errors: { NOT_FOUND: 404 },
-      resolve: ({ fail }) => {
+    const proc = k.mutation()
+      .$use(rateLimit)
+      .$errors({ NOT_FOUND: 404 })
+      .$resolve(({ fail }) => {
         fail('RATE_LIMITED')
-      },
-    })
+      })
 
     const handler = compileProcedure(proc)
     const ctx: Record<string, unknown> = {}

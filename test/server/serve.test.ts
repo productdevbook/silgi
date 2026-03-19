@@ -42,14 +42,13 @@ const getUser = query(z.object({ id: z.number() }), ({ input, ctx }) => {
   return user
 })
 
-const createUser = mutation({
-  input: z.object({ name: z.string().min(1), email: z.string().email() }),
-  errors: { CONFLICT: 409 },
-  resolve: ({ input, ctx }) => {
+const createUser = mutation()
+  .$input(z.object({ name: z.string().min(1), email: z.string().email() }))
+  .$errors({ CONFLICT: 409 })
+  .$resolve(({ input, ctx }) => {
     const user = { id: ctx.db.users.length + 1, ...input }
     return user
-  },
-})
+  })
 
 const noInput = query(() => ({ status: 'ok' }))
 

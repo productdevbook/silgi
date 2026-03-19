@@ -47,7 +47,6 @@ export type { ProcedureBuilder, ProcedureBuilderWithOutput } from './builder.ts'
 export type {
   ProcedureDef,
   ProcedureType,
-  ProcedureConfig,
   Meta,
   ErrorDef,
   ErrorDefItem,

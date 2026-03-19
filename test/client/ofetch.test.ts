@@ -45,12 +45,11 @@ const appRouter = router({
       if (!user) throw new Error('Not found')
       return user
     }),
-    create: mutation({
-      use: [auth],
-      input: z.object({ name: z.string().min(1) }),
-      errors: { CONFLICT: 409 },
-      resolve: ({ input }) => ({ id: 3, name: input.name }),
-    }),
+    create: mutation()
+      .$use(auth)
+      .$input(z.object({ name: z.string().min(1) }))
+      .$errors({ CONFLICT: 409 })
+      .$resolve(({ input }) => ({ id: 3, name: input.name })),
   },
   echo: query(z.object({ message: z.string() }), ({ input }) => ({ echo: input.message })),
 })

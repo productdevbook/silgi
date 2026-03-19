@@ -133,7 +133,7 @@ const { query, mutation, subscription, guard, wrap, router } = k
 // ── CORS (hook-based) ────────────────────────────────
 
 const corsHooks = cors({
-  origin: '*',
+  origin: 'http://localhost:3456',
   credentials: true,
   methods: ['GET', 'POST', 'OPTIONS'],
 })
@@ -227,20 +227,20 @@ const getUser = query(z.object({ id: z.number() }), async ({ input, ctx }) => {
   return user
 })
 
-// --- Users: Create (full config: auth + timing + lifecycle + errors) ---
-const createUser = mutation({
-  use: [auth, timing, lifecycle],
-  input: z.object({
+// --- Users: Create (builder: auth + timing + lifecycle + output + errors) ---
+const createUser = mutation()
+  .$use(auth, timing, lifecycle)
+  .$input(z.object({
     name: z.string().min(1).max(100),
     email: z.string().email(),
     role: z.enum(['user', 'admin']).optional(),
-  }),
-  output: UserSchema,
-  errors: {
+  }))
+  .$output(UserSchema)
+  .$errors({
     CONFLICT: 409,
     VALIDATION: { status: 422, message: 'Validation failed' },
-  },
-  resolve: async ({ input, ctx, fail }) => {
+  })
+  .$resolve(async ({ input, ctx, fail }) => {
     if (ctx.db.users.some((u) => u.email === input.email)) {
       fail('CONFLICT')
     }
@@ -254,48 +254,45 @@ const createUser = mutation({
     ctx.db.users.push(user)
     await ctx.pubsub.publish('user:created', user)
     return user
-  },
-})
+  })
 
-// --- Users: Delete (auth + typed error) ---
-const deleteUser = mutation({
-  use: [auth],
-  input: z.object({ id: z.number() }),
-  errors: { NOT_FOUND: 404 },
-  resolve: async ({ input, ctx, fail }) => {
+// --- Users: Delete (builder: auth + typed error) ---
+const deleteUser = mutation()
+  .$use(auth)
+  .$input(z.object({ id: z.number() }))
+  .$errors({ NOT_FOUND: 404 })
+  .$resolve(async ({ input, ctx, fail }) => {
     const idx = ctx.db.users.findIndex((u) => u.id === input.id)
     if (idx === -1) fail('NOT_FOUND')
     const [deleted] = ctx.db.users.splice(idx, 1)
     await ctx.pubsub.publish('user:deleted', deleted)
     return { deleted: true, id: input.id }
-  },
-})
+  })
 
-// --- Posts: List (with coercion guard for query params) ---
-const listPosts = query({
-  use: [coerceGuard],
-  input: z.object({
+// --- Posts: List (builder: coercion guard) ---
+const listPosts = query()
+  .$use(coerceGuard)
+  .$input(z.object({
     authorId: z.number().optional(),
     published: z.boolean().optional(),
-  }),
-  resolve: async ({ input, ctx }) => {
+  }))
+  .$resolve(async ({ input, ctx }) => {
     let posts = ctx.db.posts
     if (input.authorId) posts = posts.filter((p) => p.authorId === input.authorId)
     if (input.published !== undefined) posts = posts.filter((p) => p.published === input.published)
     return { posts, total: posts.length }
-  },
-})
+  })
 
-// --- Posts: Create (auth + lifecycle) ---
-const createPost = mutation({
-  use: [auth, lifecycle],
-  input: z.object({
+// --- Posts: Create (builder: auth + lifecycle + output) ---
+const createPost = mutation()
+  .$use(auth, lifecycle)
+  .$input(z.object({
     title: z.string().min(1).max(200),
     body: z.string().min(1),
     published: z.boolean().default(false),
-  }),
-  output: PostSchema,
-  resolve: async ({ input, ctx }) => {
+  }))
+  .$output(PostSchema)
+  .$resolve(async ({ input, ctx }) => {
     const post = {
       id: ctx.db.nextPostId++,
       title: input.title,
@@ -306,8 +303,7 @@ const createPost = mutation({
     ctx.db.posts.push(post)
     if (post.published) await ctx.pubsub.publish('post:published', post)
     return post
-  },
-})
+  })
 
 // --- Cookies: Demo ---
 const cookieDemo = query(async ({ ctx }) => {
