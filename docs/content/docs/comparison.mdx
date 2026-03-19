@@ -37,7 +37,11 @@ import { Callout } from 'fumadocs-ui/components/callout'
 | Message Port (Electron, Workers)        | Yes               | Yes                  | Partial            | No          |
 | CF WebSocket Hibernation                | No                | Yes                  | No                 | No          |
 | Framework adapters                      | **15**            | 17+                  | 4+                 | 2           |
-| Built-in plugins                        | **15**            | 14+                  | —                  | —           |
+| Typed guard errors (auto-merge)         | **Yes**           | No                   | No                 | No          |
+| Response caching (SWR, pluggable)       | **Built-in**      | No                   | No                 | No          |
+| Offline API docs (no CDN)               | **Yes**           | No                   | No                 | No          |
+| HTTP Cache-Control headers              | **Built-in**      | No                   | No                 | No          |
+| Built-in plugins                        | **16**            | 14+                  | —                  | —           |
 
 <Callout>This table is maintained honestly. Where oRPC or tRPC has a feature we don't, it's marked accurately.</Callout>
 
@@ -190,11 +194,15 @@ Being honest about oRPC's strengths:
 
 ## Where Katman is ahead
 
-- **Single package** — one install, no version coordination
+- **Single package** — one install, no version coordination, no transitive dependency issues
 - **Compiled pipeline** — measurably faster, lower p99 latency
 - **Guard / Wrap model** — clearer separation of concerns
+- **Typed guard errors** — guards declare errors that auto-merge into procedures and OpenAPI spec
+- **Response caching** — `cacheQuery()` with TTL, SWR, dedup, pluggable backends via unstorage
+- **Rich type serialization** — Set, Map, Date via devalue codec without extra plugins
 - **Content negotiation** — standard HTTP, interoperable with any client
-- **Built-in Scalar** — `scalar: true` in serve() for API docs
+- **Built-in Scalar** — `scalar: true` in serve() for API docs, with offline mode (`cdn: 'local'`)
+- **HTTP Cache-Control** — `route: { cache: 60 }` for CDN/browser caching
 - **HTTP/2 support** — one-flag TLS setup
 - **Auto port selection** — no `EADDRINUSE` handling needed
 
