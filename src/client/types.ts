@@ -17,6 +17,11 @@ export type Client<TClientContext extends ClientContext, TInput, TOutput, TError
   ...args: ClientRest<TClientContext, TInput>
 ) => Promise<TOutput>
 
+/** A subscription client — returns async iterator */
+export type SubscriptionClient<TClientContext extends ClientContext, TInput, TOutput> = (
+  ...args: ClientRest<TClientContext, TInput>
+) => AsyncIterableIterator<TOutput>
+
 /** Determine argument shape based on input and context optionality */
 export type ClientRest<TClientContext extends ClientContext, TInput> = undefined extends TInput
   ? Record<never, never> extends TClientContext
@@ -29,6 +34,7 @@ export type ClientRest<TClientContext extends ClientContext, TInput> = undefined
 /** Recursive nested client — mirrors the router structure */
 export type NestedClient<TClientContext extends ClientContext = ClientContext> =
   | Client<TClientContext, any, any, any>
+  | SubscriptionClient<TClientContext, any, any>
   | { [key: string]: NestedClient<TClientContext> }
 
 /** Transport interface — how requests are sent */

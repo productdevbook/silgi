@@ -40,6 +40,14 @@ const appRouter = k.router({
       resolve: ({ input, ctx }) => ({ id: 2, ...input }),
     }),
   },
+  stream: {
+    ticks: k.subscription(async function* () {
+      yield { tick: 1, time: new Date().toISOString() }
+    }),
+    events: k.subscription(z.object({ channel: z.string() }), async function* ({ input }) {
+      yield { channel: input.channel, data: 'hello' }
+    }),
+  },
 })
 
 type AppRouter = typeof appRouter
@@ -127,5 +135,23 @@ describe('E2E type roundtrip', () => {
     const client = createClient<Client>(link)
 
     await expect(client.users.get({ id: 999 })).rejects.toThrow()
+  })
+
+  it('InferClient produces correct types for subscription (no input)', () => {
+    expectTypeOf<Client['stream']['ticks']>().toBeFunction()
+    expectTypeOf<Client['stream']['ticks']>().returns.toMatchTypeOf<AsyncIterableIterator<{ tick: number; time: string }>>()
+  })
+
+  it('InferClient produces correct types for subscription (with input)', () => {
+    expectTypeOf<Client['stream']['events']>().toBeFunction()
+    expectTypeOf<Client['stream']['events']>().parameter(0).toMatchTypeOf<{ channel: string }>()
+    expectTypeOf<Client['stream']['events']>().returns.toMatchTypeOf<AsyncIterableIterator<{ channel: string; data: string }>>()
+  })
+
+  it('createClient accepts InferClient with subscriptions (NestedClient compat)', () => {
+    const link = createLink({ url: baseUrl })
+    // This must compile — InferClient with subscriptions must be assignable to NestedClient
+    const client = createClient<Client>(link)
+    expectTypeOf(client).toMatchTypeOf<Client>()
   })
 })

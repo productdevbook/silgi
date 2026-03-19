@@ -273,4 +273,53 @@ describe('InferClient', () => {
       health: () => Promise<{ ok: boolean }>
     }>()
   })
+
+  it('subscription — returns AsyncIterableIterator', () => {
+    const stream = k.subscription(async function* () {
+      yield { tick: 1, time: 'now' }
+    })
+
+    type Client = InferClient<typeof stream>
+    expectTypeOf<Client>().toEqualTypeOf<() => AsyncIterableIterator<{ tick: number; time: string }>>()
+  })
+
+  it('subscription with input — takes input, returns AsyncIterableIterator', () => {
+    const stream = k.subscription(z.object({ channel: z.string() }), async function* ({ input }) {
+      yield { channel: input.channel, message: 'hello' }
+    })
+
+    type Client = InferClient<typeof stream>
+    expectTypeOf<Client>().toEqualTypeOf<
+      (input: { channel: string }) => AsyncIterableIterator<{ channel: string; message: string }>
+    >()
+  })
+
+  it('router with subscriptions — NestedClient accepts mixed types', () => {
+    const router = k.router({
+      users: {
+        list: k.query(() => [{ id: 1 }]),
+        create: k.mutation(z.object({ name: z.string() }), ({ input }) => ({ id: 1, name: input.name })),
+      },
+      stream: {
+        ticks: k.subscription(async function* () {
+          yield { tick: 1 }
+        }),
+        messages: k.subscription(z.object({ roomId: z.string() }), async function* ({ input }) {
+          yield { roomId: input.roomId, text: 'hi' }
+        }),
+      },
+    })
+
+    type Client = InferClient<typeof router>
+    expectTypeOf<Client>().toMatchTypeOf<{
+      users: {
+        list: () => Promise<{ id: number }[]>
+        create: (input: { name: string }) => Promise<{ id: number; name: string }>
+      }
+      stream: {
+        ticks: () => AsyncIterableIterator<{ tick: number }>
+        messages: (input: { roomId: string }) => AsyncIterableIterator<{ roomId: string; text: string }>
+      }
+    }>()
+  })
 })
