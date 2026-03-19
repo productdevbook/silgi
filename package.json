@@ -249,6 +249,14 @@
     "ws": "^8.19.0",
     "zod": "^4.3.6"
   },
+  "peerDependencies": {
+    "@scalar/api-reference": ">=1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@scalar/api-reference": {
+      "optional": true
+    }
+  },
   "engines": {
     "node": ">=24",
     "pnpm": ">=10"
