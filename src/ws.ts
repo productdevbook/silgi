@@ -50,7 +50,6 @@ export function attachWebSocket(server: HttpServer, routerDef: RouterDef, option
   // Compile router once
   const flat: FlatRouter = compileRouter(routerDef)
   const binary = options.binary ?? false
-  const signal = new AbortController().signal
 
   function send(peer: Peer, data: unknown): void {
     if (binary) {
@@ -93,8 +92,9 @@ export function attachWebSocket(server: HttpServer, routerDef: RouterDef, option
 
         // Execute pipeline
         const ctx: Record<string, unknown> = Object.create(null)
+        const ac = new AbortController()
         try {
-          const result = route.handler(ctx, input ?? {}, signal)
+          const result = route.handler(ctx, input ?? {}, ac.signal)
           const output = result instanceof Promise ? await result : result
 
           // Streaming (subscription)

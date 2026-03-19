@@ -21,6 +21,7 @@ export interface LazyRouter {
   readonly __lazy: true
   readonly load: () => Promise<{ default: RouterDef | ProcedureDef }>
   _resolved?: RouterDef | ProcedureDef
+  _loading?: Promise<RouterDef | ProcedureDef>
 }
 
 /**
@@ -36,10 +37,13 @@ export function isLazy(value: unknown): value is LazyRouter {
   return typeof value === 'object' && value !== null && (value as any).__lazy === true
 }
 
-/** Resolve a lazy router (cached after first load) */
+/** Resolve a lazy router (cached after first load, race-safe) */
 export async function resolveLazy(value: LazyRouter): Promise<RouterDef | ProcedureDef> {
   if (value._resolved) return value._resolved
-  const mod = await value.load()
-  value._resolved = mod.default
-  return mod.default
+  if (value._loading) return value._loading
+  value._loading = value.load().then((mod) => {
+    value._resolved = mod.default
+    return mod.default
+  })
+  return value._loading
 }

@@ -18,8 +18,8 @@
  */
 
 import { createClient, safe, KatmanError } from 'katman/client'
-import { RPCLink } from 'katman/client/fetch'
 import { withInterceptors } from 'katman/client'
+import { RPCLink } from 'katman/client/fetch'
 import { withRetry, withDedupe, withCSRF } from 'katman/client/plugins'
 
 import type { AppRouter } from './server.ts'
@@ -117,9 +117,7 @@ async function main() {
 
   // ── Typed Error: CONFLICT ──────────────────────────
   hr('5. Duplicate Email → CONFLICT (typed error)')
-  const conflictResult = await safe(
-    client.users.create({ name: 'Clone', email: 'diana@katman.dev' }),
-  )
+  const conflictResult = await safe(client.users.create({ name: 'Clone', email: 'diana@katman.dev' }))
   if (conflictResult.isError) {
     const err = conflictResult.error as KatmanError
     console.log(`Error: ${err.code} (${err.status})`)
@@ -131,9 +129,7 @@ async function main() {
   // Create a client without auth header
   const noAuthLink = new RPCLink({ url: BASE, method: 'POST' })
   const noAuthClient = createClient<InferClient<AppRouter>>(noAuthLink)
-  const authResult = await safe(
-    noAuthClient.users.create({ name: 'X', email: 'x@test.com' }),
-  )
+  const authResult = await safe(noAuthClient.users.create({ name: 'X', email: 'x@test.com' }))
   if (authResult.isError) {
     const err = authResult.error as KatmanError
     console.log(`Error: ${err.code} (${err.status}) — ${err.message}`)

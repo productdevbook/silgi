@@ -37,8 +37,6 @@ export function katmanHono<TCtx extends Record<string, unknown>>(
 ): (c: any) => Promise<Response> {
   const flatRouter = compileRouter(router)
   const prefix = options.prefix ?? '/rpc'
-  const signal = new AbortController().signal
-
   return async (c: any) => {
     const url = new URL(c.req.url)
     let pathname = url.pathname
@@ -65,9 +63,16 @@ export function katmanHono<TCtx extends Record<string, unknown>>(
         input = await c.req.json().catch(() => undefined)
       } else {
         const data = c.req.query('data')
-        if (data) input = JSON.parse(data)
+        if (data) {
+          try {
+            input = JSON.parse(data)
+          } catch {
+            return c.json({ code: 'BAD_REQUEST', status: 400, message: 'Invalid JSON in data parameter' }, 400)
+          }
+        }
       }
 
+      const signal = c.req.raw?.signal ?? new AbortController().signal
       const output = await route.handler(ctx, input, signal)
       return c.json(output)
     } catch (error) {

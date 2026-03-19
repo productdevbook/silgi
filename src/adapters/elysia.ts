@@ -36,8 +36,6 @@ export function katmanElysia<TCtx extends Record<string, unknown>>(
 ): (app: any) => any {
   const flatRouter = compileRouter(router)
   const prefix = options.prefix ?? '/rpc'
-  const signal = new AbortController().signal
-
   return (app: any) => {
     app.all(`${prefix}/*`, async (elysiaCtx: any) => {
       let pathname = new URL(elysiaCtx.request.url).pathname
@@ -68,6 +66,7 @@ export function katmanElysia<TCtx extends Record<string, unknown>>(
           if (data) input = typeof data === 'string' ? JSON.parse(data) : data
         }
 
+        const signal = elysiaCtx.request.signal ?? new AbortController().signal
         return await route.handler(ctx, input, signal)
       } catch (error) {
         if (error instanceof ValidationError) {

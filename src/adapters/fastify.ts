@@ -35,8 +35,6 @@ export interface KatmanFastifyOptions {
 export function katmanFastify(routerDef: RouterDef, options: KatmanFastifyOptions = {}) {
   const flat: FlatRouter = compileRouter(routerDef)
   const contextFactory = options.context ?? (() => ({}))
-  const signal = new AbortController().signal
-
   return async function plugin(fastify: any) {
     // Register each procedure as a dedicated route
     for (const [path, route] of flat) {
@@ -54,7 +52,9 @@ export function katmanFastify(routerDef: RouterDef, options: KatmanFastifyOption
         const rawInput = req.body && typeof req.body === 'object' ? req.body : {}
 
         try {
-          const result = route.handler(ctx, rawInput, signal)
+          const ac = new AbortController()
+          req.raw?.on?.('close', () => ac.abort())
+          const result = route.handler(ctx, rawInput, ac.signal)
           const output = result instanceof Promise ? await result : result
 
           // Content negotiation

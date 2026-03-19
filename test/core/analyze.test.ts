@@ -60,6 +60,22 @@ describe('analyzeHandler', () => {
     const r = analyzeHandler((opts: any) => opts.ctx.db.find())
     expect(r.usesContext).toBe(true)
   })
+
+  // Known false positive cases (documenting current behavior)
+  it('false positive: "input" in string literal triggers usesInput', () => {
+    const r = analyzeHandler(() => 'the input is validated')
+    // Known limitation: regex matches word in string literals
+    expect(r.usesInput).toBe(true)
+  })
+
+  it('false positive: "context" as standalone word in string triggers usesContext', () => {
+    const r = analyzeHandler(() => {
+      // The context is important
+      return 'context matters'
+    })
+    // Known limitation: /\bcontext\b/ matches the word "context" in comments and strings
+    expect(r.usesContext).toBe(true)
+  })
 })
 
 describe('getOptimizationHints', () => {

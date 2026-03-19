@@ -44,8 +44,6 @@ export function katmanNestHandler<TCtx extends Record<string, unknown>>(
   options: NestAdapterOptions<TCtx> = {},
 ): (req: any, res: any) => Promise<void> {
   const flatRouter = compileRouter(router)
-  const signal = new AbortController().signal
-
   return async (req: any, res: any) => {
     // NestJS uses Express or Fastify under the hood
     // req.path gives the path after the controller prefix
@@ -73,7 +71,9 @@ export function katmanNestHandler<TCtx extends Record<string, unknown>>(
         input = typeof req.query.data === 'string' ? JSON.parse(req.query.data) : req.query.data
       }
 
-      const output = await route.handler(ctx, input, signal)
+      const ac = new AbortController()
+      req.on?.('close', () => ac.abort())
+      const output = await route.handler(ctx, input, ac.signal)
       res.json(output)
     } catch (error) {
       if (error instanceof ValidationError) {

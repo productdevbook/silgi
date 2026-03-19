@@ -34,13 +34,15 @@ export function katmanSolidStart<TCtx extends Record<string, unknown>>(
 ): (event: any) => Promise<Response> {
   const prefix = options.prefix ?? '/api/rpc'
   let _handler: ((req: Request) => Promise<Response>) | null = null
+  let _currentEvent: any = null
 
   return async (event: any) => {
+    _currentEvent = event
     if (!_handler) {
       const { katman } = await import('../katman.ts')
       const k = katman({
-        context: (req: Request) => {
-          if (options.context) return options.context(event)
+        context: (_req: Request) => {
+          if (options.context) return options.context(_currentEvent)
           return {} as TCtx
         },
       })

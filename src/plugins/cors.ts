@@ -29,27 +29,10 @@ export interface CORSOptions {
  * })
  * ```
  */
-export function cors(options: CORSOptions = {}): Partial<Record<keyof KatmanHooks, Function>> {
-  const origin = options.origin ?? '*'
-  const methods = options.methods ?? ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
-  const allowedHeaders = options.allowedHeaders ?? ['Content-Type', 'Authorization']
-  const credentials = options.credentials ?? false
-  const maxAge = options.maxAge
-  const exposedHeaders = options.exposedHeaders
-
-  // Build static header string (computed once, reused per request)
-  const headerValues = {
-    'access-control-allow-methods': methods.join(', '),
-    'access-control-allow-headers': allowedHeaders.join(', '),
-    ...(credentials && { 'access-control-allow-credentials': 'true' }),
-    ...(maxAge !== undefined && { 'access-control-max-age': String(maxAge) }),
-    ...(exposedHeaders && { 'access-control-expose-headers': exposedHeaders.join(', ') }),
-  }
-
+export function cors(options: CORSOptions = {}): { headers: Record<string, string>; options: CORSOptions } {
   return {
-    // No-op hooks just to be registered — actual CORS headers are added
-    // at the HTTP level via serve(). This export provides the config
-    // for middleware use.
+    headers: corsHeaders(options),
+    options,
   }
 }
 
@@ -71,8 +54,7 @@ export function corsHeaders(options: CORSOptions = {}, requestOrigin?: string): 
   if (typeof origin === 'string') {
     headers['access-control-allow-origin'] = origin
   } else if (Array.isArray(origin)) {
-    headers['access-control-allow-origin'] =
-      requestOrigin && origin.includes(requestOrigin) ? requestOrigin : origin[0]!
+    headers['access-control-allow-origin'] = requestOrigin && origin.includes(requestOrigin) ? requestOrigin : ''
     headers['vary'] = 'Origin'
   } else if (typeof origin === 'function' && requestOrigin) {
     headers['access-control-allow-origin'] = origin(requestOrigin) ? requestOrigin : ''

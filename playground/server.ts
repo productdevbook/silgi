@@ -27,6 +27,7 @@
  */
 
 import { katman, KatmanError, callable, lifecycleWrap, mapInput, lazy } from 'katman'
+import { contract, implement } from 'katman/contract'
 import {
   cors,
   rateLimitGuard,
@@ -44,7 +45,6 @@ import {
   createSerializer,
   createBatchHandler,
 } from 'katman/plugins'
-import { contract, implement } from 'katman/contract'
 import { z } from 'zod'
 
 // ── Schemas ──────────────────────────────────────────
@@ -193,31 +193,39 @@ const health = query(async () => ({
   uptime: process.uptime(),
   timestamp: new Date().toISOString(),
   features: [
-    'guard', 'wrap', 'lifecycle', 'subscription', 'hooks',
-    'cors', 'ratelimit', 'pubsub', 'cookies', 'signing',
-    'body-limit', 'coerce', 'serializer', 'callable',
-    'contract', 'openapi', 'batch', 'mapInput',
+    'guard',
+    'wrap',
+    'lifecycle',
+    'subscription',
+    'hooks',
+    'cors',
+    'ratelimit',
+    'pubsub',
+    'cookies',
+    'signing',
+    'body-limit',
+    'coerce',
+    'serializer',
+    'callable',
+    'contract',
+    'openapi',
+    'batch',
+    'mapInput',
   ],
 }))
 
 // --- Users: List (short form with input) ---
-const listUsers = query(
-  z.object({ limit: z.number().min(1).max(100).optional() }),
-  async ({ input, ctx }) => {
-    const limit = input.limit ?? 10
-    return { users: ctx.db.users.slice(0, limit), total: ctx.db.users.length }
-  },
-)
+const listUsers = query(z.object({ limit: z.number().min(1).max(100).optional() }), async ({ input, ctx }) => {
+  const limit = input.limit ?? 10
+  return { users: ctx.db.users.slice(0, limit), total: ctx.db.users.length }
+})
 
 // --- Users: Get (with NOT_FOUND error) ---
-const getUser = query(
-  z.object({ id: z.number() }),
-  async ({ input, ctx }) => {
-    const user = ctx.db.users.find((u) => u.id === input.id)
-    if (!user) throw new KatmanError('NOT_FOUND', { status: 404, message: `User #${input.id} not found` })
-    return user
-  },
-)
+const getUser = query(z.object({ id: z.number() }), async ({ input, ctx }) => {
+  const user = ctx.db.users.find((u) => u.id === input.id)
+  if (!user) throw new KatmanError('NOT_FOUND', { status: 404, message: `User #${input.id} not found` })
+  return user
+})
 
 // --- Users: Create (full config: auth + timing + lifecycle + errors) ---
 const createUser = mutation({

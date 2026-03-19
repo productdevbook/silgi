@@ -61,25 +61,6 @@ export function stringifyJSON(value: unknown): string {
 export function mergeAbortSignals(signals: (AbortSignal | undefined)[]): AbortSignal | undefined {
   const defined = signals.filter((s): s is AbortSignal => s !== undefined)
   if (defined.length === 0) return undefined
-  if (defined.length !== signals.length) return undefined
-
-  const controller = new AbortController()
-  let count = 0
-
-  for (const signal of defined) {
-    if (signal.aborted) {
-      count++
-      continue
-    }
-    signal.addEventListener(
-      'abort',
-      () => {
-        if (++count === defined.length) controller.abort(signal.reason)
-      },
-      { once: true },
-    )
-  }
-
-  if (count === defined.length) controller.abort(defined[0]!.reason)
-  return controller.signal
+  if (defined.length === 1) return defined[0]!
+  return AbortSignal.any(defined)
 }

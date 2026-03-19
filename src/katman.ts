@@ -305,7 +305,7 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
       const opts = defu(options ?? {}, { port: 3000, hostname: '127.0.0.1' })
       const hostname = opts.hostname
       const fr = flatRouter
-      const sharedSignal = new AbortController().signal
+      // Per-request AbortController created inside handler below
       const scalarEnabled = !!options?.scalar
 
       const notFound = '{"code":"NOT_FOUND","status":404,"message":"Not found"}'
@@ -379,6 +379,8 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
           // FIX #3: No per-request closures — inline respond/error logic
           // FIX #2b: Don't use pool (delete causes V8 dictionary mode)
           const ctx: Record<string, unknown> = Object.create(null)
+          const ac = new AbortController()
+          req.on('close', () => ac.abort())
 
           const t0 = performance.now()
 
@@ -386,7 +388,7 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
             const body = route.stringify(output)
             res.writeHead(200, {
               'content-type': 'application/json',
-              'content-length': body.length,
+              'content-length': Buffer.byteLength(body),
             })
             res.end(body)
             hooks.callHook('response', { path: pathname, output, durationMs: performance.now() - t0 })
@@ -396,7 +398,7 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
             if (!res.headersSent) {
               const e = err instanceof KatmanError ? err : toKatmanError(err)
               const body = stringifyJSON(e.toJSON())
-              res.writeHead(e.status, { 'content-type': 'application/json', 'content-length': body.length })
+              res.writeHead(e.status, { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) })
               res.end(body)
             }
             hooks.callHook('error', { path: pathname, error: err })
@@ -425,7 +427,7 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
 
           const executePipeline = (rawInput: unknown) => {
             try {
-              const pr = route.handler(ctx, rawInput, sharedSignal)
+              const pr = route.handler(ctx, rawInput, ac.signal)
               if (pr instanceof Promise) {
                 pr.then(respond).catch(handleError)
               } else {
@@ -446,13 +448,27 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
             return
           }
 
-          // WITH BODY: callback-based
+          // WITH BODY: callback-based (with size limit and parse safety)
+          const MAX_BODY_SIZE = 1_048_576 // 1 MB default
           let body = ''
+          let aborted = false
           req.on('data', (d: Buffer) => {
             body += d
+            if (body.length > MAX_BODY_SIZE) {
+              aborted = true
+              req.destroy()
+              handleError(new KatmanError('PAYLOAD_TOO_LARGE', { status: 413, message: 'Request body too large' }))
+            }
           })
           req.on('end', () => {
-            const input = body ? JSON.parse(body) : undefined
+            if (aborted) return
+            let input: unknown
+            try {
+              input = body ? JSON.parse(body) : undefined
+            } catch {
+              handleError(new KatmanError('BAD_REQUEST', { status: 400, message: 'Invalid JSON body' }))
+              return
+            }
             hooks.callHook('request', { path: pathname, input })
             runWithContext(input)
           })

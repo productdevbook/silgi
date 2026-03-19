@@ -51,8 +51,6 @@ export function katmanLambda<TCtx extends Record<string, unknown>>(
 ): (event: LambdaEvent) => Promise<LambdaResponse> {
   const flatRouter = compileRouter(router)
   const prefix = options.prefix ?? ''
-  const signal = new AbortController().signal
-
   return async (event: LambdaEvent): Promise<LambdaResponse> => {
     let pathname = event.path
     if (prefix && pathname.startsWith(prefix)) {
@@ -94,6 +92,7 @@ export function katmanLambda<TCtx extends Record<string, unknown>>(
         }
       }
 
+      const signal = AbortSignal.timeout(30_000) // Lambda has a max timeout
       const output = await route.handler(ctx, input, signal)
 
       return {

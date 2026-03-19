@@ -38,8 +38,6 @@ export function katmanH3<TCtx extends Record<string, unknown>>(
 ): (event: any) => Promise<unknown> {
   const flatRouter = compileRouter(router)
   const prefix = options.prefix ?? '/rpc'
-  const signal = new AbortController().signal
-
   return async (event: any) => {
     // H3 v2: event.url is a URL object, event.req is a Request-like
     const url = event.url ?? new URL(event.req?.url ?? '/', 'http://localhost')
@@ -80,9 +78,16 @@ export function katmanH3<TCtx extends Record<string, unknown>>(
         // GET: check searchParams
         const searchParams = url.searchParams ?? new URLSearchParams()
         const data = searchParams.get('data')
-        if (data) input = JSON.parse(data)
+        if (data) {
+          try {
+            input = JSON.parse(data)
+          } catch {
+            return { code: 'BAD_REQUEST', status: 400, message: 'Invalid JSON in data parameter' }
+          }
+        }
       }
 
+      const signal = event.req?.signal ?? new AbortController().signal
       const output = await route.handler(ctx, input, signal)
       return output
     } catch (error) {

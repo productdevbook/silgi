@@ -47,7 +47,6 @@ function createServerProxy(
   path: string[],
 ): unknown {
   const cache = new Map<string, unknown>()
-  const signal = new AbortController().signal
 
   const callProcedure = async (input?: unknown) => {
     const key = path.join('/')
@@ -57,6 +56,7 @@ function createServerProxy(
     const baseCtx = await contextFactory()
     const keys = Object.keys(baseCtx)
     for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = baseCtx[keys[i]!]
+    const signal = new AbortController().signal
     return route.handler(ctx, input, signal)
   }
 

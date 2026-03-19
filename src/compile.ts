@@ -277,7 +277,13 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
     if (guardResult) await guardResult
     const input = inputSchema ? await validateSchema(inputSchema, rawInput ?? {}) : rawInput
 
-    let execute: () => Promise<unknown> = () => Promise.resolve(resolveFn({ input, ctx, fail: failFn, signal }))
+    // Store input on context so wraps (e.g. mapInput) can read/modify it
+    ctx.__rawInput = input
+
+    let execute: () => Promise<unknown> = () => {
+      const resolvedInput = ctx.__rawInput ?? input
+      return Promise.resolve(resolveFn({ input: resolvedInput, ctx, fail: failFn, signal }))
+    }
 
     for (let i = wraps.length - 1; i >= 0; i--) {
       const wrapFn = wraps[i]!.fn
@@ -366,12 +372,10 @@ export class ContextPool {
   }
 
   release(ctx: Record<string, unknown>): void {
-    // Clear all properties
-    for (const key of Object.keys(ctx)) {
-      delete ctx[key]
-    }
+    // Replace with fresh null-prototype object instead of deleting properties
+    // (delete causes V8 dictionary mode transition, defeating the pool's purpose)
     if (this.#index > 0) {
-      this.#pool[--this.#index] = ctx
+      this.#pool[--this.#index] = Object.create(null)
     }
   }
 

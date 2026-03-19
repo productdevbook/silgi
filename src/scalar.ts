@@ -232,7 +232,8 @@ export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}):
 // ── Scalar HTML ─────────────────────────────────────
 
 export function scalarHTML(specUrl: string, options: ScalarOptions = {}): string {
-  const title = options.title ?? 'Katman API'
+  const title = escapeHtml(options.title ?? 'Katman API')
+  const safeUrl = escapeHtml(specUrl)
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -241,10 +242,14 @@ export function scalarHTML(specUrl: string, options: ScalarOptions = {}): string
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 </head>
 <body>
-  <script id="api-reference" data-url="${specUrl}"></script>
+  <script id="api-reference" data-url="${safeUrl}"></script>
   <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
 </body>
 </html>`
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 // ── Helpers ──────────────────────────────────────────

@@ -64,7 +64,6 @@ export function katmanMessagePort<TCtx extends Record<string, unknown>>(
   options: MessagePortAdapterOptions<TCtx> = {},
 ): () => void {
   const flatRouter = compileRouter(router)
-  const signal = new AbortController().signal
 
   const handler = async (event: { data: unknown }) => {
     const msg = event.data as RPCMessage
@@ -89,6 +88,7 @@ export function katmanMessagePort<TCtx extends Record<string, unknown>>(
         for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = baseCtx[keys[i]!]
       }
 
+      const signal = new AbortController().signal
       const result = await route.handler(ctx, msg.input, signal)
       port.postMessage({ __katman: true, __type: 'response', id: msg.id, result } satisfies RPCResponse)
     } catch (error) {

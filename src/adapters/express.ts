@@ -36,8 +36,6 @@ export function katmanExpress<TCtx extends Record<string, unknown>>(
   options: ExpressAdapterOptions<TCtx> = {},
 ): (req: any, res: any, next: any) => void {
   const flatRouter = compileRouter(router)
-  const signal = new AbortController().signal
-
   return (req: any, res: any, next: any) => {
     // Strip leading slash from the path after the mount prefix
     let pathname = req.path ?? req.url ?? ''
@@ -63,10 +61,21 @@ export function katmanExpress<TCtx extends Record<string, unknown>>(
         if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
           input = req.body
         } else if (req.query?.data) {
-          input = typeof req.query.data === 'string' ? JSON.parse(req.query.data) : req.query.data
+          if (typeof req.query.data === 'string') {
+            try {
+              input = JSON.parse(req.query.data)
+            } catch {
+              res.status(400).json({ code: 'BAD_REQUEST', status: 400, message: 'Invalid JSON in data parameter' })
+              return
+            }
+          } else {
+            input = req.query.data
+          }
         }
 
-        const output = await route.handler(ctx, input, signal)
+        const ac = new AbortController()
+        req.on('close', () => ac.abort())
+        const output = await route.handler(ctx, input, ac.signal)
         res.json(output)
       } catch (error) {
         if (error instanceof ValidationError) {

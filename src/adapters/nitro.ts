@@ -93,8 +93,6 @@ export function katmanNitro<TCtx extends Record<string, unknown>>(
 ): (event: NitroEvent) => Promise<unknown> {
   const flatRouter = compileRouter(router)
   const prefix = options.prefix
-  const signal = new AbortController().signal
-
   return async (event: NitroEvent) => {
     // Resolve procedure path
     let procedurePath: string
@@ -142,6 +140,7 @@ export function katmanNitro<TCtx extends Record<string, unknown>>(
       }
 
       // Execute compiled pipeline
+      const signal = (event.req as any)?.signal ?? new AbortController().signal
       const output = await route.handler(ctx, input, signal)
       return output
     } catch (error) {
