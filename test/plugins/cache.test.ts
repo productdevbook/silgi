@@ -77,26 +77,174 @@ describe('cacheQuery', () => {
 })
 
 describe('invalidateQueryCache', () => {
-  it('invalidates cached entries by name', async () => {
+  it('invalidates cached entries by name using shouldInvalidateCache', async () => {
     let callCount = 0
+    let shouldInvalidate = false
 
     const handler = k.handler(
       k.router({
         data: k.query({
-          use: [cacheQuery({ maxAge: 60, name: 'data_query' })],
+          use: [
+            cacheQuery({
+              maxAge: 60,
+              swr: false,
+              name: 'data_inv',
+              shouldInvalidateCache: () => {
+                if (shouldInvalidate) {
+                  shouldInvalidate = false
+                  return true
+                }
+                return false
+              },
+            }),
+          ],
           resolve: () => ++callCount,
         }),
       }),
     )
 
-    const res1 = await handler(new Request('http://localhost/data', { method: 'POST' }))
-    expect(await res1.json()).toBe(1)
+    const req = () => new Request('http://localhost/data', { method: 'POST' })
 
-    // Invalidate
-    await invalidateQueryCache('data_query')
+    const r1 = await handler(req())
+    expect(await r1.json()).toBe(1)
 
-    const res2 = await handler(new Request('http://localhost/data', { method: 'POST' }))
-    expect(await res2.json()).toBe(2) // re-resolved after invalidation
+    // Cached
+    const r2 = await handler(req())
+    expect(await r2.json()).toBe(1)
+
+    // Trigger invalidation on next call
+    shouldInvalidate = true
+    const r3 = await handler(req())
+    expect(await r3.json()).toBe(2) // re-resolved
+  })
+})
+
+describe('shouldBypassCache', () => {
+  it('bypasses cache when shouldBypassCache returns true', async () => {
+    let callCount = 0
+
+    const handler = k.handler(
+      k.router({
+        data: k.query({
+          use: [
+            cacheQuery({
+              maxAge: 60,
+              name: 'bypass_test',
+              shouldBypassCache: (input: any) => input?.noCache === true,
+            }),
+          ],
+          input: z.object({ noCache: z.boolean().optional() }),
+          resolve: () => ++callCount,
+        }),
+      }),
+    )
+
+    const makeReq = (noCache?: boolean) =>
+      new Request('http://localhost/data', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ noCache }),
+      })
+
+    const r1 = await handler(makeReq(false))
+    expect(await r1.json()).toBe(1)
+
+    // Cached
+    const r2 = await handler(makeReq(false))
+    expect(await r2.json()).toBe(1)
+
+    // Bypass — resolver runs again
+    const r3 = await handler(makeReq(true))
+    expect(await r3.json()).toBe(2)
+  })
+})
+
+describe('shouldInvalidateCache', () => {
+  it('invalidates and re-resolves when shouldInvalidateCache returns true', async () => {
+    let callCount = 0
+
+    const handler = k.handler(
+      k.router({
+        data: k.query({
+          use: [
+            cacheQuery({
+              maxAge: 60,
+              swr: false,
+              name: 'invalidate_flag_test',
+              shouldInvalidateCache: (input: any) => input?.refresh === true,
+            }),
+          ],
+          input: z.object({ refresh: z.boolean().optional() }),
+          resolve: () => ++callCount,
+        }),
+      }),
+    )
+
+    const makeReq = (refresh?: boolean) =>
+      new Request('http://localhost/data', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ refresh }),
+      })
+
+    const r1 = await handler(makeReq(false))
+    expect(await r1.json()).toBe(1)
+
+    // Cached
+    const r2 = await handler(makeReq(false))
+    expect(await r2.json()).toBe(1)
+
+    // Refresh flag — re-resolve
+    const r3 = await handler(makeReq(true))
+    expect(await r3.json()).toBe(2)
+  })
+})
+
+describe('validate', () => {
+  it('treats entry as miss when validate returns false', async () => {
+    let callCount = 0
+
+    const handler = k.handler(
+      k.router({
+        data: k.query({
+          use: [
+            cacheQuery({
+              maxAge: 60,
+              swr: false,
+              name: 'validate_test',
+              validate: (entry) => entry.value !== null && entry.value !== 0,
+            }),
+          ],
+          resolve: () => callCount++, // returns 0 first time
+        }),
+      }),
+    )
+
+    const req = () => new Request('http://localhost/data', { method: 'POST' })
+
+    // First call returns 0 — validate rejects it
+    const r1 = await handler(req())
+    expect(await r1.json()).toBe(0)
+
+    // Not cached because validate returned false for 0, resolver runs again
+    const r2 = await handler(req())
+    expect(await r2.json()).toBe(1)
+
+    // Now value is 1, validate accepts — should be cached
+    const r3 = await handler(req())
+    expect(await r3.json()).toBe(1)
+  })
+})
+
+describe('onError', () => {
+  it('passes onError callback to ocache', () => {
+    // Verify the option is accepted without error
+    const wrap = cacheQuery({
+      maxAge: 60,
+      name: 'error_cb_test',
+      onError: (err) => console.error(err),
+    })
+    expect(wrap.kind).toBe('wrap')
   })
 })
 
