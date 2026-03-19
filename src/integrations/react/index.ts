@@ -101,8 +101,8 @@ export function useServerAction<TInput, TOutput>(action: (input: TInput) => Prom
   // These imports are inline to avoid breaking non-React environments
   const { useState, useCallback, useRef } = require('react')
 
-  const [data, setData] = useState<TOutput | undefined>(undefined)
-  const [error, setError] = useState<ActionResult<TOutput>[0] | null>(null)
+  const [data, setData] = useState(undefined as TOutput | undefined)
+  const [error, setError] = useState(null as ActionResult<TOutput>[0] | null)
   const [isPending, setIsPending] = useState(false)
   const mountedRef = useRef(true)
 
@@ -163,9 +163,9 @@ export function useOptimisticServerAction<TInput, TOutput>(
   const { useState, useCallback, useRef } = require('react')
   const { useEffect } = require('react')
 
-  const [data, setData] = useState<TOutput | undefined>(undefined)
-  const [optimisticData, setOptimisticData] = useState<TOutput | undefined>(undefined)
-  const [error, setError] = useState<ActionResult<TOutput>[0] | null>(null)
+  const [data, setData] = useState(undefined as TOutput | undefined)
+  const [optimisticData, setOptimisticData] = useState(undefined as TOutput | undefined)
+  const [error, setError] = useState(null as ActionResult<TOutput>[0] | null)
   const [isPending, setIsPending] = useState(false)
   const mountedRef = useRef(true)
 

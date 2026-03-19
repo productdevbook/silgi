@@ -170,9 +170,9 @@ function createProcedureUtils<TInput, TOutput, TError>(
         : generateKey(path, { type: 'query', input: options.input }),
       queryFn: async ({ signal }: { signal: AbortSignal }): Promise<TOutput[]> => {
         const result = await client(options.input, { signal } as any)
-        if (result && typeof result === 'object' && Symbol.asyncIterator in (result as any)) {
+        if (result && typeof result === 'object' && Symbol.asyncIterator in (result as unknown as object)) {
           const items: TOutput[] = []
-          for await (const item of result as AsyncIterable<TOutput>) {
+          for await (const item of result as unknown as AsyncIterable<TOutput>) {
             items.push(item)
           }
           return items
