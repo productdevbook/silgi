@@ -58,7 +58,10 @@ function emitSwitch(ctx: RouterContext<any>, refs: unknown[]): string {
       if (!e) continue
       const d = addRef(refs, e.data)
       const g = m ? `if(m===${JSON.stringify(m)})` : ''
-      cases.push(`case ${JSON.stringify(norm)}:${g}{_rs.data=$${d};return _rs}break;`)
+      cases.push(`case ${JSON.stringify(norm)}:`)
+      // Also match trailing slash variant
+      if (norm.length > 1) cases.push(`case ${JSON.stringify(norm + '/')}:`)
+      cases.push(`${g}{_rs.data=$${d};return _rs}break;`)
     }
   }
   return cases.length ? `switch(p){${cases.join('')}}` : ''
