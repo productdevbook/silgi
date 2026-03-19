@@ -33,7 +33,7 @@ import { KatmanError, toKatmanError, isErrorStatus } from './core/error.ts'
 import { ValidationError, validateSchema } from './core/schema.ts'
 import { iteratorToEventStream } from './core/sse.ts'
 import { stringifyJSON, parseEmptyableJSON, once } from './core/utils.ts'
-import { generateOpenAPI, scalarHTML } from './scalar.ts'
+import { generateOpenAPI, scalarHTML, resolveScalarLocal } from './scalar.ts'
 
 import type { CompiledHandler, FlatRouter } from './compile.ts'
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
@@ -321,11 +321,26 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
         // Scalar API Reference (needs resolved port for URL)
         let specJson: string | undefined
         let specHtml: string | undefined
+        let scalarLocalJs: string | undefined
         if (scalarEnabled) {
           const scalarOpts = typeof options!.scalar === 'object' ? options!.scalar : {}
           const spec = generateOpenAPI(routerDef, scalarOpts)
           specJson = JSON.stringify(spec)
           specHtml = scalarHTML(`http://${hostname}:${port}/openapi.json`, scalarOpts)
+          // Pre-load local Scalar JS if cdn: 'local'
+          if (scalarOpts.cdn === 'local') {
+            const content = await resolveScalarLocal()
+            if (!content) {
+              console.warn(
+                '  [katman] cdn: "local" requires @scalar/api-reference installed.\n'
+                + '           Run: pnpm add @scalar/api-reference\n'
+                + '           Falling back to CDN.',
+              )
+              specHtml = scalarHTML(`http://${hostname}:${port}/openapi.json`, { ...scalarOpts, cdn: 'cdn' })
+            } else {
+              scalarLocalJs = content
+            }
+          }
         }
         const handler = (req: any, res: any) => {
           const rawUrl = req.url ?? '/'
@@ -342,6 +357,15 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
             if (pathname === 'reference') {
               res.writeHead(200, { 'content-type': 'text/html', 'content-length': Buffer.byteLength(specHtml!) })
               res.end(specHtml)
+              return
+            }
+            if (pathname === '__katman/scalar.js' && scalarLocalJs) {
+              res.writeHead(200, {
+                'content-type': 'application/javascript',
+                'content-length': Buffer.byteLength(scalarLocalJs),
+                'cache-control': 'public, max-age=86400',
+              })
+              res.end(scalarLocalJs)
               return
             }
           }

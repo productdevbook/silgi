@@ -92,4 +92,59 @@ describe('compileProcedure guard count specialization', () => {
     const result = await handler(ctx, undefined, AbortSignal.timeout(1000))
     expect(result).toBe('async1-async2')
   })
+
+  it('guard returning class instance — properties are applied to context', async () => {
+    class AuthResult {
+      userId: number
+      role: string
+      constructor(userId: number, role: string) {
+        this.userId = userId
+        this.role = role
+      }
+
+      get isAdmin() {
+        return this.role === 'admin'
+      }
+    }
+
+    const auth = k.guard(() => new AuthResult(42, 'admin'))
+    const proc = k.query({
+      use: [auth],
+      resolve: ({ ctx }) => ({
+        userId: (ctx as any).userId,
+        role: (ctx as any).role,
+      }),
+    })
+    const handler = compileProcedure(proc)
+    const ctx: Record<string, unknown> = {}
+    const result = (await handler(ctx, undefined, AbortSignal.timeout(1000))) as any
+    expect(result.userId).toBe(42)
+    expect(result.role).toBe('admin')
+  })
+
+  it('guard returning void — context unchanged', async () => {
+    const sideEffect = k.guard(() => {
+      // side effect only, no return
+    })
+    const proc = k.query({
+      use: [sideEffect],
+      resolve: () => 'ok',
+    })
+    const handler = compileProcedure(proc)
+    const ctx: Record<string, unknown> = {}
+    const result = await handler(ctx, undefined, AbortSignal.timeout(1000))
+    expect(result).toBe('ok')
+  })
+
+  it('guard returning null — context unchanged', async () => {
+    const g = k.guard(() => null as any)
+    const proc = k.query({
+      use: [g],
+      resolve: () => 'ok',
+    })
+    const handler = compileProcedure(proc)
+    const ctx: Record<string, unknown> = {}
+    const result = await handler(ctx, undefined, AbortSignal.timeout(1000))
+    expect(result).toBe('ok')
+  })
 })

@@ -60,10 +60,10 @@ function noopFail(code: string, data?: unknown): never {
 
 /** Apply a single guard result to context — direct property set (326x faster than Object.assign) */
 function applyGuardResult(ctx: Record<string, unknown>, result: unknown): void {
-  if (isPlainObject(result)) {
-    const keys = Object.keys(result)
-    for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = result[keys[i]!]
-  }
+  if (result === null || result === undefined || typeof result !== 'object') return
+  // Support both plain objects and class instances (preserves getters via enumerable keys)
+  const keys = Object.keys(result)
+  for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = (result as Record<string, unknown>)[keys[i]!]
 }
 
 /** Apply a single guard (sync fast-path, async fallback) */

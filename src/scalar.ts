@@ -30,6 +30,15 @@ export interface ScalarOptions {
   license?: { name: string; url?: string }
   /** External docs */
   externalDocs?: { url: string; description?: string }
+  /**
+   * Scalar UI script source.
+   *
+   * - `'cdn'` (default) — loads from cdn.jsdelivr.net
+   * - `'unpkg'` — loads from unpkg.com
+   * - `'local'` — serves from node_modules (offline, requires `@scalar/api-reference` installed)
+   * - Custom URL string — self-hosted or local path (e.g. `'/assets/scalar.js'`)
+   */
+  cdn?: 'cdn' | 'unpkg' | 'local' | (string & {})
 }
 
 interface JSONSchema {
@@ -231,9 +240,17 @@ export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}):
 
 // ── Scalar HTML ─────────────────────────────────────
 
+const SCALAR_CDN_SOURCES = {
+  cdn: 'https://cdn.jsdelivr.net/npm/@scalar/api-reference',
+  unpkg: 'https://unpkg.com/@scalar/api-reference',
+  local: '/__katman/scalar.js',
+} as Record<string, string>
+
 export function scalarHTML(specUrl: string, options: ScalarOptions = {}): string {
   const title = escapeHtml(options.title ?? 'Katman API')
   const safeUrl = escapeHtml(specUrl)
+  const cdnOption = options.cdn ?? 'cdn'
+  const scriptSrc = escapeHtml(SCALAR_CDN_SOURCES[cdnOption] ?? cdnOption)
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -243,9 +260,29 @@ export function scalarHTML(specUrl: string, options: ScalarOptions = {}): string
 </head>
 <body>
   <script id="api-reference" data-url="${safeUrl}"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+  <script src="${scriptSrc}"></script>
 </body>
 </html>`
+}
+
+/**
+ * Resolve @scalar/api-reference JS content from node_modules.
+ * Returns the file content as a string, or null if the package is not installed.
+ */
+export async function resolveScalarLocal(): Promise<string | null> {
+  try {
+    const { createRequire } = await import('node:module')
+    const { readFile } = await import('node:fs/promises')
+    const { dirname, join } = await import('node:path')
+    const require = createRequire(import.meta.url)
+    const entryPath = require.resolve('@scalar/api-reference')
+    // The main entry is typically dist/browser/standalone.js or similar
+    // Read whatever the package.json "main"/"browser" points to
+    const content = await readFile(entryPath, 'utf-8')
+    return content
+  } catch {
+    return null
+  }
 }
 
 function escapeHtml(s: string): string {
