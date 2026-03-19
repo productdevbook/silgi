@@ -231,6 +231,48 @@ const auth = k.guard(async (ctx) => {
 
 When a guard throws, the procedure never runs. The error goes straight to the client.
 
+### Typed guard errors
+
+Guards can declare their own error maps. When a procedure uses that guard, the errors automatically merge — both in TypeScript inference and in the OpenAPI spec:
+
+```ts twoslash
+// @noErrors
+const auth = k.guard({
+  errors: { UNAUTHORIZED: 401 },
+  fn: async (ctx) => {
+    const token = ctx.headers.authorization
+    if (!token) throw new KatmanError('UNAUTHORIZED')
+    return { user: await verifyToken(token) }
+  },
+})
+
+const rateLimit = k.guard({
+  errors: { RATE_LIMITED: 429 },
+  fn: (ctx) => {
+    if (tooManyRequests(ctx)) throw new KatmanError('RATE_LIMITED')
+  },
+})
+
+const createUser = k.mutation({
+  use: [auth, rateLimit],
+  errors: { CONFLICT: 409 },
+  resolve: ({ fail }) => {
+    // fail() accepts all three: 'UNAUTHORIZED' | 'RATE_LIMITED' | 'CONFLICT'
+    fail('CONFLICT')
+  },
+})
+```
+
+This gives you three things:
+
+- **Type safety** — `fail()` in the resolver knows about guard error codes, not just procedure error codes
+- **OpenAPI** — the generated spec includes `401`, `429`, and `409` responses for this endpoint
+- **Runtime** — `fail('UNAUTHORIZED')` produces the correct 401 status code
+
+<Callout type='info'>
+  The simple `k.guard(fn)` form still works. The config form `k.guard({ errors, fn })` is opt-in — use it when you want the guard's errors to be part of the typed contract.
+</Callout>
+
 ## What's next?
 
 - [Middleware](/docs/middleware) — learn about guards and wraps in detail

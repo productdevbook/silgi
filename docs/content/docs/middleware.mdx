@@ -63,6 +63,34 @@ const adminOnly = guard((ctx) => {
 })
 ```
 
+### Guards with typed errors
+
+Guards can declare their own error maps. These errors automatically merge into any procedure that uses the guard — in TypeScript, at runtime, and in the OpenAPI spec:
+
+```ts twoslash
+// @noErrors
+const auth = guard({
+  errors: { UNAUTHORIZED: 401 },
+  fn: async (ctx) => {
+    const token = ctx.headers.authorization?.replace('Bearer ', '')
+    if (!token) throw new KatmanError('UNAUTHORIZED')
+    return { user: await verifyToken(token) }
+  },
+})
+
+// In the procedure, fail() knows about 'UNAUTHORIZED' from the guard
+const createPost = k.mutation({
+  use: [auth],
+  errors: { CONFLICT: 409 },
+  resolve: ({ fail }) => {
+    // TypeScript allows both 'UNAUTHORIZED' and 'CONFLICT'
+    fail('CONFLICT')
+  },
+})
+```
+
+The simple `guard(fn)` form still works exactly as before. Use `guard({ errors, fn })` when you want the guard's errors to be part of the typed API contract. See [Typed Errors](/docs/errors#typed-guard-errors) for more details.
+
 <Callout type='info'>
   Guards can be synchronous or asynchronous. When they're sync, Katman skips the async overhead entirely — no Promises
   are created.
