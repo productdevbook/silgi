@@ -65,11 +65,13 @@ export function dehydrate(queryClient: any): unknown {
 export function createSSRSerializer() {
   return {
     serialize: (value: unknown): string => {
-      return JSON.stringify(value, (_key, val) => {
-        if (val instanceof Date) return { __type: "Date", value: val.toISOString() };
-        if (val instanceof Map) return { __type: "Map", value: Array.from(val.entries()) };
-        if (val instanceof Set) return { __type: "Set", value: Array.from(val) };
-        if (typeof val === "bigint") return { __type: "BigInt", value: val.toString() };
+      return JSON.stringify(value, function (_key, val) {
+        // JSON.stringify calls .toJSON() on Date before replacer, so check the original
+        const original = this[_key];
+        if (original instanceof Date) return { __type: "Date", value: original.toISOString() };
+        if (original instanceof Map) return { __type: "Map", value: Array.from(original.entries()) };
+        if (original instanceof Set) return { __type: "Set", value: Array.from(original) };
+        if (typeof original === "bigint") return { __type: "BigInt", value: original.toString() };
         return val;
       });
     },
