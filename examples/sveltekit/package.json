@@ -13,11 +13,11 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@sveltejs/adapter-auto": "^6.0.1",
-    "@sveltejs/kit": "^2.21.2",
-    "@sveltejs/vite-plugin-svelte": "^5.0.3",
-    "svelte": "^5.34.7",
-    "typescript": "^5.8.3",
-    "vite": "^6.3.5"
+    "@sveltejs/adapter-auto": "^7.0.1",
+    "@sveltejs/kit": "^2.55.0",
+    "@sveltejs/vite-plugin-svelte": "^7.0.0",
+    "svelte": "^5.54.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.1"
   }
 }
