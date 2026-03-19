@@ -188,9 +188,26 @@ k.serve(appRouter, {
 | Custom URL | Any URL string, e.g. `'/assets/scalar.js'` for self-hosting |
 
 <Callout>
-  For `cdn: 'local'`, install the Scalar package first: `pnpm add @scalar/api-reference`.
-  If the package is not found, Katman falls back to CDN with a warning.
+  The `'local'` option requires `@scalar/api-reference` as a dependency. If the package is not found, Katman falls back to CDN with a warning.
 </Callout>
+
+<Tabs items={['pnpm', 'npm', 'bun']}>
+  <Tab value='pnpm'>
+  ```bash
+  pnpm add @scalar/api-reference
+  ```
+  </Tab>
+  <Tab value='npm'>
+  ```bash
+  npm install @scalar/api-reference
+  ```
+  </Tab>
+  <Tab value='bun'>
+  ```bash
+  bun add @scalar/api-reference
+  ```
+  </Tab>
+</Tabs>
 
 ### Adding metadata to procedures
 
