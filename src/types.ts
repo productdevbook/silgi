@@ -124,17 +124,17 @@ export interface ResolveContext<TCtx, TInput, TErrors extends ErrorDef> {
 
 // ── Config Forms ──────────────────────────────────
 
+/** Config form without output schema — resolve return type freely inferred */
 export interface ProcedureConfig<
   TCtx,
   TInputSchema extends AnySchema | undefined,
   TOutput,
   TErrors extends ErrorDef,
   TUse extends readonly MiddlewareDef[],
-  TOutputSchema extends AnySchema | undefined = undefined,
 > {
   use?: TUse
   input?: TInputSchema
-  output?: TOutputSchema
+  output?: undefined
   errors?: TErrors
   resolve: (
     opts: ResolveContext<
@@ -142,9 +142,30 @@ export interface ProcedureConfig<
       TInputSchema extends AnySchema ? InferSchemaOutput<TInputSchema> : undefined,
       NoInfer<TErrors> & InferErrorsFromUse<TUse>
     >,
-  ) => TOutputSchema extends AnySchema
-    ? Promise<InferSchemaInput<TOutputSchema>> | InferSchemaInput<TOutputSchema>
-    : Promise<TOutput> | TOutput
+  ) => Promise<TOutput> | TOutput
+  route?: Route
+  meta?: Meta
+}
+
+/** Config form with output schema — resolve must return schema-compatible type */
+export interface ProcedureConfigWithOutput<
+  TCtx,
+  TInputSchema extends AnySchema | undefined,
+  TErrors extends ErrorDef,
+  TUse extends readonly MiddlewareDef[],
+  TOutputSchema extends AnySchema,
+> {
+  use?: TUse
+  input?: TInputSchema
+  output: TOutputSchema
+  errors?: TErrors
+  resolve: (
+    opts: ResolveContext<
+      InferContextFromUse<TUse, TCtx>,
+      TInputSchema extends AnySchema ? InferSchemaOutput<TInputSchema> : undefined,
+      NoInfer<TErrors> & InferErrorsFromUse<TUse>
+    >,
+  ) => Promise<InferSchemaInput<TOutputSchema>> | InferSchemaInput<TOutputSchema>
   route?: Route
   meta?: Meta
 }

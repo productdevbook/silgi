@@ -50,7 +50,10 @@ import type {
   MiddlewareDef,
   ResolveContext,
   RouterDef,
+  Route,
+  Meta,
   InferContextFromUse,
+  InferErrorsFromUse,
 } from './types.ts'
 import type { Hookable, HookCallback } from 'hookable'
 
@@ -149,19 +152,49 @@ interface QueryFactory<TBaseCtx> {
     resolve: (opts: ResolveContext<TBaseCtx, InferSchemaOutput<TSchema>, {}>) => Promise<TOutput> | TOutput,
   ): ProcedureDef<'query', InferSchemaInput<TSchema>, TOutput, {}>
 
-  // Config: query({ use, input, output, errors, resolve })
+  // Config with output schema — resolve return type enforced + autocomplete
+  <
+    TErrors extends ErrorDef,
+    const TUse extends readonly MiddlewareDef[],
+    TOutputSchema extends AnySchema,
+    TInputSchema extends AnySchema | undefined = undefined,
+    /** @internal Pre-resolved output type for IDE autocomplete */
+    TResolved extends InferSchemaInput<TOutputSchema> = InferSchemaInput<TOutputSchema>,
+  >(
+    config: {
+      use?: TUse
+      input?: TInputSchema
+      output: TOutputSchema
+      errors?: TErrors
+      resolve: (
+        opts: ResolveContext<
+          InferContextFromUse<TUse, TBaseCtx>,
+          TInputSchema extends AnySchema ? InferSchemaOutput<TInputSchema> : undefined,
+          NoInfer<TErrors> & InferErrorsFromUse<TUse>
+        >,
+      ) => Promise<NoInfer<TResolved>> | NoInfer<TResolved>
+      route?: Route
+      meta?: Meta
+    },
+  ): ProcedureDef<
+    'query',
+    TInputSchema extends AnySchema ? InferSchemaInput<TInputSchema> : undefined,
+    InferSchemaOutput<TOutputSchema>,
+    TErrors
+  >
+
+  // Config without output — resolve return freely inferred
   <
     TOutput,
     TErrors extends ErrorDef,
     const TUse extends readonly MiddlewareDef[],
     TInputSchema extends AnySchema | undefined = undefined,
-    TOutputSchema extends AnySchema | undefined = undefined,
   >(
-    config: ProcedureConfig<TBaseCtx, TInputSchema, TOutput, TErrors, TUse, TOutputSchema>,
+    config: ProcedureConfig<TBaseCtx, TInputSchema, TOutput, TErrors, TUse>,
   ): ProcedureDef<
     'query',
     TInputSchema extends AnySchema ? InferSchemaInput<TInputSchema> : undefined,
-    TOutputSchema extends AnySchema ? InferSchemaOutput<TOutputSchema> : TOutput,
+    TOutput,
     TErrors
   >
 }
@@ -176,18 +209,48 @@ interface MutationFactory<TBaseCtx> {
     resolve: (opts: ResolveContext<TBaseCtx, InferSchemaOutput<TSchema>, {}>) => Promise<TOutput> | TOutput,
   ): ProcedureDef<'mutation', InferSchemaInput<TSchema>, TOutput, {}>
 
+  // Config with output schema
+  <
+    TErrors extends ErrorDef,
+    const TUse extends readonly MiddlewareDef[],
+    TOutputSchema extends AnySchema,
+    TInputSchema extends AnySchema | undefined = undefined,
+    TResolved extends InferSchemaInput<TOutputSchema> = InferSchemaInput<TOutputSchema>,
+  >(
+    config: {
+      use?: TUse
+      input?: TInputSchema
+      output: TOutputSchema
+      errors?: TErrors
+      resolve: (
+        opts: ResolveContext<
+          InferContextFromUse<TUse, TBaseCtx>,
+          TInputSchema extends AnySchema ? InferSchemaOutput<TInputSchema> : undefined,
+          NoInfer<TErrors> & InferErrorsFromUse<TUse>
+        >,
+      ) => Promise<NoInfer<TResolved>> | NoInfer<TResolved>
+      route?: Route
+      meta?: Meta
+    },
+  ): ProcedureDef<
+    'mutation',
+    TInputSchema extends AnySchema ? InferSchemaInput<TInputSchema> : undefined,
+    InferSchemaOutput<TOutputSchema>,
+    TErrors
+  >
+
+  // Config without output
   <
     TOutput,
     TErrors extends ErrorDef,
     const TUse extends readonly MiddlewareDef[],
     TInputSchema extends AnySchema | undefined = undefined,
-    TOutputSchema extends AnySchema | undefined = undefined,
   >(
-    config: ProcedureConfig<TBaseCtx, TInputSchema, TOutput, TErrors, TUse, TOutputSchema>,
+    config: ProcedureConfig<TBaseCtx, TInputSchema, TOutput, TErrors, TUse>,
   ): ProcedureDef<
     'mutation',
     TInputSchema extends AnySchema ? InferSchemaInput<TInputSchema> : undefined,
-    TOutputSchema extends AnySchema ? InferSchemaOutput<TOutputSchema> : TOutput,
+    TOutput,
     TErrors
   >
 }
@@ -202,18 +265,48 @@ interface SubscriptionFactory<TBaseCtx> {
     resolve: (opts: ResolveContext<TBaseCtx, InferSchemaOutput<TSchema>, {}>) => AsyncIterableIterator<TOutput>,
   ): ProcedureDef<'subscription', InferSchemaInput<TSchema>, TOutput, {}>
 
+  // Config with output schema
+  <
+    TErrors extends ErrorDef,
+    const TUse extends readonly MiddlewareDef[],
+    TOutputSchema extends AnySchema,
+    TInputSchema extends AnySchema | undefined = undefined,
+    TResolved extends InferSchemaInput<TOutputSchema> = InferSchemaInput<TOutputSchema>,
+  >(
+    config: {
+      use?: TUse
+      input?: TInputSchema
+      output: TOutputSchema
+      errors?: TErrors
+      resolve: (
+        opts: ResolveContext<
+          InferContextFromUse<TUse, TBaseCtx>,
+          TInputSchema extends AnySchema ? InferSchemaOutput<TInputSchema> : undefined,
+          NoInfer<TErrors> & InferErrorsFromUse<TUse>
+        >,
+      ) => Promise<NoInfer<TResolved>> | NoInfer<TResolved>
+      route?: Route
+      meta?: Meta
+    },
+  ): ProcedureDef<
+    'subscription',
+    TInputSchema extends AnySchema ? InferSchemaInput<TInputSchema> : undefined,
+    InferSchemaOutput<TOutputSchema>,
+    TErrors
+  >
+
+  // Config without output
   <
     TOutput,
     TErrors extends ErrorDef,
     const TUse extends readonly MiddlewareDef[],
     TInputSchema extends AnySchema | undefined = undefined,
-    TOutputSchema extends AnySchema | undefined = undefined,
   >(
-    config: ProcedureConfig<TBaseCtx, TInputSchema, TOutput, TErrors, TUse, TOutputSchema>,
+    config: ProcedureConfig<TBaseCtx, TInputSchema, TOutput, TErrors, TUse>,
   ): ProcedureDef<
     'subscription',
     TInputSchema extends AnySchema ? InferSchemaInput<TInputSchema> : undefined,
-    TOutputSchema extends AnySchema ? InferSchemaOutput<TOutputSchema> : TOutput,
+    TOutput,
     TErrors
   >
 }
