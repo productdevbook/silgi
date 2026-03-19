@@ -92,11 +92,42 @@ oRPC evaluates the chain at runtime per request. More flexible for dynamic middl
 
 ## Benchmarks
 
-Real servers, real HTTP requests, same machine. Sequential requests to isolate per-request latency.
+All benchmarks run on the same machine (Apple M3 Max, Node v24.11.0). Sequential requests to isolate per-request latency.
 
-### Katman serve() vs Nitro v3 (H3 v2)
+### Pipeline performance (no HTTP, pure execution)
 
-> 2000 requests per scenario | Node v24.11.0
+Measures raw middleware pipeline overhead — how fast the framework processes a call after TCP/HTTP is stripped away.
+
+| Scenario | Katman | oRPC | H3 v2 | vs oRPC | vs H3 |
+|---|---|---|---|---|---|
+| No middleware | **111 ns** | 685 ns | 2,025 ns | **6.2x faster** | **18.2x faster** |
+| Zod input validation | **241 ns** | 804 ns | 4,214 ns | **3.3x faster** | **17.5x faster** |
+| 3 middleware + Zod | **297 ns** | 1,718 ns | 3,954 ns | **5.8x faster** | **13.3x faster** |
+| 5 middleware + Zod | **413 ns** | 2,219 ns | 3,917 ns | **5.4x faster** | **9.5x faster** |
+
+Katman's compiled pipeline (unrolled guards, context pool) is **3-6x faster than oRPC** and **9-18x faster than H3** at the pipeline level.
+
+### HTTP performance (Katman vs oRPC vs H3 vs Hono)
+
+Real HTTP servers, real TCP connections, 3000 sequential requests per scenario.
+
+| Scenario | Katman | oRPC | H3 v2 | Hono |
+|---|---|---|---|---|
+| Simple (no middleware) | **79µs** (12,592/s) | 83µs (12,048/s) | 78µs (12,753/s) | 74µs (13,516/s) |
+| Zod validation | **86µs** (11,627/s) | 120µs (8,315/s) | 93µs (10,707/s) | 97µs (10,280/s) |
+| Guard + Zod | **79µs** (12,706/s) | 116µs (8,625/s) | 96µs (10,359/s) | 102µs (9,799/s) |
+
+| Comparison | Simple | Zod | Guard + Zod |
+|---|---|---|---|
+| Katman vs oRPC | ~tied | **1.4x faster** | **1.5x faster** |
+| Katman vs H3 | ~tied | **1.1x faster** | **1.2x faster** |
+| Katman vs Hono | 0.9x | **1.1x faster** | **1.3x faster** |
+
+For simple routes, all four are within 10% — TCP overhead dominates. As middleware complexity grows, Katman's compiled pipeline pulls ahead: **1.5x faster than oRPC** and **1.2-1.3x faster than H3/Hono** with guards + validation.
+
+### Katman serve() vs Nitro v3 (real server)
+
+Real Nitro dev server process vs Katman `serve()`, 2000 requests.
 
 | Scenario | Katman serve() | Nitro v3 (real) | |
 |---|---|---|---|
@@ -104,36 +135,51 @@ Real servers, real HTTP requests, same machine. Sequential requests to isolate p
 | List + Zod validation | **108µs** / 9,250 req/s | 231µs / 4,322 req/s | **2.1x faster** |
 | Guard + Zod validation | **108µs** / 9,268 req/s | 223µs / 4,484 req/s | **2.1x faster** |
 
-Katman uses raw Node.js HTTP + compiled pipeline. Nitro adds srvx, H3 middleware, and Node→Fetch conversion per request.
-
-### Katman serve() vs H3 v2 (isolated)
-
-> 3000 requests per scenario | Node v24.11.0
-
-| Scenario | Katman serve() | H3 v2 native | |
-|---|---|---|---|
-| Health (simple) | 75µs / 13,232/s | 74µs / 13,487/s | Equal |
-| Zod validation | **84µs** / 11,929/s | 90µs / 11,074/s | **7% faster** |
-| Guard + Zod | **76µs** / 13,104/s | 87µs / 11,502/s | **13% faster** |
-
-For simple routes, H3 and Katman are equal. Katman's compiled guards pull ahead as middleware complexity grows.
+Nitro adds srvx abstraction, H3 middleware chain, and Node→Fetch conversion per request. Production builds would be faster, but the H3/srvx layer remains.
 
 ### Tail latency (p99)
 
-| Scenario | Katman | H3 | Nitro |
+| Scenario (Guard + Zod) | avg | p50 | p99 |
 |---|---|---|---|
-| Guard + Zod (p99) | **130µs** | 159µs | 337µs |
+| **Katman** | **79µs** | **70µs** | **148µs** |
+| oRPC | 116µs | 103µs | 223µs |
+| H3 v2 | 96µs | 82µs | 236µs |
+| Hono | 102µs | 87µs | 194µs |
 
-Katman's p99 is 18% lower than H3 and 61% lower than Nitro — compiled pipelines keep tail latency predictable.
+Katman's p99 is **34% lower** than oRPC and **37% lower** than H3 — compiled pipelines keep tail latency predictable.
+
+### Memory usage
+
+> 50K calls, 3 guards + Zod validation, measured with `--expose-gc`
+
+| Framework | Bytes per call | Ratio |
+|---|---|---|
+| **Katman** | ~40 bytes | **1x** |
+| oRPC | ~56 bytes | 1.4x more |
+
+### WebSocket performance
+
+> 2000 sequential messages over persistent connection
+
+| Scenario | Katman | oRPC | H3 v2 |
+|---|---|---|---|
+| Simple query | **39µs** | 42µs | 34µs |
+
+WebSocket eliminates TCP handshake overhead. All three are close — H3 is slightly faster here.
 
 ### What the benchmarks don't show
 
-- **Real-world APIs** spend 95%+ of time in DB queries and business logic. Pipeline overhead is a small fraction.
-- **oRPC** benchmarks are not included — we haven't run them on the same hardware. We'll add them when we do.
-- **Nitro production build** would be faster than dev mode, but still carries the H3/srvx layer.
+- **Real-world APIs** spend 95%+ of time in DB queries and business logic. Pipeline overhead matters most for high-throughput, low-latency services.
+- **Nitro production** would be faster than dev mode (watcher/HMR overhead removed).
+- All benchmarks are sequential (1 connection). Concurrent load may show different characteristics.
 
 <Callout>
-Run `node --experimental-strip-types bench/vs-nitro.ts` to reproduce.
+Reproduce on your hardware:
+```bash
+node --experimental-strip-types bench/vs-all.ts     # Katman vs oRPC vs H3 vs Hono
+node --experimental-strip-types bench/vs-nitro.ts   # vs real Nitro server
+node --experimental-strip-types bench/pipeline.ts   # pipeline only (no HTTP)
+```
 </Callout>
 
 ## Where oRPC is ahead

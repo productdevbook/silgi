@@ -191,6 +191,8 @@
     "@orpc/client": "^1.13.7",
     "@orpc/contract": "^1.13.7",
     "@orpc/server": "^1.13.7",
+    "@trpc/client": "^11.13.4",
+    "@trpc/server": "^11.13.4",
     "@types/express": "^5.0.6",
     "@types/node": "^25.5.0",
     "@types/ws": "^8.18.1",
