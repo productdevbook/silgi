@@ -49,7 +49,8 @@ export function compileRouter<T>(
       let body = 'var s=p.split("/"),l=s.length;'
       let innerIf = false
       for (const [key, child] of entries) {
-        const nodeCode = emitNode(child, refs, pre, uid, 2)
+        const childPrefix = 1 + key.length + 1 // "/key/" length
+        const nodeCode = emitNode(child, refs, pre, uid, 2, childPrefix)
         if (!nodeCode) continue
         body += `${innerIf ? 'else ' : ''}if(s[1]===${JSON.stringify(key)}){${nodeCode}}`
         innerIf = true
@@ -116,7 +117,8 @@ function emitNode(
   refs: unknown[],
   pre: string[],
   uid: { n: number },
-  depth: number, // s[depth] is the current segment
+  depth: number,
+  prefixLen?: number, // known string offset — undefined after param
 ): string {
   let code = ''
 
@@ -131,22 +133,26 @@ function emitNode(
   if (node.static) {
     for (const [key, child] of Object.entries(node.static)) {
       if (!child) continue
-      const inner = emitNode(child, refs, pre, uid, depth + 1)
+      const childPrefix = prefixLen !== undefined ? prefixLen + key.length + 1 : undefined
+      const inner = emitNode(child, refs, pre, uid, depth + 1, childPrefix)
       if (!inner) continue
       code += `${hasIf ? 'else ' : ''}if(s[${depth}]===${JSON.stringify(key)}){${inner}}`
       hasIf = true
     }
   }
 
-  // Param child: matches any value at s[depth]
+  // Param child: prefixLen becomes unknown
   if (node.param) {
     code += emitParamNode(node.param, refs, pre, uid, depth)
   }
 
-  // Wildcard: catch rest of segments — use slice when prefix known
+  // Wildcard: use p.slice(prefixLen) when known, s.slice(depth).join("/") otherwise
   if (node.wildcard?.methods) {
-    // Optimization: if we know the prefix length, use p.slice(N) instead of split+join
-    code += emitWildcardSplit(node.wildcard.methods, refs, pre, uid, depth)
+    if (prefixLen !== undefined) {
+      code += emitWildcardSlice(node.wildcard.methods, refs, pre, uid, prefixLen)
+    } else {
+      code += emitWildcardSplit(node.wildcard.methods, refs, pre, uid, depth)
+    }
   }
 
   return code
