@@ -67,9 +67,10 @@ export type GuardFn<TCtxIn, TReturn> = (ctx: TCtxIn) => TReturn | Promise<TRetur
 
 export type WrapFn<TCtx> = (ctx: TCtx, next: () => Promise<unknown>) => Promise<unknown>
 
-export interface GuardDef<TCtxIn = unknown, TReturn = unknown> {
+export interface GuardDef<TCtxIn = unknown, TReturn = unknown, TErrors extends ErrorDef = {}> {
   readonly kind: 'guard'
   readonly fn: GuardFn<TCtxIn, TReturn>
+  readonly errors?: TErrors
 }
 
 export interface WrapDef<TCtx = unknown> {
@@ -92,6 +93,17 @@ export type InferContextFromUse<T extends readonly MiddlewareDef[], TBase> = T e
 ]
   ? InferContextFromUse<Tail, TBase & InferGuardOutput<Head>>
   : TBase
+
+/** Extract errors declared by a single guard */
+export type InferGuardErrors<T> = T extends GuardDef<any, any, infer E> ? (E extends ErrorDef ? E : {}) : {}
+
+/** Walk a middleware tuple, accumulate guard errors */
+export type InferErrorsFromUse<T extends readonly MiddlewareDef[]> = T extends readonly [
+  infer Head,
+  ...infer Tail extends readonly MiddlewareDef[],
+]
+  ? InferGuardErrors<Head> & InferErrorsFromUse<Tail>
+  : {}
 
 // ── Resolve Context ───────────────────────────────
 
@@ -119,7 +131,7 @@ export interface ProcedureConfig<
     opts: ResolveContext<
       InferContextFromUse<TUse, TCtx>,
       TInputSchema extends AnySchema ? InferSchemaOutput<TInputSchema> : undefined,
-      NoInfer<TErrors>
+      NoInfer<TErrors> & InferErrorsFromUse<TUse>
     >,
   ) => Promise<TOutput> | TOutput
   route?: Route

@@ -144,10 +144,17 @@ export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}):
       ;(operation.responses as any)[String(successStatus)] = { description: successDesc }
     }
 
-    // Errors → error responses
-    if (proc.errors) {
+    // Errors → error responses (merge guard errors + procedure errors)
+    const guards = (proc.use ?? []).filter((m: any) => m.kind === 'guard' && m.errors)
+    let allErrors = proc.errors ? { ...proc.errors } : null
+    for (const guard of guards) {
+      const ge = (guard as any).errors
+      if (ge) allErrors = allErrors ? { ...allErrors, ...ge } : { ...ge }
+    }
+
+    if (allErrors) {
       const byStatus = new Map<number, { code: string; schema?: JSONSchema }[]>()
-      for (const [code, def] of Object.entries(proc.errors)) {
+      for (const [code, def] of Object.entries(allErrors)) {
         const status = typeof def === 'number' ? def : def.status
         if (!byStatus.has(status)) byStatus.set(status, [])
         const entry: { code: string; schema?: JSONSchema } = { code }

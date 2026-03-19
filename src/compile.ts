@@ -227,10 +227,18 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
   const outputSchema = procedure.output
   const resolveFn = procedure.resolve
 
+  // Merge guard errors into procedure errors (runtime)
+  let mergedErrors = procedure.errors
+  for (const guard of guards) {
+    if (guard.errors) {
+      mergedErrors = mergedErrors ? { ...mergedErrors, ...guard.errors } : guard.errors
+    }
+  }
+
   // Sucrose-style analysis: skip fail/signal allocation if handler doesn't use them
   const analysis = analyzeHandler(resolveFn)
   const failFn =
-    analysis.usesFail && procedure.errors ? createFail(procedure.errors) : analysis.usesFail ? noopFail : noopFail // always provide fail (safe fallback), but skip createFail overhead when unused
+    analysis.usesFail && mergedErrors ? createFail(mergedErrors) : analysis.usesFail ? noopFail : noopFail // always provide fail (safe fallback), but skip createFail overhead when unused
 
   // Pre-select the optimal guard runner (compiled once, used per-request)
   const runGuards = selectGuardRunner(guards)

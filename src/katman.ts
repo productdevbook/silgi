@@ -82,7 +82,7 @@ export interface KatmanInstance<TBaseCtx extends Record<string, unknown>> {
   /** Remove a lifecycle hook */
   removeHook: Hookable<KatmanHooks>['removeHook']
   /** Create a guard middleware (flat, zero-closure) */
-  guard: <TReturn extends Record<string, unknown> | void>(fn: GuardFn<TBaseCtx, TReturn>) => GuardDef<TBaseCtx, TReturn>
+  guard: GuardFactory<TBaseCtx>
 
   /** Create a wrap middleware (onion, before+after) */
   wrap: (fn: WrapFn<TBaseCtx>) => WrapDef<TBaseCtx>
@@ -116,6 +116,23 @@ export interface KatmanInstance<TBaseCtx extends Record<string, unknown>> {
       http2?: { cert: string; key: string }
     },
   ) => void
+}
+
+// ── Guard Factory ───────────────────────────────────
+
+interface GuardConfig<TBaseCtx, TReturn extends Record<string, unknown> | void, TErrors extends ErrorDef> {
+  errors?: TErrors
+  fn: GuardFn<TBaseCtx, TReturn>
+}
+
+interface GuardFactory<TBaseCtx> {
+  /** Simple guard: guard(fn) */
+  <TReturn extends Record<string, unknown> | void>(fn: GuardFn<TBaseCtx, TReturn>): GuardDef<TBaseCtx, TReturn, {}>
+
+  /** Guard with typed errors: guard({ errors, fn }) */
+  <TReturn extends Record<string, unknown> | void, TErrors extends ErrorDef>(
+    config: GuardConfig<TBaseCtx, TReturn, TErrors>,
+  ): GuardDef<TBaseCtx, TReturn, TErrors>
 }
 
 // ── Procedure Factories ──────────────────────────────
@@ -278,7 +295,12 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
     hook: hooks.hook,
     removeHook: hooks.removeHook.bind(hooks),
 
-    guard: (fn) => ({ kind: 'guard' as const, fn }),
+    guard: (fnOrConfig: any) => {
+      if (typeof fnOrConfig === 'function') {
+        return { kind: 'guard' as const, fn: fnOrConfig }
+      }
+      return { kind: 'guard' as const, fn: fnOrConfig.fn, errors: fnOrConfig.errors }
+    },
     wrap: (fn) => ({ kind: 'wrap' as const, fn }),
 
     query: ((...args: unknown[]) => createProcedure('query', ...args)) as QueryFactory<TBaseCtx>,

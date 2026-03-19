@@ -107,6 +107,75 @@ describe('context type inference', () => {
   })
 })
 
+// ── Guard errors merge into procedure ────────────────
+
+describe('guard errors', () => {
+  it('guard with errors — fail() includes guard error codes', () => {
+    const auth = k.guard({
+      errors: { UNAUTHORIZED: 401 },
+      fn: () => ({ userId: 1 }),
+    })
+
+    k.query({
+      use: [auth],
+      errors: { CONFLICT: 409 },
+      resolve: ({ fail }) => {
+        // fail should accept both procedure errors AND guard errors
+        expectTypeOf(fail).parameter(0).toEqualTypeOf<'CONFLICT' | 'UNAUTHORIZED'>()
+        return true
+      },
+    })
+  })
+
+  it('multiple guards with errors — all merge', () => {
+    const auth = k.guard({
+      errors: { UNAUTHORIZED: 401 },
+      fn: () => ({ userId: 1 }),
+    })
+    const rateLimit = k.guard({
+      errors: { RATE_LIMITED: 429 },
+      fn: () => {},
+    })
+
+    k.mutation({
+      use: [auth, rateLimit],
+      errors: { NOT_FOUND: 404 },
+      resolve: ({ fail }) => {
+        expectTypeOf(fail).parameter(0).toEqualTypeOf<'NOT_FOUND' | 'UNAUTHORIZED' | 'RATE_LIMITED'>()
+        return true
+      },
+    })
+  })
+
+  it('guard without errors — no change to fail()', () => {
+    const simple = k.guard(() => ({ extra: true }))
+
+    k.query({
+      use: [simple],
+      errors: { NOT_FOUND: 404 },
+      resolve: ({ fail }) => {
+        expectTypeOf(fail).parameter(0).toEqualTypeOf<'NOT_FOUND'>()
+        return true
+      },
+    })
+  })
+
+  it('guard with errors but no procedure errors — fail() has guard errors only', () => {
+    const auth = k.guard({
+      errors: { UNAUTHORIZED: 401, FORBIDDEN: 403 },
+      fn: () => ({ userId: 1 }),
+    })
+
+    k.query({
+      use: [auth],
+      resolve: ({ fail }) => {
+        expectTypeOf(fail).parameter(0).toEqualTypeOf<'UNAUTHORIZED' | 'FORBIDDEN'>()
+        return true
+      },
+    })
+  })
+})
+
 // ── Error / fail type inference ─────────────────────
 
 describe('error type inference', () => {

@@ -147,4 +147,56 @@ describe('compileProcedure guard count specialization', () => {
     const result = await handler(ctx, undefined, AbortSignal.timeout(1000))
     expect(result).toBe('ok')
   })
+
+  it('guard with typed errors — fail() works with merged error codes', async () => {
+    const auth = k.guard({
+      errors: { UNAUTHORIZED: 401 },
+      fn: () => ({ userId: 1 }),
+    })
+
+    const proc = k.mutation({
+      use: [auth],
+      errors: { CONFLICT: 409 },
+      resolve: ({ fail }) => {
+        fail('UNAUTHORIZED')
+      },
+    })
+
+    const handler = compileProcedure(proc)
+    const ctx: Record<string, unknown> = {}
+    try {
+      await handler(ctx, undefined, AbortSignal.timeout(1000))
+      expect.unreachable()
+    } catch (err: any) {
+      expect(err.code).toBe('UNAUTHORIZED')
+      expect(err.status).toBe(401)
+      expect(err.defined).toBe(true)
+    }
+  })
+
+  it('guard errors merge with procedure errors in fail()', async () => {
+    const rateLimit = k.guard({
+      errors: { RATE_LIMITED: 429 },
+      fn: () => {},
+    })
+
+    const proc = k.mutation({
+      use: [rateLimit],
+      errors: { NOT_FOUND: 404 },
+      resolve: ({ fail }) => {
+        fail('RATE_LIMITED')
+      },
+    })
+
+    const handler = compileProcedure(proc)
+    const ctx: Record<string, unknown> = {}
+    try {
+      await handler(ctx, undefined, AbortSignal.timeout(1000))
+      expect.unreachable()
+    } catch (err: any) {
+      expect(err.code).toBe('RATE_LIMITED')
+      expect(err.status).toBe(429)
+      expect(err.defined).toBe(true)
+    }
+  })
 })

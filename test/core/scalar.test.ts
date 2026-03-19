@@ -93,4 +93,45 @@ describe('generateOpenAPI', () => {
     expect(createOp.responses['409']).toBeDefined()
     expect(createOp.responses['422']).toBeDefined()
   })
+
+  it('guard errors appear in OpenAPI spec alongside procedure errors', () => {
+    const auth = k.guard({
+      errors: { UNAUTHORIZED: 401 },
+      fn: () => ({ userId: 1 }),
+    })
+
+    const router = k.router({
+      users: {
+        create: k.mutation({
+          use: [auth],
+          input: z.object({ name: z.string() }),
+          errors: { CONFLICT: 409 },
+          resolve: ({ input }) => ({ id: 1, name: input.name }),
+        }),
+      },
+    })
+    const spec = generateOpenAPI(router)
+    const createOp = (spec.paths as any)['/users/create']?.post
+    // Both guard error (401) and procedure error (409) should appear
+    expect(createOp.responses['401']).toBeDefined()
+    expect(createOp.responses['409']).toBeDefined()
+  })
+
+  it('guard errors without procedure errors still appear in spec', () => {
+    const auth = k.guard({
+      errors: { UNAUTHORIZED: 401, FORBIDDEN: 403 },
+      fn: () => ({ userId: 1 }),
+    })
+
+    const router = k.router({
+      secret: k.query({
+        use: [auth],
+        resolve: () => ({ data: 'secret' }),
+      }),
+    })
+    const spec = generateOpenAPI(router)
+    const secretOp = (spec.paths as any)['/secret']?.get
+    expect(secretOp.responses['401']).toBeDefined()
+    expect(secretOp.responses['403']).toBeDefined()
+  })
 })
