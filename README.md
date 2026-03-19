@@ -2,10 +2,10 @@
   <br>
   <img src=".github/assets/cover.png" alt="Katman — Type-safe RPC framework for TypeScript" width="100%">
   <br><br>
-  <a href="https://npmjs.com/package/katman"><img src="https://img.shields.io/npm/v/katman?style=flat&colorA=18181B&colorB=F0DB4F" alt="npm version"></a>
-  <a href="https://npmjs.com/package/katman"><img src="https://img.shields.io/npm/dm/katman?style=flat&colorA=18181B&colorB=F0DB4F" alt="npm downloads"></a>
-  <a href="https://github.com/productdevbook/katman/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/productdevbook/katman/ci.yml?style=flat&colorA=18181B&colorB=F0DB4F" alt="CI"></a>
-  <a href="https://github.com/productdevbook/katman/blob/main/LICENSE"><img src="https://img.shields.io/github/license/productdevbook/katman?style=flat&colorA=18181B&colorB=F0DB4F" alt="license"></a>
+  <a href="https://npmjs.com/package/katman"><img src="https://img.shields.io/npm/v/katman?style=flat&colorA=0a0908&colorB=edc462" alt="npm version"></a>
+  <a href="https://npmjs.com/package/katman"><img src="https://img.shields.io/npm/dm/katman?style=flat&colorA=0a0908&colorB=edc462" alt="npm downloads"></a>
+  <a href="https://github.com/productdevbook/katman/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/productdevbook/katman/ci.yml?style=flat&colorA=0a0908&colorB=edc462" alt="CI"></a>
+  <a href="https://github.com/productdevbook/katman/blob/main/LICENSE"><img src="https://img.shields.io/github/license/productdevbook/katman?style=flat&colorA=0a0908&colorB=edc462" alt="license"></a>
 </p>
 
 ## Quick Start
