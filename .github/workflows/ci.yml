@@ -1,38 +1,58 @@
 name: CI
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+    paths-ignore:
+      - "docs/**"
+
   pull_request:
-    branches: [main]
+    branches:
+      - main
+    paths-ignore:
+      - "docs/**"
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
+      - run: corepack enable
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm build
-      - run: pnpm lint
+      - name: 📦 Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: 👀 Lint
+        run: pnpm lint
+      - name: 🔍 Typecheck
+        run: pnpm typecheck
+      - name: 🧪 Test
+        run: pnpm test
+      - name: 🚀 Build
+        run: pnpm build
 
   bun:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
-      - uses: pnpm/action-setup@v5
+      - run: corepack enable
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-      - run: bun test/bun-compat.ts
+      - name: 📦 Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: 🧪 Bun compatibility
+        run: bun test/bun-compat.ts
