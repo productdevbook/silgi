@@ -354,6 +354,55 @@ k.removeHook('error', myHookFn)
   and wraps](/docs/middleware).
 </Callout>
 
+## Raw Response and binary streaming
+
+Procedures can return a `Response` or `ReadableStream` for full control over the HTTP response — useful for file downloads, PDF generation, image serving, and binary data.
+
+### Returning a Response
+
+Return a standard `Response` object for complete control over status, headers, and body:
+
+```ts twoslash
+// @noErrors
+const downloadPdf = k.query({
+  input: z.object({ id: z.string() }),
+  resolve: async ({ input, ctx }) => {
+    const pdf = await ctx.storage.getFile(input.id)
+    return new Response(pdf, {
+      headers: {
+        'content-type': 'application/pdf',
+        'content-disposition': `attachment; filename="${input.id}.pdf"`,
+      },
+    })
+  },
+})
+```
+
+### Returning a ReadableStream
+
+Return a `ReadableStream` for binary streaming. Katman sends it with `application/octet-stream`:
+
+```ts twoslash
+// @noErrors
+const exportCsv = k.query({
+  resolve: async ({ ctx }) => {
+    return new ReadableStream({
+      async start(controller) {
+        controller.enqueue(new TextEncoder().encode('id,name\n'))
+        for await (const user of ctx.db.users.cursor()) {
+          controller.enqueue(new TextEncoder().encode(`${user.id},${user.name}\n`))
+        }
+        controller.close()
+      },
+    })
+  },
+})
+```
+
+<Callout type='info'>
+  When a procedure returns a `Response` or `ReadableStream`, content negotiation and JSON serialization are skipped entirely. The response is passed through as-is.
+</Callout>
+
 ## callable()
 
 For server-side code where you need to call a procedure directly — without HTTP, serialization, or the client proxy. Useful in scripts, cron jobs, and seed files.

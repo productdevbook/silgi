@@ -180,6 +180,42 @@ describe('E2E type roundtrip', () => {
     expect(res.headers.get('cache-control')).toBe('public, max-age=300, stale-while-revalidate=60')
   })
 
+  it('handler passes through raw Response from resolver', async () => {
+    const k2 = katman({ context: () => ({}) })
+    const router = k2.router({
+      download: k2.query(() => new Response('file-content', {
+        status: 200,
+        headers: { 'content-type': 'application/pdf', 'x-custom': 'test' },
+      })),
+    })
+    const handle = k2.handler(router)
+    const res = await handle(new Request('http://localhost/download', { method: 'POST' }))
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('application/pdf')
+    expect(res.headers.get('x-custom')).toBe('test')
+    expect(await res.text()).toBe('file-content')
+  })
+
+  it('handler passes through ReadableStream as octet-stream', async () => {
+    const k2 = katman({ context: () => ({}) })
+    const router = k2.router({
+      stream: k2.query(() => {
+        const encoder = new TextEncoder()
+        return new ReadableStream({
+          start(controller) {
+            controller.enqueue(encoder.encode('chunk1'))
+            controller.enqueue(encoder.encode('chunk2'))
+            controller.close()
+          },
+        })
+      }),
+    })
+    const handle = k2.handler(router)
+    const res = await handle(new Request('http://localhost/stream', { method: 'POST' }))
+    expect(res.headers.get('content-type')).toBe('application/octet-stream')
+    expect(await res.text()).toBe('chunk1chunk2')
+  })
+
   it('mutation has no Cache-Control header', async () => {
     const handle = k.handler(appRouter)
     const res = await handle(

@@ -430,7 +430,42 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
 
           const t0 = performance.now()
 
-          const respond = (output: unknown) => {
+          const respond = async (output: unknown) => {
+            // Raw Response passthrough
+            if (output instanceof Response) {
+              res.writeHead(output.status, Object.fromEntries(output.headers))
+              if (output.body) {
+                const reader = output.body.getReader()
+                const pump = async () => {
+                  while (true) {
+                    const { done, value } = await reader.read()
+                    if (done) break
+                    res.write(value)
+                  }
+                  res.end()
+                }
+                await pump()
+              } else {
+                res.end(await output.text())
+              }
+              hooks.callHook('response', { path: pathname, output: null, durationMs: performance.now() - t0 })
+              return
+            }
+
+            // ReadableStream passthrough
+            if (output instanceof ReadableStream) {
+              res.writeHead(200, { 'content-type': 'application/octet-stream' })
+              const reader = (output as ReadableStream<Uint8Array>).getReader()
+              while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                res.write(value)
+              }
+              res.end()
+              hooks.callHook('response', { path: pathname, output: null, durationMs: performance.now() - t0 })
+              return
+            }
+
             const body = route.stringify(output)
             const headers: Record<string, string | number> = {
               'content-type': 'application/json',
@@ -704,6 +739,18 @@ function createFetchHandler(
       // Execute compiled pipeline — sync dispatch when possible
       const pipelineResult = route.handler(ctx, rawInput, request.signal)
       const output = pipelineResult instanceof Promise ? await pipelineResult : pipelineResult
+
+      // Raw Response passthrough — full control over headers, status, body
+      if (output instanceof Response) {
+        hooks?.callHook('response', { path: pathname, output: null, durationMs: performance.now() - t0 })
+        return output
+      }
+
+      // ReadableStream passthrough — binary downloads, file streaming
+      if (output instanceof ReadableStream) {
+        hooks?.callHook('response', { path: pathname, output: null, durationMs: performance.now() - t0 })
+        return new Response(output, { headers: { 'content-type': 'application/octet-stream' } })
+      }
 
       // SSE streaming
       if (output && typeof output === 'object' && Symbol.asyncIterator in (output as object)) {
