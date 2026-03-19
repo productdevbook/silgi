@@ -2,8 +2,42 @@
   "name": "katman",
   "version": "0.0.1",
   "private": false,
-  "description": "The fastest end-to-end type-safe RPC framework — 5x faster than oRPC, 6x less memory",
+  "description": "The fastest end-to-end type-safe RPC framework for TypeScript — compiled pipelines, single package, every runtime",
+  "keywords": [
+    "api",
+    "client",
+    "express",
+    "fastify",
+    "h3",
+    "hono",
+    "middleware",
+    "msgpack",
+    "nextjs",
+    "nitro",
+    "nuxt",
+    "openapi",
+    "orpc",
+    "react",
+    "rpc",
+    "server",
+    "sveltekit",
+    "tanstack-query",
+    "trpc",
+    "type-safe",
+    "typescript",
+    "websocket",
+    "zod"
+  ],
+  "homepage": "https://katman.silgi.dev",
+  "bugs": {
+    "url": "https://github.com/productdevbook/katman/issues"
+  },
   "license": "MIT",
+  "author": "productdevbook",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/productdevbook/katman.git"
+  },
   "files": [
     "dist"
   ],

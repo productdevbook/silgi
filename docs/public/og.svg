@@ -4,14 +4,6 @@
       <stop offset="0%" stop-color="#0c0a07"/>
       <stop offset="100%" stop-color="#0a0908"/>
     </linearGradient>
-    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#edc462"/>
-      <stop offset="100%" stop-color="#e8a830"/>
-    </linearGradient>
-    <linearGradient id="layer-fade" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#edc462" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#edc462" stop-opacity="0"/>
-    </linearGradient>
     <filter id="glow">
       <feGaussianBlur stdDeviation="20" result="blur"/>
       <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
@@ -24,69 +16,64 @@
   <!-- Background -->
   <rect width="1200" height="630" fill="url(#bg)"/>
 
-  <!-- Large ambient glow behind layers -->
-  <ellipse cx="850" cy="320" rx="350" ry="250" fill="#edc462" opacity="0.04" filter="url(#softglow)"/>
+  <!-- Ambient glow -->
+  <ellipse cx="860" cy="290" rx="400" ry="280" fill="#edc462" opacity="0.035" filter="url(#softglow)"/>
 
-  <!-- ═══ THREE STACKED LAYER CARDS — the hero visual ═══ -->
+  <!-- ═══ THREE STACKED LAYER CARDS ═══ -->
 
-  <!-- Layer 3: TRANSPORT (bottom, largest) -->
-  <g transform="translate(620, 310)">
-    <rect x="0" y="0" width="500" height="110" rx="14" fill="#100f0c" stroke="white" stroke-opacity="0.07"/>
-    <circle cx="30" cy="30" r="7" fill="#bfa0cc"/>
-    <text x="48" y="36" fill="#bfa0cc" font-family="'Courier New', monospace" font-size="15" font-weight="bold" letter-spacing="3">TRANSPORT</text>
-    <text x="30" y="68" fill="#c9b99a" font-family="'Courier New', monospace" font-size="16">HTTP · HTTP/2 · WebSocket</text>
-    <text x="30" y="92" fill="#c9b99a" font-family="'Courier New', monospace" font-size="16">JSON · MessagePack · devalue</text>
+  <!-- Layer 3: TRANSPORT (bottom, widest) -->
+  <g transform="translate(570, 340)">
+    <rect x="0" y="0" width="570" height="88" rx="14" fill="#0e0d0a" stroke="white" stroke-opacity="0.06"/>
+    <text x="28" y="34" fill="#bfa0cc" font-family="sans-serif" font-size="13" font-weight="700" letter-spacing="2.5" text-transform="uppercase">TRANSPORT</text>
+    <text x="28" y="64" fill="#9a8e7e" font-family="'Menlo', 'Consolas', monospace" font-size="17" letter-spacing="0.3">HTTP · HTTP/2 · WebSocket · SSE</text>
   </g>
 
   <!-- Layer 2: PIPELINE (middle) -->
-  <g transform="translate(660, 210)">
-    <rect x="0" y="0" width="460" height="110" rx="14" fill="#12110e" stroke="#edc462" stroke-opacity="0.15"/>
-    <circle cx="30" cy="30" r="7" fill="#7fb5ac"/>
-    <text x="48" y="36" fill="#7fb5ac" font-family="'Courier New', monospace" font-size="15" font-weight="bold" letter-spacing="3">PIPELINE</text>
-    <text x="30" y="68" fill="#ede6db" font-family="'Courier New', monospace" font-size="16">guard() · wrap() · compile()</text>
-    <text x="30" y="92" fill="#8a7e6e" font-family="'Courier New', monospace" font-size="14">pre-linked · unrolled · zero closures</text>
+  <g transform="translate(610, 240)">
+    <rect x="0" y="0" width="530" height="92" rx="14" fill="#11100d" stroke="#edc462" stroke-opacity="0.12"/>
+    <text x="28" y="34" fill="#7fb5ac" font-family="sans-serif" font-size="13" font-weight="700" letter-spacing="2.5">PIPELINE</text>
+    <text x="28" y="62" fill="#ede6db" font-family="'Menlo', 'Consolas', monospace" font-size="18" font-weight="600">guard → wrap → resolve</text>
+    <text x="28" y="82" fill="#6b6058" font-family="sans-serif" font-size="13" font-weight="400" letter-spacing="0.2">compiled at startup · zero closures per request</text>
   </g>
 
   <!-- Layer 1: CLIENT (top, brightest) -->
-  <g transform="translate(700, 120)">
-    <rect x="0" y="0" width="420" height="100" rx="14" fill="#161411" stroke="#edc462" stroke-opacity="0.25"/>
-    <rect x="-3" y="-3" width="426" height="106" rx="17" fill="none" stroke="#edc462" stroke-opacity="0.06"/>
-    <circle cx="30" cy="30" r="7" fill="#edc462"/>
-    <text x="48" y="36" fill="#edc462" font-family="'Courier New', monospace" font-size="15" font-weight="bold" letter-spacing="3">CLIENT</text>
-    <text x="30" y="66" fill="#ede6db" font-family="'Courier New', monospace" font-size="17" font-weight="bold">createClient&lt;AppRouter&gt;()</text>
-    <text x="30" y="88" fill="#8a7e6e" font-family="'Courier New', monospace" font-size="14">typed · inferred · end-to-end</text>
+  <g transform="translate(650, 142)">
+    <rect x="0" y="0" width="490" height="88" rx="14" fill="#141310" stroke="#edc462" stroke-opacity="0.22"/>
+    <text x="28" y="34" fill="#edc462" font-family="sans-serif" font-size="13" font-weight="700" letter-spacing="2.5">CLIENT</text>
+    <text x="28" y="64" fill="#ede6db" font-family="'Menlo', 'Consolas', monospace" font-size="19" font-weight="600">createClient&lt;AppRouter&gt;(link)</text>
   </g>
 
   <!-- Connection lines between layers -->
-  <line x1="880" y1="230" x2="880" y2="212" stroke="#edc462" stroke-opacity="0.1" stroke-width="1" stroke-dasharray="3 3"/>
-  <line x1="880" y1="310" x2="880" y2="292" stroke="#edc462" stroke-opacity="0.08" stroke-width="1" stroke-dasharray="3 3"/>
+  <line x1="880" y1="234" x2="880" y2="242" stroke="#edc462" stroke-opacity="0.1" stroke-width="1" stroke-dasharray="3 3"/>
+  <line x1="860" y1="332" x2="860" y2="340" stroke="#edc462" stroke-opacity="0.07" stroke-width="1" stroke-dasharray="3 3"/>
 
   <!-- ═══ LEFT SIDE — Text ═══ -->
 
   <!-- Logo + name -->
-  <g transform="translate(80, 130)">
-    <rect width="36" height="36" rx="8" fill="#edc462"/>
-    <circle cx="18" cy="18" r="5" fill="#0a0908"/>
-    <text x="48" y="27" fill="#ede6db" font-family="Georgia, serif" font-size="26" font-style="italic" letter-spacing="-0.5">Katman</text>
+  <g transform="translate(72, 72)">
+    <rect width="48" height="48" rx="11" fill="#edc462"/>
+    <circle cx="24" cy="24" r="7" fill="#0a0908"/>
+    <text x="62" y="36" fill="#ede6db" font-family="Georgia, 'Times New Roman', serif" font-size="34" font-style="italic" letter-spacing="-0.5">Katman</text>
   </g>
 
   <!-- Title -->
-  <text x="76" y="270" fill="#ede6db" font-family="Georgia, serif" font-size="76" font-style="italic" letter-spacing="-2">Build in</text>
-  <text x="76" y="360" fill="#edc462" font-family="Georgia, serif" font-size="76" font-style="italic" letter-spacing="-2" filter="url(#glow)">layers.</text>
+  <text x="72" y="240" fill="#ede6db" font-family="Georgia, 'Times New Roman', serif" font-size="92" font-style="italic" letter-spacing="-3">Build in</text>
+  <text x="72" y="350" fill="#edc462" font-family="Georgia, 'Times New Roman', serif" font-size="92" font-style="italic" letter-spacing="-3" filter="url(#glow)">layers.</text>
 
   <!-- Subtitle -->
-  <text x="80" y="420" fill="#8a7e6e" font-family="sans-serif" font-size="18" font-weight="300">Type-safe RPC framework for TypeScript</text>
+  <text x="76" y="415" fill="#8a7e6e" font-family="sans-serif" font-size="24" font-weight="400" letter-spacing="0.2">Type-safe RPC framework for TypeScript</text>
 
   <!-- Install command -->
-  <g transform="translate(80, 470)">
-    <rect x="0" y="0" width="340" height="48" rx="8" fill="#100f0c" stroke="white" stroke-opacity="0.08"/>
-    <text x="20" y="31" fill="#5e5549" font-family="'Courier New', monospace" font-size="16">$</text>
-    <text x="42" y="31" fill="#ede6db" font-family="'Courier New', monospace" font-size="16">pnpm add katman</text>
+  <g transform="translate(72, 460)">
+    <rect x="0" y="0" width="380" height="52" rx="10" fill="#0e0d0a" stroke="white" stroke-opacity="0.06"/>
+    <text x="20" y="34" fill="#5e5549" font-family="'Menlo', 'Consolas', monospace" font-size="19">$</text>
+    <text x="42" y="34" fill="#ede6db" font-family="'Menlo', 'Consolas', monospace" font-size="19">pnpm add katman</text>
   </g>
 
   <!-- Bottom tagline -->
-  <text x="80" y="572" fill="#5e5549" font-family="sans-serif" font-size="14">Compiled pipelines · Single package · Every runtime</text>
+  <text x="76" y="572" fill="#4a4238" font-family="sans-serif" font-size="16" font-weight="400" letter-spacing="0.3">Compiled pipelines · Single package · Every runtime</text>
+  <text x="1128" y="572" fill="#3d3830" font-family="sans-serif" font-size="14" text-anchor="end">katman.silgi.dev</text>
 
   <!-- Border -->
-  <rect x="0" y="0" width="1200" height="630" fill="none" stroke="white" stroke-opacity="0.04" stroke-width="1"/>
+  <rect x="0" y="0" width="1200" height="630" fill="none" stroke="white" stroke-opacity="0.03"/>
 </svg>

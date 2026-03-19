@@ -1,39 +1,95 @@
-# Katman
+<p align="center">
+  <br>
+  <img src=".github/assets/cover.png" alt="Katman — Type-safe RPC framework for TypeScript" width="100%">
+  <br><br>
+  <a href="https://npmjs.com/package/katman"><img src="https://img.shields.io/npm/v/katman?style=flat&colorA=18181B&colorB=F0DB4F" alt="npm version"></a>
+  <a href="https://npmjs.com/package/katman"><img src="https://img.shields.io/npm/dm/katman?style=flat&colorA=18181B&colorB=F0DB4F" alt="npm downloads"></a>
+  <a href="https://github.com/productdevbook/katman/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/productdevbook/katman/ci.yml?style=flat&colorA=18181B&colorB=F0DB4F" alt="CI"></a>
+  <a href="https://github.com/productdevbook/katman/blob/main/LICENSE"><img src="https://img.shields.io/github/license/productdevbook/katman?style=flat&colorA=18181B&colorB=F0DB4F" alt="license"></a>
+</p>
 
-Type-safe RPC framework for TypeScript. Compiled pipelines. Single package.
+## Quick Start
 
 ```bash
 npm install katman
 ```
 
 ```ts
-import { katman } from "katman"
-import { z } from "zod"
+import { katman } from 'katman'
+import { z } from 'zod'
 
 const k = katman({ context: (req) => ({ db: getDB() }) })
 
-const users = k.query(
-  z.object({ limit: z.number().optional() }),
-  ({ input, ctx }) => ctx.db.users.find({ take: input.limit }),
-)
+const appRouter = k.router({
+  users: {
+    list: k.query(
+      z.object({ limit: z.number().optional() }),
+      ({ input, ctx }) => ctx.db.users.find({ take: input.limit }),
+    ),
+  },
+})
 
-k.serve(k.router({ users }), { port: 3000, scalar: true })
+k.serve(appRouter, { port: 3000, scalar: true })
 ```
+
+## Features
+
+- **Single package** — server, client, 15 plugins, 15 adapters. One install.
+- **Compiled pipeline** — guards unrolled, handlers pre-linked at startup.
+- **Guard / Wrap** — guards enrich context (flat, sync fast-path). Wraps run before + after (onion).
+- **Content negotiation** — JSON, MessagePack, devalue. Automatic from `Accept` header.
+- **Contract-first** — define API shape, share types, implement separately.
+- **Standard Schema** — Zod, Valibot, ArkType.
+
+## Adapters
+
+| | Import |
+|---|---|
+| Standalone | `k.serve()` / `k.handler()` |
+| Nitro v3 | `katman/nitro` |
+| H3 v2 | `katman/h3` |
+| Hono | `katman/hono` |
+| Express | `katman/express` |
+| Fastify | `katman/fastify` |
+| Elysia | `katman/elysia` |
+| Next.js | `katman/nextjs` |
+| Nuxt | via `katman/nitro` |
+| SvelteKit | `katman/sveltekit` |
+| Remix | `katman/remix` |
+| Astro | `katman/astro` |
+| SolidStart | `katman/solidstart` |
+| NestJS | `katman/nestjs` |
+| AWS Lambda | `katman/aws-lambda` |
+| MessagePort | `katman/message-port` |
+
+## Integrations
+
+- **TanStack Query** — `queryOptions`, `mutationOptions`, `infiniteOptions`, `skipToken`
+- **React Server Actions** — `createAction`, `useServerAction`, `useOptimisticServerAction`
+- **AI SDK** — `routerToTools()` turns procedures into LLM tools
+- **tRPC Interop** — `fromTRPC()` for incremental migration
+
+## Examples
+
+```bash
+npx giget@latest gh:productdevbook/katman/examples/standalone my-app
+npx giget@latest gh:productdevbook/katman/examples/hono my-hono-app
+npx giget@latest gh:productdevbook/katman/examples/nextjs my-nextjs-app
+npx giget@latest gh:productdevbook/katman/examples/nuxt my-nuxt-app
+```
+
+10 examples: standalone, hono, express, elysia, nitro, nitro-h3, nextjs, nuxt, sveltekit, client-react.
 
 ## Documentation
 
-[katman.dev](https://katman.dev)
+[katman.silgi.dev](https://katman.silgi.dev)
 
 ## Credits
 
-Katman is built on the shoulders of great open source projects. We took heavy inspiration from and directly use:
-
-- [oRPC](https://github.com/unnoq/orpc) — Type-safe RPC framework. Pipeline architecture, client proxy pattern, error handling, and contract-first workflow are inspired by oRPC.
-- [tRPC](https://github.com/trpc/trpc) — The original type-safe RPC for TypeScript. Router/procedure model and end-to-end type inference concepts originate here.
-- [Elysia](https://github.com/elysiajs/elysia) — Sucrose-style static handler analysis (`Function.toString()` optimization) is inspired by Elysia's AOT compilation approach.
-- [Hono](https://github.com/honojs/hono) — Lightweight HTTP framework. Middleware composition patterns and multi-runtime support approach.
-- [Vite](https://github.com/vitejs/vite) — Documentation site design language is adapted from Vite's landing page structure.
-
+- [oRPC](https://github.com/unnoq/orpc) — Pipeline architecture, client proxy, error handling, contract-first workflow
+- [tRPC](https://github.com/trpc/trpc) — Router/procedure model, end-to-end type inference
+- [Elysia](https://github.com/elysiajs/elysia) — Sucrose-style static handler analysis
+- [Hono](https://github.com/honojs/hono) — Middleware composition, multi-runtime support
 
 ## License
 
