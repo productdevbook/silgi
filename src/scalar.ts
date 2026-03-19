@@ -271,14 +271,11 @@ export function scalarHTML(specUrl: string, options: ScalarOptions = {}): string
  */
 export async function resolveScalarLocal(): Promise<string | null> {
   try {
-    const { createRequire } = await import('node:module')
     const { readFile } = await import('node:fs/promises')
-    const { dirname, join } = await import('node:path')
-    const require = createRequire(import.meta.url)
-    const entryPath = require.resolve('@scalar/api-reference')
-    // The main entry is typically dist/browser/standalone.js or similar
-    // Read whatever the package.json "main"/"browser" points to
-    const content = await readFile(entryPath, 'utf-8')
+    const { fileURLToPath } = await import('node:url')
+    const resolved = import.meta.resolve('@scalar/api-reference')
+    const filePath = fileURLToPath(resolved)
+    const content = await readFile(filePath, 'utf-8')
     return content
   } catch {
     return null
