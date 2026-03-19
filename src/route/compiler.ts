@@ -96,49 +96,68 @@ function emitNode(
 
   // Static children
   if (node.static) {
-    for (const [key, child] of Object.entries(node.static)) {
-      if (!child) continue
-      const inner = emitNode(child, refs, pre, uid, depth + 1, true)
-      if (!inner) continue
-
-      if (needsSplit) {
-        // At depth 1: check first char BEFORE split, then split inside the if
+    if (needsSplit) {
+      // Depth 1: group by first char → split inside each group
+      // Miss = 1 charCodeAt check (~1ns). Match = split + compare (~25ns)
+      const byChar = new Map<number, Array<[string, RouteNode<any>]>>()
+      for (const [key, child] of Object.entries(node.static)) {
+        if (!child) continue
         const ch = key.charCodeAt(0)
-        const prefixLen = key.length + 1 // +1 for leading /
-        const prefixCheck = `p.charCodeAt(1)===${ch}&&(p.length===${prefixLen}||p.charCodeAt(${prefixLen})===47)&&p.startsWith(${JSON.stringify(key)},1)`
-        code += `${hasIf ? 'else ' : ''}if(${prefixCheck}){var s=p.split("/"),l=s.length;${inner}}`
-      } else {
+        if (!byChar.has(ch)) byChar.set(ch, [])
+        byChar.get(ch)!.push([key, child])
+      }
+
+      for (const [ch, entries] of byChar) {
+        let inner = ''
+        for (const [key, child] of entries) {
+          const childCode = emitNode(child, refs, pre, uid, depth + 1, true)
+          if (!childCode) continue
+          const cond = key.length > 1
+            ? `s[1].charCodeAt(0)===${ch}&&s[1]===${JSON.stringify(key)}`
+            : `s[1]===${JSON.stringify(key)}`
+          inner += `${inner ? 'else ' : ''}if(${cond}){${childCode}}`
+        }
+        if (inner) {
+          code += `${hasIf ? 'else ' : ''}if(p.charCodeAt(1)===${ch}){var s=p.split("/"),l=s.length;${inner}}`
+          hasIf = true
+        }
+      }
+    } else {
+      for (const [key, child] of Object.entries(node.static)) {
+        if (!child) continue
+        const inner = emitNode(child, refs, pre, uid, depth + 1, true)
+        if (!inner) continue
         const ch = key.charCodeAt(0)
         const cond = key.length > 1
           ? `s[${depth}].charCodeAt(0)===${ch}&&s[${depth}]===${JSON.stringify(key)}`
           : `s[${depth}]===${JSON.stringify(key)}`
         code += `${hasIf ? 'else ' : ''}if(${cond}){${inner}}`
+        hasIf = true
       }
-      hasIf = true
     }
   }
 
   // Param child
   if (node.param) {
-    if (needsSplit) {
-      const paramInner = emitParam(node.param, refs, pre, uid, depth)
-      if (paramInner) {
-        code += `${hasIf ? '' : ''}{var s=p.split("/"),l=s.length;${paramInner}}`
+    const paramInner = emitParam(node.param, refs, pre, uid, depth)
+    if (paramInner) {
+      if (needsSplit) {
+        code += `{var s=s||p.split("/"),l=l||s.length;${paramInner}}`
+      } else {
+        code += paramInner
       }
-    } else {
-      code += emitParam(node.param, refs, pre, uid, depth)
     }
   }
 
   // Wildcard child
   if (node.wildcard?.methods) {
-    if (needsSplit) {
-      const wcInner = emitWildcard(node.wildcard.methods, refs, pre, uid, depth)
-      if (wcInner) {
-        code += `{var s=p.split("/"),l=s.length;${wcInner}}`
+    const wcInner = emitWildcard(node.wildcard.methods, refs, pre, uid, depth)
+    if (wcInner) {
+      if (needsSplit) {
+        code += `{var s=s||p.split("/"),l=l||s.length;${wcInner}}`
+      } else {
+        code += wcInner
       }
-    } else {
-      code += emitWildcard(node.wildcard.methods, refs, pre, uid, depth)
     }
   }
 
