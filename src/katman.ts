@@ -354,9 +354,9 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
             const content = await resolveScalarLocal()
             if (!content) {
               console.warn(
-                '  [katman] cdn: "local" requires @scalar/api-reference installed.\n'
-                + '           Run: pnpm add @scalar/api-reference\n'
-                + '           Falling back to CDN.',
+                '  [katman] cdn: "local" requires @scalar/api-reference installed.\n' +
+                  '           Run: pnpm add @scalar/api-reference\n' +
+                  '           Falling back to CDN.',
               )
               specHtml = scalarHTML(`http://${hostname}:${port}/openapi.json`, { ...scalarOpts, cdn: 'cdn' })
             } else {
@@ -432,10 +432,12 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
 
           const respond = (output: unknown) => {
             const body = route.stringify(output)
-            res.writeHead(200, {
+            const headers: Record<string, string | number> = {
               'content-type': 'application/json',
               'content-length': Buffer.byteLength(body),
-            })
+            }
+            if (route.cacheControl) headers['cache-control'] = route.cacheControl
+            res.writeHead(200, headers)
             res.end(body)
             hooks.callHook('response', { path: pathname, output, durationMs: performance.now() - t0 })
           }
@@ -499,12 +501,14 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
           let body = ''
           let aborted = false
           req.on('data', (d: Buffer) => {
-            body += d
-            if (body.length > MAX_BODY_SIZE) {
+            if (aborted) return
+            if (body.length + d.length > MAX_BODY_SIZE) {
               aborted = true
               req.destroy()
               handleError(new KatmanError('PAYLOAD_TOO_LARGE', { status: 413, message: 'Request body too large' }))
+              return
             }
+            body += d
           })
           req.on('end', () => {
             if (aborted) return
@@ -535,7 +539,7 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
           )
         } else {
           const h1 = httpMod as typeof import('node:http')
-          server = h1.createServer({ keepAlive: true, requestTimeout: 0, headersTimeout: 0 }, handler)
+          server = h1.createServer({ keepAlive: true, requestTimeout: 30_000, headersTimeout: 10_000 }, handler)
         }
 
         // Attach WebSocket if enabled
@@ -599,16 +603,23 @@ function encodeResponse(
   status: number,
   format: ResponseFormat,
   jsonStringify?: (v: unknown) => string,
+  extraHeaders?: Record<string, string>,
 ): Response {
   switch (format) {
     case 'msgpack':
-      return new Response(msgpackEncode(data), { status, headers: { 'content-type': MSGPACK_CONTENT_TYPE } })
+      return new Response(msgpackEncode(data), {
+        status,
+        headers: { 'content-type': MSGPACK_CONTENT_TYPE, ...extraHeaders },
+      })
     case 'devalue':
-      return new Response(devalueEncode(data), { status, headers: { 'content-type': DEVALUE_CONTENT_TYPE } })
+      return new Response(devalueEncode(data), {
+        status,
+        headers: { 'content-type': DEVALUE_CONTENT_TYPE, ...extraHeaders },
+      })
     default:
       return new Response(jsonStringify ? jsonStringify(data) : stringifyJSON(data), {
         status,
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', ...extraHeaders },
       })
   }
 }
@@ -704,7 +715,8 @@ function createFetchHandler(
       hooks?.callHook('response', { path: pathname, output, durationMs: performance.now() - t0 })
       const accept = request.headers.get('accept')
       const fmt = acceptsMsgpack(accept) ? 'msgpack' : acceptsDevalue(accept) ? 'devalue' : 'json'
-      return encodeResponse(output, 200, fmt, route.stringify)
+      const cacheHeaders = route.cacheControl ? { 'cache-control': route.cacheControl } : undefined
+      return encodeResponse(output, 200, fmt, route.stringify, cacheHeaders)
     } catch (error) {
       hooks?.callHook('error', { path: pathname, error })
       const accept = request.headers.get('accept')

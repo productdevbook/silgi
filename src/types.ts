@@ -17,6 +17,14 @@ export interface Route {
   deprecated?: boolean
   successStatus?: number
   successDescription?: string
+  /**
+   * Cache-Control header for query responses.
+   *
+   * - `number` — shorthand for `max-age=N` (seconds)
+   * - `string` — full Cache-Control value (e.g. `'public, max-age=60, stale-while-revalidate=30'`)
+   * - Only applies to query procedures (mutations and subscriptions are never cached)
+   */
+  cache?: number | string
 }
 
 /** Procedure metadata */

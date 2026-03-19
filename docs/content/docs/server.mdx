@@ -180,33 +180,22 @@ k.serve(appRouter, {
 })
 ```
 
-| Value | Description |
-| --- | --- |
-| `'cdn'` (default) | Load from cdn.jsdelivr.net |
-| `'unpkg'` | Load from unpkg.com |
-| `'local'` | Serve from `node_modules` — no external requests, fully offline |
-| Custom URL | Any URL string, e.g. `'/assets/scalar.js'` for self-hosting |
+| Value             | Description                                                     |
+| ----------------- | --------------------------------------------------------------- |
+| `'cdn'` (default) | Load from cdn.jsdelivr.net                                      |
+| `'unpkg'`         | Load from unpkg.com                                             |
+| `'local'`         | Serve from `node_modules` — no external requests, fully offline |
+| Custom URL        | Any URL string, e.g. `'/assets/scalar.js'` for self-hosting     |
 
 <Callout>
-  The `'local'` option requires `@scalar/api-reference` as a dependency. If the package is not found, Katman falls back to CDN with a warning.
+  The `'local'` option requires `@scalar/api-reference` as a dependency. If the package is not found, Katman falls back
+  to CDN with a warning.
 </Callout>
 
 <Tabs items={['pnpm', 'npm', 'bun']}>
-  <Tab value='pnpm'>
-  ```bash
-  pnpm add @scalar/api-reference
-  ```
-  </Tab>
-  <Tab value='npm'>
-  ```bash
-  npm install @scalar/api-reference
-  ```
-  </Tab>
-  <Tab value='bun'>
-  ```bash
-  bun add @scalar/api-reference
-  ```
-  </Tab>
+  <Tab value='pnpm'>```bash pnpm add @scalar/api-reference ```</Tab>
+  <Tab value='npm'>```bash npm install @scalar/api-reference ```</Tab>
+  <Tab value='bun'>```bash bun add @scalar/api-reference ```</Tab>
 </Tabs>
 
 ### Adding metadata to procedures
@@ -236,6 +225,37 @@ The `route` field accepts:
 | `deprecated`         | Mark an endpoint as deprecated                 |
 | `successStatus`      | Override the default 200 status                |
 | `successDescription` | Describe what a successful response looks like |
+| `cache`              | Cache-Control header for query responses       |
+
+## Caching
+
+Add a `cache` option to `route` to set `Cache-Control` headers on query responses. This enables HTTP-level caching by browsers, CDNs, and reverse proxies.
+
+```ts twoslash
+// @noErrors
+// Shorthand: cache for 60 seconds
+const listUsers = k.query({
+  route: { cache: 60 },
+  resolve: ({ ctx }) => ctx.db.users.findMany(),
+})
+
+// Full control: custom Cache-Control value
+const getConfig = k.query({
+  route: { cache: 'public, max-age=300, stale-while-revalidate=60' },
+  resolve: () => loadConfig(),
+})
+```
+
+| Value    | Behavior |
+| -------- | -------- |
+| `number` | Sets `Cache-Control: public, max-age=N` (seconds) |
+| `string` | Sets the exact `Cache-Control` header value |
+
+The cache header is compiled once at startup and added to every response for that procedure — zero per-request overhead.
+
+<Callout type='info'>
+  Caching only applies to query procedures. Mutations and subscriptions never get Cache-Control headers, even if you set `cache` on them.
+</Callout>
 
 ## HTTP/2
 

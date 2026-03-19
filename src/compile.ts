@@ -58,12 +58,18 @@ function noopFail(code: string, data?: unknown): never {
 
 // ── Guard Application (inline, no closure) ──────────
 
+const UNSAFE_KEYS = /* @__PURE__ */ new Set(['__proto__', 'constructor', 'prototype'])
+
 /** Apply a single guard result to context — direct property set (326x faster than Object.assign) */
 function applyGuardResult(ctx: Record<string, unknown>, result: unknown): void {
   if (result === null || result === undefined || typeof result !== 'object') return
   // Support both plain objects and class instances (preserves getters via enumerable keys)
   const keys = Object.keys(result)
-  for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = (result as Record<string, unknown>)[keys[i]!]
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i]!
+    if (UNSAFE_KEYS.has(k)) continue
+    ctx[k] = (result as Record<string, unknown>)[k]
+  }
 }
 
 /** Apply a single guard (sync fast-path, async fallback) */
@@ -237,8 +243,7 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
 
   // Sucrose-style analysis: skip fail/signal allocation if handler doesn't use them
   const analysis = analyzeHandler(resolveFn)
-  const failFn =
-    analysis.usesFail && mergedErrors ? createFail(mergedErrors) : analysis.usesFail ? noopFail : noopFail // always provide fail (safe fallback), but skip createFail overhead when unused
+  const failFn = analysis.usesFail && mergedErrors ? createFail(mergedErrors) : analysis.usesFail ? noopFail : noopFail // always provide fail (safe fallback), but skip createFail overhead when unused
 
   // Pre-select the optimal guard runner (compiled once, used per-request)
   const runGuards = selectGuardRunner(guards)
@@ -309,6 +314,8 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
 export interface CompiledRoute {
   handler: CompiledHandler
   stringify: (value: unknown) => string
+  /** Pre-computed Cache-Control header value, or undefined if no caching */
+  cacheControl?: string
 }
 
 export type FlatRouter = Map<string, CompiledRoute>
@@ -326,9 +333,16 @@ export function compileRouter(def: Record<string, unknown>): FlatRouter {
     if (isProcedureDef(node)) {
       const key = path.join('/')
       const proc = node as ProcedureDef
+      // Pre-compute cache header at startup (queries only)
+      const route = proc.route as import('./types.ts').Route | null
+      let cacheControl: string | undefined
+      if (proc.type === 'query' && route?.cache != null) {
+        cacheControl = typeof route.cache === 'number' ? `public, max-age=${route.cache}` : route.cache
+      }
       map.set(key, {
         handler: compileProcedure(proc),
         stringify: compileStringify(proc.output),
+        cacheControl,
       })
       return
     }

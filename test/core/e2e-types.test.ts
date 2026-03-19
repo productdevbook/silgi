@@ -23,7 +23,14 @@ const k = katman({
 const auth = k.guard(() => ({ userId: 1 }))
 
 const appRouter = k.router({
-  health: k.query(() => ({ status: 'ok' as const, uptime: 123 })),
+  health: k.query({
+    route: { cache: 60 },
+    resolve: () => ({ status: 'ok' as const, uptime: 123 }),
+  }),
+  cached: k.query({
+    route: { cache: 'public, max-age=300, stale-while-revalidate=60' },
+    resolve: () => ({ data: 'cached' }),
+  }),
   users: {
     list: k.query(z.object({ limit: z.number().optional() }), ({ input, ctx }) =>
       ctx.db.users.slice(0, input.limit ?? 10),
@@ -157,5 +164,31 @@ describe('E2E type roundtrip', () => {
     // This must compile — InferClient with subscriptions must be assignable to NestedClient
     const client = createClient<Client>(link)
     expectTypeOf(client).toMatchTypeOf<Client>()
+  })
+
+  it('route.cache: number — sets Cache-Control header', async () => {
+    const handle = k.handler(appRouter)
+    const res = await handle(new Request(`http://localhost/health`, { method: 'POST' }))
+    expect(res.status).toBe(200)
+    expect(res.headers.get('cache-control')).toBe('public, max-age=60')
+  })
+
+  it('route.cache: string — sets custom Cache-Control header', async () => {
+    const handle = k.handler(appRouter)
+    const res = await handle(new Request(`http://localhost/cached`, { method: 'POST' }))
+    expect(res.status).toBe(200)
+    expect(res.headers.get('cache-control')).toBe('public, max-age=300, stale-while-revalidate=60')
+  })
+
+  it('mutation has no Cache-Control header', async () => {
+    const handle = k.handler(appRouter)
+    const res = await handle(
+      new Request(`http://localhost/users/create`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'Test', email: 'test@test.com' }),
+      }),
+    )
+    expect(res.headers.get('cache-control')).toBeNull()
   })
 })
