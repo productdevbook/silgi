@@ -89,7 +89,7 @@ export function createBatchHandler<TCtx extends Record<string, unknown>>(
     // Execute all calls concurrently
     const results = await Promise.all(
       calls.map(async (call): Promise<BatchResponse> => {
-        const route = flatRouter.get(call.path)
+        const route = flatRouter('POST', '/' + call.path)?.data
         if (!route) {
           return { error: { code: 'NOT_FOUND', status: 404, message: 'Procedure not found' } }
         }

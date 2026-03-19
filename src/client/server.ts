@@ -50,7 +50,7 @@ function createServerProxy(
 
   const callProcedure = async (input?: unknown) => {
     const key = path.join('/')
-    const route = flatRouter.get(key)
+    const route = flatRouter('POST', '/' + key)?.data
     if (!route) throw new Error(`Procedure not found: ${key}`)
     const ctx: Record<string, unknown> = Object.create(null)
     const baseCtx = await contextFactory()

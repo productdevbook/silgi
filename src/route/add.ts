@@ -88,7 +88,7 @@ export function addRoute<T>(
       // Optional param: :name?
       if (parsed.optional) {
         // Add route at current node too (matches without this segment)
-        _setMethod(node, method, data, [...paramMap], [...paramRegex], hasRegex)
+        _setMethod(node, method, data, [...paramMap], [...paramRegex], hasRegex, false)
       }
 
       node = node.param

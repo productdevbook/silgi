@@ -43,7 +43,7 @@ export function katmanH3<TCtx extends Record<string, unknown>>(
     const url = event.url ?? new URL(event.req?.url ?? '/', 'http://localhost')
     const pathname = extractPath(typeof url === 'string' ? url : url.pathname, prefix)
 
-    const route = flatRouter.get(pathname)
+    const route = flatRouter('POST', '/' + pathname)?.data
     if (!route) {
       // H3 v2: set status via event.res.headers or return with status
       if (event.res?.headers) event.res.headers.set('content-type', 'application/json')

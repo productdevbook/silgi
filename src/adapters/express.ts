@@ -41,7 +41,7 @@ export function katmanExpress<TCtx extends Record<string, unknown>>(
     let pathname = req.path ?? req.url ?? ''
     if (pathname.startsWith('/')) pathname = pathname.slice(1)
 
-    const route = flatRouter.get(pathname)
+    const route = flatRouter('POST', '/' + pathname)?.data
     if (!route) {
       // Pass to next middleware if not found
       return next()

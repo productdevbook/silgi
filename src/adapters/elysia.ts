@@ -44,7 +44,7 @@ export function katmanElysia<TCtx extends Record<string, unknown>>(
       }
       if (pathname.startsWith('/')) pathname = pathname.slice(1)
 
-      const route = flatRouter.get(pathname)
+      const route = flatRouter('POST', '/' + pathname)?.data
       if (!route) {
         elysiaCtx.set.status = 404
         return { code: 'NOT_FOUND', status: 404, message: 'Procedure not found' }

@@ -45,7 +45,7 @@ export function katmanHono<TCtx extends Record<string, unknown>>(
     }
     if (pathname.startsWith('/')) pathname = pathname.slice(1)
 
-    const route = flatRouter.get(pathname)
+    const route = flatRouter('POST', '/' + pathname)?.data
     if (!route) {
       return c.json({ code: 'NOT_FOUND', status: 404, message: 'Procedure not found' }, 404)
     }

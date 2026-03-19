@@ -108,7 +108,7 @@ export function katmanNitro<TCtx extends Record<string, unknown>>(
       procedurePath = prefix ? stripPrefix(rawPath, prefix) : stripLeadingSlash(rawPath)
     }
 
-    const route = flatRouter.get(procedurePath)
+    const route = flatRouter('POST', '/' + procedurePath)?.data
     if (!route) {
       return {
         code: 'NOT_FOUND',

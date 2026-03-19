@@ -50,7 +50,7 @@ export function katmanNestHandler<TCtx extends Record<string, unknown>>(
     let pathname = req.params?.[0] ?? req.path ?? req.url ?? ''
     if (pathname.startsWith('/')) pathname = pathname.slice(1)
 
-    const route = flatRouter.get(pathname)
+    const route = flatRouter('POST', '/' + pathname)?.data
     if (!route) {
       res.status(404).json({ code: 'NOT_FOUND', status: 404, message: 'Procedure not found' })
       return

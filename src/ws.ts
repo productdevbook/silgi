@@ -84,7 +84,7 @@ export function attachWebSocket(server: HttpServer, routerDef: RouterDef, option
         const { id, path, input } = req
 
         // Route lookup
-        const route = flat.get(path)
+        const route = flat('POST', '/' + path)?.data
         if (!route) {
           send(peer, { id, error: { code: 'NOT_FOUND', status: 404, message: `Procedure "${path}" not found` } })
           return

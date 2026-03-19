@@ -58,7 +58,7 @@ export function katmanLambda<TCtx extends Record<string, unknown>>(
     }
     if (pathname.startsWith('/')) pathname = pathname.slice(1)
 
-    const route = flatRouter.get(pathname)
+    const route = flatRouter('POST', '/' + pathname)?.data
     if (!route) {
       return {
         statusCode: 404,

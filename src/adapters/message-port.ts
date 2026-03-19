@@ -69,7 +69,7 @@ export function katmanMessagePort<TCtx extends Record<string, unknown>>(
     const msg = event.data as RPCMessage
     if (!msg || typeof msg !== 'object' || !msg.__katman || msg.__type !== 'request') return
 
-    const route = flatRouter.get(msg.path)
+    const route = flatRouter('POST', '/' + msg.path)?.data
     if (!route) {
       port.postMessage({
         __katman: true,

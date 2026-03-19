@@ -29,6 +29,7 @@ import {
   MSGPACK_CONTENT_TYPE,
 } from './codec/msgpack.ts'
 import { compileProcedure, compileRouter, ContextPool } from './compile.ts'
+import type { CompiledRouterFn } from './compile.ts'
 import { KatmanError, toKatmanError, isErrorStatus } from './core/error.ts'
 import { ValidationError, validateSchema } from './core/schema.ts'
 import { iteratorToEventStream } from './core/sse.ts'
@@ -36,7 +37,7 @@ import { stringifyJSON, parseEmptyableJSON, once } from './core/utils.ts'
 import { createProcedureBuilder } from './builder.ts'
 import { generateOpenAPI, scalarHTML, resolveScalarLocal } from './scalar.ts'
 
-import type { CompiledHandler, FlatRouter } from './compile.ts'
+import type { CompiledHandler } from './compile.ts'
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
 import type { ScalarOptions } from './scalar.ts'
 import type { ProcedureBuilder } from './builder.ts'
@@ -260,16 +261,16 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
     handler: (routerDef) => createFetchHandler(routerDef, contextFactory, hooks),
 
     serve: (routerDef, options) => {
-      // Compile flat router ONCE
-      let flatRouter = routerCache.get(routerDef)
-      if (!flatRouter) {
-        flatRouter = compileRouter(routerDef)
-        routerCache.set(routerDef, flatRouter)
+      // Compile router ONCE
+      let compiledServeRouter = routerCache.get(routerDef)
+      if (!compiledServeRouter) {
+        compiledServeRouter = compileRouter(routerDef)
+        routerCache.set(routerDef, compiledServeRouter)
       }
 
       const opts = defu(options ?? {}, { port: 3000, hostname: '127.0.0.1' })
       const hostname = opts.hostname
-      const fr = flatRouter
+      const fr = compiledServeRouter
       // Per-request AbortController created inside handler below
       const scalarEnabled = !!options?.scalar
 
@@ -335,12 +336,13 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
             }
           }
 
-          const route = fr.get(pathname)
-          if (!route) {
+          const match = fr('POST', '/' + pathname)
+          if (!match) {
             res.writeHead(404, { 'content-type': 'application/json', 'content-length': notFound.length })
             res.end(notFound)
             return
           }
+          const route = match.data
 
           // FIX #1: No Proxy — plain object with iterable protocol (saves 200-500ns/req)
           // FIX #2: Object literal with stable hidden class (not Object.create(null))
@@ -545,7 +547,7 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
 
 // ── Flat Router Cache ───────────────────────────────
 
-const routerCache = new WeakMap<RouterDef, FlatRouter>()
+const routerCache = new WeakMap<RouterDef, CompiledRouterFn>()
 
 function isProcedureDef(value: unknown): value is ProcedureDef {
   return (
@@ -609,11 +611,11 @@ function createFetchHandler(
   contextFactory: (req: Request) => Record<string, unknown> | Promise<Record<string, unknown>>,
   hooks?: Hookable<KatmanHooks>,
 ): (request: Request) => Promise<Response> {
-  // Get or compile the flat router map — O(1) lookup
-  let flatRouter = routerCache.get(routerDef)
-  if (!flatRouter) {
-    flatRouter = compileRouter(routerDef)
-    routerCache.set(routerDef, flatRouter)
+  // Compile router tree into JIT-compiled radix router
+  let compiledRouter = routerCache.get(routerDef)
+  if (!compiledRouter) {
+    compiledRouter = compileRouter(routerDef)
+    routerCache.set(routerDef, compiledRouter)
   }
 
   // Context pool — zero allocation per request
@@ -633,11 +635,12 @@ function createFetchHandler(
     const qMark = url.indexOf('?', pathStart)
     const pathname = qMark === -1 ? url.slice(pathStart + 1) : url.slice(pathStart + 1, qMark)
 
-    // O(1) flat Map lookup
-    const route = flatRouter!.get(pathname)
-    if (!route) {
+    // Compiled radix router lookup
+    const match = compiledRouter!('POST', '/' + pathname)
+    if (!match) {
       return new Response(notFoundBody, { status: 404, headers: jsonHeaders })
     }
+    const route = match.data
 
     // Borrow context from pool
     const ctx = ctxPool.borrow()

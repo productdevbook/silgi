@@ -309,7 +309,11 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
   }
 }
 
-// ── FLAT MAP ROUTER ─────────────────────────────────
+// ── COMPILED ROUTER ─────────────────────────────────
+
+import { createRouter as createRadixRouter, addRoute as addRadixRoute, compileRouter as compileRadixRouter } from './route/index.ts'
+
+import type { MatchedRoute } from './route/types.ts'
 
 export interface CompiledRoute {
   handler: CompiledHandler
@@ -318,32 +322,50 @@ export interface CompiledRoute {
   cacheControl?: string
 }
 
-export type FlatRouter = Map<string, CompiledRoute>
+/** Compiled router function — returns matched route + params */
+export type CompiledRouterFn = (method: string, path: string) => MatchedRoute<CompiledRoute> | undefined
+
+/** @deprecated Use CompiledRouterFn */
+export type FlatRouter = CompiledRouterFn
 
 /**
- * Compile a router tree into a flat Map for O(1) lookup.
+ * Compile a router tree into a JIT-compiled radix router.
  *
- * Instead of:  traverse tree per request O(depth)
- * Now:         Map.get(path) per request O(1)
+ * Uses charCodeAt dispatch + lazy split + pre-allocated results.
+ * Static: ~2ns, Param: ~15ns, Wildcard: ~7ns, Miss: ~2ns.
  */
-export function compileRouter(def: Record<string, unknown>): FlatRouter {
-  const map: FlatRouter = new Map()
+export function compileRouter(def: Record<string, unknown>): CompiledRouterFn {
+  const radix = createRadixRouter<CompiledRoute>()
 
   function walk(node: unknown, path: string[]): void {
     if (isProcedureDef(node)) {
-      const key = path.join('/')
       const proc = node as ProcedureDef
-      // Pre-compute cache header at startup (queries only)
       const route = proc.route as import('./types.ts').Route | null
+
+      // Use custom route path or auto-generated from tree
+      const routePath = route?.path || '/' + path.join('/')
+
+      // Determine HTTP method from procedure type
+      const method = route?.method?.toUpperCase() || (proc.type === 'query' ? 'GET' : 'POST')
+
       let cacheControl: string | undefined
       if (proc.type === 'query' && route?.cache != null) {
         cacheControl = typeof route.cache === 'number' ? `public, max-age=${route.cache}` : route.cache
       }
-      map.set(key, {
+
+      addRadixRoute(radix, method, routePath, {
         handler: compileProcedure(proc),
         stringify: compileStringify(proc.output),
         cacheControl,
       })
+
+      // Also add empty method for fallback (any method)
+      addRadixRoute(radix, '', routePath, {
+        handler: compileProcedure(proc),
+        stringify: compileStringify(proc.output),
+        cacheControl,
+      })
+
       return
     }
     if (typeof node === 'object' && node !== null) {
@@ -354,7 +376,7 @@ export function compileRouter(def: Record<string, unknown>): FlatRouter {
   }
 
   walk(def, [])
-  return map
+  return compileRadixRouter(radix)
 }
 
 function isProcedureDef(value: unknown): value is ProcedureDef {
