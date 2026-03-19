@@ -5,11 +5,11 @@
  * originated from JavaScript, not cross-origin form submissions.
  */
 
-import type { ClientLink, ClientContext, ClientOptions } from "../types.ts";
+import type { ClientLink, ClientContext, ClientOptions } from '../types.ts'
 
 export interface CSRFLinkOptions {
-  headerName?: string;
-  headerValue?: string;
+  headerName?: string
+  headerValue?: string
 }
 
 /**
@@ -19,8 +19,8 @@ export function withCSRF<TClientContext extends ClientContext>(
   link: ClientLink<TClientContext>,
   options: CSRFLinkOptions = {},
 ): ClientLink<TClientContext> {
-  const headerName = options.headerName ?? "x-csrf-token";
-  const headerValue = options.headerValue ?? "katman";
+  const headerName = options.headerName ?? 'x-csrf-token'
+  const headerValue = options.headerValue ?? 'katman'
 
   return {
     call(path, input, callOptions) {
@@ -32,9 +32,9 @@ export function withCSRF<TClientContext extends ClientContext>(
           ...callOptions.context,
           __csrfHeader: { name: headerName, value: headerValue },
         },
-      } as unknown as ClientOptions<TClientContext>;
+      } as unknown as ClientOptions<TClientContext>
 
-      return link.call(path, input, enhancedOptions);
+      return link.call(path, input, enhancedOptions)
     },
-  };
+  }
 }

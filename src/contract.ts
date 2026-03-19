@@ -50,8 +50,8 @@
  * ```
  */
 
-import type { AnySchema, InferSchemaInput, InferSchemaOutput } from "./core/schema.ts";
-import type { ProcedureType, ErrorDef, Route } from "./types.ts";
+import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
+import type { ProcedureType, ErrorDef, Route } from './types.ts'
 
 // ── Contract Definition Types ───────────────────────
 
@@ -61,17 +61,17 @@ export interface ProcedureContract<
   TOutput extends AnySchema | undefined = AnySchema | undefined,
   TErrors extends ErrorDef = ErrorDef,
 > {
-  type?: TType;
-  input?: TInput;
-  output?: TOutput;
-  errors?: TErrors;
-  route?: Route;
-  description?: string;
+  type?: TType
+  input?: TInput
+  output?: TOutput
+  errors?: TErrors
+  route?: Route
+  description?: string
 }
 
 export type ContractRouter = {
-  [key: string]: ProcedureContract<any, any, any, any> | ContractRouter;
-};
+  [key: string]: ProcedureContract<any, any, any, any> | ContractRouter
+}
 
 // ── Contract Factory ────────────────────────────────
 
@@ -80,7 +80,7 @@ export type ContractRouter = {
  * Pure type information, no runtime behavior.
  */
 export function contract<T extends ContractRouter>(definition: T): T {
-  return definition;
+  return definition
 }
 
 // ── Implementation Types ────────────────────────────
@@ -88,20 +88,20 @@ export function contract<T extends ContractRouter>(definition: T): T {
 type ImplementProcedure<T extends ProcedureContract> =
   T extends ProcedureContract<infer _TType, infer TInput, infer TOutput, infer TErrors>
     ? (opts: {
-        input: TInput extends AnySchema ? InferSchemaOutput<TInput> : undefined;
-        ctx: Record<string, unknown>;
-        fail: TErrors extends ErrorDef ? <K extends keyof TErrors & string>(code: K, ...args: any[]) => never : never;
-        signal: AbortSignal;
+        input: TInput extends AnySchema ? InferSchemaOutput<TInput> : undefined
+        ctx: Record<string, unknown>
+        fail: TErrors extends ErrorDef ? <K extends keyof TErrors & string>(code: K, ...args: any[]) => never : never
+        signal: AbortSignal
       }) => TOutput extends AnySchema ? InferSchemaOutput<TOutput> | Promise<InferSchemaOutput<TOutput>> : unknown
-    : never;
+    : never
 
 type ImplementRouter<T extends ContractRouter> = {
   [K in keyof T]: T[K] extends ProcedureContract
     ? ImplementProcedure<T[K]>
     : T[K] extends ContractRouter
       ? ImplementRouter<T[K]>
-      : never;
-};
+      : never
+}
 
 // ── Implement Function ──────────────────────────────
 
@@ -112,21 +112,21 @@ type ImplementRouter<T extends ContractRouter> = {
 export function implement<T extends ContractRouter>(
   contractDef: T,
   implementations: ImplementRouter<T>,
-): import("./types.ts").RouterDef {
-  return buildRouter(contractDef, implementations);
+): import('./types.ts').RouterDef {
+  return buildRouter(contractDef, implementations)
 }
 
 function buildRouter(contractDef: ContractRouter, impls: any): any {
-  const router: Record<string, unknown> = {};
+  const router: Record<string, unknown> = {}
 
   for (const [key, contractEntry] of Object.entries(contractDef)) {
-    const impl = impls[key];
-    if (!impl) continue;
+    const impl = impls[key]
+    if (!impl) continue
 
     if (isProcedureContract(contractEntry)) {
       // Build a ProcedureDef from contract + implementation
       router[key] = {
-        type: contractEntry.type ?? "query",
+        type: contractEntry.type ?? 'query',
         input: contractEntry.input ?? null,
         output: contractEntry.output ?? null,
         errors: contractEntry.errors ?? null,
@@ -134,20 +134,20 @@ function buildRouter(contractDef: ContractRouter, impls: any): any {
         resolve: impl,
         route: contractEntry.route ?? null,
         meta: null,
-      };
+      }
     } else {
       // Nested router
-      router[key] = buildRouter(contractEntry as ContractRouter, impl);
+      router[key] = buildRouter(contractEntry as ContractRouter, impl)
     }
   }
 
-  return router;
+  return router
 }
 
 function isProcedureContract(v: unknown): v is ProcedureContract {
-  if (typeof v !== "object" || v === null) return false;
+  if (typeof v !== 'object' || v === null) return false
   // A procedure contract has input/output/type but no "resolve"
-  return "input" in v || "output" in v || "type" in v || "errors" in v;
+  return 'input' in v || 'output' in v || 'type' in v || 'errors' in v
 }
 
 // ── Client Type Inference from Contract ─────────────
@@ -160,5 +160,5 @@ export type InferContractClient<T extends ContractRouter> = {
       : () => Promise<TOutput extends AnySchema ? InferSchemaOutput<TOutput> : unknown>
     : T[K] extends ContractRouter
       ? InferContractClient<T[K]>
-      : never;
-};
+      : never
+}

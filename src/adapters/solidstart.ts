@@ -17,11 +17,11 @@
  * ```
  */
 
-import type { RouterDef } from "../types.ts";
+import type { RouterDef } from '../types.ts'
 
 export interface SolidStartAdapterOptions<TCtx extends Record<string, unknown>> {
-  context?: (event: any) => TCtx | Promise<TCtx>;
-  prefix?: string;
+  context?: (event: any) => TCtx | Promise<TCtx>
+  prefix?: string
 }
 
 /**
@@ -32,29 +32,29 @@ export function katmanSolidStart<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: SolidStartAdapterOptions<TCtx> = {},
 ): (event: any) => Promise<Response> {
-  const prefix = options.prefix ?? "/api/rpc";
-  let _handler: ((req: Request) => Promise<Response>) | null = null;
+  const prefix = options.prefix ?? '/api/rpc'
+  let _handler: ((req: Request) => Promise<Response>) | null = null
 
   return async (event: any) => {
     if (!_handler) {
-      const { katman } = await import("../katman.ts");
+      const { katman } = await import('../katman.ts')
       const k = katman({
         context: (req: Request) => {
-          if (options.context) return options.context(event);
-          return {} as TCtx;
+          if (options.context) return options.context(event)
+          return {} as TCtx
         },
-      });
-      _handler = k.handler(router);
+      })
+      _handler = k.handler(router)
     }
 
-    const request: Request = event.request ?? event;
-    const url = new URL(request.url);
-    let pathname = url.pathname;
+    const request: Request = event.request ?? event
+    const url = new URL(request.url)
+    let pathname = url.pathname
     if (pathname.startsWith(prefix)) {
-      pathname = pathname.slice(prefix.length);
-      if (!pathname.startsWith("/")) pathname = "/" + pathname;
+      pathname = pathname.slice(prefix.length)
+      if (!pathname.startsWith('/')) pathname = '/' + pathname
     }
 
-    return _handler(new Request(new URL(pathname + url.search, url.origin), request));
-  };
+    return _handler(new Request(new URL(pathname + url.search, url.origin), request))
+  }
 }

@@ -17,26 +17,27 @@
  * ```
  */
 
-import type { RouterDef } from "../types.ts";
-import { compileRouter, type FlatRouter } from "../compile.ts";
-import { KatmanError, toKatmanError } from "../core/error.ts";
-import { ValidationError } from "../core/schema.ts";
+import { compileRouter, type FlatRouter } from '../compile.ts'
+import { KatmanError, toKatmanError } from '../core/error.ts'
+import { ValidationError } from '../core/schema.ts'
+
+import type { RouterDef } from '../types.ts'
 
 export interface BatchHandlerOptions<TCtx extends Record<string, unknown>> {
   /** Context factory — called once per batch request */
-  context: (req: Request) => TCtx | Promise<TCtx>;
+  context: (req: Request) => TCtx | Promise<TCtx>
   /** Maximum number of calls in a single batch. Default: 50 */
-  maxBatchSize?: number;
+  maxBatchSize?: number
 }
 
 interface BatchRequest {
-  path: string;
-  input?: unknown;
+  path: string
+  input?: unknown
 }
 
 interface BatchResponse {
-  data?: unknown;
-  error?: { code: string; status: number; message: string; data?: unknown };
+  data?: unknown
+  error?: { code: string; status: number; message: string; data?: unknown }
 }
 
 /**
@@ -51,62 +52,67 @@ export function createBatchHandler<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: BatchHandlerOptions<TCtx>,
 ): (request: Request) => Promise<Response> {
-  const flatRouter = compileRouter(router);
-  const { maxBatchSize = 50 } = options;
-  const signal = new AbortController().signal;
+  const flatRouter = compileRouter(router)
+  const { maxBatchSize = 50 } = options
+  const signal = new AbortController().signal
 
   return async (request: Request): Promise<Response> => {
-    if (request.method !== "POST") {
-      return Response.json({ code: "METHOD_NOT_ALLOWED", status: 405 }, { status: 405 });
+    if (request.method !== 'POST') {
+      return Response.json({ code: 'METHOD_NOT_ALLOWED', status: 405 }, { status: 405 })
     }
 
-    let calls: BatchRequest[];
+    let calls: BatchRequest[]
     try {
-      calls = await request.json();
+      calls = await request.json()
     } catch {
-      return Response.json({ code: "BAD_REQUEST", status: 400, message: "Invalid JSON" }, { status: 400 });
+      return Response.json({ code: 'BAD_REQUEST', status: 400, message: 'Invalid JSON' }, { status: 400 })
     }
 
     if (!Array.isArray(calls)) {
-      return Response.json({ code: "BAD_REQUEST", status: 400, message: "Expected array" }, { status: 400 });
+      return Response.json({ code: 'BAD_REQUEST', status: 400, message: 'Expected array' }, { status: 400 })
     }
 
     if (calls.length > maxBatchSize) {
-      return Response.json({
-        code: "BAD_REQUEST",
-        status: 400,
-        message: `Batch too large: ${calls.length} calls (max ${maxBatchSize})`,
-      }, { status: 400 });
+      return Response.json(
+        {
+          code: 'BAD_REQUEST',
+          status: 400,
+          message: `Batch too large: ${calls.length} calls (max ${maxBatchSize})`,
+        },
+        { status: 400 },
+      )
     }
 
     // Build context once for the entire batch
-    const baseCtx = await options.context(request);
+    const baseCtx = await options.context(request)
 
     // Execute all calls concurrently
     const results = await Promise.all(
       calls.map(async (call): Promise<BatchResponse> => {
-        const route = flatRouter.get(call.path);
+        const route = flatRouter.get(call.path)
         if (!route) {
-          return { error: { code: "NOT_FOUND", status: 404, message: `Procedure not found: ${call.path}` } };
+          return { error: { code: 'NOT_FOUND', status: 404, message: `Procedure not found: ${call.path}` } }
         }
 
         try {
-          const ctx: Record<string, unknown> = Object.create(null);
-          const keys = Object.keys(baseCtx);
-          for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = baseCtx[keys[i]!];
+          const ctx: Record<string, unknown> = Object.create(null)
+          const keys = Object.keys(baseCtx)
+          for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = baseCtx[keys[i]!]
 
-          const output = await route.handler(ctx, call.input, signal);
-          return { data: output };
+          const output = await route.handler(ctx, call.input, signal)
+          return { data: output }
         } catch (error) {
           if (error instanceof ValidationError) {
-            return { error: { code: "BAD_REQUEST", status: 400, message: error.message, data: { issues: error.issues } } };
+            return {
+              error: { code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } },
+            }
           }
-          const e = error instanceof KatmanError ? error : toKatmanError(error);
-          return { error: e.toJSON() as any };
+          const e = error instanceof KatmanError ? error : toKatmanError(error)
+          return { error: e.toJSON() as any }
         }
       }),
-    );
+    )
 
-    return Response.json(results);
-  };
+    return Response.json(results)
+  }
 }

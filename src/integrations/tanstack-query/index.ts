@@ -11,118 +11,120 @@
  *   // use with useQuery(options) or queryClient.fetchQuery(options)
  */
 
-import type { ClientContext, NestedClient, Client } from "../../client/types.ts";
+import type { ClientContext, NestedClient, Client } from '../../client/types.ts'
 
 // === Key Generation ===
 
-export type OperationType = "query" | "infinite" | "mutation";
-export type OperationKey = [path: readonly string[], options: { type?: OperationType; input?: unknown }];
+export type OperationType = 'query' | 'infinite' | 'mutation'
+export type OperationKey = [path: readonly string[], options: { type?: OperationType; input?: unknown }]
 
 export function generateKey(
   path: readonly string[],
   options?: { type?: OperationType; input?: unknown },
 ): OperationKey {
-  const keyOptions: Record<string, unknown> = {};
-  if (options?.type) keyOptions.type = options.type;
-  if (options?.input !== undefined) keyOptions.input = options.input;
-  return [path, keyOptions];
+  const keyOptions: Record<string, unknown> = {}
+  if (options?.type) keyOptions.type = options.type
+  if (options?.input !== undefined) keyOptions.input = options.input
+  return [path, keyOptions]
 }
 
 // === Procedure Utils ===
 
 export interface QueryOptionsIn<TInput, TOutput, TError> {
-  input: TInput;
-  queryKey?: unknown[];
-  enabled?: boolean;
-  staleTime?: number;
-  gcTime?: number;
-  refetchInterval?: number | false;
-  retry?: boolean | number;
-  select?: (data: TOutput) => unknown;
+  input: TInput
+  queryKey?: unknown[]
+  enabled?: boolean
+  staleTime?: number
+  gcTime?: number
+  refetchInterval?: number | false
+  retry?: boolean | number
+  select?: (data: TOutput) => unknown
 }
 
 export interface MutationOptionsIn<TInput, TOutput, TError> {
-  onSuccess?: (data: TOutput, input: TInput) => void;
-  onError?: (error: TError, input: TInput) => void;
-  onSettled?: (data: TOutput | undefined, error: TError | null, input: TInput) => void;
-  retry?: boolean | number;
+  onSuccess?: (data: TOutput, input: TInput) => void
+  onError?: (error: TError, input: TInput) => void
+  onSettled?: (data: TOutput | undefined, error: TError | null, input: TInput) => void
+  retry?: boolean | number
 }
 
 /** Sentinel value to disable a query in a type-safe way. */
-export const skipToken: unique symbol = Symbol.for("katman.skipToken");
-export type SkipToken = typeof skipToken;
+export const skipToken: unique symbol = Symbol.for('katman.skipToken')
+export type SkipToken = typeof skipToken
 
 export interface InfiniteQueryOptionsIn<TInput, TOutput, TError, TPageParam> {
-  input: (pageParam: TPageParam) => TInput;
-  initialPageParam: TPageParam;
-  getNextPageParam: (lastPage: TOutput, allPages: TOutput[], lastPageParam: TPageParam) => TPageParam | undefined;
-  queryKey?: unknown[];
-  enabled?: boolean;
-  staleTime?: number;
-  gcTime?: number;
+  input: (pageParam: TPageParam) => TInput
+  initialPageParam: TPageParam
+  getNextPageParam: (lastPage: TOutput, allPages: TOutput[], lastPageParam: TPageParam) => TPageParam | undefined
+  queryKey?: unknown[]
+  enabled?: boolean
+  staleTime?: number
+  gcTime?: number
 }
 
 export interface ProcedureQueryUtils<TInput, TOutput, TError> {
   /** Direct call to the procedure */
-  call: (input: TInput, options?: { signal?: AbortSignal }) => Promise<TOutput>;
+  call: (input: TInput, options?: { signal?: AbortSignal }) => Promise<TOutput>
 
   /** Generate a query key for this procedure */
-  queryKey: (input?: TInput) => OperationKey;
+  queryKey: (input?: TInput) => OperationKey
 
   /** Generate full query options for useQuery. Pass `skipToken` as input to disable. */
   queryOptions: (options: QueryOptionsIn<TInput | SkipToken, TOutput, TError>) => {
-    queryKey: OperationKey;
-    queryFn: (ctx: { signal: AbortSignal }) => Promise<TOutput>;
-    enabled?: boolean;
-    staleTime?: number;
-    gcTime?: number;
-    refetchInterval?: number | false;
-    retry?: boolean | number;
-    select?: (data: TOutput) => unknown;
-  };
+    queryKey: OperationKey
+    queryFn: (ctx: { signal: AbortSignal }) => Promise<TOutput>
+    enabled?: boolean
+    staleTime?: number
+    gcTime?: number
+    refetchInterval?: number | false
+    retry?: boolean | number
+    select?: (data: TOutput) => unknown
+  }
 
   /** Generate infinite query options for useInfiniteQuery */
-  infiniteOptions: <TPageParam = number>(options: InfiniteQueryOptionsIn<TInput, TOutput, TError, TPageParam>) => {
-    queryKey: OperationKey;
-    queryFn: (ctx: { signal: AbortSignal; pageParam: TPageParam }) => Promise<TOutput>;
-    initialPageParam: TPageParam;
-    getNextPageParam: (lastPage: TOutput, allPages: TOutput[], lastPageParam: TPageParam) => TPageParam | undefined;
-    enabled?: boolean;
-    staleTime?: number;
-    gcTime?: number;
-  };
+  infiniteOptions: <TPageParam = number>(
+    options: InfiniteQueryOptionsIn<TInput, TOutput, TError, TPageParam>,
+  ) => {
+    queryKey: OperationKey
+    queryFn: (ctx: { signal: AbortSignal; pageParam: TPageParam }) => Promise<TOutput>
+    initialPageParam: TPageParam
+    getNextPageParam: (lastPage: TOutput, allPages: TOutput[], lastPageParam: TPageParam) => TPageParam | undefined
+    enabled?: boolean
+    staleTime?: number
+    gcTime?: number
+  }
 
   /** Generate streamed query options — data appends to array as events arrive */
   streamedOptions: (options: QueryOptionsIn<TInput, TOutput[], TError>) => {
-    queryKey: OperationKey;
-    queryFn: (ctx: { signal: AbortSignal }) => Promise<TOutput[]>;
-    enabled?: boolean;
-    staleTime?: number;
-    gcTime?: number;
-  };
+    queryKey: OperationKey
+    queryFn: (ctx: { signal: AbortSignal }) => Promise<TOutput[]>
+    enabled?: boolean
+    staleTime?: number
+    gcTime?: number
+  }
 
   /** Generate live query options — latest event replaces previous data */
   liveOptions: (options: QueryOptionsIn<TInput, TOutput, TError>) => {
-    queryKey: OperationKey;
-    queryFn: (ctx: { signal: AbortSignal }) => Promise<TOutput>;
-    refetchInterval: number;
-    enabled?: boolean;
-    staleTime?: number;
-    gcTime?: number;
-  };
+    queryKey: OperationKey
+    queryFn: (ctx: { signal: AbortSignal }) => Promise<TOutput>
+    refetchInterval: number
+    enabled?: boolean
+    staleTime?: number
+    gcTime?: number
+  }
 
   /** Generate a mutation key */
-  mutationKey: () => OperationKey;
+  mutationKey: () => OperationKey
 
   /** Generate full mutation options for useMutation */
   mutationOptions: (options?: MutationOptionsIn<TInput, TOutput, TError>) => {
-    mutationKey: OperationKey;
-    mutationFn: (input: TInput) => Promise<TOutput>;
-    onSuccess?: (data: TOutput, input: TInput) => void;
-    onError?: (error: TError, input: TInput) => void;
-    onSettled?: (data: TOutput | undefined, error: TError | null, input: TInput) => void;
-    retry?: boolean | number;
-  };
+    mutationKey: OperationKey
+    mutationFn: (input: TInput) => Promise<TOutput>
+    onSuccess?: (data: TOutput, input: TInput) => void
+    onError?: (error: TError, input: TInput) => void
+    onSettled?: (data: TOutput | undefined, error: TError | null, input: TInput) => void
+    retry?: boolean | number
+  }
 }
 
 function createProcedureUtils<TInput, TOutput, TError>(
@@ -130,18 +132,16 @@ function createProcedureUtils<TInput, TOutput, TError>(
   path: readonly string[],
 ): ProcedureQueryUtils<TInput, TOutput, TError> {
   return {
-    call: (input: TInput, options?: { signal?: AbortSignal }) =>
-      client(input, options as any) as Promise<TOutput>,
+    call: (input: TInput, options?: { signal?: AbortSignal }) => client(input, options as any) as Promise<TOutput>,
 
-    queryKey: (input?: TInput) =>
-      generateKey(path, { type: "query", input }),
+    queryKey: (input?: TInput) => generateKey(path, { type: 'query', input }),
 
     queryOptions: (options) => {
-      const isSkipped = options.input === skipToken;
+      const isSkipped = options.input === skipToken
       return {
         queryKey: options.queryKey
           ? (options.queryKey as OperationKey)
-          : generateKey(path, { type: "query", input: isSkipped ? undefined : options.input }),
+          : generateKey(path, { type: 'query', input: isSkipped ? undefined : options.input }),
         queryFn: ({ signal }) => client(options.input as TInput, { signal } as any) as Promise<TOutput>,
         ...(isSkipped && { enabled: false }),
         ...(options.enabled !== undefined && { enabled: options.enabled }),
@@ -150,13 +150,11 @@ function createProcedureUtils<TInput, TOutput, TError>(
         ...(options.refetchInterval !== undefined && { refetchInterval: options.refetchInterval }),
         ...(options.retry !== undefined && { retry: options.retry }),
         ...(options.select !== undefined && { select: options.select }),
-      };
+      }
     },
 
     infiniteOptions: (options: any) => ({
-      queryKey: options.queryKey
-        ? (options.queryKey as OperationKey)
-        : generateKey(path, { type: "infinite" }),
+      queryKey: options.queryKey ? (options.queryKey as OperationKey) : generateKey(path, { type: 'infinite' }),
       queryFn: ({ signal, pageParam }: { signal: AbortSignal; pageParam: unknown }) =>
         client(options.input(pageParam), { signal } as any) as Promise<TOutput>,
       initialPageParam: options.initialPageParam,
@@ -169,18 +167,18 @@ function createProcedureUtils<TInput, TOutput, TError>(
     streamedOptions: (options: any) => ({
       queryKey: options.queryKey
         ? (options.queryKey as OperationKey)
-        : generateKey(path, { type: "query", input: options.input }),
+        : generateKey(path, { type: 'query', input: options.input }),
       queryFn: async ({ signal }: { signal: AbortSignal }) => {
         // Call the subscription/SSE endpoint and accumulate results into an array
-        const result = await client(options.input, { signal } as any);
-        if (result && typeof result === "object" && Symbol.asyncIterator in (result as object)) {
-          const items: unknown[] = [];
+        const result = await client(options.input, { signal } as any)
+        if (result && typeof result === 'object' && Symbol.asyncIterator in (result as object)) {
+          const items: unknown[] = []
           for await (const item of result as AsyncIterable<unknown>) {
-            items.push(item);
+            items.push(item)
           }
-          return items;
+          return items
         }
-        return Array.isArray(result) ? result : [result];
+        return Array.isArray(result) ? result : [result]
       },
       ...(options.enabled !== undefined && { enabled: options.enabled }),
       ...(options.staleTime !== undefined && { staleTime: options.staleTime }),
@@ -190,30 +188,29 @@ function createProcedureUtils<TInput, TOutput, TError>(
     liveOptions: (options: any) => ({
       queryKey: options.queryKey
         ? (options.queryKey as OperationKey)
-        : generateKey(path, { type: "query", input: options.input }),
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        client(options.input, { signal } as any) as Promise<TOutput>,
+        : generateKey(path, { type: 'query', input: options.input }),
+      queryFn: ({ signal }: { signal: AbortSignal }) => client(options.input, { signal } as any) as Promise<TOutput>,
       refetchInterval: options.refetchInterval ?? 1000,
       ...(options.enabled !== undefined && { enabled: options.enabled }),
       ...(options.staleTime !== undefined && { staleTime: options.staleTime }),
       ...(options.gcTime !== undefined && { gcTime: options.gcTime }),
     }),
 
-    mutationKey: () => generateKey(path, { type: "mutation" }),
+    mutationKey: () => generateKey(path, { type: 'mutation' }),
 
     mutationOptions: (options) => ({
-      mutationKey: generateKey(path, { type: "mutation" }),
+      mutationKey: generateKey(path, { type: 'mutation' }),
       mutationFn: (input: TInput) => client(input) as Promise<TOutput>,
       ...options,
     }),
-  };
+  }
 }
 
 // === Router Utils (Recursive Proxy) ===
 
 export interface GeneralUtils {
   /** Generate a key prefix for bulk invalidation */
-  key: (input?: unknown) => OperationKey;
+  key: (input?: unknown) => OperationKey
 }
 
 export type QueryUtils<T extends NestedClient> =
@@ -221,7 +218,7 @@ export type QueryUtils<T extends NestedClient> =
     ? ProcedureQueryUtils<TInput, TOutput, TError> & GeneralUtils
     : T extends Record<string, NestedClient>
       ? { [K in keyof T]: QueryUtils<T[K]> } & GeneralUtils
-      : GeneralUtils;
+      : GeneralUtils
 
 /**
  * Create TanStack Query utilities from a Katman client.
@@ -229,40 +226,35 @@ export type QueryUtils<T extends NestedClient> =
  * Returns a recursive proxy that mirrors the client structure,
  * with `.queryOptions()`, `.mutationOptions()`, `.queryKey()` at each level.
  */
-export function createQueryUtils<T extends NestedClient>(
-  client: T,
-  path: readonly string[] = [],
-): QueryUtils<T> {
+export function createQueryUtils<T extends NestedClient>(client: T, path: readonly string[] = []): QueryUtils<T> {
   const generalUtils: GeneralUtils = {
     key: (input?: unknown) => generateKey(path, input !== undefined ? { input } : undefined),
-  };
+  }
 
   // Check if this is a callable (procedure-level client)
-  const procedureUtils = typeof client === "function"
-    ? createProcedureUtils(client as any, path)
-    : {};
+  const procedureUtils = typeof client === 'function' ? createProcedureUtils(client as any, path) : {}
 
   return new Proxy({} as QueryUtils<T>, {
     get(_target, prop) {
-      if (prop === "then") return undefined;
+      if (prop === 'then') return undefined
 
       // General utils
-      if (prop === "key") return generalUtils.key;
+      if (prop === 'key') return generalUtils.key
 
       // Procedure utils
-      if (typeof prop === "string" && prop in procedureUtils) {
-        return (procedureUtils as any)[prop];
+      if (typeof prop === 'string' && prop in procedureUtils) {
+        return (procedureUtils as any)[prop]
       }
 
       // Recurse into child
-      if (typeof prop === "string") {
-        const child = (client as any)[prop];
+      if (typeof prop === 'string') {
+        const child = (client as any)[prop]
         if (child) {
-          return createQueryUtils(child, [...path, prop]);
+          return createQueryUtils(child, [...path, prop])
         }
       }
 
-      return undefined;
+      return undefined
     },
-  });
+  })
 }

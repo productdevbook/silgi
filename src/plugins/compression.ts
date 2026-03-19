@@ -15,13 +15,13 @@
  * ```
  */
 
-import type { WrapDef } from "../types.ts";
+import type { WrapDef } from '../types.ts'
 
 export interface CompressionOptions {
   /** Minimum response size in bytes before compression kicks in. Default: 1024 */
-  threshold?: number;
+  threshold?: number
   /** Preferred encoding. Default: "gzip" */
-  encoding?: "gzip" | "deflate";
+  encoding?: 'gzip' | 'deflate'
 }
 
 /**
@@ -32,15 +32,15 @@ export interface CompressionOptions {
  * This wrap operates on the procedure output before serialization.
  */
 export function compressionWrap(options: CompressionOptions = {}): WrapDef {
-  const { threshold = 1024, encoding = "gzip" } = options;
+  const { threshold = 1024, encoding = 'gzip' } = options
 
   return {
-    kind: "wrap",
+    kind: 'wrap',
     fn: async (_ctx, next) => {
       // Pass through — the actual compression happens at the transport layer.
       // This wrap attaches compression hints to the context for transport-level use.
-      (_ctx as any).__compression = { threshold, encoding };
-      return next();
+      ;(_ctx as any).__compression = { threshold, encoding }
+      return next()
     },
-  };
+  }
 }

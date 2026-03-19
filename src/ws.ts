@@ -10,24 +10,26 @@
  *   Server → Client (stream): { id: string, data: unknown, done?: boolean }
  */
 
-import nodeAdapter from "crossws/adapters/node";
-import type { Peer, Message } from "crossws";
-import type { Server as HttpServer } from "node:http";
-import { compileRouter, type FlatRouter } from "./compile.ts";
-import type { RouterDef } from "./types.ts";
-import { KatmanError, toKatmanError } from "./core/error.ts";
-import { stringifyJSON } from "./core/utils.ts";
-import { encode as msgpackEncode, decode as msgpackDecode } from "./codec/msgpack.ts";
+import nodeAdapter from 'crossws/adapters/node'
+
+import { encode as msgpackEncode, decode as msgpackDecode } from './codec/msgpack.ts'
+import { compileRouter, type FlatRouter } from './compile.ts'
+import { KatmanError, toKatmanError } from './core/error.ts'
+import { stringifyJSON } from './core/utils.ts'
+
+import type { RouterDef } from './types.ts'
+import type { Peer, Message } from 'crossws'
+import type { Server as HttpServer } from 'node:http'
 
 export interface WSAdapterOptions {
   /** Use MessagePack binary protocol instead of JSON */
-  binary?: boolean;
+  binary?: boolean
 }
 
 interface RPCRequest {
-  id: string;
-  path: string;
-  input?: unknown;
+  id: string
+  path: string
+  input?: unknown
 }
 
 /**
@@ -43,29 +45,25 @@ interface RPCRequest {
  * server.listen(3000);
  * ```
  */
-export function attachWebSocket(
-  server: HttpServer,
-  routerDef: RouterDef,
-  options: WSAdapterOptions = {},
-): void {
+export function attachWebSocket(server: HttpServer, routerDef: RouterDef, options: WSAdapterOptions = {}): void {
   // Compile router once
-  const flat: FlatRouter = compileRouter(routerDef);
-  const binary = options.binary ?? false;
-  const signal = new AbortController().signal;
+  const flat: FlatRouter = compileRouter(routerDef)
+  const binary = options.binary ?? false
+  const signal = new AbortController().signal
 
   function send(peer: Peer, data: unknown): void {
     if (binary) {
-      peer.send(msgpackEncode(data) as ArrayBuffer);
+      peer.send(msgpackEncode(data) as ArrayBuffer)
     } else {
-      peer.send(stringifyJSON(data));
+      peer.send(stringifyJSON(data))
     }
   }
 
   function parseMessage(message: Message): RPCRequest {
     if (binary) {
-      return msgpackDecode(message.uint8Array()) as RPCRequest;
+      return msgpackDecode(message.uint8Array()) as RPCRequest
     }
-    return message.json<RPCRequest>();
+    return message.json<RPCRequest>()
   }
 
   const ws = nodeAdapter({
@@ -75,49 +73,49 @@ export function attachWebSocket(
       },
 
       async message(peer, message) {
-        let req: RPCRequest;
+        let req: RPCRequest
         try {
-          req = parseMessage(message);
+          req = parseMessage(message)
         } catch {
-          send(peer, { id: "0", error: { code: "BAD_REQUEST", status: 400, message: "Invalid message format" } });
-          return;
+          send(peer, { id: '0', error: { code: 'BAD_REQUEST', status: 400, message: 'Invalid message format' } })
+          return
         }
 
-        const { id, path, input } = req;
+        const { id, path, input } = req
 
         // Route lookup
-        const route = flat.get(path);
+        const route = flat.get(path)
         if (!route) {
-          send(peer, { id, error: { code: "NOT_FOUND", status: 404, message: `Procedure "${path}" not found` } });
-          return;
+          send(peer, { id, error: { code: 'NOT_FOUND', status: 404, message: `Procedure "${path}" not found` } })
+          return
         }
 
         // Execute pipeline
-        const ctx: Record<string, unknown> = Object.create(null);
+        const ctx: Record<string, unknown> = Object.create(null)
         try {
-          const result = route.handler(ctx, input ?? {}, signal);
-          const output = result instanceof Promise ? await result : result;
+          const result = route.handler(ctx, input ?? {}, signal)
+          const output = result instanceof Promise ? await result : result
 
           // Streaming (subscription)
-          if (output && typeof output === "object" && Symbol.asyncIterator in (output as object)) {
-            const iter = output as AsyncIterableIterator<unknown>;
+          if (output && typeof output === 'object' && Symbol.asyncIterator in (output as object)) {
+            const iter = output as AsyncIterableIterator<unknown>
             try {
               for await (const data of iter) {
-                send(peer, { id, data });
+                send(peer, { id, data })
               }
-              send(peer, { id, data: null, done: true });
+              send(peer, { id, data: null, done: true })
             } catch (err) {
-              const e = err instanceof KatmanError ? err : toKatmanError(err);
-              send(peer, { id, error: e.toJSON() });
+              const e = err instanceof KatmanError ? err : toKatmanError(err)
+              send(peer, { id, error: e.toJSON() })
             }
-            return;
+            return
           }
 
           // Single response
-          send(peer, { id, result: output });
+          send(peer, { id, result: output })
         } catch (err) {
-          const e = err instanceof KatmanError ? err : toKatmanError(err);
-          send(peer, { id, error: e.toJSON() });
+          const e = err instanceof KatmanError ? err : toKatmanError(err)
+          send(peer, { id, error: e.toJSON() })
         }
       },
 
@@ -126,13 +124,13 @@ export function attachWebSocket(
       },
 
       error(_peer, error) {
-        console.error("[katman:ws] error:", error);
+        console.error('[katman:ws] error:', error)
       },
     },
-  });
+  })
 
   // Attach to existing HTTP server
-  server.on("upgrade", (req, socket, head) => {
-    ws.handleUpgrade(req, socket, head);
-  });
+  server.on('upgrade', (req, socket, head) => {
+    ws.handleUpgrade(req, socket, head)
+  })
 }

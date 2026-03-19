@@ -1,30 +1,28 @@
-import { describe, it, expect } from "vitest";
-import { z } from "zod";
-import { katman } from "#src/katman.ts";
-import { createServerClient } from "#src/client/server.ts";
+import { describe, it, expect } from 'vitest'
+import { z } from 'zod'
 
-const k = katman({ context: () => ({ db: "test" }) });
+import { createServerClient } from '#src/client/server.ts'
+import { katman } from '#src/katman.ts'
 
-describe("createServerClient()", () => {
-  it("calls procedures in-process", async () => {
+const k = katman({ context: () => ({ db: 'test' }) })
+
+describe('createServerClient()', () => {
+  it('calls procedures in-process', async () => {
     const router = k.router({
-      health: k.query(() => ({ status: "ok" })),
+      health: k.query(() => ({ status: 'ok' })),
       users: {
-        list: k.query(
-          z.object({ limit: z.number().optional() }),
-          ({ input }) => ({ count: input.limit ?? 10 }),
-        ),
+        list: k.query(z.object({ limit: z.number().optional() }), ({ input }) => ({ count: input.limit ?? 10 })),
       },
-    });
+    })
 
     const client = createServerClient(router, {
-      context: () => ({ db: "test" }),
-    });
+      context: () => ({ db: 'test' }),
+    })
 
-    const health = await (client as any).health();
-    expect(health).toEqual({ status: "ok" });
+    const health = await (client as any).health()
+    expect(health).toEqual({ status: 'ok' })
 
-    const users = await (client as any).users.list({ limit: 3 });
-    expect(users).toEqual({ count: 3 });
-  });
-});
+    const users = await (client as any).users.list({ limit: 3 })
+    expect(users).toEqual({ count: 3 })
+  })
+})

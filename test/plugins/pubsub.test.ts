@@ -1,32 +1,33 @@
-import { describe, it, expect } from "vitest";
-import { createPublisher, MemoryPubSub } from "#src/plugins/pubsub.ts";
+import { describe, it, expect } from 'vitest'
 
-describe("PubSub", () => {
-  it("MemoryPubSub publishes and subscribes", async () => {
-    const backend = new MemoryPubSub();
-    const received: unknown[] = [];
+import { createPublisher, MemoryPubSub } from '#src/plugins/pubsub.ts'
 
-    const unsub = backend.subscribe("test", (data) => received.push(data));
+describe('PubSub', () => {
+  it('MemoryPubSub publishes and subscribes', async () => {
+    const backend = new MemoryPubSub()
+    const received: unknown[] = []
 
-    await backend.publish("test", { id: 1 });
-    await backend.publish("test", { id: 2 });
+    const unsub = backend.subscribe('test', (data) => received.push(data))
 
-    expect(received).toEqual([{ id: 1 }, { id: 2 }]);
+    await backend.publish('test', { id: 1 })
+    await backend.publish('test', { id: 2 })
 
-    unsub();
+    expect(received).toEqual([{ id: 1 }, { id: 2 }])
 
-    await backend.publish("test", { id: 3 });
-    expect(received).toHaveLength(2); // no more events after unsubscribe
-  });
+    unsub()
 
-  it("createPublisher.publish dispatches to backend", async () => {
-    const backend = new MemoryPubSub();
-    const pubsub = createPublisher(backend);
-    const received: unknown[] = [];
+    await backend.publish('test', { id: 3 })
+    expect(received).toHaveLength(2) // no more events after unsubscribe
+  })
 
-    backend.subscribe("ch", (data) => received.push(data));
-    await pubsub.publish("ch", "hello");
+  it('createPublisher.publish dispatches to backend', async () => {
+    const backend = new MemoryPubSub()
+    const pubsub = createPublisher(backend)
+    const received: unknown[] = []
 
-    expect(received).toEqual(["hello"]);
-  });
-});
+    backend.subscribe('ch', (data) => received.push(data))
+    await pubsub.publish('ch', 'hello')
+
+    expect(received).toEqual(['hello'])
+  })
+})

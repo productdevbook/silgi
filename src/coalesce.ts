@@ -15,7 +15,7 @@
  */
 
 export class RequestCoalescer {
-  #inflight = new Map<string, Promise<string>>();
+  #inflight = new Map<string, Promise<string>>()
 
   /**
    * Execute handler with coalescing. If an identical request is already
@@ -23,31 +23,28 @@ export class RequestCoalescer {
    *
    * Returns the serialized response string.
    */
-  async execute(
-    key: string,
-    handler: () => Promise<string> | string,
-  ): Promise<string> {
+  async execute(key: string, handler: () => Promise<string> | string): Promise<string> {
     // Check if this exact request is already being processed
-    const existing = this.#inflight.get(key);
-    if (existing) return existing;
+    const existing = this.#inflight.get(key)
+    if (existing) return existing
 
     // First request for this key — execute and share result
     const promise = (async () => {
       try {
-        const result = handler();
-        return result instanceof Promise ? await result : result;
+        const result = handler()
+        return result instanceof Promise ? await result : result
       } finally {
         // Remove from inflight AFTER microtask so concurrent arrivals can find it
-        queueMicrotask(() => this.#inflight.delete(key));
+        queueMicrotask(() => this.#inflight.delete(key))
       }
-    })();
+    })()
 
-    this.#inflight.set(key, promise);
-    return promise;
+    this.#inflight.set(key, promise)
+    return promise
   }
 
   /** Number of currently in-flight unique requests */
   get inflightCount(): number {
-    return this.#inflight.size;
+    return this.#inflight.size
   }
 }

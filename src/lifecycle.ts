@@ -22,17 +22,17 @@
  * ```
  */
 
-import type { WrapDef } from "./types.ts";
+import type { WrapDef } from './types.ts'
 
 export interface LifecycleHooks<TCtx = Record<string, unknown>> {
   /** Called before the procedure runs */
-  onStart?: (event: { ctx: TCtx }) => void | Promise<void>;
+  onStart?: (event: { ctx: TCtx }) => void | Promise<void>
   /** Called after a successful result */
-  onSuccess?: (event: { ctx: TCtx; output: unknown; durationMs: number }) => void | Promise<void>;
+  onSuccess?: (event: { ctx: TCtx; output: unknown; durationMs: number }) => void | Promise<void>
   /** Called when the procedure throws */
-  onError?: (event: { ctx: TCtx; error: unknown; durationMs: number }) => void | Promise<void>;
+  onError?: (event: { ctx: TCtx; error: unknown; durationMs: number }) => void | Promise<void>
   /** Called after the procedure completes (success or failure) */
-  onFinish?: (event: { ctx: TCtx; durationMs: number; error?: unknown }) => void | Promise<void>;
+  onFinish?: (event: { ctx: TCtx; durationMs: number; error?: unknown }) => void | Promise<void>
 }
 
 /**
@@ -41,37 +41,35 @@ export interface LifecycleHooks<TCtx = Record<string, unknown>> {
  * All hooks are optional. The procedure result is never modified —
  * hooks are purely for side effects (logging, metrics, error reporting).
  */
-export function lifecycleWrap<TCtx = Record<string, unknown>>(
-  hooks: LifecycleHooks<TCtx>,
-): WrapDef<TCtx> {
+export function lifecycleWrap<TCtx = Record<string, unknown>>(hooks: LifecycleHooks<TCtx>): WrapDef<TCtx> {
   return {
-    kind: "wrap",
+    kind: 'wrap',
     fn: async (ctx, next) => {
-      const typedCtx = ctx as TCtx;
+      const typedCtx = ctx as TCtx
 
-      if (hooks.onStart) await hooks.onStart({ ctx: typedCtx });
+      if (hooks.onStart) await hooks.onStart({ ctx: typedCtx })
 
-      const t0 = performance.now();
-      let error: unknown;
+      const t0 = performance.now()
+      let error: unknown
 
       try {
-        const output = await next();
-        const durationMs = performance.now() - t0;
+        const output = await next()
+        const durationMs = performance.now() - t0
 
-        if (hooks.onSuccess) await hooks.onSuccess({ ctx: typedCtx, output, durationMs });
+        if (hooks.onSuccess) await hooks.onSuccess({ ctx: typedCtx, output, durationMs })
 
-        return output;
+        return output
       } catch (err) {
-        error = err;
-        const durationMs = performance.now() - t0;
+        error = err
+        const durationMs = performance.now() - t0
 
-        if (hooks.onError) await hooks.onError({ ctx: typedCtx, error: err, durationMs });
+        if (hooks.onError) await hooks.onError({ ctx: typedCtx, error: err, durationMs })
 
-        throw err;
+        throw err
       } finally {
-        const durationMs = performance.now() - t0;
-        if (hooks.onFinish) await hooks.onFinish({ ctx: typedCtx, durationMs, error });
+        const durationMs = performance.now() - t0
+        if (hooks.onFinish) await hooks.onFinish({ ctx: typedCtx, durationMs, error })
       }
     },
-  };
+  }
 }

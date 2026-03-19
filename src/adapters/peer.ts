@@ -26,19 +26,21 @@
  * ```
  */
 
-import type { RouterDef, InferClient } from "../types.ts";
-import { katmanMessagePort, MessagePortLink } from "./message-port.ts";
-import { createClient } from "../client/client.ts";
+import { createClient } from '../client/client.ts'
+
+import { katmanMessagePort, MessagePortLink } from './message-port.ts'
+
+import type { RouterDef, InferClient } from '../types.ts'
 
 export interface PeerOptions<TCtx extends Record<string, unknown>> {
-  context?: () => TCtx | Promise<TCtx>;
+  context?: () => TCtx | Promise<TCtx>
 }
 
 export interface Peer<TRemoteRouter extends RouterDef> {
   /** Typed client to call the remote peer's procedures */
-  client: InferClient<TRemoteRouter>;
+  client: InferClient<TRemoteRouter>
   /** Dispose function to stop listening */
-  dispose: () => void;
+  dispose: () => void
 }
 
 /**
@@ -49,24 +51,21 @@ export interface Peer<TRemoteRouter extends RouterDef> {
  * @param port - Bidirectional message port
  * @param options - Context factory for incoming calls
  */
-export function createPeer<
-  TLocalRouter extends RouterDef,
-  TRemoteRouter extends RouterDef,
->(
+export function createPeer<TLocalRouter extends RouterDef, TRemoteRouter extends RouterDef>(
   localRouter: TLocalRouter,
   port: {
-    postMessage(msg: unknown): void;
-    addEventListener(type: "message", handler: (event: { data: unknown }) => void): void;
-    removeEventListener(type: "message", handler: (event: { data: unknown }) => void): void;
+    postMessage(msg: unknown): void
+    addEventListener(type: 'message', handler: (event: { data: unknown }) => void): void
+    removeEventListener(type: 'message', handler: (event: { data: unknown }) => void): void
   },
   options: PeerOptions<Record<string, unknown>> = {},
 ): Peer<TRemoteRouter> {
   // Server side: handle incoming calls
-  const dispose = katmanMessagePort(localRouter, port, options);
+  const dispose = katmanMessagePort(localRouter, port, options)
 
   // Client side: make outgoing calls
-  const link = new MessagePortLink(port);
-  const client = createClient<InferClient<TRemoteRouter>>(link);
+  const link = new MessagePortLink(port)
+  const client = createClient<InferClient<TRemoteRouter>>(link)
 
-  return { client, dispose };
+  return { client, dispose }
 }

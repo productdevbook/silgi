@@ -37,52 +37,64 @@
  */
 
 // ── Main API ────────────────────────────────────────
-export { katman } from "./katman.ts";
-export type { KatmanInstance, KatmanConfig } from "./katman.ts";
+export { katman } from './katman.ts'
+export type { KatmanInstance, KatmanConfig } from './katman.ts'
 
 // ── Types ───────────────────────────────────────────
 export type {
-  ProcedureDef, ProcedureType, ProcedureConfig, Meta,
-  ErrorDef, ErrorDefItem, FailFn,
-  GuardDef, WrapDef, GuardFn, WrapFn, MiddlewareDef,
-  ResolveContext, RouterDef, InferClient,
-  InferContextFromUse, InferGuardOutput,
-} from "./types.ts";
+  ProcedureDef,
+  ProcedureType,
+  ProcedureConfig,
+  Meta,
+  ErrorDef,
+  ErrorDefItem,
+  FailFn,
+  GuardDef,
+  WrapDef,
+  GuardFn,
+  WrapFn,
+  MiddlewareDef,
+  ResolveContext,
+  RouterDef,
+  InferClient,
+  InferContextFromUse,
+  InferGuardOutput,
+} from './types.ts'
 
 // ── Error ───────────────────────────────────────────
-export { KatmanError, isDefinedError, toKatmanError } from "./core/error.ts";
-export type { KatmanErrorCode, KatmanErrorOptions, KatmanErrorJSON } from "./core/error.ts";
+export { KatmanError, isDefinedError, toKatmanError } from './core/error.ts'
+export type { KatmanErrorCode, KatmanErrorOptions, KatmanErrorJSON } from './core/error.ts'
 
 // ── Schema ──────────────────────────────────────────
-export { type, validateSchema, ValidationError } from "./core/schema.ts";
-export type { Schema, AnySchema, InferSchemaInput, InferSchemaOutput } from "./core/schema.ts";
+export { type, validateSchema, ValidationError } from './core/schema.ts'
+export type { Schema, AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
 
 // ── SSE/Streaming ───────────────────────────────────
-export { withEventMeta, getEventMeta } from "./core/sse.ts";
-export type { EventMeta } from "./core/sse.ts";
+export { withEventMeta, getEventMeta } from './core/sse.ts'
+export type { EventMeta } from './core/sse.ts'
 
 // ── Callable ───────────────────────────────────────
-export { callable } from "./callable.ts";
-export type { CallableOptions } from "./callable.ts";
+export { callable } from './callable.ts'
+export type { CallableOptions } from './callable.ts'
 
 // ── Lifecycle ──────────────────────────────────────
-export { lifecycleWrap } from "./lifecycle.ts";
-export type { LifecycleHooks } from "./lifecycle.ts";
+export { lifecycleWrap } from './lifecycle.ts'
+export type { LifecycleHooks } from './lifecycle.ts'
 
 // ── Input Mapping ──────────────────────────────────
-export { mapInput } from "./map-input.ts";
+export { mapInput } from './map-input.ts'
 
 // ── Advanced ────────────────────────────────────────
-export { compileProcedure, compileRouter, ContextPool } from "./compile.ts";
-export { AsyncIteratorClass, mapAsyncIterator } from "./core/iterator.ts";
+export { compileProcedure, compileRouter, ContextPool } from './compile.ts'
+export { AsyncIteratorClass, mapAsyncIterator } from './core/iterator.ts'
 
 // ── Client (re-export for convenience) ──────────────
-export { createClient, safe } from "./client/client.ts";
+export { createClient, safe } from './client/client.ts'
 
 // ── Lazy Loading ────────────────────────────────────
-export { lazy, isLazy, resolveLazy } from "./lazy.ts";
-export type { LazyRouter } from "./lazy.ts";
+export { lazy, isLazy, resolveLazy } from './lazy.ts'
+export type { LazyRouter } from './lazy.ts'
 
 // ── OpenAPI / Scalar ────────────────────────────────
-export { generateOpenAPI, scalarHTML } from "./scalar.ts";
-export type { ScalarOptions } from "./scalar.ts";
+export { generateOpenAPI, scalarHTML } from './scalar.ts'
+export type { ScalarOptions } from './scalar.ts'

@@ -40,43 +40,44 @@
  * ```
  */
 
-import type { RouterDef } from "../types.ts";
-import { compileRouter, type FlatRouter } from "../compile.ts";
-import { KatmanError, toKatmanError } from "../core/error.ts";
-import { ValidationError } from "../core/schema.ts";
+import { compileRouter, type FlatRouter } from '../compile.ts'
+import { KatmanError, toKatmanError } from '../core/error.ts'
+import { ValidationError } from '../core/schema.ts'
+
+import type { RouterDef } from '../types.ts'
 
 export interface NitroAdapterOptions<TCtx extends Record<string, unknown>> {
   /**
    * Context factory — receives the Nitro/H3 event.
    * Access `event.context` for middleware data (auth, session, etc.).
    */
-  context?: (event: NitroEvent) => TCtx | Promise<TCtx>;
+  context?: (event: NitroEvent) => TCtx | Promise<TCtx>
   /**
    * Route prefix to strip from the path.
    * When using FS routing at `server/routes/rpc/[...path].ts`,
    * leave this undefined — the path param is used directly.
    * When using a catch-all handler, set this to strip the prefix.
    */
-  prefix?: string;
+  prefix?: string
 }
 
 /** Minimal Nitro/H3 v2 event shape */
 interface NitroEvent {
-  url: URL;
-  path: string;
+  url: URL
+  path: string
   req: {
-    method: string;
-    headers: Headers;
-    json(): Promise<unknown>;
-    text(): Promise<string>;
-  };
+    method: string
+    headers: Headers
+    json(): Promise<unknown>
+    text(): Promise<string>
+  }
   res: {
-    headers: Headers;
-  };
+    headers: Headers
+  }
   context: {
-    params: Record<string, string>;
-    [key: string]: unknown;
-  };
+    params: Record<string, string>
+    [key: string]: unknown
+  }
 }
 
 /**
@@ -89,79 +90,79 @@ export function katmanNitro<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: NitroAdapterOptions<TCtx> = {},
 ): (event: NitroEvent) => Promise<unknown> {
-  const flatRouter = compileRouter(router);
-  const prefix = options.prefix;
-  const signal = new AbortController().signal;
+  const flatRouter = compileRouter(router)
+  const prefix = options.prefix
+  const signal = new AbortController().signal
 
   return async (event: NitroEvent) => {
     // Resolve procedure path
-    let procedurePath: string;
+    let procedurePath: string
 
     // Option 1: FS routing — path comes from [...path] param
-    const pathParam = event.context.params?.path;
+    const pathParam = event.context.params?.path
     if (pathParam && !prefix) {
       // Nitro joins catch-all segments with "/"
-      procedurePath = pathParam;
+      procedurePath = pathParam
     } else {
       // Option 2: Explicit prefix — strip from event.path
-      const rawPath = event.path ?? event.url?.pathname ?? "/";
-      procedurePath = prefix ? stripPrefix(rawPath, prefix) : stripLeadingSlash(rawPath);
+      const rawPath = event.path ?? event.url?.pathname ?? '/'
+      procedurePath = prefix ? stripPrefix(rawPath, prefix) : stripLeadingSlash(rawPath)
     }
 
-    const route = flatRouter.get(procedurePath);
+    const route = flatRouter.get(procedurePath)
     if (!route) {
       return {
-        code: "NOT_FOUND",
+        code: 'NOT_FOUND',
         status: 404,
         message: `Procedure not found: ${procedurePath}`,
-      };
+      }
     }
 
     try {
       // Build context
-      const ctx: Record<string, unknown> = Object.create(null);
+      const ctx: Record<string, unknown> = Object.create(null)
       if (options.context) {
-        const baseCtx = await options.context(event);
-        const keys = Object.keys(baseCtx);
-        for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = baseCtx[keys[i]!];
+        const baseCtx = await options.context(event)
+        const keys = Object.keys(baseCtx)
+        for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = baseCtx[keys[i]!]
       }
 
       // Parse input
-      let input: unknown;
-      const method = event.req.method;
+      let input: unknown
+      const method = event.req.method
 
-      if (method === "POST" || method === "PUT" || method === "PATCH") {
+      if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
         // Nitro v3 / H3 v2: event.req.json()
-        input = await event.req.json().catch(() => undefined);
+        input = await event.req.json().catch(() => undefined)
       } else {
         // GET: check searchParams
-        const data = event.url.searchParams.get("data");
-        if (data) input = JSON.parse(data);
+        const data = event.url.searchParams.get('data')
+        if (data) input = JSON.parse(data)
       }
 
       // Execute compiled pipeline
-      const output = await route.handler(ctx, input, signal);
-      return output;
+      const output = await route.handler(ctx, input, signal)
+      return output
     } catch (error) {
       if (error instanceof ValidationError) {
         return {
-          code: "BAD_REQUEST",
+          code: 'BAD_REQUEST',
           status: 400,
           message: error.message,
           data: { issues: error.issues },
-        };
+        }
       }
-      const e = error instanceof KatmanError ? error : toKatmanError(error);
-      return e.toJSON();
+      const e = error instanceof KatmanError ? error : toKatmanError(error)
+      return e.toJSON()
     }
-  };
+  }
 }
 
 function stripPrefix(path: string, prefix: string): string {
-  const clean = path.startsWith(prefix) ? path.slice(prefix.length) : path;
-  return clean.startsWith("/") ? clean.slice(1) : clean;
+  const clean = path.startsWith(prefix) ? path.slice(prefix.length) : path
+  return clean.startsWith('/') ? clean.slice(1) : clean
 }
 
 function stripLeadingSlash(path: string): string {
-  return path.startsWith("/") ? path.slice(1) : path;
+  return path.startsWith('/') ? path.slice(1) : path
 }

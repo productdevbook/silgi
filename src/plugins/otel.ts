@@ -5,19 +5,19 @@
  * Zero OTel dependencies — uses a lightweight Tracer interface.
  */
 
-import type { WrapDef } from "../types.ts";
+import type { WrapDef } from '../types.ts'
 
 // ── Tracer Abstraction ──────────────────────────────
 
 export interface Span {
-  setAttribute(key: string, value: string | number | boolean): void;
-  setStatus(status: { code: number; message?: string }): void;
-  addEvent(name: string, attributes?: Record<string, unknown>): void;
-  end(): void;
+  setAttribute(key: string, value: string | number | boolean): void
+  setStatus(status: { code: number; message?: string }): void
+  addEvent(name: string, attributes?: Record<string, unknown>): void
+  end(): void
 }
 
 export interface Tracer {
-  startSpan(name: string, options?: { attributes?: Record<string, string | number | boolean> }): Span;
+  startSpan(name: string, options?: { attributes?: Record<string, string | number | boolean> }): Span
 }
 
 /**
@@ -36,27 +36,27 @@ export interface Tracer {
  * })
  * ```
  */
-export function otelWrap(tracer: Tracer, spanName = "rpc.call"): WrapDef {
+export function otelWrap(tracer: Tracer, spanName = 'rpc.call'): WrapDef {
   return {
-    kind: "wrap",
+    kind: 'wrap',
     fn: async (_ctx, next) => {
       const span = tracer.startSpan(spanName, {
-        attributes: { "rpc.system": "katman" },
-      });
+        attributes: { 'rpc.system': 'katman' },
+      })
 
       try {
-        const result = await next();
-        span.setStatus({ code: 0 });
-        return result;
+        const result = await next()
+        span.setStatus({ code: 0 })
+        return result
       } catch (error) {
-        span.setStatus({ code: 2, message: String(error) });
-        span.addEvent("exception", {
-          "exception.message": error instanceof Error ? error.message : String(error),
-        });
-        throw error;
+        span.setStatus({ code: 2, message: String(error) })
+        span.addEvent('exception', {
+          'exception.message': error instanceof Error ? error.message : String(error),
+        })
+        throw error
       } finally {
-        span.end();
+        span.end()
       }
     },
-  };
+  }
 }

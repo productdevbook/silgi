@@ -20,19 +20,19 @@
  * ```
  */
 
-import type { ProcedureDef, ErrorDef } from "./types.ts";
-import type { AnySchema, InferSchemaInput, InferSchemaOutput } from "./core/schema.ts";
-import { compileProcedure } from "./compile.ts";
+import { compileProcedure } from './compile.ts'
+
+import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
+import type { ProcedureDef, ErrorDef } from './types.ts'
 
 export interface CallableOptions<TCtx extends Record<string, unknown>> {
   /** Context factory — called on every invocation */
-  context: () => TCtx | Promise<TCtx>;
+  context: () => TCtx | Promise<TCtx>
 }
 
-type CallableFn<TInput, TOutput> =
-  undefined extends TInput
-    ? (input?: TInput) => Promise<TOutput>
-    : (input: TInput) => Promise<TOutput>;
+type CallableFn<TInput, TOutput> = undefined extends TInput
+  ? (input?: TInput) => Promise<TOutput>
+  : (input: TInput) => Promise<TOutput>
 
 /**
  * Convert a ProcedureDef into a directly callable async function.
@@ -40,25 +40,20 @@ type CallableFn<TInput, TOutput> =
  * Compiles the full pipeline (guards, wraps, validation) once,
  * then each call runs the compiled handler directly — no HTTP overhead.
  */
-export function callable<
-  TInput,
-  TOutput,
-  TErrors extends ErrorDef,
-  TCtx extends Record<string, unknown>,
->(
+export function callable<TInput, TOutput, TErrors extends ErrorDef, TCtx extends Record<string, unknown>>(
   procedure: ProcedureDef<any, TInput, TOutput, TErrors>,
   options: CallableOptions<TCtx>,
 ): CallableFn<TInput, TOutput> {
-  const handler = compileProcedure(procedure);
-  const contextFactory = options.context;
-  const signal = new AbortController().signal;
+  const handler = compileProcedure(procedure)
+  const contextFactory = options.context
+  const signal = new AbortController().signal
 
   return (async (input?: unknown) => {
-    const ctx = await contextFactory();
+    const ctx = await contextFactory()
     // Copy context properties into a fresh object (same as handler path)
-    const ctxObj: Record<string, unknown> = Object.create(null);
-    const keys = Object.keys(ctx);
-    for (let i = 0; i < keys.length; i++) ctxObj[keys[i]!] = ctx[keys[i]!];
-    return handler(ctxObj, input, signal);
-  }) as CallableFn<TInput, TOutput>;
+    const ctxObj: Record<string, unknown> = Object.create(null)
+    const keys = Object.keys(ctx)
+    for (let i = 0; i < keys.length; i++) ctxObj[keys[i]!] = ctx[keys[i]!]
+    return handler(ctxObj, input, signal)
+  }) as CallableFn<TInput, TOutput>
 }

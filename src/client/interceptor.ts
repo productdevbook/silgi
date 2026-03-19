@@ -22,30 +22,26 @@
  * ```
  */
 
-import type { ClientLink, ClientContext, ClientOptions } from "./types.ts";
+import type { ClientLink, ClientContext, ClientOptions } from './types.ts'
 
 export interface ClientInterceptors<TClientContext extends ClientContext = ClientContext> {
   /** Called before every request. Can modify input or options. */
   onRequest?: (event: {
-    path: readonly string[];
-    input: unknown;
-    options: ClientOptions<TClientContext>;
-  }) => void | Promise<void>;
+    path: readonly string[]
+    input: unknown
+    options: ClientOptions<TClientContext>
+  }) => void | Promise<void>
 
   /** Called after a successful response. */
   onResponse?: (event: {
-    path: readonly string[];
-    input: unknown;
-    output: unknown;
-    durationMs: number;
-  }) => void | Promise<void>;
+    path: readonly string[]
+    input: unknown
+    output: unknown
+    durationMs: number
+  }) => void | Promise<void>
 
   /** Called when a request fails. */
-  onError?: (event: {
-    path: readonly string[];
-    input: unknown;
-    error: unknown;
-  }) => void | Promise<void>;
+  onError?: (event: { path: readonly string[]; input: unknown; error: unknown }) => void | Promise<void>
 }
 
 /**
@@ -57,19 +53,15 @@ export function withInterceptors<TClientContext extends ClientContext = ClientCo
   interceptors: ClientInterceptors<TClientContext>,
 ): ClientLink<TClientContext> {
   return {
-    async call(
-      path: readonly string[],
-      input: unknown,
-      options: ClientOptions<TClientContext>,
-    ): Promise<unknown> {
+    async call(path: readonly string[], input: unknown, options: ClientOptions<TClientContext>): Promise<unknown> {
       if (interceptors.onRequest) {
-        await interceptors.onRequest({ path, input, options });
+        await interceptors.onRequest({ path, input, options })
       }
 
-      const t0 = performance.now();
+      const t0 = performance.now()
 
       try {
-        const output = await link.call(path, input, options);
+        const output = await link.call(path, input, options)
 
         if (interceptors.onResponse) {
           await interceptors.onResponse({
@@ -77,16 +69,16 @@ export function withInterceptors<TClientContext extends ClientContext = ClientCo
             input,
             output,
             durationMs: performance.now() - t0,
-          });
+          })
         }
 
-        return output;
+        return output
       } catch (error) {
         if (interceptors.onError) {
-          await interceptors.onError({ path, input, error });
+          await interceptors.onError({ path, input, error })
         }
-        throw error;
+        throw error
       }
     },
-  };
+  }
 }

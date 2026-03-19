@@ -15,23 +15,24 @@
  * ```
  */
 
-import type { GuardDef } from "../types.ts";
-import { KatmanError } from "../core/error.ts";
+import { KatmanError } from '../core/error.ts'
+
+import type { GuardDef } from '../types.ts'
 
 /**
  * Guard that rejects non-GET requests. Use on query procedures
  * to enforce RESTful method semantics and prevent CSRF.
  */
 export const strictGetGuard: GuardDef = {
-  kind: "guard",
+  kind: 'guard',
   fn: (ctx: Record<string, unknown>) => {
-    const method = ctx.method as string | undefined;
+    const method = ctx.method as string | undefined
     // Only block if method info is available and it's not GET/HEAD
-    if (method && method !== "GET" && method !== "HEAD") {
-      throw new KatmanError("METHOD_NOT_ALLOWED", {
+    if (method && method !== 'GET' && method !== 'HEAD') {
+      throw new KatmanError('METHOD_NOT_ALLOWED', {
         status: 405,
         message: `Expected GET, received ${method}`,
-      });
+      })
     }
   },
-};
+}

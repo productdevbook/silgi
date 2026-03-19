@@ -31,10 +31,8 @@ export async function prefetchQueries(
   queryClient: any,
   ...optionsArray: Array<{ queryKey: unknown; queryFn: Function } | Array<{ queryKey: unknown; queryFn: Function }>>
 ): Promise<void> {
-  const flat = optionsArray.flat();
-  await Promise.all(
-    flat.map((opts) => queryClient.prefetchQuery(opts)),
-  );
+  const flat = optionsArray.flat()
+  await Promise.all(flat.map((opts) => queryClient.prefetchQuery(opts)))
 }
 
 /**
@@ -43,19 +41,19 @@ export async function prefetchQueries(
  */
 export function dehydrate(queryClient: any): unknown {
   // Use TanStack Query's built-in dehydrate
-  if (typeof queryClient.dehydrate === "function") {
-    return queryClient.dehydrate();
+  if (typeof queryClient.dehydrate === 'function') {
+    return queryClient.dehydrate()
   }
   // Fallback: manual cache extraction
-  const cache = queryClient.getQueryCache?.();
-  if (!cache) return {};
+  const cache = queryClient.getQueryCache?.()
+  if (!cache) return {}
 
   const queries = cache.getAll().map((query: any) => ({
     queryKey: query.queryKey,
     state: query.state,
-  }));
+  }))
 
-  return { queries };
+  return { queries }
 }
 
 /**
@@ -67,26 +65,30 @@ export function createSSRSerializer() {
     serialize: (value: unknown): string => {
       return JSON.stringify(value, function (_key, val) {
         // JSON.stringify calls .toJSON() on Date before replacer, so check the original
-        const original = this[_key];
-        if (original instanceof Date) return { __type: "Date", value: original.toISOString() };
-        if (original instanceof Map) return { __type: "Map", value: Array.from(original.entries()) };
-        if (original instanceof Set) return { __type: "Set", value: Array.from(original) };
-        if (typeof original === "bigint") return { __type: "BigInt", value: original.toString() };
-        return val;
-      });
+        const original = this[_key]
+        if (original instanceof Date) return { __type: 'Date', value: original.toISOString() }
+        if (original instanceof Map) return { __type: 'Map', value: Array.from(original.entries()) }
+        if (original instanceof Set) return { __type: 'Set', value: Array.from(original) }
+        if (typeof original === 'bigint') return { __type: 'BigInt', value: original.toString() }
+        return val
+      })
     },
     deserialize: (text: string): unknown => {
       return JSON.parse(text, (_key, val) => {
-        if (val && typeof val === "object" && "__type" in val) {
+        if (val && typeof val === 'object' && '__type' in val) {
           switch (val.__type) {
-            case "Date": return new Date(val.value);
-            case "Map": return new Map(val.value);
-            case "Set": return new Set(val.value);
-            case "BigInt": return BigInt(val.value);
+            case 'Date':
+              return new Date(val.value)
+            case 'Map':
+              return new Map(val.value)
+            case 'Set':
+              return new Set(val.value)
+            case 'BigInt':
+              return BigInt(val.value)
           }
         }
-        return val;
-      });
+        return val
+      })
     },
-  };
+  }
 }

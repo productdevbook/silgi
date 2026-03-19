@@ -12,15 +12,15 @@
 
 export interface HandlerAnalysis {
   /** Handler uses ctx (context) */
-  usesContext: boolean;
+  usesContext: boolean
   /** Handler uses input */
-  usesInput: boolean;
+  usesInput: boolean
   /** Handler uses fail (error throwing) */
-  usesFail: boolean;
+  usesFail: boolean
   /** Handler uses signal (abort) */
-  usesSignal: boolean;
+  usesSignal: boolean
   /** Handler is async */
-  isAsync: boolean;
+  isAsync: boolean
 }
 
 /**
@@ -36,21 +36,21 @@ export interface HandlerAnalysis {
  * ```
  */
 export function analyzeHandler(fn: Function): HandlerAnalysis {
-  const src = fn.toString();
+  const src = fn.toString()
 
   // Detect destructuring pattern: ({ ctx, input, fail, signal })
   // Also handles renamed destructuring: ({ ctx: context, input: data })
   // And property access: opts.ctx, opts.input, etc.
 
-  const isAsync = src.startsWith("async ") || src.includes("__async");
+  const isAsync = src.startsWith('async ') || src.includes('__async')
 
   // Check for destructured parameter names or property access
-  const usesContext = /\bctx\b/.test(src) || /\.ctx\b/.test(src) || /\bcontext\b/.test(src);
-  const usesInput = /\binput\b/.test(src) || /\.input\b/.test(src);
-  const usesFail = /\bfail\b/.test(src) || /\.fail\b/.test(src);
-  const usesSignal = /\bsignal\b/.test(src) || /\.signal\b/.test(src);
+  const usesContext = /\bctx\b/.test(src) || /\.ctx\b/.test(src) || /\bcontext\b/.test(src)
+  const usesInput = /\binput\b/.test(src) || /\.input\b/.test(src)
+  const usesFail = /\bfail\b/.test(src) || /\.fail\b/.test(src)
+  const usesSignal = /\bsignal\b/.test(src) || /\.signal\b/.test(src)
 
-  return { usesContext, usesInput, usesFail, usesSignal, isAsync };
+  return { usesContext, usesInput, usesFail, usesSignal, isAsync }
 }
 
 /**
@@ -59,13 +59,13 @@ export function analyzeHandler(fn: Function): HandlerAnalysis {
  */
 export interface OptimizationHints {
   /** Skip body parsing entirely (handler doesn't use input) */
-  skipBodyParse: boolean;
+  skipBodyParse: boolean
   /** Skip context factory call (handler doesn't use context) */
-  skipContext: boolean;
+  skipContext: boolean
   /** Skip fail function creation (handler doesn't use fail) */
-  skipFail: boolean;
+  skipFail: boolean
   /** Handler is guaranteed sync (no async/await) */
-  guaranteedSync: boolean;
+  guaranteedSync: boolean
 }
 
 export function getOptimizationHints(analysis: HandlerAnalysis, hasInput: boolean): OptimizationHints {
@@ -74,5 +74,5 @@ export function getOptimizationHints(analysis: HandlerAnalysis, hasInput: boolea
     skipContext: !analysis.usesContext,
     skipFail: !analysis.usesFail,
     guaranteedSync: !analysis.isAsync,
-  };
+  }
 }

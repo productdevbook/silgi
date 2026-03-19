@@ -8,28 +8,28 @@
  * that JSON.stringify can't handle.
  */
 
-import { stringify, parse } from "devalue";
+import { stringify, parse } from 'devalue'
 
-export const DEVALUE_CONTENT_TYPE = "application/x-devalue+json";
+export const DEVALUE_CONTENT_TYPE = 'application/x-devalue+json'
 
 /** Serialize a value with devalue (handles Date, Map, Set, BigInt, etc.) */
 export function encode(value: unknown): string {
-  return stringify(value);
+  return stringify(value)
 }
 
 /** Deserialize a devalue string back to the original value */
 export function decode(text: string): unknown {
-  return parse(text);
+  return parse(text)
 }
 
 /** Check if request body uses devalue encoding */
 export function isDevalue(contentType: string | null | undefined): boolean {
-  if (!contentType) return false;
-  return contentType.includes(DEVALUE_CONTENT_TYPE);
+  if (!contentType) return false
+  return contentType.includes(DEVALUE_CONTENT_TYPE)
 }
 
 /** Check if client accepts devalue responses */
 export function acceptsDevalue(acceptHeader: string | null | undefined): boolean {
-  if (!acceptHeader) return false;
-  return acceptHeader.includes(DEVALUE_CONTENT_TYPE);
+  if (!acceptHeader) return false
+  return acceptHeader.includes(DEVALUE_CONTENT_TYPE)
 }

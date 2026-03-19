@@ -24,5 +24,5 @@
  * Each key maps to a separate client — they can use different links.
  */
 export function mergeClients<T extends Record<string, unknown>>(clients: T): T {
-  return clients;
+  return clients
 }

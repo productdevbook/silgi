@@ -7,20 +7,20 @@
 // ── Logger Interface (Pino-compatible) ──────────────
 
 export interface Logger {
-  child(bindings: Record<string, unknown>): Logger;
-  info(obj: Record<string, unknown>, msg?: string): void;
-  error(obj: Record<string, unknown>, msg?: string): void;
-  warn(obj: Record<string, unknown>, msg?: string): void;
-  debug(obj: Record<string, unknown>, msg?: string): void;
+  child(bindings: Record<string, unknown>): Logger
+  info(obj: Record<string, unknown>, msg?: string): void
+  error(obj: Record<string, unknown>, msg?: string): void
+  warn(obj: Record<string, unknown>, msg?: string): void
+  debug(obj: Record<string, unknown>, msg?: string): void
 }
 
 export interface LoggingOptions {
   /** The root logger instance */
-  logger: Logger;
+  logger: Logger
   /** Log request received events (default: true) */
-  logRequests?: boolean;
+  logRequests?: boolean
   /** Log response events (default: true) */
-  logResponses?: boolean;
+  logResponses?: boolean
 }
 
 /**
@@ -38,26 +38,23 @@ export interface LoggingOptions {
  * ```
  */
 export function loggingHooks(options: LoggingOptions) {
-  const { logger } = options;
-  const logRequests = options.logRequests ?? true;
-  const logResponses = options.logResponses ?? true;
+  const { logger } = options
+  const logRequests = options.logRequests ?? true
+  const logResponses = options.logResponses ?? true
 
   return {
     ...(logRequests && {
       request: ({ path, input }: { path: string; input: unknown }) => {
-        logger.info({ path, hasInput: input !== undefined }, "request received");
+        logger.info({ path, hasInput: input !== undefined }, 'request received')
       },
     }),
     ...(logResponses && {
       response: ({ path, durationMs }: { path: string; durationMs: number }) => {
-        logger.info({ path, durationMs: Math.round(durationMs * 100) / 100 }, "response sent");
+        logger.info({ path, durationMs: Math.round(durationMs * 100) / 100 }, 'response sent')
       },
     }),
     error: ({ path, error }: { path: string; error: unknown }) => {
-      logger.error(
-        { path, error: error instanceof Error ? error.message : String(error) },
-        "request error",
-      );
+      logger.error({ path, error: error instanceof Error ? error.message : String(error) }, 'request error')
     },
-  };
+  }
 }

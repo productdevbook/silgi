@@ -1,36 +1,39 @@
-import { describe, it, expect } from "vitest";
-import { z } from "zod";
-import { katman, KatmanError } from "#src/katman.ts";
+import { describe, it, expect } from 'vitest'
+import { z } from 'zod'
 
-const k = katman({ context: () => ({ db: "test" }) });
+import { katman, KatmanError } from '#src/katman.ts'
+
+const k = katman({ context: () => ({ db: 'test' }) })
 
 const testRouter = k.router({
-  health: k.query(() => ({ status: "ok" })),
+  health: k.query(() => ({ status: 'ok' })),
   echo: k.query(z.object({ msg: z.string() }), ({ input }) => ({ echo: input.msg })),
   greet: k.mutation(z.object({ name: z.string() }), ({ input }) => ({ hello: input.name })),
-  fail: k.query(() => { throw new KatmanError("NOT_FOUND", { message: "nope" }); }),
-});
+  fail: k.query(() => {
+    throw new KatmanError('NOT_FOUND', { message: 'nope' })
+  }),
+})
 
-describe("katmanRemix() — real Request/Response", () => {
-  it("handles real Fetch API requests", async () => {
-    const { katmanRemix } = await import("#src/adapters/remix.ts");
-    const handler = katmanRemix(testRouter, { prefix: "/rpc" });
+describe('katmanRemix() — real Request/Response', () => {
+  it('handles real Fetch API requests', async () => {
+    const { katmanRemix } = await import('#src/adapters/remix.ts')
+    const handler = katmanRemix(testRouter, { prefix: '/rpc' })
 
     const r1 = await handler({
-      request: new Request("http://localhost/rpc/health", { method: "POST" }),
+      request: new Request('http://localhost/rpc/health', { method: 'POST' }),
       params: {},
-    });
-    expect(r1.status).toBe(200);
-    expect(await r1.json()).toEqual({ status: "ok" });
+    })
+    expect(r1.status).toBe(200)
+    expect(await r1.json()).toEqual({ status: 'ok' })
 
     const r2 = await handler({
-      request: new Request("http://localhost/rpc/greet", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "Remix" }),
+      request: new Request('http://localhost/rpc/greet', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'Remix' }),
       }),
       params: {},
-    });
-    expect(await r2.json()).toEqual({ hello: "Remix" });
-  });
-});
+    })
+    expect(await r2.json()).toEqual({ hello: 'Remix' })
+  })
+})

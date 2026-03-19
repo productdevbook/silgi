@@ -5,65 +5,66 @@
  * Pluggable: swap MemoryRateLimiter for Redis/Upstash/etc.
  */
 
-import type { GuardDef } from "../types.ts";
-import { KatmanError } from "../core/error.ts";
+import { KatmanError } from '../core/error.ts'
+
+import type { GuardDef } from '../types.ts'
 
 // ── Rate Limiter Interface ──────────────────────────
 
 export interface RateLimitResult {
-  success: boolean;
-  limit: number;
-  remaining: number;
-  reset: number; // Unix timestamp in ms
+  success: boolean
+  limit: number
+  remaining: number
+  reset: number // Unix timestamp in ms
 }
 
 export interface RateLimiter {
-  limit(key: string): Promise<RateLimitResult>;
+  limit(key: string): Promise<RateLimitResult>
 }
 
 // ── In-Memory Rate Limiter (Sliding Window) ─────────
 
 export interface MemoryRateLimiterOptions {
   /** Maximum requests per window */
-  limit: number;
+  limit: number
   /** Window duration in milliseconds */
-  windowMs: number;
+  windowMs: number
 }
 
 export class MemoryRateLimiter implements RateLimiter {
-  #limit: number;
-  #windowMs: number;
-  #store = new Map<string, number[]>();
+  #limit: number
+  #windowMs: number
+  #store = new Map<string, number[]>()
 
   constructor(options: MemoryRateLimiterOptions) {
-    this.#limit = options.limit;
-    this.#windowMs = options.windowMs;
+    this.#limit = options.limit
+    this.#windowMs = options.windowMs
   }
 
   async limit(key: string): Promise<RateLimitResult> {
-    const now = Date.now();
-    const windowStart = now - this.#windowMs;
+    const now = Date.now()
+    const windowStart = now - this.#windowMs
 
-    let timestamps = this.#store.get(key);
+    let timestamps = this.#store.get(key)
     if (!timestamps) {
-      timestamps = [];
-      this.#store.set(key, timestamps);
+      timestamps = []
+      this.#store.set(key, timestamps)
     }
 
     // Remove expired
     while (timestamps.length > 0 && timestamps[0]! < windowStart) {
-      timestamps.shift();
+      timestamps.shift()
     }
 
-    const remaining = Math.max(0, this.#limit - timestamps.length);
-    const reset = timestamps.length > 0 ? timestamps[0]! + this.#windowMs : now + this.#windowMs;
+    const remaining = Math.max(0, this.#limit - timestamps.length)
+    const reset = timestamps.length > 0 ? timestamps[0]! + this.#windowMs : now + this.#windowMs
 
     if (timestamps.length >= this.#limit) {
-      return { success: false, limit: this.#limit, remaining: 0, reset };
+      return { success: false, limit: this.#limit, remaining: 0, reset }
     }
 
-    timestamps.push(now);
-    return { success: true, limit: this.#limit, remaining: remaining - 1, reset };
+    timestamps.push(now)
+    return { success: true, limit: this.#limit, remaining: remaining - 1, reset }
   }
 }
 
@@ -71,11 +72,11 @@ export class MemoryRateLimiter implements RateLimiter {
 
 export interface RateLimitGuardOptions {
   /** The rate limiter instance */
-  limiter: RateLimiter;
+  limiter: RateLimiter
   /** Extract rate limit key from context */
-  keyFn: (ctx: Record<string, unknown>) => string | Promise<string>;
+  keyFn: (ctx: Record<string, unknown>) => string | Promise<string>
   /** Custom error message */
-  message?: string;
+  message?: string
 }
 
 /**
@@ -98,25 +99,25 @@ export interface RateLimitGuardOptions {
  */
 export function rateLimitGuard(options: RateLimitGuardOptions): GuardDef<any, any> {
   return {
-    kind: "guard",
+    kind: 'guard',
     fn: async (ctx: any) => {
-      const key = await options.keyFn(ctx);
-      const result = await options.limiter.limit(key);
+      const key = await options.keyFn(ctx)
+      const result = await options.limiter.limit(key)
 
       if (!result.success) {
-        throw new KatmanError("TOO_MANY_REQUESTS", {
+        throw new KatmanError('TOO_MANY_REQUESTS', {
           status: 429,
-          message: options.message ?? "Rate limit exceeded",
+          message: options.message ?? 'Rate limit exceeded',
           data: {
             limit: result.limit,
             remaining: result.remaining,
             reset: result.reset,
             retryAfter: Math.ceil((result.reset - Date.now()) / 1000),
           },
-        });
+        })
       }
 
-      return { rateLimit: result };
+      return { rateLimit: result }
     },
-  };
+  }
 }

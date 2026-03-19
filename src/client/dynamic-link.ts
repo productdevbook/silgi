@@ -18,32 +18,27 @@
  * ```
  */
 
-import type { ClientLink, ClientContext, ClientOptions } from "./types.ts";
+import type { ClientLink, ClientContext, ClientOptions } from './types.ts'
 
 export type LinkSelector<TClientContext extends ClientContext = ClientContext> = (
   path: readonly string[],
   input: unknown,
   options: ClientOptions<TClientContext>,
-) => ClientLink<TClientContext>;
+) => ClientLink<TClientContext>
 
 /**
  * A link that delegates to other links based on a selector function.
  * The selector runs on every call, so it can use dynamic state.
  */
-export class DynamicLink<TClientContext extends ClientContext = ClientContext>
-  implements ClientLink<TClientContext> {
-  #selector: LinkSelector<TClientContext>;
+export class DynamicLink<TClientContext extends ClientContext = ClientContext> implements ClientLink<TClientContext> {
+  #selector: LinkSelector<TClientContext>
 
   constructor(selector: LinkSelector<TClientContext>) {
-    this.#selector = selector;
+    this.#selector = selector
   }
 
-  call(
-    path: readonly string[],
-    input: unknown,
-    options: ClientOptions<TClientContext>,
-  ): Promise<unknown> {
-    const link = this.#selector(path, input, options);
-    return link.call(path, input, options);
+  call(path: readonly string[], input: unknown, options: ClientOptions<TClientContext>): Promise<unknown> {
+    const link = this.#selector(path, input, options)
+    return link.call(path, input, options)
   }
 }

@@ -28,28 +28,28 @@
 
 export interface TypeHandler<T = unknown> {
   /** Test if a value is this type */
-  test: (value: unknown) => boolean;
+  test: (value: unknown) => boolean
   /** Convert to JSON-safe value */
-  serialize: (value: T) => unknown;
+  serialize: (value: T) => unknown
   /** Convert back from JSON-safe value */
-  deserialize: (value: unknown) => T;
+  deserialize: (value: unknown) => T
 }
 
 export interface Serializer {
   /** Register a custom type handler. Returns self for chaining. */
-  register<T>(tag: string, handler: TypeHandler<T>): Serializer;
+  register<T>(tag: string, handler: TypeHandler<T>): Serializer
   /** JSON.stringify replacer function */
-  replacer: (key: string, value: unknown) => unknown;
+  replacer: (key: string, value: unknown) => unknown
   /** JSON.parse reviver function */
-  reviver: (key: string, value: unknown) => unknown;
+  reviver: (key: string, value: unknown) => unknown
   /** Stringify with custom types */
-  stringify: (value: unknown) => string;
+  stringify: (value: unknown) => string
   /** Parse with custom types */
-  parse: (text: string) => unknown;
+  parse: (text: string) => unknown
 }
 
-const TYPE_TAG = "__$type";
-const VALUE_TAG = "__$value";
+const TYPE_TAG = '__$type'
+const VALUE_TAG = '__$value'
 
 /**
  * Create a custom serializer with support for non-JSON types.
@@ -58,39 +58,36 @@ const VALUE_TAG = "__$value";
  * during stringify and unwrapped during parse.
  */
 export function createSerializer(): Serializer {
-  const handlers = new Map<string, TypeHandler>();
+  const handlers = new Map<string, TypeHandler>()
 
   const replacer = (_key: string, value: unknown): unknown => {
     for (const [tag, handler] of handlers) {
       if (handler.test(value)) {
-        return { [TYPE_TAG]: tag, [VALUE_TAG]: handler.serialize(value as any) };
+        return { [TYPE_TAG]: tag, [VALUE_TAG]: handler.serialize(value as any) }
       }
     }
-    return value;
-  };
+    return value
+  }
 
   const reviver = (_key: string, value: unknown): unknown => {
-    if (
-      typeof value === "object" && value !== null &&
-      TYPE_TAG in value && VALUE_TAG in value
-    ) {
-      const tag = (value as any)[TYPE_TAG] as string;
-      const handler = handlers.get(tag);
-      if (handler) return handler.deserialize((value as any)[VALUE_TAG]);
+    if (typeof value === 'object' && value !== null && TYPE_TAG in value && VALUE_TAG in value) {
+      const tag = (value as any)[TYPE_TAG] as string
+      const handler = handlers.get(tag)
+      if (handler) return handler.deserialize((value as any)[VALUE_TAG])
     }
-    return value;
-  };
+    return value
+  }
 
   const serializer: Serializer = {
     register(tag, handler) {
-      handlers.set(tag, handler as TypeHandler);
-      return serializer;
+      handlers.set(tag, handler as TypeHandler)
+      return serializer
     },
     replacer,
     reviver,
     stringify: (value) => JSON.stringify(value, replacer),
     parse: (text) => JSON.parse(text, reviver),
-  };
+  }
 
-  return serializer;
+  return serializer
 }

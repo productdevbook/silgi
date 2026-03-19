@@ -22,7 +22,7 @@
  * ```
  */
 
-import type { WrapDef } from "./types.ts";
+import type { WrapDef } from './types.ts'
 
 /**
  * Create a wrap that transforms the procedure input before execution.
@@ -35,17 +35,15 @@ import type { WrapDef } from "./types.ts";
  * (not on ctx), mapInput works as a wrap that intercepts and transforms
  * before calling next().
  */
-export function mapInput<TIn = unknown, TOut = unknown>(
-  mapper: (input: TIn) => TOut | Promise<TOut>,
-): WrapDef {
+export function mapInput<TIn = unknown, TOut = unknown>(mapper: (input: TIn) => TOut | Promise<TOut>): WrapDef {
   return {
-    kind: "wrap",
+    kind: 'wrap',
     fn: async (ctx, next) => {
       // Access the raw input from context (set by the pipeline)
-      const rawInput = (ctx as any).__rawInput;
-      const mapped = await mapper(rawInput as TIn);
-      (ctx as any).__rawInput = mapped;
-      return next();
+      const rawInput = (ctx as any).__rawInput
+      const mapped = await mapper(rawInput as TIn)
+      ;(ctx as any).__rawInput = mapped
+      return next()
     },
-  };
+  }
 }

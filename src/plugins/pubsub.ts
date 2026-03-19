@@ -29,32 +29,32 @@
 // ── PubSub Backend Interface ─────────────────────────
 
 export interface PubSubBackend {
-  publish(channel: string, data: unknown): Promise<void>;
-  subscribe(channel: string, callback: (data: unknown) => void): () => void;
+  publish(channel: string, data: unknown): Promise<void>
+  subscribe(channel: string, callback: (data: unknown) => void): () => void
 }
 
 // ── Memory Backend ───────────────────────────────────
 
 export class MemoryPubSub implements PubSubBackend {
-  #listeners = new Map<string, Set<(data: unknown) => void>>();
+  #listeners = new Map<string, Set<(data: unknown) => void>>()
 
   async publish(channel: string, data: unknown): Promise<void> {
-    const listeners = this.#listeners.get(channel);
-    if (!listeners) return;
-    for (const cb of listeners) cb(data);
+    const listeners = this.#listeners.get(channel)
+    if (!listeners) return
+    for (const cb of listeners) cb(data)
   }
 
   subscribe(channel: string, callback: (data: unknown) => void): () => void {
-    let set = this.#listeners.get(channel);
+    let set = this.#listeners.get(channel)
     if (!set) {
-      set = new Set();
-      this.#listeners.set(channel, set);
+      set = new Set()
+      this.#listeners.set(channel, set)
     }
-    set.add(callback);
+    set.add(callback)
     return () => {
-      set!.delete(callback);
-      if (set!.size === 0) this.#listeners.delete(channel);
-    };
+      set!.delete(callback)
+      if (set!.size === 0) this.#listeners.delete(channel)
+    }
   }
 }
 
@@ -62,9 +62,9 @@ export class MemoryPubSub implements PubSubBackend {
 
 export interface Publisher {
   /** Publish an event to a channel */
-  publish(channel: string, data: unknown): Promise<void>;
+  publish(channel: string, data: unknown): Promise<void>
   /** Subscribe to a channel — returns an async iterable for use in subscriptions */
-  subscribe<T = unknown>(channel: string): AsyncGenerator<T, void, unknown>;
+  subscribe<T = unknown>(channel: string): AsyncGenerator<T, void, unknown>
 }
 
 /**
@@ -78,28 +78,30 @@ export function createPublisher(backend: PubSubBackend): Publisher {
     publish: (channel, data) => backend.publish(channel, data),
 
     async *subscribe<T = unknown>(channel: string): AsyncGenerator<T, void, unknown> {
-      const queue: T[] = [];
-      let resolve: (() => void) | null = null;
+      const queue: T[] = []
+      let resolve: (() => void) | null = null
 
       const unsubscribe = backend.subscribe(channel, (data) => {
-        queue.push(data as T);
+        queue.push(data as T)
         if (resolve) {
-          resolve();
-          resolve = null;
+          resolve()
+          resolve = null
         }
-      });
+      })
 
       try {
         while (true) {
           if (queue.length > 0) {
-            yield queue.shift()!;
+            yield queue.shift()!
           } else {
-            await new Promise<void>((r) => { resolve = r; });
+            await new Promise<void>((r) => {
+              resolve = r
+            })
           }
         }
       } finally {
-        unsubscribe();
+        unsubscribe()
       }
     },
-  };
+  }
 }
