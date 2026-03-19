@@ -116,6 +116,17 @@ describe("lifecycleWrap()", () => {
   });
 });
 
+// ── mapInput ──────────────────────────────────────────
+
+describe("mapInput()", () => {
+  it("creates a wrap middleware", () => {
+    const { mapInput } = require("../src/map-input.ts");
+    const mapper = mapInput((input: any) => ({ id: input.userId }));
+    expect(mapper.kind).toBe("wrap");
+    expect(typeof mapper.fn).toBe("function");
+  });
+});
+
 // ── bodyLimitGuard ────────────────────────────────────
 
 describe("bodyLimitGuard()", () => {
