@@ -200,8 +200,7 @@ function createProcedure(type: ProcedureType, ...args: unknown[]): ProcedureDef 
     }
   }
 
-  // No config form — use builder: k.query().$input(s).$resolve(fn)
-  throw new Error(`[katman] Config form removed. Use builder: k.${type}().$input(schema).$resolve(fn)`)
+  throw new TypeError(`Invalid arguments for ${type}()`)
 }
 
 /**

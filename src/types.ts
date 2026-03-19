@@ -124,7 +124,6 @@ export interface ResolveContext<TCtx, TInput, TErrors extends ErrorDef> {
 
 // ── Config Forms ──────────────────────────────────
 
-// Config forms removed — use builder pattern: k.query().$input(s).$output(s).$resolve(fn)
 
 // ── Router Types ──────────────────────────────────
 

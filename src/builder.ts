@@ -1,17 +1,13 @@
 /**
- * Procedure Builder — chainable API with IDE autocomplete for output schemas.
- *
- * Alternative to the config object form. Both produce the same ProcedureDef.
+ * Procedure Builder — chainable $-prefixed API with IDE autocomplete.
  *
  * @example
  * ```ts
- * // Config form (existing):
- * const p = k.query({ output: PostSchema, resolve: () => ({ ... }) })
- *
- * // Builder form (new — autocomplete on return type):
  * const p = k.query()
- *   .output(PostSchema)
- *   .resolve(() => ({ ... }))  // ← autocomplete for id, title, body
+ *   .$input(inputSchema)
+ *   .$output(PostSchema)
+ *   .$resolve(() => ({ id: 1, title: 'hi', body: 'x' }))
+ *   // ← autocomplete suggests id, title, body
  * ```
  */
 
