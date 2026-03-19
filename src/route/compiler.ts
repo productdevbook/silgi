@@ -21,10 +21,10 @@ export function compileRouter<T>(
 
   if (!sw && !dyn) return () => undefined
 
-  const norm = 'if(p.length>1&&p.charCodeAt(p.length-1)===47)p=p.slice(0,-1);'
+  // Skip normalize — caller should ensure clean paths
   return new Function(
     ...refs.map((_, i) => `$${i}`),
-    `${pre.join(';')};return(m,p)=>{${norm}${sw}${dyn}}`,
+    `${pre.join(';')};return(m,p)=>{${sw}${dyn}}`,
   )(...refs)
 }
 
