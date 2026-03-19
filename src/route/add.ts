@@ -108,7 +108,7 @@ export function addRoute<T>(
     node = node.static![segment]!
   }
 
-  _setMethod(node, method, data, paramMap, paramRegex, hasRegex)
+  _setMethod(node, method, data, paramMap, paramRegex, hasRegex, !isStatic && _lastIsCatchAll(segments))
 
   // Cache fully static routes for O(1) lookup
   if (isStatic) {
@@ -128,17 +128,25 @@ function _setMethod<T>(
   paramMap: ParamMapEntry[],
   paramRegex: RegExp[],
   hasRegex: boolean,
+  catchAll: boolean,
 ): void {
   if (!node.methods) node.methods = Object.create(null)
   const entry: MethodEntry<T> = {
     data,
     paramMap: paramMap.length > 0 ? paramMap : undefined,
     paramRegex,
+    catchAll: catchAll || undefined,
   }
   if (hasRegex) node.hasRegex = true
 
-  // Append to method entries (supports multiple routes on same node with different regex)
   const key = method || ''
   if (!node.methods![key]) node.methods![key] = []
   node.methods![key]!.push(entry)
+}
+
+/** Check if the last segment is a catch-all pattern */
+function _lastIsCatchAll(segments: string[]): boolean {
+  if (segments.length === 0) return false
+  const last = segments[segments.length - 1]!
+  return last === '**' || last.startsWith('**:') || last.endsWith('+') || last.endsWith('*')
 }

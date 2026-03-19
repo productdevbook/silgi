@@ -1,19 +1,14 @@
 /**
- * Find a route by method and path.
+ * Find a route by method and path — zero-allocation hot path.
  *
- * Optimized lookup order:
- * 1. Static cache (Map O(1)) — most common case
- * 2. Radix tree traversal — params/wildcards
+ * Static routes: direct property access (O(1))
+ * Dynamic routes: index-based string traversal (no split/array)
  */
-
-import { splitPath } from './utils.ts'
 
 import type { RouterContext, RouteNode, MethodEntry, MatchedRoute, ParamMapEntry } from './types.ts'
 
 /**
  * Find a matching route for a given method and path.
- *
- * Returns `{ data, params }` or `undefined` if no match.
  */
 export function findRoute<T>(
   ctx: RouterContext<T>,
@@ -21,30 +16,47 @@ export function findRoute<T>(
   path: string,
 ): MatchedRoute<T> | undefined {
   // Normalize trailing slash
-  if (path.length > 1 && path.charCodeAt(path.length - 1) === 47) {
+  const len = path.length
+  if (len > 1 && path.charCodeAt(len - 1) === 47) {
     path = path.slice(0, -1)
   }
 
-  // Fast path: static route cache (O(1))
+  // Fast path: static route cache
   const staticNode = ctx.static[path]
   if (staticNode?.methods) {
     const entries = staticNode.methods[method] || staticNode.methods['']
     if (entries) return { data: entries[0]!.data }
   }
 
-  // Tree traversal
-  const segments = splitPath(path)
+  // Segment-by-segment tree traversal
+  // We still need segments for param extraction, but collect lazily
+  const segments: string[] = []
+  let pos = path.charCodeAt(0) === 47 ? 1 : 0
+  const end = path.length
+
+  // Extract segments while traversing
+  while (pos < end) {
+    const nextSlash = path.indexOf('/', pos)
+    const segEnd = nextSlash === -1 ? end : nextSlash
+    segments.push(path.slice(pos, segEnd))
+    pos = segEnd + 1
+  }
+
+  if (segments.length === 0 && path === '/') {
+    // Root path — check root node
+    if (ctx.root.methods) {
+      const entries = ctx.root.methods[method] || ctx.root.methods['']
+      if (entries) return { data: entries[0]!.data }
+    }
+    return undefined
+  }
+
   const match = _lookup(ctx.root, method, segments, 0)
   if (!match) return undefined
 
-  // Extract params
   if (match.paramMap) {
-    return {
-      data: match.data,
-      params: _extractParams(segments, match.paramMap),
-    }
+    return { data: match.data, params: _extractParams(segments, match.paramMap, match.catchAll) }
   }
-
   return { data: match.data }
 }
 
@@ -54,40 +66,32 @@ function _lookup<T>(
   segments: string[],
   index: number,
 ): MethodEntry<T> | undefined {
-  // End of path
   if (index === segments.length) {
+    // Check current node
     if (node.methods) {
       const entries = node.methods[method] || node.methods['']
       if (entries) return entries[0]
     }
-    // Fallback: optional param child
+    // Optional param fallback
     if (node.param?.methods) {
       const entries = node.param.methods[method] || node.param.methods['']
-      if (entries) {
-        const e = entries[0]!
-        if (e.paramMap?.[e.paramMap.length - 1]?.[2] /* optional */) return e
-      }
+      if (entries?.[0]?.paramMap?.[entries[0].paramMap.length - 1]?.[2]) return entries[0]
     }
-    // Fallback: wildcard child
+    // Wildcard fallback (** matches zero segments)
     if (node.wildcard?.methods) {
       const entries = node.wildcard.methods[method] || node.wildcard.methods['']
-      if (entries) {
-        const e = entries[0]!
-        if (e.paramMap?.[e.paramMap.length - 1]?.[2] /* optional */) return e
-      }
+      if (entries) return entries[0]
     }
     return undefined
   }
 
   const segment = segments[index]!
 
-  // 1. Static child
-  if (node.static) {
-    const child = node.static[segment]
-    if (child) {
-      const match = _lookup(child, method, segments, index + 1)
-      if (match) return match
-    }
+  // 1. Static child (highest priority, fastest)
+  const staticChild = node.static?.[segment]
+  if (staticChild) {
+    const match = _lookup(staticChild, method, segments, index + 1)
+    if (match) return match
   }
 
   // 2. Param child
@@ -97,12 +101,14 @@ function _lookup<T>(
       // Regex constraint check
       if (node.param.hasRegex && match.paramRegex[index]) {
         if (!match.paramRegex[index]!.test(segment)) {
-          // Try next entry (unconstrained fallback)
-          // Re-lookup to find unconstrained match
-          const entries = _getEntries(node.param, method, segments, index + 1)
-          if (entries) {
-            for (const e of entries) {
-              if (!e.paramRegex[index] || e.paramRegex[index]!.test(segment)) return e
+          // Try unconstrained fallback at same node
+          if (index + 1 === segments.length && node.param.methods) {
+            const entries = node.param.methods[method] || node.param.methods['']
+            if (entries) {
+              for (let e = 0; e < entries.length; e++) {
+                const entry = entries[e]!
+                if (!entry.paramRegex[index] || entry.paramRegex[index]!.test(segment)) return entry
+              }
             }
           }
           return undefined
@@ -112,7 +118,7 @@ function _lookup<T>(
     }
   }
 
-  // 3. Wildcard child (catch-all)
+  // 3. Wildcard catch-all
   if (node.wildcard?.methods) {
     const entries = node.wildcard.methods[method] || node.wildcard.methods['']
     if (entries) return entries[0]
@@ -121,37 +127,22 @@ function _lookup<T>(
   return undefined
 }
 
-/** Get all method entries at a terminal node */
-function _getEntries<T>(
-  node: RouteNode<T>,
-  method: string,
-  segments: string[],
-  index: number,
-): MethodEntry<T>[] | undefined {
-  if (index === segments.length && node.methods) {
-    return node.methods[method] || node.methods['']
-  }
-  return undefined
-}
-
-/** Extract params from segments using the param map */
 function _extractParams(
   segments: string[],
   paramMap: ParamMapEntry[],
+  catchAll?: boolean,
 ): Record<string, string> {
   const params: Record<string, string> = Object.create(null)
   for (let i = 0; i < paramMap.length; i++) {
-    const [idx, name, _optional] = paramMap[i]!
+    const [idx, name] = paramMap[i]!
     const paramName = typeof name === 'string' ? name : String(i)
-
     if (idx >= segments.length) continue
 
-    // Last param entry with remaining segments → wildcard catch-all
-    if (i === paramMap.length - 1 && idx < segments.length - 1) {
+    // Catch-all: join remaining segments
+    if (catchAll && i === paramMap.length - 1) {
       params[paramName] = segments.slice(idx).join('/')
       continue
     }
-
     params[paramName] = segments[idx]!
   }
   return params
