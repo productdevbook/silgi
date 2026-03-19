@@ -246,15 +246,16 @@ const getConfig = k.query({
 })
 ```
 
-| Value    | Behavior |
-| -------- | -------- |
+| Value    | Behavior                                          |
+| -------- | ------------------------------------------------- |
 | `number` | Sets `Cache-Control: public, max-age=N` (seconds) |
-| `string` | Sets the exact `Cache-Control` header value |
+| `string` | Sets the exact `Cache-Control` header value       |
 
 The cache header is compiled once at startup and added to every response for that procedure — zero per-request overhead.
 
 <Callout type='info'>
-  Caching only applies to query procedures. Mutations and subscriptions never get Cache-Control headers, even if you set `cache` on them.
+  Caching only applies to query procedures. Mutations and subscriptions never get Cache-Control headers, even if you set
+  `cache` on them.
 </Callout>
 
 ## HTTP/2

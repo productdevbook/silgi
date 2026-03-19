@@ -92,7 +92,7 @@ export function isDefinedError<TError>(error: TError): error is TError & KatmanE
 export function toKatmanError(error: unknown): KatmanError {
   if (error instanceof KatmanError) return error
   return new KatmanError('INTERNAL_SERVER_ERROR', {
-    message: error instanceof Error ? error.message : 'Unknown error',
+    message: 'Internal server error',
     cause: error,
   })
 }

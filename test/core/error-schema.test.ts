@@ -43,10 +43,14 @@ describe('KatmanError', () => {
     expect(isDefinedError(notDefined)).toBe(false)
   })
 
-  it('toKatmanError wraps unknown errors', () => {
+  it('toKatmanError wraps unknown errors without leaking internal message', () => {
     const err = toKatmanError(new Error('boom'))
     expect(err.code).toBe('INTERNAL_SERVER_ERROR')
-    expect(err.message).toBe('boom')
+    // Internal error messages must not be exposed to clients
+    expect(err.message).toBe('Internal server error')
+    // Original error preserved as cause for server-side logging
+    expect(err.cause).toBeInstanceOf(Error)
+    expect((err.cause as Error).message).toBe('boom')
   })
 
   it('toKatmanError passes through KatmanError', () => {

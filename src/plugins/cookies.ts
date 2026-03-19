@@ -77,7 +77,11 @@ export function setCookie(name: string, value: string, options: CookieOptions = 
   if (maxAge !== undefined) cookie += `; Max-Age=${maxAge}`
   if (expires) cookie += `; Expires=${expires.toUTCString()}`
   if (httpOnly) cookie += '; HttpOnly'
-  if (secure ?? (typeof globalThis.process !== 'undefined' && globalThis.process.env?.NODE_ENV === 'production')) {
+  if (
+    secure ??
+    (sameSite === 'none' ||
+      (typeof globalThis.process !== 'undefined' && globalThis.process.env?.NODE_ENV === 'production'))
+  ) {
     cookie += '; Secure'
   }
   cookie += `; SameSite=${sameSite.charAt(0).toUpperCase() + sameSite.slice(1)}`

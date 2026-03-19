@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
-
-import { scalarHTML, generateOpenAPI, resolveScalarLocal } from '#src/scalar.ts'
-import { katman } from '#src/katman.ts'
 import { z } from 'zod'
+
+import { katman } from '#src/katman.ts'
+import { scalarHTML, generateOpenAPI, resolveScalarLocal } from '#src/scalar.ts'
 
 describe('scalarHTML', () => {
   it('uses jsdelivr CDN by default', () => {

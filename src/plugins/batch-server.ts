@@ -55,7 +55,6 @@ export function createBatchHandler<TCtx extends Record<string, unknown>>(
 ): (request: Request) => Promise<Response> {
   const flatRouter = compileRouter(router)
   const { maxBatchSize = 50 } = options
-  const signal = new AbortController().signal
 
   return async (request: Request): Promise<Response> => {
     if (request.method !== 'POST') {
@@ -92,7 +91,7 @@ export function createBatchHandler<TCtx extends Record<string, unknown>>(
       calls.map(async (call): Promise<BatchResponse> => {
         const route = flatRouter.get(call.path)
         if (!route) {
-          return { error: { code: 'NOT_FOUND', status: 404, message: `Procedure not found: ${call.path}` } }
+          return { error: { code: 'NOT_FOUND', status: 404, message: 'Procedure not found' } }
         }
 
         try {
@@ -100,7 +99,7 @@ export function createBatchHandler<TCtx extends Record<string, unknown>>(
           const keys = Object.keys(baseCtx)
           for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = baseCtx[keys[i]!]
 
-          const output = await route.handler(ctx, call.input, signal)
+          const output = await route.handler(ctx, call.input, request.signal)
           return { data: output }
         } catch (error) {
           if (error instanceof ValidationError) {

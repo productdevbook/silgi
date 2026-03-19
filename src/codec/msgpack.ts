@@ -16,22 +16,43 @@ export const MSGPACK_CONTENT_TYPE = 'application/x-msgpack'
  * Stateless msgpack codec — for request/response (no connection persistence).
  * Records disabled for cross-request compatibility.
  */
-const codec = new Packr({
+const encoder = new Packr({
   useRecords: false,
-  moreTypes: true, // Date, Set, Map, Error, RegExp
+  moreTypes: true, // Date, Set, Map for outbound responses
+  int64AsType: 'number',
+})
+
+const decoder = new Packr({
+  useRecords: false,
+  moreTypes: false, // No Error/RegExp from untrusted input
   int64AsType: 'number',
 })
 
 /** Encode a value to MessagePack binary (usable as Response body) */
 export function encode(value: unknown): BodyInit {
-  const buf = codec.pack(value)
+  const buf = encoder.pack(value)
   // Return ArrayBuffer slice — compatible with Response constructor
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
 }
 
-/** Decode a MessagePack Buffer to a value */
+/** Decode a MessagePack Buffer to a value (safe for untrusted input) */
 export function decode(buf: Buffer | Uint8Array): unknown {
-  return codec.unpack(buf)
+  return sanitizeDecoded(decoder.unpack(buf))
+}
+
+/** Strip unsafe types (Error, RegExp) that msgpackr may deserialize from untrusted input */
+function sanitizeDecoded(value: unknown): unknown {
+  if (value === null || value === undefined) return value
+  if (typeof value !== 'object') return value
+  if (value instanceof Error) return { message: (value as Error).message }
+  if (value instanceof RegExp) return String(value)
+  if (Array.isArray(value)) return value.map(sanitizeDecoded)
+  if (value instanceof Date || value instanceof Map || value instanceof Set) return value
+  const result: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(value)) {
+    result[k] = sanitizeDecoded(v)
+  }
+  return result
 }
 
 /** Check if a request accepts msgpack */

@@ -113,7 +113,7 @@ export function katmanNitro<TCtx extends Record<string, unknown>>(
       return {
         code: 'NOT_FOUND',
         status: 404,
-        message: `Procedure not found: ${procedurePath}`,
+        message: 'Procedure not found',
       }
     }
 

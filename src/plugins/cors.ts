@@ -30,6 +30,10 @@ export interface CORSOptions {
  * ```
  */
 export function cors(options: CORSOptions = {}): { headers: Record<string, string>; options: CORSOptions } {
+  const origin = options.origin ?? '*'
+  if (options.credentials && typeof origin === 'string' && origin === '*') {
+    throw new Error('[katman/cors] Cannot use credentials: true with origin: "*". Set an explicit origin.')
+  }
   return {
     headers: corsHeaders(options),
     options,

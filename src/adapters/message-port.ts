@@ -75,7 +75,7 @@ export function katmanMessagePort<TCtx extends Record<string, unknown>>(
         __katman: true,
         __type: 'response',
         id: msg.id,
-        error: { code: 'NOT_FOUND', status: 404, message: `Procedure not found: ${msg.path}` },
+        error: { code: 'NOT_FOUND', status: 404, message: 'Procedure not found' },
       } satisfies RPCResponse)
       return
     }

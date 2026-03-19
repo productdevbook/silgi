@@ -35,7 +35,9 @@ function toHex(buffer: ArrayBuffer): string {
     .join('')
 }
 
-function fromHex(hex: string): Uint8Array {
+function fromHex(hex: string): Uint8Array | null {
+  if (hex.length % 2 !== 0 || hex.length === 0) return null
+  if (!/^[0-9a-f]+$/i.test(hex)) return null
   const bytes = new Uint8Array(hex.length / 2)
   for (let i = 0; i < hex.length; i += 2) {
     bytes[i / 2] = Number.parseInt(hex.slice(i, i + 2), 16)
@@ -64,8 +66,9 @@ export async function unsign(signed: string, secret: string): Promise<string | n
   const value = signed.slice(0, dotIdx)
   const signature = signed.slice(dotIdx + 1)
 
-  const key = await getSigningKey(secret)
   const expected = fromHex(signature)
+  if (!expected) return null
+  const key = await getSigningKey(secret)
   const valid = await crypto.subtle.verify('HMAC', key, expected.buffer as ArrayBuffer, encoder.encode(value))
   return valid ? value : null
 }

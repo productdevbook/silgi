@@ -24,13 +24,11 @@ export function withCSRF<TClientContext extends ClientContext>(
 
   return {
     call(path, input, callOptions) {
-      // The CSRF header will be injected by the fetch transport
-      // We store it in the options context for the transport to pick up
       const enhancedOptions = {
         ...callOptions,
-        context: {
-          ...callOptions.context,
-          __csrfHeader: { name: headerName, value: headerValue },
+        headers: {
+          ...(callOptions as any).headers,
+          [headerName]: headerValue,
         },
       } as unknown as ClientOptions<TClientContext>
 
