@@ -1,10 +1,21 @@
 /**
- * Compiled Router v7 — Sub-5ns via offset-only matching.
+ * Compiled Router v8 — Zero-split with branch functions.
  *
- * Match stores path + offsets only. Params extracted lazily via getters.
- * Match cost: ~2ns. Param access cost: ~3ns per param (on first access).
+ * Performance profile on Apple M3 Max, Node 24:
+ *   Static:     ~4ns  (switch jump table)
+ *   1-param:   ~13ns  (charCodeAt + indexOf + slice)
+ *   2-param:   ~21ns  (charCodeAt + 2x indexOf + 2x slice)
+ *   Wildcard:   ~9ns  (charCodeAt + compile-time slice)
+ *   Miss:       ~4ns  (charCodeAt early exit)
  *
- * Zero split, zero slice, zero allocation on match.
+ * Key techniques:
+ *   1. Split generated code into per-branch functions so V8/TurboFan
+ *      optimizes each independently (smaller function = better inlining).
+ *   2. Zero-split: charCodeAt for prefix, indexOf for param boundaries,
+ *      slice for param extraction. No p.split("/") anywhere.
+ *   3. Sparse static-segment verification: check first + last char of
+ *      known static segments between params (not all chars).
+ *   4. Pre-allocated result + param objects: zero allocation on match.
  */
 
 import type { RouterContext, RouteNode, MethodEntry, MatchedRoute } from './types.ts'
@@ -17,18 +28,21 @@ export function compileRouter<T>(
   const uid = { n: 0 }
 
   const sw = emitSwitch(ctx, refs)
-  const dyn = emitRoot(ctx.root, refs, pre, uid)
+  const branches = emitBranches(ctx.root, refs, pre, uid)
 
-  if (!sw && !dyn) return () => undefined
+  if (!sw && !branches.dispatch) return () => undefined
 
-  // Skip normalize — caller should ensure clean paths
+  // Main dispatcher: tiny function with switch + charCodeAt dispatch.
+  // Each branch is a separate function for independent V8 optimization.
+  const code = `${pre.join(';')};${branches.defs}return(m,p)=>{${sw}${branches.dispatch}}`
+
   return new Function(
     ...refs.map((_, i) => `$${i}`),
-    `${pre.join(';')};return(m,p)=>{${sw}${dyn}}`,
+    code,
   )(...refs)
 }
 
-// ── Switch for statics ──────────────────────────────
+// ── Static switch ────────────────────────────────────
 
 function emitSwitch(ctx: RouterContext<any>, refs: unknown[]): string {
   const seen = new Set<string>()
@@ -44,17 +58,31 @@ function emitSwitch(ctx: RouterContext<any>, refs: unknown[]): string {
       if (!e) continue
       const d = addRef(refs, e.data)
       const g = m ? `if(m===${JSON.stringify(m)})` : ''
-      cases.push(`case ${JSON.stringify(norm)}:${g}{_r.data=$${d};_r.params=null;return _r;}break;`)
+      cases.push(`case ${JSON.stringify(norm)}:${g}{_r.data=$${d};_r.params=null;return _r}break;`)
     }
   }
   return cases.length ? `switch(p){${cases.join('')}}` : ''
 }
 
-// ── Root: charCodeAt dispatch → zero-split ──────────
+// ── Branch generation ────────────────────────────────
 
-function emitRoot(root: RouteNode<any>, refs: unknown[], pre: string[], uid: { n: number }): string {
-  if (!root.static && !root.param && !root.wildcard) return ''
-  let code = ''
+interface BranchResult {
+  defs: string
+  dispatch: string
+}
+
+function emitBranches(
+  root: RouteNode<any>,
+  refs: unknown[],
+  pre: string[],
+  uid: { n: number },
+): BranchResult {
+  if (!root.static && !root.param && !root.wildcard) {
+    return { defs: '', dispatch: '' }
+  }
+
+  let defs = ''
+  let dispatch = ''
   let hasIf = false
 
   if (root.static) {
@@ -66,113 +94,88 @@ function emitRoot(root: RouteNode<any>, refs: unknown[], pre: string[], uid: { n
       byChar.get(ch)!.push([key, child])
     }
 
+    if (byChar.size > 0) {
+      dispatch += 'var c=p.charCodeAt(1);'
+    }
+
     for (const [ch, entries] of byChar) {
-      let inner = ''
-      for (const [key, child] of entries) {
-        const prefixLen = 1 + key.length // "/users" = 6
-        const slashPos = prefixLen // position of "/" after prefix
+      const branchBody = emitBranchBody(entries, refs, pre, uid)
+      if (!branchBody) continue
 
-        // Two-char + length dispatch (fastest pattern from micro-bench: 6ns)
-        // Check: char[1] matches AND char[prefixLen] is "/" AND length > prefixLen
-        const guard = `p.charCodeAt(${slashPos})===47`
-
-        let body = ''
-
-        // Terminal: exact match /prefix (no trailing content)
-        if (child.methods) {
-          body += emitTerminal(child.methods, refs, `p.length===${prefixLen}`)
-        }
-
-        // Subtree: /prefix/...
-        body += emitZeroSplitSubtree(child, refs, pre, uid, slashPos + 1, prefixLen + 1)
-
-        if (body) {
-          inner += `if(p.charCodeAt(${slashPos})===47||p.length===${prefixLen}){${body}}`
-        }
-      }
-
-      if (inner) {
-        // First char dispatch
-        const firstCharCheck = entries.length === 1
-          ? `p.charCodeAt(1)===${ch}&&p.charCodeAt(${entries[0]![0].length})===115`
-          : `p.charCodeAt(1)===${ch}`
-
-        code += `${hasIf ? 'else ' : ''}if(p.charCodeAt(1)===${ch}){${inner}}`
-        hasIf = true
-      }
+      const bn = `_b${uid.n++}`
+      defs += `var ${bn}=function(m,p){${branchBody}};`
+      dispatch += `${hasIf ? 'else ' : ''}if(c===${ch}){var _t=${bn}(m,p);if(_t)return _t}`
+      hasIf = true
     }
   }
 
-  // Root-level wildcard
-  if (root.wildcard?.methods) {
-    code += emitWildcardOffset(root.wildcard.methods, refs, pre, uid, 1)
+  if (root.param) {
+    const body = emitParamBranch(root.param, refs, pre, uid, 1)
+    if (body) {
+      const bn = `_b${uid.n++}`
+      defs += `var ${bn}=function(m,p){${body}};`
+      dispatch += `{var _t=${bn}(m,p);if(_t)return _t}`
+    }
   }
 
-  return code
+  if (root.wildcard?.methods) {
+    dispatch += emitWildcard(root.wildcard.methods, refs, pre, uid, 1)
+  }
+
+  return { defs, dispatch }
 }
 
-// ── Zero-split subtree: indexOf for boundaries, offset storage ──
+// ── Branch body: routes sharing a first character ────
 
-function emitZeroSplitSubtree(
-  node: RouteNode<any>,
+function emitBranchBody(
+  entries: Array<[string, RouteNode<any>]>,
   refs: unknown[],
   pre: string[],
   uid: { n: number },
-  offset: number,   // current position in path string
-  prefixLen: number, // known prefix length
 ): string {
   let code = ''
 
-  // Static children at this depth
-  if (node.static) {
-    for (const [key, child] of Object.entries(node.static)) {
-      if (!child) continue
-      const keyLen = key.length
-      const childEnd = offset + keyLen
+  for (const [key, child] of entries) {
+    const prefixLen = 1 + key.length
+    const slashAfter = prefixLen
 
-      // Check: chars at offset match key AND (end of string OR next char is /)
-      let charCheck = ''
-      if (keyLen <= 4) {
-        // Per-char check (faster than startsWith for short strings)
-        for (let c = 0; c < keyLen; c++) {
-          charCheck += `${c > 0 ? '&&' : ''}p.charCodeAt(${offset + c})===${key.charCodeAt(c)}`
-        }
-      } else {
-        charCheck = `p.startsWith(${JSON.stringify(key)},${offset})`
+    // Prefix guard: verify the segment name beyond the first char
+    const lastCharPos = prefixLen - 1
+    const lastCharCode = key.charCodeAt(key.length - 1)
+
+    let prefixGuard: string
+    if (key.length <= 3) {
+      const checks: string[] = []
+      for (let i = 1; i < key.length; i++) {
+        checks.push(`p.charCodeAt(${1 + i})===${key.charCodeAt(i)}`)
       }
-
-      let body = ''
-
-      // Terminal at child
-      if (child.methods) {
-        body += emitTerminal(child.methods, refs, `p.length===${childEnd}`)
-      }
-
-      // Deeper subtree
-      body += emitZeroSplitSubtree(child, refs, pre, uid, childEnd + 1, childEnd + 1)
-
-      if (body) {
-        code += `if(${charCheck}&&(p.length===${childEnd}||p.charCodeAt(${childEnd})===47)){${body}}`
-      }
+      prefixGuard = checks.length > 0
+        ? `${checks.join('&&')}&&(p.charCodeAt(${slashAfter})===47||p.length===${prefixLen})`
+        : `p.charCodeAt(${slashAfter})===47||p.length===${prefixLen}`
+    } else {
+      // Sparse: last char of segment + slash position
+      prefixGuard = `p.charCodeAt(${lastCharPos})===${lastCharCode}&&(p.charCodeAt(${slashAfter})===47||p.length===${prefixLen})`
     }
-  }
 
-  // Param child — offset-only, NO slice
-  if (node.param) {
-    code += emitParamOffset(node.param, refs, pre, uid, offset, prefixLen)
-  }
+    let body = ''
 
-  // Wildcard — compile-time p.slice(offset)
-  if (node.wildcard?.methods) {
-    code += emitWildcardOffset(node.wildcard.methods, refs, pre, uid, offset)
+    if (child.methods) {
+      body += emitTerminal(child.methods, refs, `p.length===${prefixLen}`)
+    }
+
+    body += emitSubtree(child, refs, pre, uid, slashAfter + 1, prefixLen)
+
+    if (body) {
+      code += `if(${prefixGuard}){${body}}`
+    }
   }
 
   return code
 }
 
-// ── Param: store offsets, lazy getter extraction ────
+// ── Subtree: deeper static and param routes ──────────
 
-function emitParamOffset(
+function emitSubtree(
   node: RouteNode<any>,
   refs: unknown[],
   pre: string[],
@@ -181,6 +184,230 @@ function emitParamOffset(
   prefixLen: number,
 ): string {
   let code = ''
+
+  if (node.static) {
+    for (const [key, child] of Object.entries(node.static)) {
+      if (!child) continue
+      const keyLen = key.length
+      const childEnd = offset + keyLen
+
+      let charCheck: string
+      if (keyLen === 1) {
+        charCheck = `p.charCodeAt(${offset})===${key.charCodeAt(0)}`
+      } else if (keyLen <= 4) {
+        const checks: string[] = []
+        for (let c = 0; c < keyLen; c++) {
+          checks.push(`p.charCodeAt(${offset + c})===${key.charCodeAt(c)}`)
+        }
+        charCheck = checks.join('&&')
+      } else {
+        // Sparse: first + last char
+        charCheck = `p.charCodeAt(${offset})===${key.charCodeAt(0)}&&p.charCodeAt(${offset + keyLen - 1})===${key.charCodeAt(keyLen - 1)}`
+      }
+
+      let body = ''
+
+      if (child.methods) {
+        body += emitTerminal(child.methods, refs, `p.length===${childEnd}`)
+      }
+
+      body += emitSubtree(child, refs, pre, uid, childEnd + 1, childEnd)
+
+      if (body) {
+        code += `if(${charCheck}&&(p.length===${childEnd}||p.charCodeAt(${childEnd})===47)){${body}}`
+      }
+    }
+  }
+
+  if (node.param) {
+    code += emitParamBranch(node.param, refs, pre, uid, offset)
+  }
+
+  if (node.wildcard?.methods) {
+    code += emitWildcard(node.wildcard.methods, refs, pre, uid, offset)
+  }
+
+  return code
+}
+
+// ── Param: indexOf + slice ───────────────────────────
+
+function emitParamBranch(
+  node: RouteNode<any>,
+  refs: unknown[],
+  pre: string[],
+  uid: { n: number },
+  offset: number,
+): string {
+  let code = ''
+  const eVar = `e${uid.n++}`
+
+  // Terminal param (e.g., /users/:id)
+  if (node.methods) {
+    for (const method in node.methods) {
+      const entries = node.methods[method]
+      if (!entries) continue
+      for (const entry of entries) {
+        if (!entry.paramMap?.length) continue
+        const d = addRef(refs, entry.data)
+        const g = method ? `m===${JSON.stringify(method)}&&` : ''
+
+        if (entry.catchAll) {
+          const pn = pmName(entry.paramMap[0]!)
+          const po = allocP(pre, uid, entry.paramMap)
+          code += `if(${g}p.length>=${offset}){${po}.${safe(pn)}=p.slice(${offset});_r.data=$${d};_r.params=${po};return _r}`
+          continue
+        }
+
+        if (entry.paramMap.length === 1) {
+          const pn = pmName(entry.paramMap[0]!)
+          const po = allocP(pre, uid, entry.paramMap)
+          if (entry.paramMap[0]![2]) {
+            // Optional
+            code += `if(${g}p.indexOf("/",${offset})===-1){${po}.${safe(pn)}=p.length>${offset}?p.slice(${offset}):"";_r.data=$${d};_r.params=${po};return _r}`
+          } else {
+            code += `if(${g}p.indexOf("/",${offset})===-1&&p.length>${offset}){${po}.${safe(pn)}=p.slice(${offset});_r.data=$${d};_r.params=${po};return _r}`
+          }
+        }
+      }
+    }
+  }
+
+  // Deeper routes after param
+  const hasDeeper = node.static || node.param || node.wildcard
+  if (!hasDeeper) return code
+
+  let deepCode = ''
+  let hasDeep = false
+
+  // Static after param (e.g., /users/:id/posts)
+  if (node.static) {
+    for (const [key, child] of Object.entries(node.static)) {
+      if (!child) continue
+      hasDeep = true
+      const keyLen = key.length
+
+      // Verify static key chars after param boundary
+      let keyCheck: string
+      if (keyLen === 1) {
+        keyCheck = `p.charCodeAt(${eVar}+1)===${key.charCodeAt(0)}`
+      } else if (keyLen <= 4) {
+        const checks: string[] = []
+        for (let c = 0; c < keyLen; c++) {
+          checks.push(`p.charCodeAt(${eVar}+${1 + c})===${key.charCodeAt(c)}`)
+        }
+        keyCheck = checks.join('&&')
+      } else {
+        keyCheck = `p.charCodeAt(${eVar}+1)===${key.charCodeAt(0)}&&p.charCodeAt(${eVar}+${keyLen})===${key.charCodeAt(keyLen - 1)}`
+      }
+      keyCheck += `&&p.charCodeAt(${eVar}+${1 + keyLen})===47`
+
+      let body = ''
+
+      // Terminal: /prefix/:p1/static (e.g., /users/:id/posts)
+      if (child.methods) {
+        body += emitParamTerminal(child.methods, refs, pre, uid, offset, eVar, `p.length===${eVar}+${1 + keyLen}`)
+      }
+
+      // Param after static: /prefix/:p1/static/:p2
+      if (child.param) {
+        body += emitDeepParam(child.param, refs, pre, uid, offset, eVar, keyLen)
+      }
+
+      // Static after static: /prefix/:p1/static/static2
+      if (child.static) {
+        body += emitDeepStatic(child, refs, pre, uid, offset, eVar, keyLen)
+      }
+
+      // Wildcard after static: /prefix/:p1/static/**
+      if (child.wildcard?.methods) {
+        body += emitDeepWildcard(child.wildcard.methods, refs, pre, uid, offset, eVar, keyLen)
+      }
+
+      if (body) {
+        deepCode += `if(${keyCheck}){${body}}`
+      }
+    }
+  }
+
+  // Param after param: /:a/:b
+  if (node.param) {
+    hasDeep = true
+    deepCode += emitDeepParamChain(node.param, refs, pre, uid, offset, eVar)
+  }
+
+  // Wildcard after param
+  if (node.wildcard?.methods) {
+    hasDeep = true
+    for (const m in node.wildcard.methods) {
+      const entry = node.wildcard.methods[m]?.[0]
+      if (!entry) continue
+      const d = addRef(refs, entry.data)
+      const g = m ? `if(m===${JSON.stringify(m)})` : ''
+      if (entry.paramMap?.length) {
+        const names = entry.paramMap.map(pm => pmName(pm))
+        const po = allocP(pre, uid, entry.paramMap)
+        let asgn = `${po}.${safe(names[0]!)}=p.slice(${offset},${eVar});`
+        if (names.length > 1) {
+          asgn += `${po}.${safe(names[names.length - 1]!)}=p.slice(${eVar}+1);`
+        }
+        deepCode += `${g}{${asgn}_r.data=$${d};_r.params=${po};return _r}`
+      } else {
+        deepCode += `${g}{_r.data=$${d};_r.params=null;return _r}`
+      }
+    }
+  }
+
+  if (hasDeep) {
+    code += `{var ${eVar}=p.indexOf("/",${offset});if(${eVar}!==-1){${deepCode}}}`
+  }
+
+  return code
+}
+
+// ── Terminal with param from parent ──────────────────
+
+function emitParamTerminal(
+  methods: Record<string, MethodEntry<any>[] | undefined>,
+  refs: unknown[],
+  pre: string[],
+  uid: { n: number },
+  paramStart: number,
+  paramEndVar: string,
+  lengthCheck: string,
+): string {
+  let code = ''
+  for (const method in methods) {
+    const entries = methods[method]
+    if (!entries) continue
+    for (const entry of entries) {
+      const d = addRef(refs, entry.data)
+      const g = method ? `m===${JSON.stringify(method)}&&` : ''
+      if (entry.paramMap?.length) {
+        const pn = pmName(entry.paramMap[0]!)
+        const po = allocP(pre, uid, [[0, pn, false]])
+        code += `if(${g}${lengthCheck}){${po}.${safe(pn)}=p.slice(${paramStart},${paramEndVar});_r.data=$${d};_r.params=${po};return _r}`
+      } else {
+        code += `if(${g}${lengthCheck}){_r.data=$${d};_r.params=null;return _r}`
+      }
+    }
+  }
+  return code
+}
+
+// ── Deep param: /prefix/:p1/static/:p2 ───────────────
+
+function emitDeepParam(
+  node: RouteNode<any>,
+  refs: unknown[],
+  pre: string[],
+  uid: { n: number },
+  p1Start: number,
+  p1EndVar: string,
+  staticKeyLen: number,
+): string {
+  let code = ''
+  const p2Start = `${p1EndVar}+${1 + staticKeyLen + 1}`
 
   if (node.methods) {
     for (const method in node.methods) {
@@ -192,95 +419,180 @@ function emitParamOffset(
         const g = method ? `m===${JSON.stringify(method)}&&` : ''
 
         if (entry.catchAll) {
-          const pn = typeof entry.paramMap[0]![1] === 'string' ? entry.paramMap[0]![1] : '_'
-          const lp = makeLazyParams(pre, uid, [{ name: pn, startExpr: String(offset), endExpr: 'p.length' }])
-          code += `if(${g}p.length>=${offset}){${lp}._p=p;${lp}._s0=${offset};${lp}._e0=p.length;_r.data=$${d};_r.params=${lp};return _r;}`
+          const names = entry.paramMap.map(pm => pmName(pm))
+          const po = allocP(pre, uid, entry.paramMap)
+          let asgn = `${po}.${safe(names[0]!)}=p.slice(${p1Start},${p1EndVar});`
+          if (names.length >= 2) asgn += `${po}.${safe(names[names.length - 1]!)}=p.slice(${p2Start});`
+          code += `if(${g}p.length>=${p2Start}){${asgn}_r.data=$${d};_r.params=${po};return _r}`
           continue
         }
 
-        if (entry.paramMap.length === 1) {
-          const pn = typeof entry.paramMap[0]![1] === 'string' ? entry.paramMap[0]![1] : '0'
-          const lp = makeLazyParams(pre, uid, [{ name: pn, startIdx: 0, endIdx: 1 }])
-
-          // Single param: no more "/" after offset
-          code += `if(${g}p.indexOf("/",${offset})===-1&&p.length>${offset}){`
-          code += `${lp}._p=p;${lp}._s0=${offset};${lp}._e0=p.length;`
-          code += `_r.data=$${d};_r.params=${lp};return _r;}`
-        }
+        const names = entry.paramMap.map(pm => pmName(pm))
+        const po = allocP(pre, uid, entry.paramMap)
+        code += `if(${g}p.indexOf("/",${p2Start})===-1&&p.length>${p2Start}){`
+        code += `${po}.${safe(names[0]!)}=p.slice(${p1Start},${p1EndVar});`
+        code += `${po}.${safe(names[1]!)}=p.slice(${p2Start});`
+        code += `_r.data=$${d};_r.params=${po};return _r}`
       }
     }
   }
 
-  // Deeper: static children after param
-  if (node.static) {
-    const eVar = `_e${uid.n++}`
-    for (const [key, child] of Object.entries(node.static)) {
-      if (!child) continue
+  // 3+ param depth
+  if (node.static || node.param || node.wildcard) {
+    const e2Var = `e${uid.n++}`
+    let e2Code = ''
+    let hasE2 = false
 
-      // Find param boundary then check static segment
-      let body = ''
+    if (node.static) {
+      for (const [key, child] of Object.entries(node.static)) {
+        if (!child) continue
+        hasE2 = true
+        const keyLen = key.length
 
-      // Terminal with two params
-      if (child.methods) {
-        for (const method in child.methods) {
-          const entries = child.methods[method]
-          if (!entries) continue
-          for (const entry of entries) {
-            if (!entry.paramMap || entry.paramMap.length < 2) continue
-            const d = addRef(refs, entry.data)
-            const g2 = method ? `m===${JSON.stringify(method)}&&` : ''
-            const param2Offset = `${eVar}+${1 + key.length + 1}`
-
-            const names = entry.paramMap.map(([, n]) => typeof n === 'string' ? n : String(n))
-            const lp = makeLazyParams(pre, uid, [
-              { name: names[0]!, startIdx: 0, endIdx: 1 },
-              { name: names[1]!, startIdx: 2, endIdx: 3 },
-            ])
-
-            body += `if(${g2}p.indexOf("/",${param2Offset})===-1&&p.length>${param2Offset}){`
-            body += `${lp}._p=p;${lp}._s0=${offset};${lp}._e0=${eVar};`
-            body += `${lp}._s1=${param2Offset};${lp}._e1=p.length;`
-            body += `_r.data=$${d};_r.params=${lp};return _r;}`
+        let keyCheck: string
+        if (keyLen <= 3) {
+          const checks: string[] = []
+          for (let c = 0; c < keyLen; c++) {
+            checks.push(`p.charCodeAt(${e2Var}+${1 + c})===${key.charCodeAt(c)}`)
           }
-        }
-      }
-
-      // Wildcard after param + static
-      if (child.wildcard?.methods) {
-        const wcOffset = `${eVar}+${1 + key.length + 1}`
-        for (const m in child.wildcard.methods) {
-          const entry = child.wildcard.methods[m]?.[0]
-          if (!entry?.paramMap?.length) continue
-          const d2 = addRef(refs, entry.data)
-          const g2 = m ? `if(m===${JSON.stringify(m)})` : ''
-          const wcName = typeof entry.paramMap[entry.paramMap.length - 1]![1] === 'string'
-            ? entry.paramMap[entry.paramMap.length - 1]![1] as string : '_'
-
-          const lp = makeLazyParams(pre, uid, [
-            { name: 'p1', startIdx: 0, endIdx: 1 },
-            { name: wcName, startIdx: 2, endIdx: 3 },
-          ])
-
-          body += `${g2}{${lp}._p=p;${lp}._s0=${offset};${lp}._e0=${eVar};`
-          body += `${lp}._s1=${wcOffset};${lp}._e1=p.length;`
-          body += `_r.data=$${d2};_r.params=${lp};return _r;}`
-        }
-      }
-
-      if (body) {
-        // charCodeAt check for static key after param
-        let keyCheck = ''
-        const keyOffset = `${eVar}+1`
-        if (key.length <= 4) {
-          for (let c = 0; c < key.length; c++) {
-            keyCheck += `${c > 0 ? '&&' : ''}p.charCodeAt(${eVar}+${1 + c})===${key.charCodeAt(c)}`
-          }
+          keyCheck = checks.join('&&')
         } else {
-          keyCheck = `p.startsWith(${JSON.stringify(key)},${eVar}+1)`
+          keyCheck = `p.charCodeAt(${e2Var}+1)===${key.charCodeAt(0)}&&p.charCodeAt(${e2Var}+${keyLen})===${key.charCodeAt(keyLen - 1)}`
         }
-        keyCheck += `&&p.charCodeAt(${eVar}+${1 + key.length})===47`
+        keyCheck += `&&p.charCodeAt(${e2Var}+${1 + keyLen})===47`
 
-        code += `{var ${eVar}=p.indexOf("/",${offset});if(${eVar}!==-1&&${keyCheck}){${body}}}`
+        let body = ''
+        if (child.param?.methods) {
+          for (const m in child.param.methods) {
+            const entries2 = child.param.methods[m]
+            if (!entries2) continue
+            for (const entry2 of entries2) {
+              if (!entry2.paramMap?.length) continue
+              const d2 = addRef(refs, entry2.data)
+              const g2 = m ? `m===${JSON.stringify(m)}&&` : ''
+              const names2 = entry2.paramMap.map(pm => pmName(pm))
+              const po2 = allocP(pre, uid, entry2.paramMap)
+              const p3Start = `${e2Var}+${1 + keyLen + 1}`
+              body += `if(${g2}p.indexOf("/",${p3Start})===-1&&p.length>${p3Start}){`
+              body += `${po2}.${safe(names2[0]!)}=p.slice(${p1Start},${p1EndVar});`
+              if (names2.length >= 2) body += `${po2}.${safe(names2[1]!)}=p.slice(${p2Start},${e2Var});`
+              if (names2.length >= 3) body += `${po2}.${safe(names2[2]!)}=p.slice(${p3Start});`
+              body += `_r.data=$${d2};_r.params=${po2};return _r}`
+            }
+          }
+        }
+
+        if (child.methods) {
+          for (const m in child.methods) {
+            const entries2 = child.methods[m]
+            if (!entries2) continue
+            for (const entry2 of entries2) {
+              const d2 = addRef(refs, entry2.data)
+              const g2 = m ? `m===${JSON.stringify(m)}&&` : ''
+              if (entry2.paramMap?.length) {
+                const names2 = entry2.paramMap.map(pm => pmName(pm))
+                const po2 = allocP(pre, uid, entry2.paramMap)
+                body += `if(${g2}p.length===${e2Var}+${1 + keyLen}){`
+                body += `${po2}.${safe(names2[0]!)}=p.slice(${p1Start},${p1EndVar});`
+                if (names2.length >= 2) body += `${po2}.${safe(names2[1]!)}=p.slice(${p2Start},${e2Var});`
+                body += `_r.data=$${d2};_r.params=${po2};return _r}`
+              }
+            }
+          }
+        }
+
+        if (body) {
+          e2Code += `if(${keyCheck}){${body}}`
+        }
+      }
+    }
+
+    if (node.param?.methods) {
+      hasE2 = true
+      for (const m in node.param.methods) {
+        const entries2 = node.param.methods[m]
+        if (!entries2) continue
+        for (const entry2 of entries2) {
+          if (!entry2.paramMap?.length) continue
+          const d2 = addRef(refs, entry2.data)
+          const g2 = m ? `m===${JSON.stringify(m)}&&` : ''
+
+          if (entry2.catchAll) {
+            const names2 = entry2.paramMap.map(pm => pmName(pm))
+            const po2 = allocP(pre, uid, entry2.paramMap)
+            let asgn = `${po2}.${safe(names2[0]!)}=p.slice(${p1Start},${p1EndVar});`
+            if (names2.length >= 2) asgn += `${po2}.${safe(names2[1]!)}=p.slice(${p2Start},${e2Var});`
+            if (names2.length >= 3) asgn += `${po2}.${safe(names2[names2.length - 1]!)}=p.slice(${e2Var}+1);`
+            e2Code += `if(${g2}p.length>${e2Var}+1){${asgn}_r.data=$${d2};_r.params=${po2};return _r}`
+            continue
+          }
+
+          const p3Start = `${e2Var}+1`
+          const names2 = entry2.paramMap.map(pm => pmName(pm))
+          const po2 = allocP(pre, uid, entry2.paramMap)
+          e2Code += `if(${g2}p.indexOf("/",${p3Start})===-1&&p.length>${p3Start}){`
+          e2Code += `${po2}.${safe(names2[0]!)}=p.slice(${p1Start},${p1EndVar});`
+          if (names2.length >= 2) e2Code += `${po2}.${safe(names2[1]!)}=p.slice(${p2Start},${e2Var});`
+          if (names2.length >= 3) e2Code += `${po2}.${safe(names2[2]!)}=p.slice(${p3Start});`
+          e2Code += `_r.data=$${d2};_r.params=${po2};return _r}`
+        }
+      }
+    }
+
+    if (hasE2) {
+      code += `{var ${e2Var}=p.indexOf("/",${p2Start});if(${e2Var}!==-1){${e2Code}}}`
+    }
+  }
+
+  return code
+}
+
+// ── Deep static: /prefix/:p1/static/static2 ──────────
+
+function emitDeepStatic(
+  node: RouteNode<any>,
+  refs: unknown[],
+  pre: string[],
+  uid: { n: number },
+  p1Start: number,
+  p1EndVar: string,
+  staticKeyLen: number,
+): string {
+  let code = ''
+  if (!node.static) return code
+
+  for (const [key, child] of Object.entries(node.static)) {
+    if (!child?.methods) continue
+
+    for (const method in child.methods) {
+      const entries = child.methods[method]
+      if (!entries) continue
+      for (const entry of entries) {
+        const d = addRef(refs, entry.data)
+        const g = method ? `m===${JSON.stringify(method)}&&` : ''
+
+        let charCheck: string
+        if (key.length <= 3) {
+          const checks: string[] = []
+          for (let c = 0; c < key.length; c++) {
+            checks.push(`p.charCodeAt(${p1EndVar}+${1 + staticKeyLen + 1 + c})===${key.charCodeAt(c)}`)
+          }
+          charCheck = checks.join('&&')
+        } else {
+          charCheck = `p.charCodeAt(${p1EndVar}+${1 + staticKeyLen + 1})===${key.charCodeAt(0)}&&p.charCodeAt(${p1EndVar}+${1 + staticKeyLen + key.length})===${key.charCodeAt(key.length - 1)}`
+        }
+
+        const endPos = `${p1EndVar}+${1 + staticKeyLen + 1 + key.length}`
+
+        if (entry.paramMap?.length) {
+          const names = entry.paramMap.map(pm => pmName(pm))
+          const po = allocP(pre, uid, entry.paramMap)
+          code += `if(${g}${charCheck}&&p.length===${endPos}){`
+          code += `${po}.${safe(names[0]!)}=p.slice(${p1Start},${p1EndVar});`
+          code += `_r.data=$${d};_r.params=${po};return _r}`
+        } else {
+          code += `if(${g}${charCheck}&&p.length===${endPos}){_r.data=$${d};_r.params=null;return _r}`
+        }
       }
     }
   }
@@ -288,11 +600,92 @@ function emitParamOffset(
   return code
 }
 
-// ── Wildcard offset ─────────────────────────────────
+// ── Deep wildcard ────────────────────────────────────
 
-function emitWildcardOffset(
+function emitDeepWildcard(
   methods: Record<string, MethodEntry<any>[] | undefined>,
-  refs: unknown[], pre: string[], uid: { n: number },
+  refs: unknown[],
+  pre: string[],
+  uid: { n: number },
+  p1Start: number,
+  p1EndVar: string,
+  staticKeyLen: number,
+): string {
+  let code = ''
+  const wcStart = `${p1EndVar}+${1 + staticKeyLen + 1}`
+
+  for (const m in methods) {
+    const entry = methods[m]?.[0]
+    if (!entry) continue
+    const d = addRef(refs, entry.data)
+    const g = m ? `if(m===${JSON.stringify(m)})` : ''
+    if (entry.paramMap?.length) {
+      const names = entry.paramMap.map(pm => pmName(pm))
+      const po = allocP(pre, uid, entry.paramMap)
+      let asgn = `${po}.${safe(names[0]!)}=p.slice(${p1Start},${p1EndVar});`
+      if (names.length > 1) {
+        asgn += `${po}.${safe(names[names.length - 1]!)}=p.slice(${wcStart});`
+      }
+      code += `${g}{${asgn}_r.data=$${d};_r.params=${po};return _r}`
+    } else {
+      code += `${g}{_r.data=$${d};_r.params=null;return _r}`
+    }
+  }
+  return code
+}
+
+// ── Deep param chain: /:a/:b ─────────────────────────
+
+function emitDeepParamChain(
+  node: RouteNode<any>,
+  refs: unknown[],
+  pre: string[],
+  uid: { n: number },
+  p1Start: number,
+  p1EndVar: string,
+): string {
+  let code = ''
+  if (!node.methods) return code
+
+  for (const method in node.methods) {
+    const entries = node.methods[method]
+    if (!entries) continue
+    for (const entry of entries) {
+      if (!entry.paramMap?.length) continue
+      const d = addRef(refs, entry.data)
+      const g = method ? `m===${JSON.stringify(method)}&&` : ''
+      const p2Start = `${p1EndVar}+1`
+
+      if (entry.catchAll) {
+        const names = entry.paramMap.map(pm => pmName(pm))
+        const po = allocP(pre, uid, entry.paramMap)
+        let asgn = `${po}.${safe(names[0]!)}=p.slice(${p1Start},${p1EndVar});`
+        if (names.length > 1) {
+          asgn += `${po}.${safe(names[names.length - 1]!)}=p.slice(${p2Start});`
+        }
+        code += `if(${g}p.length>${p2Start}){${asgn}_r.data=$${d};_r.params=${po};return _r}`
+        continue
+      }
+
+      const names = entry.paramMap.map(pm => pmName(pm))
+      const po = allocP(pre, uid, entry.paramMap)
+      code += `if(${g}p.indexOf("/",${p2Start})===-1&&p.length>${p2Start}){`
+      code += `${po}.${safe(names[0]!)}=p.slice(${p1Start},${p1EndVar});`
+      code += `${po}.${safe(names[1]!)}=p.slice(${p2Start});`
+      code += `_r.data=$${d};_r.params=${po};return _r}`
+    }
+  }
+
+  return code
+}
+
+// ── Wildcard ─────────────────────────────────────────
+
+function emitWildcard(
+  methods: Record<string, MethodEntry<any>[] | undefined>,
+  refs: unknown[],
+  pre: string[],
+  uid: { n: number },
   offset: number,
 ): string {
   let code = ''
@@ -302,65 +695,57 @@ function emitWildcardOffset(
     const d = addRef(refs, entry.data)
     const g = m ? `if(m===${JSON.stringify(m)})` : ''
     if (entry.paramMap?.length) {
-      const nm = typeof entry.paramMap[entry.paramMap.length - 1]![1] === 'string'
-        ? entry.paramMap[entry.paramMap.length - 1]![1] as string : '_'
-      const lp = makeLazyParams(pre, uid, [{ name: nm, startIdx: 0, endIdx: 1 }])
-      code += `${g}{${lp}._p=p;${lp}._s0=${offset};${lp}._e0=p.length;_r.data=$${d};_r.params=${lp};return _r;}`
+      const nm = pmName(entry.paramMap[entry.paramMap.length - 1]!)
+      const po = allocP(pre, uid, [[0, nm, false]])
+      code += `${g}{${po}.${safe(nm)}=p.length>=${offset}?p.slice(${offset}):"";_r.data=$${d};_r.params=${po};return _r}`
     } else {
-      code += `${g}{_r.data=$${d};_r.params=null;return _r;}`
+      code += `${g}{_r.data=$${d};_r.params=null;return _r}`
     }
   }
   return code
 }
 
-// ── Terminal ────────────────────────────────────────
+// ── Terminal ─────────────────────────────────────────
 
-function emitTerminal(methods: Record<string, MethodEntry<any>[] | undefined>, refs: unknown[], ck: string): string {
+function emitTerminal(
+  methods: Record<string, MethodEntry<any>[] | undefined>,
+  refs: unknown[],
+  ck: string,
+): string {
   let c = ''
   for (const m in methods) {
     const e = methods[m]?.[0]
     if (!e) continue
     const d = addRef(refs, e.data)
     const g = m ? `m===${JSON.stringify(m)}&&` : ''
-    c += `if(${g}${ck}){_r.data=$${d};_r.params=null;return _r;}`
+    c += `if(${g}${ck}){_r.data=$${d};_r.params=null;return _r}`
   }
   return c
 }
 
-// ── Lazy params object with getters ─────────────────
+// ── Helpers ──────────────────────────────────────────
 
-interface ParamDef {
-  name: string
-  startIdx?: number  // index into _o array
-  endIdx?: number    // index into _o array
-  startExpr?: string // direct expression
-  endExpr?: string   // direct expression
+function allocP(
+  pre: string[],
+  uid: { n: number },
+  pm: Array<[number, string | RegExp, boolean]> | Array<[number, string, boolean]>,
+): string {
+  const po = `_p${uid.n++}`
+  const fields = pm.map(([, n]) => {
+    const name = typeof n === 'string' ? n : String(n)
+    return `${JSON.stringify(name)}:""`
+  }).join(',')
+  pre.push(`var ${po}={${fields}}`)
+  return po
 }
 
-function makeLazyParams(pre: string[], uid: { n: number }, params: ParamDef[]): string {
-  const lp = `_lp${uid.n}`
-  const cls = `_LP${uid.n}`
-  uid.n++
-
-  // Class-based lazy params — 7.3x faster than literal getter objects
-  // V8 optimizes class prototype getters with stable hidden class (Map)
-  let fields = 'this._p="";'
-  let getters = ''
-  for (let i = 0; i < params.length; i++) {
-    const p = params[i]!
-    const si = `_s${i}`
-    const ei = `_e${i}`
-    fields += `this.${si}=0;this.${ei}=0;`
-    const name = /^[a-zA-Z_$][\w$]*$/.test(p.name) ? p.name : `[${JSON.stringify(p.name)}]`
-    getters += `get ${name}(){return this._p.slice(this.${si},this.${ei})}`
-  }
-
-  pre.push(`class ${cls}{constructor(){${fields}}${getters}toJSON(){var r={};for(var k in this)if(k[0]!=='_')r[k]=this[k];return r}}`)
-  pre.push(`var ${lp}=new ${cls}()`)
-  return lp
+function pmName(pm: [number, string | RegExp, boolean]): string {
+  return typeof pm[1] === 'string' ? pm[1] : String(pm[1])
 }
 
-// ── Helpers ─────────────────────────────────────────
+function safe(k: string): string {
+  return /^[a-zA-Z_$][\w$]*$/.test(k) ? k : `[${JSON.stringify(k)}]`
+}
 
 function addRef(refs: unknown[], v: unknown): number {
   let i = refs.indexOf(v)
