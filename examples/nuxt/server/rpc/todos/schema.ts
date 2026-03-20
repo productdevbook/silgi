@@ -1,14 +1,24 @@
 import { z } from 'zod'
 
+// ── Schemas ─────────────────────────────────────────
+
+export const TodoSchema = z.object({
+  id: z.number(),
+  title: z.string(),
+  completed: z.boolean(),
+  createdAt: z.string(),
+})
+
 export const CreateTodoSchema = z.object({ title: z.string().min(1).max(200) })
 export const TodoIdSchema = z.object({ id: z.number() })
+export const TodoListSchema = z.array(TodoSchema)
+export const OkSchema = z.object({ ok: z.boolean() })
 
-export interface Todo {
-  id: number
-  title: string
-  completed: boolean
-  createdAt: string
-}
+// ── Types ───────────────────────────────────────────
+
+export type Todo = z.infer<typeof TodoSchema>
+
+// ── In-memory store ─────────────────────────────────
 
 let nextId = 4
 
