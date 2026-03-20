@@ -1,14 +1,14 @@
 ---
 title: Plugins
-description: Extend Katman with CORS, distributed tracing, structured logging, rate limiting, and more.
+description: Extend Silgi with CORS, distributed tracing, structured logging, rate limiting, and more.
 ---
 
 import { Cards, Card } from 'fumadocs-ui/components/card'
 import { Callout } from 'fumadocs-ui/components/callout'
 
-Katman plugins are just regular middleware and hooks. There is no special plugin API — a "plugin" is a guard, a wrap, or a set of lifecycle hooks that someone has packaged up for reuse.
+Silgi plugins are just regular middleware and hooks. There is no special plugin API — a "plugin" is a guard, a wrap, or a set of lifecycle hooks that someone has packaged up for reuse.
 
-All plugins ship as subpath imports from the `katman` package. You only import what you use, and unused plugins add zero bytes to your bundle.
+All plugins ship as subpath imports from the `silgi` package. You only import what you use, and unused plugins add zero bytes to your bundle.
 
 <Callout>
   You can build your own plugins the same way. A guard that checks a feature flag, a wrap that logs slow queries, a set

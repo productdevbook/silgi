@@ -6,7 +6,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { z } from 'zod'
 
 import { compileProcedure } from '#src/compile.ts'
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 import { corsHeaders } from '#src/plugins/cors.ts'
 import { otelWrap } from '#src/plugins/otel.ts'
 import { loggingHooks } from '#src/plugins/pino.ts'
@@ -158,7 +158,7 @@ describe('Pino logging hooks', () => {
   it('logs requests and responses', async () => {
     const logger = mockLogger()
     const hooks = loggingHooks({ logger })
-    const k = katman({ context: () => ({}), hooks: hooks as any })
+    const k = silgi({ context: () => ({}), hooks: hooks as any })
     const router = k.router({ health: k.$resolve(() => ({ ok: true })) })
     const handle = k.handler(router)
 
@@ -171,7 +171,7 @@ describe('Pino logging hooks', () => {
   it('logs errors', async () => {
     const logger = mockLogger()
     const hooks = loggingHooks({ logger })
-    const k = katman({ context: () => ({}), hooks: hooks as any })
+    const k = silgi({ context: () => ({}), hooks: hooks as any })
     const router = k.router({
       fail: k.$resolve(() => {
         throw new Error('boom')

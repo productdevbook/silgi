@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 
-const k = katman({ context: () => ({}) })
+const k = silgi({ context: () => ({}) })
 const echoRouter = k.router({
   echo: k.$resolve(({ input }) => input),
   hello: k.$resolve(() => 'world'),
@@ -30,7 +30,7 @@ describe('handler() — body parsing safety', () => {
   })
 
   it('handles UTF-8 multibyte response correctly', async () => {
-    const k2 = katman({ context: () => ({}) })
+    const k2 = silgi({ context: () => ({}) })
     const r = k2.router({
       emoji: k2.$resolve(() => ({ text: 'Merhaba dünya 🌍 日本語' })),
     })

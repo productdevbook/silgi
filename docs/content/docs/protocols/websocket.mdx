@@ -6,7 +6,7 @@ description: Bidirectional RPC over a persistent connection — ideal for real-t
 import { Callout } from 'fumadocs-ui/components/callout'
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 
-Katman's default transport is HTTP — every procedure call is a separate request/response. WebSocket gives you a persistent connection instead. Messages skip the TCP handshake, which makes repeated calls faster and enables real-time server-to-client streaming.
+Silgi's default transport is HTTP — every procedure call is a separate request/response. WebSocket gives you a persistent connection instead. Messages skip the TCP handshake, which makes repeated calls faster and enables real-time server-to-client streaming.
 
 ## When to use WebSocket
 
@@ -25,9 +25,9 @@ If you're using `serve()`, add `ws: true`:
 
 ```ts twoslash
 // @noErrors
-import { katman } from 'katman'
+import { silgi } from 'silgi'
 
-const k = katman({ context: (req) => ({}) })
+const k = silgi({ context: (req) => ({}) })
 const { subscription, router } = k
 
 const appRouter = router({
@@ -55,7 +55,7 @@ If you have your own HTTP server (or an existing Fastify/Express app), attach We
 ```ts twoslash
 // @noErrors
 import { createServer } from 'node:http'
-import { attachWebSocket } from 'katman/ws'
+import { attachWebSocket } from 'silgi/ws'
 
 const server = createServer(yourHttpHandler)
 attachWebSocket(server, appRouter)
@@ -168,7 +168,7 @@ Combine WebSocket with [MessagePack](/docs/protocols/msgpack) for smaller messag
 
 ```ts twoslash
 // @noErrors
-import { attachWebSocket } from 'katman/ws'
+import { attachWebSocket } from 'silgi/ws'
 
 attachWebSocket(server, appRouter, { binary: true })
 ```

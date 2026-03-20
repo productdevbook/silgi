@@ -6,13 +6,13 @@ description: Sliding window rate limiter — protect your API with in-memory or 
 import { Callout } from 'fumadocs-ui/components/callout'
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 
-Rate limiting prevents clients from making too many requests in a short period. Katman provides a guard middleware that uses a sliding window algorithm and works with an in-memory store or any custom backend.
+Rate limiting prevents clients from making too many requests in a short period. Silgi provides a guard middleware that uses a sliding window algorithm and works with an in-memory store or any custom backend.
 
 ## Quick start
 
 ```ts twoslash
 // @noErrors
-import { rateLimitGuard, MemoryRateLimiter } from 'katman/ratelimit'
+import { rateLimitGuard, MemoryRateLimiter } from 'silgi/ratelimit'
 
 const rateLimit = rateLimitGuard({
   limiter: new MemoryRateLimiter({
@@ -94,7 +94,7 @@ The built-in limiter stores counters in memory using a sliding window algorithm:
 
 ```ts twoslash
 // @noErrors
-import { MemoryRateLimiter } from 'katman/ratelimit'
+import { MemoryRateLimiter } from 'silgi/ratelimit'
 
 const limiter = new MemoryRateLimiter({
   limit: 100, // max requests per window
@@ -116,7 +116,7 @@ The rate limiter is an interface with a single method. Implement it for Redis, U
   <Tab value="Interface">
   ```ts twoslash
 // @noErrors
-import type { RateLimiter, RateLimitResult } from "katman/ratelimit"
+import type { RateLimiter, RateLimitResult } from "silgi/ratelimit"
 
 interface RateLimiter {
 limit(key: string): Promise<RateLimitResult>
@@ -134,7 +134,7 @@ reset: number // Unix timestamp in ms
 <Tab value="Redis example">
 ```ts twoslash
 // @noErrors
-import type { RateLimiter, RateLimitResult } from "katman/ratelimit"
+import type { RateLimiter, RateLimitResult } from "silgi/ratelimit"
 import Redis from "ioredis"
 
 class RedisRateLimiter implements RateLimiter {

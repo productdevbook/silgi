@@ -1,20 +1,20 @@
 /**
- * Hono adapter — use Katman with Hono on any runtime.
+ * Hono adapter — use Silgi with Hono on any runtime.
  *
  * @example
  * ```ts
  * import { Hono } from "hono"
- * import { katmanHono } from "katman/hono"
+ * import { silgiHono } from "silgi/hono"
  *
  * const app = new Hono()
- * app.all("/rpc/*", katmanHono(appRouter, {
+ * app.all("/rpc/*", silgiHono(appRouter, {
  *   context: (c) => ({ db: getDB(), user: c.get("user") }),
  * }))
  * ```
  */
 
 import { compileRouter } from '../compile.ts'
-import { KatmanError, toKatmanError } from '../core/error.ts'
+import { SilgiError, toSilgiError } from '../core/error.ts'
 import { ValidationError } from '../core/schema.ts'
 
 import type { RouterDef } from '../types.ts'
@@ -27,11 +27,11 @@ export interface HonoAdapterOptions<TCtx extends Record<string, unknown>> {
 }
 
 /**
- * Create a Hono handler that routes to Katman procedures.
+ * Create a Hono handler that routes to Silgi procedures.
  *
  * Works with Hono on Node.js, Bun, Deno, Cloudflare Workers, etc.
  */
-export function katmanHono<TCtx extends Record<string, unknown>>(
+export function silgiHono<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: HonoAdapterOptions<TCtx> = {},
 ): (c: any) => Promise<Response> {
@@ -82,7 +82,7 @@ export function katmanHono<TCtx extends Record<string, unknown>>(
       if (error instanceof ValidationError) {
         return c.json({ code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } }, 400)
       }
-      const e = error instanceof KatmanError ? error : toKatmanError(error)
+      const e = error instanceof SilgiError ? error : toSilgiError(error)
       return c.json(e.toJSON(), e.status)
     }
   }

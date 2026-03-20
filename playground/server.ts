@@ -1,10 +1,10 @@
 /**
- * Katman Playground — Full Feature Showcase
+ * Silgi Playground — Full Feature Showcase
  *
  * Run: pnpm play
  *
- * Demonstrates every Katman feature:
- *  1.  katman() instance + context
+ * Demonstrates every Silgi feature:
+ *  1.  silgi() instance + context
  *  2.  guard middleware (auth)
  *  3.  wrap middleware (timing)
  *  4.  lifecycleWrap (onStart/onSuccess/onError/onFinish)
@@ -26,8 +26,8 @@
  *  20. mapInput middleware
  */
 
-import { katman, KatmanError, callable, lifecycleWrap, mapInput, lazy } from 'katman'
-import { contract, implement } from 'katman/contract'
+import { silgi, SilgiError, callable, lifecycleWrap, mapInput, lazy } from 'silgi'
+import { contract, implement } from 'silgi/contract'
 import {
   cors,
   rateLimitGuard,
@@ -44,7 +44,7 @@ import {
   decrypt,
   createSerializer,
   createBatchHandler,
-} from 'katman/plugins'
+} from 'silgi/plugins'
 import { z } from 'zod'
 
 // ── Schemas ──────────────────────────────────────────
@@ -69,12 +69,12 @@ const PostSchema = z.object({
 
 const db = {
   users: [
-    { id: 1, name: 'Alice', email: 'alice@katman.dev', role: 'admin' as const, createdAt: new Date().toISOString() },
-    { id: 2, name: 'Bob', email: 'bob@katman.dev', role: 'user' as const, createdAt: new Date().toISOString() },
-    { id: 3, name: 'Charlie', email: 'charlie@katman.dev', role: 'user' as const, createdAt: new Date().toISOString() },
+    { id: 1, name: 'Alice', email: 'alice@silgi.dev', role: 'admin' as const, createdAt: new Date().toISOString() },
+    { id: 2, name: 'Bob', email: 'bob@silgi.dev', role: 'user' as const, createdAt: new Date().toISOString() },
+    { id: 3, name: 'Charlie', email: 'charlie@silgi.dev', role: 'user' as const, createdAt: new Date().toISOString() },
   ],
   posts: [
-    { id: 1, title: 'Hello Katman', body: 'First post about RPC', authorId: 1, published: true },
+    { id: 1, title: 'Hello Silgi', body: 'First post about RPC', authorId: 1, published: true },
     { id: 2, title: 'Type Safety', body: 'End-to-end types', authorId: 1, published: true },
     { id: 3, title: 'Draft Post', body: 'Work in progress', authorId: 2, published: false },
   ],
@@ -105,9 +105,9 @@ const serializer = createSerializer()
     deserialize: (v) => new Map(Object.entries(v as object)),
   })
 
-// ── Katman Instance ──────────────────────────────────
+// ── Silgi Instance ──────────────────────────────────
 
-const k = katman({
+const k = silgi({
   context: (req: Request) => ({
     headers: Object.fromEntries(req.headers) as Record<string, string>,
     db,
@@ -122,7 +122,7 @@ const k = katman({
       console.log(`  ← ${path} (${durationMs.toFixed(1)}ms)`)
     },
     error: ({ path, error }) => {
-      const msg = error instanceof KatmanError ? `${error.code} (${error.status})` : String(error)
+      const msg = error instanceof SilgiError ? `${error.code} (${error.status})` : String(error)
       console.log(`  ✗ ${path} — ${msg}`)
     },
   },
@@ -144,7 +144,7 @@ const corsHooks = cors({
 const auth = guard(async (ctx) => {
   const token = ctx.headers.authorization?.replace('Bearer ', '')
   if (token !== 'secret-token') {
-    throw new KatmanError('UNAUTHORIZED', { status: 401, message: 'Invalid or missing token' })
+    throw new SilgiError('UNAUTHORIZED', { status: 401, message: 'Invalid or missing token' })
   }
   return { userId: 1, role: 'admin' as const }
 })
@@ -223,7 +223,7 @@ const listUsers = query(z.object({ limit: z.number().min(1).max(100).optional() 
 // --- Users: Get (with NOT_FOUND error) ---
 const getUser = query(z.object({ id: z.number() }), async ({ input, ctx }) => {
   const user = ctx.db.users.find((u) => u.id === input.id)
-  if (!user) throw new KatmanError('NOT_FOUND', { status: 404, message: `User #${input.id} not found` })
+  if (!user) throw new SilgiError('NOT_FOUND', { status: 404, message: `User #${input.id} not found` })
   return user
 })
 
@@ -314,7 +314,7 @@ const createPost = mutation()
 // --- Cookies: Demo ---
 const cookieDemo = query(async ({ ctx }) => {
   const existing = getCookie(ctx.headers.cookie ?? '', 'session')
-  const newCookie = setCookie('session', 'katman-session-123', {
+  const newCookie = setCookie('session', 'silgi-session-123', {
     httpOnly: true,
     maxAge: 3600,
     path: '/',
@@ -328,8 +328,8 @@ const cookieDemo = query(async ({ ctx }) => {
 
 // --- Signing & Encryption: Demo ---
 const signingDemo = query(async () => {
-  const secret = 'katman-secret-key-2026'
-  const message = 'hello from katman'
+  const secret = 'silgi-secret-key-2026'
+  const message = 'hello from silgi'
 
   // Sign
   const signed = await sign(message, secret)
@@ -402,7 +402,7 @@ const getUserBySlug = query({
   resolve: async ({ input, ctx }) => {
     const name = (input as any).name ?? (input as any).slug
     const user = ctx.db.users.find((u) => u.name.toLowerCase() === name?.toLowerCase())
-    if (!user) throw new KatmanError('NOT_FOUND', { status: 404, message: `User "${name}" not found` })
+    if (!user) throw new SilgiError('NOT_FOUND', { status: 404, message: `User "${name}" not found` })
     return user
   },
 })
@@ -498,15 +498,15 @@ const batchHandler = createBatchHandler(appRouter, {
 k.serve(appRouter, {
   port: Number(process.env.PORT) || 3456,
   scalar: {
-    title: 'Katman Playground',
+    title: 'Silgi Playground',
     version: '0.1.0',
-    description: 'Full feature showcase — every Katman capability in one server',
+    description: 'Full feature showcase — every Silgi capability in one server',
     security: { type: 'http', scheme: 'bearer', bearerFormat: 'Token' },
   },
 })
 
 console.log('\n╔══════════════════════════════════════════════╗')
-console.log('║        Katman Playground — All Features      ║')
+console.log('║        Silgi Playground — All Features      ║')
 console.log('╠══════════════════════════════════════════════╣')
 console.log('║                                              ║')
 console.log('║  QUERIES (GET)                               ║')

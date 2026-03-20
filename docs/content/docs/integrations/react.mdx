@@ -1,17 +1,17 @@
 ---
 title: React Server Actions
-description: Call Katman procedures as React Server Actions — type-safe [error, data] tuples instead of try/catch.
+description: Call Silgi procedures as React Server Actions — type-safe [error, data] tuples instead of try/catch.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
 
-React Server Actions let you call server-side code directly from React components. Katman wraps your procedures as actions that return `[error, data]` tuples instead of throwing, making error handling straightforward in your UI code.
+React Server Actions let you call server-side code directly from React components. Silgi wraps your procedures as actions that return `[error, data]` tuples instead of throwing, making error handling straightforward in your UI code.
 
 This works with **Next.js** (App Router) and **TanStack Start**.
 
 ## Prerequisites
 
-You need a Katman router defined on the server. If you haven't set one up yet, see the [Getting Started](/docs/getting-started) guide.
+You need a Silgi router defined on the server. If you haven't set one up yet, see the [Getting Started](/docs/getting-started) guide.
 
 ## createAction
 
@@ -23,7 +23,7 @@ Define the action in a file with `"use server"`:
 // @noErrors
 // app/actions.ts
 'use server'
-import { createAction } from 'katman/react'
+import { createAction } from 'silgi/react'
 import { appRouter } from '../router'
 
 export const listUsers = createAction(appRouter.users.list)
@@ -69,7 +69,7 @@ Converts an entire router into actions at once. The result mirrors your router s
 ```ts twoslash
 // @noErrors
 'use server'
-import { createActions } from 'katman/react'
+import { createActions } from 'silgi/react'
 import { appRouter } from '../router'
 
 export const actions = createActions(appRouter)
@@ -92,7 +92,7 @@ For HTML `<form>` submissions, `createFormAction` accepts `FormData` and convert
 // @noErrors
 // app/actions.ts
 'use server'
-import { createFormAction } from 'katman/react'
+import { createFormAction } from 'silgi/react'
 
 export const submitUser = createFormAction(appRouter.users.create)
 ```
@@ -137,7 +137,7 @@ const submitUser = createFormAction(appRouter.users.create, {
 
 ## Framework errors
 
-Katman automatically detects and rethrows framework-specific errors:
+Silgi automatically detects and rethrows framework-specific errors:
 
 - **Next.js** `redirect()` and `notFound()` (errors with `NEXT_` digest)
 - **TanStack Router** navigation errors (`isNotFound: true`)
@@ -155,7 +155,7 @@ These errors pass through untouched — they won't be caught as `[error, data]` 
 A React hook that wraps a server action with loading and error state:
 
 ```tsx
-import { useServerAction } from 'katman/react'
+import { useServerAction } from 'silgi/react'
 
 function CreateUserButton() {
   const { execute, data, error, isPending, reset } = useServerAction(createUser)
@@ -179,7 +179,7 @@ function CreateUserButton() {
 Like `useServerAction`, but applies an optimistic update immediately while the server call is in flight:
 
 ```tsx
-import { useOptimisticServerAction } from 'katman/react'
+import { useOptimisticServerAction } from 'silgi/react'
 
 function UserName({ user }) {
   const { execute, displayData, isPending } = useOptimisticServerAction(updateUser, {
@@ -200,6 +200,6 @@ function UserName({ user }) {
 
 ## What's next?
 
-- [Getting Started](/docs/getting-started) — set up a Katman router
+- [Getting Started](/docs/getting-started) — set up a Silgi router
 - [Typed Errors](/docs/errors) — how error maps and `fail()` work, and how they appear in the `error` tuple
 - [TanStack Query](/docs/integrations/tanstack-query) — client-side data fetching with caching, as an alternative

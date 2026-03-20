@@ -1,21 +1,21 @@
 ---
 title: Core Concepts
-description: The mental model behind Katman — context, procedures, middleware, and type inference.
+description: The mental model behind Silgi — context, procedures, middleware, and type inference.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
 
-Before diving into API details, it helps to understand how Katman thinks about your code. There are four main ideas.
+Before diving into API details, it helps to understand how Silgi thinks about your code. There are four main ideas.
 
 ## Context
 
-Every request starts by running your **context factory**. This is a function you provide when creating the Katman instance. It receives the raw HTTP request and returns an object.
+Every request starts by running your **context factory**. This is a function you provide when creating the Silgi instance. It receives the raw HTTP request and returns an object.
 
 ```ts twoslash
 // @noErrors
-import { katman } from 'katman'
+import { silgi } from 'silgi'
 
-const k = katman({
+const k = silgi({
   context: (req) => ({
     db: getDB(),
     headers: Object.fromEntries(req.headers),
@@ -40,7 +40,7 @@ See the [Procedures](/docs/procedures) page for how to write them.
 
 ## Middleware
 
-Middleware runs before (and sometimes after) a procedure. Katman has two kinds:
+Middleware runs before (and sometimes after) a procedure. Silgi has two kinds:
 
 **Guards** run before the procedure and can add to the context:
 
@@ -48,7 +48,7 @@ Middleware runs before (and sometimes after) a procedure. Katman has two kinds:
 // @noErrors
 const auth = k.guard(async (ctx) => {
   const user = await verifyToken(ctx.headers.authorization)
-  if (!user) throw new KatmanError('UNAUTHORIZED')
+  if (!user) throw new SilgiError('UNAUTHORIZED')
   return { user } // added to ctx
 })
 ```
@@ -69,7 +69,7 @@ See the [Middleware](/docs/middleware) page for details and execution order.
 
 ## Type inference
 
-Katman infers types from your code. You don't write them yourself and you don't run a code generator.
+Silgi infers types from your code. You don't write them yourself and you don't run a code generator.
 
 When you define a procedure with a Zod schema, the client automatically knows the input type. When the procedure returns something, the client knows the return type. When a guard adds `{ user }` to the context, the procedure knows `ctx.user` exists.
 
@@ -77,13 +77,13 @@ This works because of `InferClient`:
 
 ```ts twoslash
 // @noErrors
-import type { InferClient } from 'katman'
+import type { InferClient } from 'silgi'
 
 type Client = InferClient<typeof appRouter>
 // Client.users.list: (input: { limit?: number }) => Promise<User[]>
 ```
 
 <Callout>
-  Katman uses the Standard Schema spec for validation. This means Zod, Valibot, and ArkType all work — you're not locked
+  Silgi uses the Standard Schema spec for validation. This means Zod, Valibot, and ArkType all work — you're not locked
   into any one library.
 </Callout>

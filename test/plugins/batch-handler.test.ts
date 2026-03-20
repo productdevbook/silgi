@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
 
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 import { createBatchHandler } from '#src/plugins/batch-server.ts'
 
-const k = katman({ context: () => ({ db: 'test' }) })
+const k = silgi({ context: () => ({ db: 'test' }) })
 
 describe('createBatchHandler()', () => {
   it('processes multiple calls in one request', async () => {

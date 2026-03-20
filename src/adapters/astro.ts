@@ -1,13 +1,13 @@
 /**
- * Astro adapter — use Katman with Astro API routes.
+ * Astro adapter — use Silgi with Astro API routes.
  *
  * @example
  * ```ts
  * // src/pages/api/rpc/[...path].ts
- * import { katmanAstro } from "katman/astro"
+ * import { silgiAstro } from "silgi/astro"
  * import { appRouter } from "~/server/rpc"
  *
- * const handler = katmanAstro(appRouter, {
+ * const handler = silgiAstro(appRouter, {
  *   prefix: "/api/rpc",
  *   context: (req) => ({ db: getDB() }),
  * })
@@ -27,9 +27,9 @@ export interface AstroAdapterOptions<TCtx extends Record<string, unknown>> {
 
 /**
  * Create an Astro API route handler.
- * Astro passes { request: Request, params } — uses Katman's handler().
+ * Astro passes { request: Request, params } — uses Silgi's handler().
  */
-export function katmanAstro<TCtx extends Record<string, unknown>>(
+export function silgiAstro<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: AstroAdapterOptions<TCtx> = {},
 ): (ctx: { request: Request; params: Record<string, string> }) => Promise<Response> {
@@ -38,8 +38,8 @@ export function katmanAstro<TCtx extends Record<string, unknown>>(
 
   return async ({ request }) => {
     if (!_handler) {
-      const { katman } = await import('../katman.ts')
-      const k = katman({ context: options.context ?? (() => ({}) as TCtx) })
+      const { silgi } = await import('../silgi.ts')
+      const k = silgi({ context: options.context ?? (() => ({}) as TCtx) })
       _handler = k.handler(router)
     }
 

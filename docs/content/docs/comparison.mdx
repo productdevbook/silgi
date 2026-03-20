@@ -1,13 +1,13 @@
 ---
 title: Comparison
-description: How Katman compares to oRPC, tRPC, ts-rest, and Hono — features, architecture, and benchmarks.
+description: How Silgi compares to oRPC, tRPC, ts-rest, and Hono — features, architecture, and benchmarks.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
 
 ## Feature matrix
 
-| Feature                                 | Katman            | oRPC                 | tRPC               | ts-rest     |
+| Feature                                 | Silgi            | oRPC                 | tRPC               | ts-rest     |
 | --------------------------------------- | ----------------- | -------------------- | ------------------ | ----------- |
 | End-to-end type-safe I/O                | Yes               | Yes                  | Yes                | Yes         |
 | End-to-end type-safe errors             | Yes               | Yes                  | Partial            | Yes         |
@@ -49,45 +49,45 @@ import { Callout } from 'fumadocs-ui/components/callout'
 
 ### Single package vs 35 packages
 
-Katman ships everything as one `npm install katman` with subpath imports:
+Silgi ships everything as one `npm install silgi` with subpath imports:
 
 ```ts twoslash
 // @noErrors
-import { katman } from 'katman'
-import { createClient } from 'katman/client'
-import { katmanHono } from 'katman/hono'
-import { otelWrap } from 'katman/otel'
+import { silgi } from 'silgi'
+import { createClient } from 'silgi/client'
+import { silgiHono } from 'silgi/hono'
+import { otelWrap } from 'silgi/otel'
 ```
 
 oRPC requires separate installs: `@orpc/server`, `@orpc/client`, `@orpc/react-query`, `@orpc/openapi`, `@orpc/zod`, etc. Both approaches work — single package is simpler to manage, monorepo packages allow finer dependency control.
 
 ### Guard / Wrap vs middleware chain
 
-Most RPC libraries have one middleware type. Katman has two:
+Most RPC libraries have one middleware type. Silgi has two:
 
 - **Guard** — runs before, enriches context. No `next()`. Sync fast-path.
 - **Wrap** — runs before AND after (onion). Has `next()`. For timing, caching, error capture.
 
 ```
 oRPC:    middleware → middleware → middleware → handler
-Katman:  guard → guard → guard → [wrap → [wrap → handler]]
+Silgi:  guard → guard → guard → [wrap → [wrap → handler]]
 ```
 
 Guards are semantically clearer and faster (no async overhead when sync). oRPC's single middleware is more flexible.
 
 ### Compiled pipeline vs runtime dispatch
 
-Katman compiles the middleware chain once at startup:
+Silgi compiles the middleware chain once at startup:
 
 - Guards are unrolled (0-4 specialization, no loop)
 - Context pool eliminates per-request allocation
 - Handler analysis skips unused features
 
-oRPC evaluates the chain at runtime per request. More flexible for dynamic middleware, but Katman is faster for static pipelines.
+oRPC evaluates the chain at runtime per request. More flexible for dynamic middleware, but Silgi is faster for static pipelines.
 
 ### Content negotiation vs RPC protocol
 
-**Katman** inspects `Accept` header and responds in the matching format (JSON, MessagePack, or devalue). Standard HTTP, works with any client.
+**Silgi** inspects `Accept` header and responds in the matching format (JSON, MessagePack, or devalue). Standard HTTP, works with any client.
 
 **oRPC** uses its own RPC protocol that natively handles Date, File, Blob, BigInt without negotiation. Simpler for oRPC-to-oRPC, less interoperable with non-oRPC consumers.
 
@@ -101,20 +101,20 @@ All benchmarks run on the same machine (Apple M3 Max, Node v24.11.0). Sequential
 
 Measures raw middleware pipeline overhead — how fast the framework processes a call after TCP/HTTP is stripped away.
 
-| Scenario             | Katman     | oRPC     | H3 v2    | vs oRPC         | vs H3            |
+| Scenario             | Silgi     | oRPC     | H3 v2    | vs oRPC         | vs H3            |
 | -------------------- | ---------- | -------- | -------- | --------------- | ---------------- |
 | No middleware        | **111 ns** | 685 ns   | 2,025 ns | **6.2x faster** | **18.2x faster** |
 | Zod input validation | **241 ns** | 804 ns   | 4,214 ns | **3.3x faster** | **17.5x faster** |
 | 3 middleware + Zod   | **297 ns** | 1,718 ns | 3,954 ns | **5.8x faster** | **13.3x faster** |
 | 5 middleware + Zod   | **413 ns** | 2,219 ns | 3,917 ns | **5.4x faster** | **9.5x faster**  |
 
-Katman's compiled pipeline (unrolled guards, context pool) is **3-6x faster than oRPC** and **9-18x faster than H3** at the pipeline level.
+Silgi's compiled pipeline (unrolled guards, context pool) is **3-6x faster than oRPC** and **9-18x faster than H3** at the pipeline level.
 
-### HTTP performance (Katman vs oRPC vs H3 vs Hono)
+### HTTP performance (Silgi vs oRPC vs H3 vs Hono)
 
 Real HTTP servers, real TCP connections, 3000 sequential requests per scenario.
 
-| Scenario               | Katman              | oRPC            | H3 v2           | Hono            |
+| Scenario               | Silgi              | oRPC            | H3 v2           | Hono            |
 | ---------------------- | ------------------- | --------------- | --------------- | --------------- |
 | Simple (no middleware) | **79µs** (12,592/s) | 83µs (12,048/s) | 78µs (12,753/s) | 74µs (13,516/s) |
 | Zod validation         | **86µs** (11,627/s) | 120µs (8,315/s) | 93µs (10,707/s) | 97µs (10,280/s) |
@@ -122,17 +122,17 @@ Real HTTP servers, real TCP connections, 3000 sequential requests per scenario.
 
 | Comparison     | Simple | Zod             | Guard + Zod     |
 | -------------- | ------ | --------------- | --------------- |
-| Katman vs oRPC | ~tied  | **1.4x faster** | **1.5x faster** |
-| Katman vs H3   | ~tied  | **1.1x faster** | **1.2x faster** |
-| Katman vs Hono | 0.9x   | **1.1x faster** | **1.3x faster** |
+| Silgi vs oRPC | ~tied  | **1.4x faster** | **1.5x faster** |
+| Silgi vs H3   | ~tied  | **1.1x faster** | **1.2x faster** |
+| Silgi vs Hono | 0.9x   | **1.1x faster** | **1.3x faster** |
 
-For simple routes, all four are within 10% — TCP overhead dominates. As middleware complexity grows, Katman's compiled pipeline pulls ahead: **1.5x faster than oRPC** and **1.2-1.3x faster than H3/Hono** with guards + validation.
+For simple routes, all four are within 10% — TCP overhead dominates. As middleware complexity grows, Silgi's compiled pipeline pulls ahead: **1.5x faster than oRPC** and **1.2-1.3x faster than H3/Hono** with guards + validation.
 
-### Router performance (Katman compiled vs rou3)
+### Router performance (Silgi compiled vs rou3)
 
 JIT-compiled radix tree router vs rou3's compiled router.
 
-| Scenario                | Katman      | rou3    |                  |
+| Scenario                | Silgi      | rou3    |                  |
 | ----------------------- | ----------- | ------- | ---------------- |
 | Static `/users/list`    | **3.1 ns**  | 3.9 ns  | **1.23x faster** |
 | Param `/users/123`      | **22.0 ns** | 25.6 ns | **1.16x faster** |
@@ -140,18 +140,18 @@ JIT-compiled radix tree router vs rou3's compiled router.
 | Wildcard `/files/a/b/c` | **19.2 ns** | 91.3 ns | **4.75x faster** |
 | Miss `/missing/deep`    | **4.5 ns**  | 22.3 ns | **4.96x faster** |
 
-Katman's router uses indexOf fast path for simple branches (avoids `split()`), switch-based charCodeAt dispatch, and compile-time `substring()` for wildcards.
+Silgi's router uses indexOf fast path for simple branches (avoids `split()`), switch-based charCodeAt dispatch, and compile-time `substring()` for wildcards.
 
 ### Tail latency (p99)
 
 | Scenario (Guard + Zod) | avg      | p50      | p99       |
 | ---------------------- | -------- | -------- | --------- |
-| **Katman**             | **79µs** | **70µs** | **148µs** |
+| **Silgi**             | **79µs** | **70µs** | **148µs** |
 | oRPC                   | 116µs    | 103µs    | 223µs     |
 | H3 v2                  | 96µs     | 82µs     | 236µs     |
 | Hono                   | 102µs    | 87µs     | 194µs     |
 
-Katman's p99 is **34% lower** than oRPC and **37% lower** than H3 — compiled pipelines keep tail latency predictable.
+Silgi's p99 is **34% lower** than oRPC and **37% lower** than H3 — compiled pipelines keep tail latency predictable.
 
 ### Memory usage
 
@@ -159,14 +159,14 @@ Katman's p99 is **34% lower** than oRPC and **37% lower** than H3 — compiled p
 
 | Framework  | Bytes per call | Ratio     |
 | ---------- | -------------- | --------- |
-| **Katman** | ~40 bytes      | **1x**    |
+| **Silgi** | ~40 bytes      | **1x**    |
 | oRPC       | ~56 bytes      | 1.4x more |
 
 ### WebSocket performance
 
 > 2000 sequential messages over persistent connection
 
-| Scenario     | Katman   | oRPC | H3 v2 |
+| Scenario     | Silgi   | oRPC | H3 v2 |
 | ------------ | -------- | ---- | ----- |
 | Simple query | **39µs** | 42µs | 34µs  |
 
@@ -189,7 +189,7 @@ Being honest about oRPC's strengths:
 - **Community size** — Larger user base means more battle-tested edge cases
 - **Angular support** — TanStack Query for Angular
 
-## Where Katman is ahead
+## Where Silgi is ahead
 
 - **Single package** — one install, no version coordination, no transitive dependency issues
 - **Compiled pipeline** — measurably faster, lower p99 latency
@@ -205,6 +205,6 @@ Being honest about oRPC's strengths:
 
 ## What's next?
 
-- [Getting Started](/docs/getting-started) — build your first Katman API
+- [Getting Started](/docs/getting-started) — build your first Silgi API
 - [Examples](/docs/examples) — download and run in one command
 - [Migrating from tRPC](/docs/migrations/from-trpc) — step-by-step guide

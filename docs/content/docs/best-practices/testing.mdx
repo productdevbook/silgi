@@ -1,12 +1,12 @@
 ---
 title: Testing & Mocking
-description: Test Katman procedures without starting a server.
+description: Test Silgi procedures without starting a server.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 
-Three patterns for testing Katman APIs, from lightweight unit tests to full HTTP-level integration tests.
+Three patterns for testing Silgi APIs, from lightweight unit tests to full HTTP-level integration tests.
 
 ## 1. callable() — unit testing
 
@@ -14,7 +14,7 @@ Test a single procedure in isolation. The compiled pipeline runs (guards, wraps,
 
 ```ts twoslash
 // @noErrors
-import { callable } from 'katman'
+import { callable } from 'silgi'
 import { describe, it, expect } from 'vitest'
 
 const listUsers = k
@@ -88,7 +88,7 @@ Test the full router as a single unit. The server client compiles the router onc
 
 ```ts twoslash
 // @noErrors
-import { createServerClient } from 'katman/client/server'
+import { createServerClient } from 'silgi/client/server'
 
 const client = createServerClient(appRouter, {
   context: () => ({

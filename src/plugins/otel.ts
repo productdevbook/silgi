@@ -25,7 +25,7 @@ export interface Tracer {
  *
  * @example
  * ```ts
- * import { otelWrap } from "katman/otel"
+ * import { otelWrap } from "silgi/otel"
  * import { trace } from "@opentelemetry/api"
  *
  * const tracing = otelWrap(trace.getTracer("my-service"))
@@ -40,7 +40,7 @@ export function otelWrap(tracer: Tracer, spanName = 'rpc.call'): WrapDef {
     kind: 'wrap',
     fn: async (_ctx, next) => {
       const span = tracer.startSpan(spanName, {
-        attributes: { 'rpc.system': 'katman' },
+        attributes: { 'rpc.system': 'silgi' },
       })
 
       try {

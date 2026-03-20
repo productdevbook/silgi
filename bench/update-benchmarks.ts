@@ -23,18 +23,18 @@ import type { Server, IncomingMessage, ServerResponse } from 'node:http'
 const EchoInput = z.object({ message: z.string() })
 const GuardedInput = z.object({ name: z.string() })
 
-// ── Katman Setup ────────────────────────────────────
+// ── Silgi Setup ────────────────────────────────────
 
 import { compileProcedure, compileRouter, ContextPool } from '../src/compile.ts'
-import { katman } from '../src/katman.ts'
+import { silgi } from '../src/silgi.ts'
 import { attachWebSocket } from '../src/ws.ts'
 
 import type { GuardDef, WrapDef } from '../src/types.ts'
 
-const k = katman({ context: () => ({}) })
+const k = silgi({ context: () => ({}) })
 const auth = k.guard(() => ({ userId: 1 }))
 
-const katmanRouter = k.router({
+const silgiRouter = k.router({
   health: k.$resolve(async () => ({ status: 'ok' })),
   echo: k.$input(EchoInput as any).$resolve(async ({ input }: any) => ({ echo: input.message })),
   guarded: k
@@ -99,15 +99,15 @@ async function httpBench(url: string, body: string | null, n: number) {
 
 function generateCert() {
   const tmpDir = os.tmpdir()
-  const keyPath = `${tmpDir}/katman-bench-key.pem`
-  const certPath = `${tmpDir}/katman-bench-cert.pem`
+  const keyPath = `${tmpDir}/silgi-bench-key.pem`
+  const certPath = `${tmpDir}/silgi-bench-cert.pem`
   execSync(
     `openssl req -x509 -newkey rsa:2048 -keyout ${keyPath} -out ${certPath} -days 1 -nodes -subj "/CN=localhost" 2>/dev/null`,
   )
   return { key: readFileSync(keyPath, 'utf8'), cert: readFileSync(certPath, 'utf8') }
 }
 
-// ── Pipeline Benchmark (Katman vs oRPC vs H3) ──────
+// ── Pipeline Benchmark (Silgi vs oRPC vs H3) ──────
 
 import { compilePipeline } from '../src/core/pipeline.ts'
 import { validateSchema } from '../src/core/schema.ts'
@@ -116,7 +116,7 @@ import type { Middleware } from '../src/core/pipeline.ts'
 
 interface PipelineResult {
   name: string
-  katman_ns: number
+  silgi_ns: number
   orpc_ns: number
   h3_ns: number
   vs_orpc: string
@@ -157,7 +157,7 @@ async function runPipelineBenchmarks(): Promise<PipelineResult[]> {
   // 1. No middleware
   const orpc1 = orpcOs.handler(async ({ input }) => ({ result: input }))
   const orpc1Client = (await import('@orpc/server')).createRouterClient({ p: orpc1 }, { context: {} })
-  const katman1 = compileProcedure({
+  const silgi1 = compileProcedure({
     type: 'query',
     input: null,
     output: null,
@@ -167,12 +167,12 @@ async function runPipelineBenchmarks(): Promise<PipelineResult[]> {
     route: null,
   })
 
-  const k1 = await measure(() => katman1({}, testInput, signal), RUNS)
+  const k1 = await measure(() => silgi1({}, testInput, signal), RUNS)
   const o1 = await measure(() => (orpc1Client as any).p(testInput), RUNS)
   const h1 = await measure(() => h3App.fetch(h3Req('/noMw', testInput)), RUNS)
   results.push({
     name: 'No middleware',
-    katman_ns: Math.round(k1),
+    silgi_ns: Math.round(k1),
     orpc_ns: Math.round(o1),
     h3_ns: Math.round(h1),
     vs_orpc: `${(o1 / k1).toFixed(1)}x`,
@@ -182,7 +182,7 @@ async function runPipelineBenchmarks(): Promise<PipelineResult[]> {
   // 2. Zod input validation
   const orpc2 = orpcOs.input(InputSchema).handler(async ({ input }) => input)
   const orpc2Client = (await import('@orpc/server')).createRouterClient({ p: orpc2 }, { context: {} })
-  const katman2 = compileProcedure({
+  const silgi2 = compileProcedure({
     type: 'query',
     input: InputSchema as any,
     output: null,
@@ -192,12 +192,12 @@ async function runPipelineBenchmarks(): Promise<PipelineResult[]> {
     route: null,
   })
 
-  const k2 = await measure(() => katman2({}, testInput, signal), RUNS)
+  const k2 = await measure(() => silgi2({}, testInput, signal), RUNS)
   const o2 = await measure(() => (orpc2Client as any).p(testInput), RUNS)
   const h2r = await measure(() => h3App.fetch(h3Req('/zod', testInput)), RUNS)
   results.push({
     name: 'Zod input validation',
-    katman_ns: Math.round(k2),
+    silgi_ns: Math.round(k2),
     orpc_ns: Math.round(o2),
     h3_ns: Math.round(h2r),
     vs_orpc: `${(o2 / k2).toFixed(1)}x`,
@@ -212,7 +212,7 @@ async function runPipelineBenchmarks(): Promise<PipelineResult[]> {
     .input(InputSchema)
     .handler(async ({ input }) => input)
   const orpc3Client = (await import('@orpc/server')).createRouterClient({ p: orpc3 }, { context: {} })
-  const katman3 = compileProcedure({
+  const silgi3 = compileProcedure({
     type: 'mutation',
     input: InputSchema as any,
     output: null,
@@ -226,12 +226,12 @@ async function runPipelineBenchmarks(): Promise<PipelineResult[]> {
     route: null,
   })
 
-  const k3 = await measure(() => katman3({}, testInput, signal), RUNS)
+  const k3 = await measure(() => silgi3({}, testInput, signal), RUNS)
   const o3 = await measure(() => (orpc3Client as any).p(testInput), RUNS)
   const h3r = await measure(() => h3App.fetch(h3Req('/3mw', testInput)), RUNS)
   results.push({
     name: '3 middleware + Zod',
-    katman_ns: Math.round(k3),
+    silgi_ns: Math.round(k3),
     orpc_ns: Math.round(o3),
     h3_ns: Math.round(h3r),
     vs_orpc: `${(o3 / k3).toFixed(1)}x`,
@@ -254,7 +254,7 @@ async function runPipelineBenchmarks(): Promise<PipelineResult[]> {
     .input(InputSchema)
     .handler(async ({ input }) => input)
   const orpc4Client = (await import('@orpc/server')).createRouterClient({ p: orpc4 }, { context: {} })
-  const katman4 = compileProcedure({
+  const silgi4 = compileProcedure({
     type: 'mutation',
     input: InputSchema as any,
     output: null,
@@ -270,12 +270,12 @@ async function runPipelineBenchmarks(): Promise<PipelineResult[]> {
     route: null,
   })
 
-  const k4 = await measure(() => katman4({}, testInput, signal), RUNS)
+  const k4 = await measure(() => silgi4({}, testInput, signal), RUNS)
   const o4 = await measure(() => (orpc4Client as any).p(testInput), RUNS)
   const h4 = await measure(() => h3App.fetch(h3Req('/5mw', testInput)), RUNS)
   results.push({
     name: '5 middleware + Zod',
-    katman_ns: Math.round(k4),
+    silgi_ns: Math.round(k4),
     orpc_ns: Math.round(o4),
     h3_ns: Math.round(h4),
     vs_orpc: `${(o4 / k4).toFixed(1)}x`,
@@ -289,8 +289,8 @@ async function runPipelineBenchmarks(): Promise<PipelineResult[]> {
 
 interface HTTPResult {
   name: string
-  katman_us: number
-  katman_rps: number
+  silgi_us: number
+  silgi_rps: number
   h3_us: number
   h3_rps: number
   orpc_us: number
@@ -303,10 +303,10 @@ async function runHTTPBenchmarks(): Promise<HTTPResult[]> {
     HP = 4301,
     OP = 4302
 
-  const flat = compileRouter(katmanRouter)
+  const flat = compileRouter(silgiRouter)
   const sig = new AbortController().signal
 
-  function katmanHandler(req: IncomingMessage, res: ServerResponse) {
+  function silgiHandler(req: IncomingMessage, res: ServerResponse) {
     const u = req.url ?? '/'
     const q = u.indexOf('?')
     const p = q === -1 ? u.slice(1) : u.slice(1, q)
@@ -375,7 +375,7 @@ async function runHTTPBenchmarks(): Promise<HTTPResult[]> {
   }
 
   const kSrv: Server = await new Promise((r) => {
-    const s = createServer({ keepAlive: true, requestTimeout: 0, headersTimeout: 0 }, katmanHandler)
+    const s = createServer({ keepAlive: true, requestTimeout: 0, headersTimeout: 0 }, silgiHandler)
     s.listen(KP, '127.0.0.1', () => r(s))
   })
 
@@ -441,8 +441,8 @@ async function runHTTPBenchmarks(): Promise<HTTPResult[]> {
     const oR = await httpBench(`http://127.0.0.1:${OP}/${s.path}`, s.body, N)
     results.push({
       name: s.name,
-      katman_us: Math.round(kR.avg * 1000),
-      katman_rps: kR.rps,
+      silgi_us: Math.round(kR.avg * 1000),
+      silgi_rps: kR.rps,
       h3_us: Math.round(hR.avg * 1000),
       h3_rps: hR.rps,
       orpc_us: Math.round(oR.avg * 1000),
@@ -467,7 +467,7 @@ interface H2Result {
 
 async function runH2Benchmarks(): Promise<H2Result[]> {
   const N = 2000
-  const flat = compileRouter(katmanRouter)
+  const flat = compileRouter(silgiRouter)
   const sig = new AbortController().signal
 
   function handler(req: any, res: any) {
@@ -581,7 +581,7 @@ import { WebSocketServer } from 'ws'
 
 interface WSResult {
   name: string
-  katman_us: number
+  silgi_us: number
   orpc_us: number
   h3_us: number
   vs_orpc: string
@@ -621,20 +621,20 @@ async function wsBench(
 
 async function runWSBenchmarks(): Promise<WSResult[]> {
   const N = 2000
-  const flat = compileRouter(katmanRouter)
+  const flat = compileRouter(silgiRouter)
   const sig = new AbortController().signal
 
-  // ── Katman WS Server (crossws) ──
-  const katmanSrv: Server = await new Promise((r) => {
+  // ── Silgi WS Server (crossws) ──
+  const silgiSrv: Server = await new Promise((r) => {
     const s = createServer((req, res) => {
       res.writeHead(404)
       res.end()
     })
-    attachWebSocket(s, katmanRouter)
+    attachWebSocket(s, silgiRouter)
     s.listen(4320, '127.0.0.1', () => r(s))
   })
 
-  // ── oRPC WS Server (raw ws, same protocol as Katman for fair comparison) ──
+  // ── oRPC WS Server (raw ws, same protocol as Silgi for fair comparison) ──
   const orpcWss = new WebSocketServer({ port: 4321, host: '127.0.0.1' })
   orpcWss.on('connection', (ws) => {
     ws.on('message', async (data) => {
@@ -652,7 +652,7 @@ async function runWSBenchmarks(): Promise<WSResult[]> {
   })
   await new Promise<void>((r) => orpcWss.on('listening', r))
 
-  // ── H3 WS Server (crossws, same protocol as Katman) ──
+  // ── H3 WS Server (crossws, same protocol as Silgi) ──
   const h3Ws = nodeWsAdapter({
     hooks: {
       message(peer, msg) {
@@ -673,8 +673,8 @@ async function runWSBenchmarks(): Promise<WSResult[]> {
   })
 
   // ── Benchmark ──
-  // Katman WS
-  const katmanAvg = await wsBench(
+  // Silgi WS
+  const silgiAvg = await wsBench(
     'ws://127.0.0.1:4320',
     (i) => JSON.stringify({ id: String(i), path: 'health' }),
     (d) => {
@@ -706,11 +706,11 @@ async function runWSBenchmarks(): Promise<WSResult[]> {
     N,
   )
 
-  katmanSrv.close()
+  silgiSrv.close()
   orpcWss.close()
   h3WsSrv.close()
 
-  const kUs = Math.round(katmanAvg * 1000)
+  const kUs = Math.round(silgiAvg * 1000)
   const oUs = Math.round(orpcAvg * 1000)
   const hUs = Math.round(h3Avg * 1000)
 
@@ -727,7 +727,7 @@ async function runWSBenchmarks(): Promise<WSResult[]> {
         ? `${(kUs / hUs).toFixed(1)}x slower`
         : `~tied`
 
-  return [{ name: 'Simple query (persistent conn)', katman_us: kUs, orpc_us: oUs, h3_us: hUs, vs_orpc, vs_h3 }]
+  return [{ name: 'Simple query (persistent conn)', silgi_us: kUs, orpc_us: oUs, h3_us: hUs, vs_orpc, vs_h3 }]
 }
 
 // ── Generate Markdown ───────────────────────────────
@@ -759,33 +759,33 @@ async function main() {
   ].join('\n')
 
   const pipelineTable = [
-    `| Scenario | Katman | oRPC | H3 v2 | vs oRPC | vs H3 |`,
+    `| Scenario | Silgi | oRPC | H3 v2 | vs oRPC | vs H3 |`,
     `|---|---|---|---|---|---|`,
     ...pipelineResults.map(
       (r) =>
-        `| ${r.name} | **${r.katman_ns} ns** | ${r.orpc_ns} ns | ${r.h3_ns} ns | **${r.vs_orpc}** | **${r.vs_h3}** |`,
+        `| ${r.name} | **${r.silgi_ns} ns** | ${r.orpc_ns} ns | ${r.h3_ns} ns | **${r.vs_orpc}** | **${r.vs_h3}** |`,
     ),
   ].join('\n')
 
   const httpTable = [
-    `| Scenario | Katman | H3 v2 | oRPC | vs H3 | vs oRPC |`,
+    `| Scenario | Silgi | H3 v2 | oRPC | vs H3 | vs oRPC |`,
     `|---|---|---|---|---|---|`,
     ...httpResults.map((r) => {
-      const ratio_h3 = r.h3_us / r.katman_us
+      const ratio_h3 = r.h3_us / r.silgi_us
       const vsH3 =
         ratio_h3 > 1.05
           ? `**${ratio_h3.toFixed(1)}x faster**`
           : ratio_h3 < 0.95
             ? `${(1 / ratio_h3).toFixed(1)}x slower`
             : `~tied`
-      const ratio_or = r.orpc_us / r.katman_us
+      const ratio_or = r.orpc_us / r.silgi_us
       const vsOr =
         ratio_or > 1.05
           ? `**${ratio_or.toFixed(1)}x faster**`
           : ratio_or < 0.95
             ? `${(1 / ratio_or).toFixed(1)}x slower`
             : `~tied`
-      return `| ${r.name} | **${r.katman_us}µs** (${r.katman_rps}/s) | ${r.h3_us}µs (${r.h3_rps}/s) | ${r.orpc_us}µs (${r.orpc_rps}/s) | ${vsH3} | ${vsOr} |`
+      return `| ${r.name} | **${r.silgi_us}µs** (${r.silgi_rps}/s) | ${r.h3_us}µs (${r.h3_rps}/s) | ${r.orpc_us}µs (${r.orpc_rps}/s) | ${vsH3} | ${vsOr} |`
     }),
   ].join('\n')
 
@@ -796,10 +796,10 @@ async function main() {
   ].join('\n')
 
   const wsTable = [
-    `| Scenario | Katman | oRPC | H3 v2 | vs oRPC | vs H3 |`,
+    `| Scenario | Silgi | oRPC | H3 v2 | vs oRPC | vs H3 |`,
     `|---|---|---|---|---|---|`,
     ...wsResults.map(
-      (r) => `| ${r.name} | **${r.katman_us}µs** | ${r.orpc_us}µs | ${r.h3_us}µs | ${r.vs_orpc} | ${r.vs_h3} |`,
+      (r) => `| ${r.name} | **${r.silgi_us}µs** | ${r.orpc_us}µs | ${r.h3_us}µs | ${r.vs_orpc} | ${r.vs_h3} |`,
     ),
   ].join('\n')
 
@@ -813,7 +813,7 @@ ${env}
 
 ## Pipeline Performance (pure execution, no HTTP)
 
-Measures raw middleware pipeline overhead — Katman vs oRPC vs H3 v2.
+Measures raw middleware pipeline overhead — Silgi vs oRPC vs H3 v2.
 
 ${pipelineTable}
 
@@ -825,13 +825,13 @@ ${httpTable}
 
 ## HTTP/2 vs HTTP/1.1
 
-Same Katman server, comparing protocols. HTTP/2 uses TLS.
+Same Silgi server, comparing protocols. HTTP/2 uses TLS.
 
 ${h2Table}
 
 ## WebSocket Performance (persistent connection)
 
-WebSocket RPC latency — Katman vs oRPC vs H3 v2, 2000 sequential messages.
+WebSocket RPC latency — Silgi vs oRPC vs H3 v2, 2000 sequential messages.
 
 ${wsTable}
 
@@ -841,7 +841,7 @@ ${wsTable}
 
 | Framework | Bytes/call | Ratio |
 |---|---|---|
-| **Katman** | ~40 bytes | **1x** |
+| **Silgi** | ~40 bytes | **1x** |
 | oRPC | ~56 bytes | 1.4x |
 
 ## Runtime Compatibility
@@ -856,9 +856,9 @@ ${wsTable}
 
 \`\`\`sh
 pnpm bench           # run all benchmarks and update this file
-pnpm bench:orpc      # oRPC vs Katman pipeline (mitata)
-pnpm bench:h3        # Katman vs H3 v2 vs oRPC (HTTP)
-pnpm bench:http      # Katman vs oRPC (HTTP, detailed)
+pnpm bench:orpc      # oRPC vs Silgi pipeline (mitata)
+pnpm bench:h3        # Silgi vs H3 v2 vs oRPC (HTTP)
+pnpm bench:http      # Silgi vs oRPC (HTTP, detailed)
 pnpm bench:micro     # per-operation bottleneck analysis
 bun test/bun-compat.ts  # Bun compatibility test
 \`\`\`
@@ -869,14 +869,14 @@ bun test/bun-compat.ts  # Bun compatibility test
 
   console.log('Pipeline:')
   for (const r of pipelineResults)
-    console.log(`  ${r.name}: Katman ${r.katman_ns}ns | oRPC ${r.orpc_ns}ns | H3 ${r.h3_ns}ns`)
+    console.log(`  ${r.name}: Silgi ${r.silgi_ns}ns | oRPC ${r.orpc_ns}ns | H3 ${r.h3_ns}ns`)
   console.log('\nHTTP/1.1:')
   for (const r of httpResults)
-    console.log(`  ${r.name}: Katman ${r.katman_us}µs | H3 ${r.h3_us}µs | oRPC ${r.orpc_us}µs`)
+    console.log(`  ${r.name}: Silgi ${r.silgi_us}µs | H3 ${r.h3_us}µs | oRPC ${r.orpc_us}µs`)
   console.log('\nHTTP/2 vs HTTP/1.1:')
   for (const r of h2Results) console.log(`  ${r.name}: H1 ${r.h1_us}µs | H2 ${r.h2_us}µs (${r.improvement})`)
   console.log('\nWebSocket:')
-  for (const r of wsResults) console.log(`  ${r.name}: Katman ${r.katman_us}µs | oRPC ${r.orpc_us}µs | H3 ${r.h3_us}µs`)
+  for (const r of wsResults) console.log(`  ${r.name}: Silgi ${r.silgi_us}µs | oRPC ${r.orpc_us}µs | H3 ${r.h3_us}µs`)
 
   process.exit(0)
 }

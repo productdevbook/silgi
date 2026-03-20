@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
 
 import { callable } from '#src/callable.ts'
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 
-const k = katman({ context: () => ({ db: 'test' }) })
+const k = silgi({ context: () => ({ db: 'test' }) })
 
 describe('callable()', () => {
   it('calls a procedure directly without HTTP', async () => {

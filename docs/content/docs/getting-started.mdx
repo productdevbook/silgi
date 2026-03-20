@@ -1,6 +1,6 @@
 ---
 title: Getting Started
-description: Install Katman and build your first type-safe API in 5 minutes.
+description: Install Silgi and build your first type-safe API in 5 minutes.
 ---
 
 import { Step, Steps } from 'fumadocs-ui/components/steps'
@@ -10,9 +10,9 @@ import { File, Folder, Files } from 'fumadocs-ui/components/files'
 ## Install
 
 <Tabs items={['npm', 'pnpm', 'bun']}>
-  <Tab value='npm'>```bash npm install katman zod ```</Tab>
-  <Tab value='pnpm'>```bash pnpm add katman zod ```</Tab>
-  <Tab value='bun'>```bash bun add katman zod ```</Tab>
+  <Tab value='npm'>```bash npm install silgi zod ```</Tab>
+  <Tab value='pnpm'>```bash pnpm add silgi zod ```</Tab>
+  <Tab value='bun'>```bash bun add silgi zod ```</Tab>
 </Tabs>
 
 You also need a validator. We use Zod here, but Valibot and ArkType also work.
@@ -41,15 +41,15 @@ Two files. That's all you need to get started.
 <Steps>
 <Step>
 
-### Create the Katman instance
+### Create the Silgi instance
 
-This is where you tell Katman how to build the context for each request. The context is an object that every procedure can access — a good place to put things like a database connection.
+This is where you tell Silgi how to build the context for each request. The context is an object that every procedure can access — a good place to put things like a database connection.
 
 ```ts twoslash title="src/rpc.ts"
 // @noErrors
-import { katman } from 'katman'
+import { silgi } from 'silgi'
 
-const k = katman({
+const k = silgi({
   context: (req) => ({
     // This runs on every request.
     // Whatever you return here is available as `ctx` in procedures.
@@ -72,14 +72,14 @@ A **procedure** is a single API endpoint. All procedures default to POST. Use `.
 ```ts twoslash title="src/server.ts"
 // @noErrors
 import { k, guard, router } from './rpc'
-import { KatmanError } from 'katman'
+import { SilgiError } from 'silgi'
 import { z } from 'zod'
 
 // A guard checks something before the procedure runs.
 // If it returns an object, that object is added to the context.
 const auth = guard((ctx) => {
   const token = ctx.headers?.authorization
-  if (!token) throw new KatmanError('UNAUTHORIZED')
+  if (!token) throw new SilgiError('UNAUTHORIZED')
   return { userId: 1 }
 })
 
@@ -135,7 +135,7 @@ npx tsx src/server.ts
 You should see:
 
 ```
-Katman server running at http://127.0.0.1:3000
+Silgi server running at http://127.0.0.1:3000
 Scalar API Reference at http://127.0.0.1:3000/reference
 ```
 
@@ -146,8 +146,8 @@ Scalar API Reference at http://127.0.0.1:3000/reference
 
 ```ts twoslash
 // @noErrors
-import { createClient } from 'katman/client'
-import { createLink } from 'katman/client/ofetch'
+import { createClient } from 'silgi/client'
+import { createLink } from 'silgi/client/ofetch'
 
 // The link tells the client how to talk to the server
 const link = createLink({ url: 'http://localhost:3000' })

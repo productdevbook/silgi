@@ -6,7 +6,7 @@
  */
 
 import { compileProcedure } from '../../compile.ts'
-import { KatmanError, toKatmanError } from '../../core/error.ts'
+import { SilgiError, toSilgiError } from '../../core/error.ts'
 
 import type { CompiledHandler } from '../../compile.ts'
 import type { ProcedureDef, RouterDef } from '../../types.ts'
@@ -22,7 +22,7 @@ export type ActionResult<TOutput> =
  * ```ts
  * // app/actions.ts
  * "use server"
- * import { createAction } from "katman/react"
+ * import { createAction } from "silgi/react"
  *
  * export const createUser = createAction(appRouter.users.create)
  *
@@ -44,7 +44,7 @@ export function createAction<TInput = unknown, TOutput = unknown>(
       return [null, output as TOutput]
     } catch (error) {
       if (isFrameworkError(error)) throw error
-      const e = error instanceof KatmanError ? error : toKatmanError(error)
+      const e = error instanceof SilgiError ? error : toSilgiError(error)
       return [e.toJSON() as any, undefined]
     }
   }

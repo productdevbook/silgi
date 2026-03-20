@@ -6,17 +6,17 @@ description: Read, set, and delete cookies inside procedures — typed helpers w
 import { Callout } from 'fumadocs-ui/components/callout'
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 
-Lightweight cookie utilities for Katman handlers. No dependencies. Works with both `serve()` and `handler()`.
+Lightweight cookie utilities for Silgi handlers. No dependencies. Works with both `serve()` and `handler()`.
 
 ## Reading cookies
 
 ```ts twoslash
 // @noErrors
-import { getCookie, parseCookies } from 'katman/cookies'
+import { getCookie, parseCookies } from 'silgi/cookies'
 
 const auth = k.guard((ctx) => {
   const token = getCookie(ctx.headers, 'session')
-  if (!token) throw new KatmanError('UNAUTHORIZED')
+  if (!token) throw new SilgiError('UNAUTHORIZED')
   return { sessionToken: token }
 })
 
@@ -31,7 +31,7 @@ const all = parseCookies(ctx.headers)
 
 ```ts twoslash
 // @noErrors
-import { setCookie } from 'katman/cookies'
+import { setCookie } from 'silgi/cookies'
 
 const header = setCookie('session', token, {
   httpOnly: true,
@@ -47,7 +47,7 @@ const header = setCookie('session', token, {
 
 ```ts twoslash
 // @noErrors
-import { deleteCookie } from 'katman/cookies'
+import { deleteCookie } from 'silgi/cookies'
 
 const header = deleteCookie('session')
 // "session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax"

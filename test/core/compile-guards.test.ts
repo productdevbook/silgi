@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
 import { compileProcedure } from '#src/compile.ts'
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 
-const k = katman({ context: () => ({}) })
+const k = silgi({ context: () => ({}) })
 
 describe('compileProcedure guard count specialization', () => {
   it('0 guards — direct resolve', async () => {

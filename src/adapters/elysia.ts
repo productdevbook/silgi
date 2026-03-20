@@ -1,19 +1,19 @@
 /**
- * Elysia adapter — use Katman with Elysia on Bun.
+ * Elysia adapter — use Silgi with Elysia on Bun.
  *
  * @example
  * ```ts
  * import { Elysia } from "elysia"
- * import { katmanElysia } from "katman/elysia"
+ * import { silgiElysia } from "silgi/elysia"
  *
  * const app = new Elysia()
- *   .use(katmanElysia(appRouter, { prefix: "/rpc" }))
+ *   .use(silgiElysia(appRouter, { prefix: "/rpc" }))
  *   .listen(3000)
  * ```
  */
 
 import { compileRouter } from '../compile.ts'
-import { KatmanError, toKatmanError } from '../core/error.ts'
+import { SilgiError, toSilgiError } from '../core/error.ts'
 import { ValidationError } from '../core/schema.ts'
 
 import type { RouterDef } from '../types.ts'
@@ -26,11 +26,11 @@ export interface ElysiaAdapterOptions<TCtx extends Record<string, unknown>> {
 }
 
 /**
- * Create an Elysia plugin that routes to Katman procedures.
+ * Create an Elysia plugin that routes to Silgi procedures.
  *
  * Returns a function that can be passed to `app.use()`.
  */
-export function katmanElysia<TCtx extends Record<string, unknown>>(
+export function silgiElysia<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: ElysiaAdapterOptions<TCtx> = {},
 ): (app: any) => any {
@@ -76,7 +76,7 @@ export function katmanElysia<TCtx extends Record<string, unknown>>(
           elysiaCtx.set.status = 400
           return { code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } }
         }
-        const e = error instanceof KatmanError ? error : toKatmanError(error)
+        const e = error instanceof SilgiError ? error : toSilgiError(error)
         elysiaCtx.set.status = e.status
         return e.toJSON()
       }

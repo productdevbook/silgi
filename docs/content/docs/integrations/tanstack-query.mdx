@@ -1,16 +1,16 @@
 ---
 title: TanStack Query
-description: Generate type-safe queryOptions, mutationOptions, and cache keys from your Katman client.
+description: Generate type-safe queryOptions, mutationOptions, and cache keys from your Silgi client.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
 import { Step, Steps } from 'fumadocs-ui/components/steps'
 
-[TanStack Query](https://tanstack.com/query) is the most popular data-fetching library for React, Vue, Solid, and Svelte. Katman provides `createQueryUtils`, a utility that generates type-safe `queryOptions` and `mutationOptions` from your client — so you don't have to write query keys or fetch functions by hand.
+[TanStack Query](https://tanstack.com/query) is the most popular data-fetching library for React, Vue, Solid, and Svelte. Silgi provides `createQueryUtils`, a utility that generates type-safe `queryOptions` and `mutationOptions` from your client — so you don't have to write query keys or fetch functions by hand.
 
 ## Prerequisites
 
-You need a Katman [client](/docs/client) set up. The TanStack Query integration wraps this client.
+You need a Silgi [client](/docs/client) set up. The TanStack Query integration wraps this client.
 
 ```bash
 npm install @tanstack/react-query
@@ -27,8 +27,8 @@ npm install @tanstack/react-query
 
 ```ts twoslash
 // @noErrors
-import { createQueryUtils } from 'katman/tanstack-query'
-import { client } from './client' // your Katman client
+import { createQueryUtils } from 'silgi/tanstack-query'
+import { client } from './client' // your Silgi client
 
 const utils = createQueryUtils(client)
 ```
@@ -217,7 +217,7 @@ The `input` option is a function that receives the current page parameter and re
 Use `skipToken` to conditionally disable a query. This is the type-safe alternative to `enabled: false` — it tells both TanStack Query and TypeScript that the query should not run:
 
 ```tsx
-import { skipToken } from 'katman/tanstack-query'
+import { skipToken } from 'silgi/tanstack-query'
 import { useQuery } from '@tanstack/react-query'
 
 function UserProfile({ userId }: { userId: string | null }) {
@@ -277,6 +277,6 @@ function ServerStatus() {
 
 ## What's next?
 
-- [Client](/docs/client) — set up the Katman client that powers the query utils
+- [Client](/docs/client) — set up the Silgi client that powers the query utils
 - [React Server Actions](/docs/integrations/react) — an alternative for server-first React apps
 - [Typed Errors](/docs/errors) — handle errors from your queries and mutations

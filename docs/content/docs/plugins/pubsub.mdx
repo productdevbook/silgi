@@ -11,7 +11,7 @@ Publish events from any procedure and subscribe to them via SSE or WebSocket. Bu
 
 ```ts twoslash
 // @noErrors
-import { createPublisher, MemoryPubSub } from 'katman/plugins'
+import { createPublisher, MemoryPubSub } from 'silgi/plugins'
 
 const pubsub = createPublisher(new MemoryPubSub())
 ```
@@ -48,7 +48,7 @@ Implement the `PubSubBackend` interface for Redis, Upstash, or any message broke
 
 ```ts twoslash
 // @noErrors
-import type { PubSubBackend } from 'katman/plugins'
+import type { PubSubBackend } from 'silgi/plugins'
 import Redis from 'ioredis'
 
 class RedisPubSub implements PubSubBackend {

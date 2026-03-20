@@ -1,23 +1,23 @@
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
 
-import { katman, KatmanError } from '#src/katman.ts'
+import { silgi, SilgiError } from '#src/silgi.ts'
 
-const k = katman({ context: () => ({ db: 'test' }) })
+const k = silgi({ context: () => ({ db: 'test' }) })
 
 const testRouter = k.router({
   health: k.$resolve(() => ({ status: 'ok' })),
   echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
   greet: k.$input(z.object({ name: z.string() })).$resolve(({ input }) => ({ hello: input.name })),
   fail: k.$resolve(() => {
-    throw new KatmanError('NOT_FOUND', { message: 'nope' })
+    throw new SilgiError('NOT_FOUND', { message: 'nope' })
   }),
 })
 
-describe('katmanSvelteKit() — real Request/Response', () => {
+describe('silgiSvelteKit() — real Request/Response', () => {
   it('handles real Fetch API requests', async () => {
-    const { katmanSvelteKit } = await import('#src/adapters/sveltekit.ts')
-    const handler = katmanSvelteKit(testRouter, { prefix: '/api/rpc' })
+    const { silgiSvelteKit } = await import('#src/adapters/sveltekit.ts')
+    const handler = silgiSvelteKit(testRouter, { prefix: '/api/rpc' })
 
     const r1 = await handler({
       request: new Request('http://localhost/api/rpc/health', { method: 'POST' }),

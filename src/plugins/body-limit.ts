@@ -5,7 +5,7 @@
  *
  * @example
  * ```ts
- * import { bodyLimitGuard } from "katman/plugins"
+ * import { bodyLimitGuard } from "silgi/plugins"
  *
  * const upload = k
  *   .$use(bodyLimitGuard({ maxBytes: 5 * 1024 * 1024 })) // 5 MB
@@ -13,7 +13,7 @@
  * ```
  */
 
-import { KatmanError } from '../core/error.ts'
+import { SilgiError } from '../core/error.ts'
 
 import type { GuardDef } from '../types.ts'
 
@@ -44,7 +44,7 @@ export function bodyLimitGuard(options: BodyLimitOptions = {}): GuardDef<Record<
       if (Number.isNaN(size)) return
 
       if (size > maxBytes) {
-        throw new KatmanError('PAYLOAD_TOO_LARGE', {
+        throw new SilgiError('PAYLOAD_TOO_LARGE', {
           status: 413,
           message,
           data: { maxBytes, receivedBytes: size },

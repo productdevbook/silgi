@@ -1,5 +1,5 @@
 /**
- * KatmanError — unified RPC error with cross-realm instanceof.
+ * SilgiError — unified RPC error with cross-realm instanceof.
  */
 
 const COMMON_ERRORS = /* @__PURE__ */ Object.freeze({
@@ -22,9 +22,9 @@ const COMMON_ERRORS = /* @__PURE__ */ Object.freeze({
   GATEWAY_TIMEOUT: { status: 504, message: 'Gateway Timeout' },
 } as const)
 
-export type KatmanErrorCode = keyof typeof COMMON_ERRORS | (string & {})
+export type SilgiErrorCode = keyof typeof COMMON_ERRORS | (string & {})
 
-export interface KatmanErrorOptions<TData = unknown> {
+export interface SilgiErrorOptions<TData = unknown> {
   status?: number
   message?: string
   data?: TData
@@ -32,7 +32,7 @@ export interface KatmanErrorOptions<TData = unknown> {
   defined?: boolean
 }
 
-export interface KatmanErrorJSON<TCode extends string = string, TData = unknown> {
+export interface SilgiErrorJSON<TCode extends string = string, TData = unknown> {
   defined: boolean
   code: TCode
   status: number
@@ -40,16 +40,16 @@ export interface KatmanErrorJSON<TCode extends string = string, TData = unknown>
   data: TData
 }
 
-const REGISTRY_KEY = Symbol.for('katman.error.registry')
+const REGISTRY_KEY = Symbol.for('silgi.error.registry')
 const registry = ((globalThis as Record<symbol, WeakSet<Function>>)[REGISTRY_KEY] ??= new WeakSet<Function>())
 
-export class KatmanError<TCode extends string = string, TData = unknown> extends Error {
+export class SilgiError<TCode extends string = string, TData = unknown> extends Error {
   readonly code: TCode
   readonly status: number
   readonly data: TData
   readonly defined: boolean
 
-  constructor(code: TCode, options: KatmanErrorOptions<TData> = {}) {
+  constructor(code: TCode, options: SilgiErrorOptions<TData> = {}) {
     const defaults = COMMON_ERRORS[code as keyof typeof COMMON_ERRORS]
     const message = options.message ?? defaults?.message ?? code
     super(message, options.cause ? { cause: options.cause } : undefined)
@@ -57,10 +57,10 @@ export class KatmanError<TCode extends string = string, TData = unknown> extends
     this.status = options.status ?? defaults?.status ?? 500
     this.data = options.data as TData
     this.defined = options.defined ?? false
-    this.name = 'KatmanError'
+    this.name = 'SilgiError'
   }
 
-  toJSON(): KatmanErrorJSON<TCode, TData> {
+  toJSON(): SilgiErrorJSON<TCode, TData> {
     return {
       defined: this.defined,
       code: this.code,
@@ -85,13 +85,13 @@ export class KatmanError<TCode extends string = string, TData = unknown> extends
   }
 }
 
-export function isDefinedError<TError>(error: TError): error is TError & KatmanError & { defined: true } {
-  return error instanceof KatmanError && error.defined === true
+export function isDefinedError<TError>(error: TError): error is TError & SilgiError & { defined: true } {
+  return error instanceof SilgiError && error.defined === true
 }
 
-export function toKatmanError(error: unknown): KatmanError {
-  if (error instanceof KatmanError) return error
-  return new KatmanError('INTERNAL_SERVER_ERROR', {
+export function toSilgiError(error: unknown): SilgiError {
+  if (error instanceof SilgiError) return error
+  return new SilgiError('INTERNAL_SERVER_ERROR', {
     message: 'Internal server error',
     cause: error,
   })
@@ -101,18 +101,18 @@ export function isErrorStatus(status: number): boolean {
   return status >= 400
 }
 
-export function isKatmanErrorJSON(json: unknown): json is KatmanErrorJSON {
+export function isSilgiErrorJSON(json: unknown): json is SilgiErrorJSON {
   return (
     typeof json === 'object' &&
     json !== null &&
     'code' in json &&
     'status' in json &&
-    typeof (json as KatmanErrorJSON).code === 'string'
+    typeof (json as SilgiErrorJSON).code === 'string'
   )
 }
 
-export function fromKatmanErrorJSON(json: KatmanErrorJSON): KatmanError {
-  return new KatmanError(json.code, {
+export function fromSilgiErrorJSON(json: SilgiErrorJSON): SilgiError {
+  return new SilgiError(json.code, {
     status: json.status,
     message: json.message,
     data: json.data,

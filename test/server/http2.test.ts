@@ -12,9 +12,9 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { z } from 'zod'
 
 import { compileRouter } from '#src/compile.ts'
-import { KatmanError, toKatmanError } from '#src/core/error.ts'
+import { SilgiError, toSilgiError } from '#src/core/error.ts'
 import { stringifyJSON } from '#src/core/utils.ts'
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 
 // ── Generate self-signed cert ───────────────────────
 
@@ -36,7 +36,7 @@ function generateSelfSignedCert() {
 
 // ── Setup ──────────────────────────────────────────
 
-const k = katman({ context: () => ({}) })
+const k = silgi({ context: () => ({}) })
 
 const appRouter = k.router({
   health: k.$resolve(() => ({ status: 'ok' })),
@@ -80,7 +80,7 @@ function requestHandler(req: any, res: any) {
         res.end(body)
       }
     } catch (err) {
-      const e = err instanceof KatmanError ? err : toKatmanError(err)
+      const e = err instanceof SilgiError ? err : toSilgiError(err)
       const body = stringifyJSON(e.toJSON())
       res.writeHead(e.status, { 'content-type': 'application/json' })
       res.end(body)
@@ -108,7 +108,7 @@ function requestHandler(req: any, res: any) {
         res.end(b)
       }
     } catch (err) {
-      const e = err instanceof KatmanError ? err : toKatmanError(err)
+      const e = err instanceof SilgiError ? err : toSilgiError(err)
       const b = stringifyJSON(e.toJSON())
       res.writeHead(e.status, { 'content-type': 'application/json' })
       res.end(b)
@@ -143,8 +143,8 @@ async function generateEphemeralCert(): Promise<{ privateKey: string; certificat
   // Use openssl via child_process for self-signed cert generation
   const { execSync } = await import('node:child_process')
   const tmpDir = await import('node:os').then((os) => os.tmpdir())
-  const keyPath = `${tmpDir}/katman-test-key.pem`
-  const certPath = `${tmpDir}/katman-test-cert.pem`
+  const keyPath = `${tmpDir}/silgi-test-key.pem`
+  const certPath = `${tmpDir}/silgi-test-cert.pem`
 
   execSync(
     `openssl req -x509 -newkey rsa:2048 -keyout ${keyPath} -out ${certPath} -days 1 -nodes -subj "/CN=localhost" 2>/dev/null`,

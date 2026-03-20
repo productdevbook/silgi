@@ -14,7 +14,7 @@ Wrap a query with `cacheQuery()` to cache its results:
 
 ```ts twoslash
 // @noErrors
-import { cacheQuery } from 'katman/cache'
+import { cacheQuery } from 'silgi/cache'
 
 const listUsers = k.$use(cacheQuery({ maxAge: 60 })).$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
@@ -55,7 +55,7 @@ Skip the cache entirely for specific requests, or force a refresh:
 
 ````ts twoslash
 // @noErrors
-import { cacheQuery } from 'katman/cache'
+import { cacheQuery } from 'silgi/cache'
 
 const listUsers = k
   .$use(cacheQuery({
@@ -75,7 +75,7 @@ Invalidate cached queries by name — typically after a mutation:
 
 ```ts twoslash
 // @noErrors
-import { cacheQuery, invalidateQueryCache } from 'katman/cache'
+import { cacheQuery, invalidateQueryCache } from 'silgi/cache'
 
 const listUsers = k
   .$use(cacheQuery({ maxAge: 300, name: 'users_list' }))
@@ -102,7 +102,7 @@ By default, cache lives in memory. For production, plug in any storage backend v
 
 ```ts twoslash
 // @noErrors
-import { setCacheStorage, createUnstorageAdapter } from 'katman/cache'
+import { setCacheStorage, createUnstorageAdapter } from 'silgi/cache'
 import { createStorage } from 'unstorage'
 import redisDriver from 'unstorage/drivers/redis'
 
@@ -117,7 +117,7 @@ setCacheStorage(createUnstorageAdapter(storage))
 
 ```ts twoslash
 // @noErrors
-import { setCacheStorage, createUnstorageAdapter } from 'katman/cache'
+import { setCacheStorage, createUnstorageAdapter } from 'silgi/cache'
 import { createStorage } from 'unstorage'
 import cfKvDriver from 'unstorage/drivers/cloudflare-kv-binding'
 
@@ -134,7 +134,7 @@ Any object with `get` and `set` methods works:
 
 ```ts twoslash
 // @noErrors
-import { setCacheStorage } from 'katman/cache'
+import { setCacheStorage } from 'silgi/cache'
 
 setCacheStorage({
   get: (key) => myStore.get(key),

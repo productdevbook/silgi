@@ -1,23 +1,23 @@
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
 
-import { katman, KatmanError } from '#src/katman.ts'
+import { silgi, SilgiError } from '#src/silgi.ts'
 
-const k = katman({ context: () => ({ db: 'test' }) })
+const k = silgi({ context: () => ({ db: 'test' }) })
 
 const testRouter = k.router({
   health: k.$resolve(() => ({ status: 'ok' })),
   echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
   greet: k.$input(z.object({ name: z.string() })).$resolve(({ input }) => ({ hello: input.name })),
   fail: k.$resolve(() => {
-    throw new KatmanError('NOT_FOUND', { message: 'nope' })
+    throw new SilgiError('NOT_FOUND', { message: 'nope' })
   }),
 })
 
-describe('katmanNitro() — real NitroEvent', () => {
+describe('silgiNitro() — real NitroEvent', () => {
   it('handles FS routing with path param', async () => {
-    const { katmanNitro } = await import('#src/adapters/nitro.ts')
-    const handler = katmanNitro(testRouter)
+    const { silgiNitro } = await import('#src/adapters/nitro.ts')
+    const handler = silgiNitro(testRouter)
 
     const event = {
       url: new URL('http://localhost/rpc/health'),
@@ -37,8 +37,8 @@ describe('katmanNitro() — real NitroEvent', () => {
   })
 
   it('handles prefix mode with body', async () => {
-    const { katmanNitro } = await import('#src/adapters/nitro.ts')
-    const handler = katmanNitro(testRouter, { prefix: '/rpc' })
+    const { silgiNitro } = await import('#src/adapters/nitro.ts')
+    const handler = silgiNitro(testRouter, { prefix: '/rpc' })
 
     const event = {
       url: new URL('http://localhost/rpc/echo'),
@@ -58,8 +58,8 @@ describe('katmanNitro() — real NitroEvent', () => {
   })
 
   it('returns NOT_FOUND for unknown procedures', async () => {
-    const { katmanNitro } = await import('#src/adapters/nitro.ts')
-    const handler = katmanNitro(testRouter)
+    const { silgiNitro } = await import('#src/adapters/nitro.ts')
+    const handler = silgiNitro(testRouter)
 
     const event = {
       url: new URL('http://localhost/nope'),
@@ -79,11 +79,11 @@ describe('katmanNitro() — real NitroEvent', () => {
   })
 
   it('passes context from Nitro event', async () => {
-    const { katmanNitro } = await import('#src/adapters/nitro.ts')
+    const { silgiNitro } = await import('#src/adapters/nitro.ts')
     const ctxRouter = k.router({
       whoami: k.$resolve(({ ctx }) => ({ user: (ctx as any).user })),
     })
-    const handler = katmanNitro(ctxRouter, {
+    const handler = silgiNitro(ctxRouter, {
       context: (event: any) => ({ user: event.context.auth }),
     })
 
@@ -105,8 +105,8 @@ describe('katmanNitro() — real NitroEvent', () => {
   })
 
   it('handles validation errors', async () => {
-    const { katmanNitro } = await import('#src/adapters/nitro.ts')
-    const handler = katmanNitro(testRouter, { prefix: '/rpc' })
+    const { silgiNitro } = await import('#src/adapters/nitro.ts')
+    const handler = silgiNitro(testRouter, { prefix: '/rpc' })
 
     const event = {
       url: new URL('http://localhost/rpc/echo'),
@@ -127,8 +127,8 @@ describe('katmanNitro() — real NitroEvent', () => {
   })
 
   it('handles GET with query params', async () => {
-    const { katmanNitro } = await import('#src/adapters/nitro.ts')
-    const handler = katmanNitro(testRouter, { prefix: '/rpc' })
+    const { silgiNitro } = await import('#src/adapters/nitro.ts')
+    const handler = silgiNitro(testRouter, { prefix: '/rpc' })
 
     const event = {
       url: new URL('http://localhost/rpc/echo?data=' + encodeURIComponent(JSON.stringify({ msg: 'query' }))),

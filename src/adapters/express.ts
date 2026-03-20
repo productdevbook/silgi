@@ -1,13 +1,13 @@
 /**
- * Express adapter — use Katman as Express middleware.
+ * Express adapter — use Silgi as Express middleware.
  *
  * @example
  * ```ts
  * import express from "express"
- * import { katmanExpress } from "katman/express"
+ * import { silgiExpress } from "silgi/express"
  *
  * const app = express()
- * app.use("/rpc", katmanExpress(appRouter, {
+ * app.use("/rpc", silgiExpress(appRouter, {
  *   context: (req) => ({ db: getDB(), user: req.user }),
  * }))
  * app.listen(3000)
@@ -15,7 +15,7 @@
  */
 
 import { compileRouter } from '../compile.ts'
-import { KatmanError, toKatmanError } from '../core/error.ts'
+import { SilgiError, toSilgiError } from '../core/error.ts'
 import { ValidationError } from '../core/schema.ts'
 
 import type { RouterDef } from '../types.ts'
@@ -26,12 +26,12 @@ export interface ExpressAdapterOptions<TCtx extends Record<string, unknown>> {
 }
 
 /**
- * Create Express middleware that routes to Katman procedures.
+ * Create Express middleware that routes to Silgi procedures.
  *
  * Mount at a prefix — the remainder of the path is the procedure name.
  * Requires `express.json()` middleware for POST body parsing.
  */
-export function katmanExpress<TCtx extends Record<string, unknown>>(
+export function silgiExpress<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: ExpressAdapterOptions<TCtx> = {},
 ): (req: any, res: any, next: any) => void {
@@ -87,7 +87,7 @@ export function katmanExpress<TCtx extends Record<string, unknown>>(
             .json({ code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } })
           return
         }
-        const e = error instanceof KatmanError ? error : toKatmanError(error)
+        const e = error instanceof SilgiError ? error : toSilgiError(error)
         res.status(e.status).json(e.toJSON())
       }
     }

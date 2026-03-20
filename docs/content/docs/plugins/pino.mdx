@@ -5,17 +5,17 @@ description: Structured request logging via lifecycle hooks — request received
 
 import { Callout } from 'fumadocs-ui/components/callout'
 
-[Pino](https://github.com/pinojs/pino) is the fastest Node.js JSON logger. Katman's `loggingHooks` plugs it into the [lifecycle hooks](/docs/server#lifecycle-hooks) system so every request, response, and error is logged automatically.
+[Pino](https://github.com/pinojs/pino) is the fastest Node.js JSON logger. Silgi's `loggingHooks` plugs it into the [lifecycle hooks](/docs/server#lifecycle-hooks) system so every request, response, and error is logged automatically.
 
 ## Setup
 
 ```ts twoslash
 // @noErrors
-import { katman } from 'katman'
+import { silgi } from 'silgi'
 import pino from 'pino'
-import { loggingHooks } from 'katman/pino'
+import { loggingHooks } from 'silgi/pino'
 
-const k = katman({
+const k = silgi({
   context: (req) => ({ db: getDB() }),
   hooks: loggingHooks({ logger: pino() }),
 })
@@ -49,7 +49,7 @@ The `durationMs` field measures how long the procedure took, rounded to two deci
 
 ```ts twoslash
 // @noErrors
-import { loggingHooks } from 'katman/pino'
+import { loggingHooks } from 'silgi/pino'
 
 loggingHooks({
   logger: pino(),
@@ -90,9 +90,9 @@ This means you're not locked into Pino. Any logger with compatible methods works
 
 ```ts twoslash
 // @noErrors
-import { loggingHooks } from 'katman/pino'
+import { loggingHooks } from 'silgi/pino'
 
-const k = katman({
+const k = silgi({
   context: (req) => ({}),
   hooks: {
     ...loggingHooks({ logger: pino() }),

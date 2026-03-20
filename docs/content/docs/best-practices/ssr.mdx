@@ -9,7 +9,7 @@ import { Step, Steps } from 'fumadocs-ui/components/steps'
 
 When you render on the server, data should already be in the cache when the client hydrates. Otherwise, TanStack Query refetches everything on mount — causing a visible loading flash.
 
-Katman provides `prefetchQueries` to solve this in one call.
+Silgi provides `prefetchQueries` to solve this in one call.
 
 ## The problem
 
@@ -39,8 +39,8 @@ Use `createServerClient` so prefetching runs in-process — no network round-tri
 
 ```ts twoslash title="server/query.ts"
 // @noErrors
-import { createServerClient } from 'katman/client/server'
-import { createQueryUtils } from 'katman/tanstack-query'
+import { createServerClient } from 'silgi/client/server'
+import { createQueryUtils } from 'silgi/tanstack-query'
 import { appRouter } from './router'
 
 export function createSSRUtils() {

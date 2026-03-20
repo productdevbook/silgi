@@ -1,10 +1,10 @@
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
-import { katman } from 'katman'
-import { katmanHono } from 'katman/hono'
+import { silgi } from 'silgi'
+import { silgiHono } from 'silgi/hono'
 import { z } from 'zod'
 
-const k = katman({ context: () => ({ db: 'hono-db' }) })
+const k = silgi({ context: () => ({ db: 'hono-db' }) })
 
 const appRouter = k.router({
   health: k.$resolve(() => ({ status: 'ok', framework: 'hono' })),
@@ -12,9 +12,9 @@ const appRouter = k.router({
 })
 
 const app = new Hono()
-app.get('/', (c) => c.json({ name: 'Katman + Hono', docs: '/rpc/health' }))
-app.all('/rpc/*', katmanHono(appRouter, { prefix: '/rpc' }))
+app.get('/', (c) => c.json({ name: 'Silgi + Hono', docs: '/rpc/health' }))
+app.all('/rpc/*', silgiHono(appRouter, { prefix: '/rpc' }))
 
 serve({ fetch: app.fetch, port: 3000 }, (info) => {
-  console.log(`Katman + Hono running at http://localhost:${info.port}`)
+  console.log(`Silgi + Hono running at http://localhost:${info.port}`)
 })

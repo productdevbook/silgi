@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
 
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 
-const k = katman({ context: () => ({ db: 'test' }) })
+const k = silgi({ context: () => ({ db: 'test' }) })
 
 const testRouter = k.router({
   health: k.$resolve(() => ({ status: 'ok' })),
@@ -13,14 +13,14 @@ const testRouter = k.router({
 
 describe('MessagePort adapter', () => {
   it('handles RPC over message port', async () => {
-    const { katmanMessagePort, MessagePortLink } = await import('#src/adapters/message-port.ts')
+    const { silgiMessagePort, MessagePortLink } = await import('#src/adapters/message-port.ts')
     const { createClient } = await import('#src/client/client.ts')
 
     // Create a mock MessageChannel
     const channel = new MessageChannel()
 
     // Server side
-    const dispose = katmanMessagePort(testRouter, channel.port1, {
+    const dispose = silgiMessagePort(testRouter, channel.port1, {
       context: () => ({ db: 'test' }),
     })
 
@@ -40,11 +40,11 @@ describe('MessagePort adapter', () => {
   })
 
   it('returns error for unknown procedure', async () => {
-    const { katmanMessagePort, MessagePortLink } = await import('#src/adapters/message-port.ts')
+    const { silgiMessagePort, MessagePortLink } = await import('#src/adapters/message-port.ts')
     const { createClient } = await import('#src/client/client.ts')
 
     const channel = new MessageChannel()
-    const dispose = katmanMessagePort(testRouter, channel.port1, {
+    const dispose = silgiMessagePort(testRouter, channel.port1, {
       context: () => ({}),
     })
 

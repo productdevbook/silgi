@@ -1,7 +1,7 @@
-import { katman } from 'katman'
+import { silgi } from 'silgi'
 import { z } from 'zod'
 
-const k = katman({ context: () => ({ db: 'nextjs-db' }) })
+const k = silgi({ context: () => ({ db: 'nextjs-db' }) })
 
 export const appRouter = k.router({
   health: k.$resolve(() => ({ status: 'ok', framework: 'nextjs' })),

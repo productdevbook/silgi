@@ -1,12 +1,12 @@
 /**
- * Katman Router — High-performance radix tree router.
+ * Silgi Router — High-performance radix tree router.
  *
  * Faster than rou3 for static routes (Map.get O(1)),
  * competitive for parametric/wildcard routes.
  *
  * @example
  * ```ts
- * import { createRouter, addRoute, findRoute } from 'katman/route'
+ * import { createRouter, addRoute, findRoute } from 'silgi/route'
  *
  * const router = createRouter()
  * addRoute(router, 'GET', '/users/:id', { handler: getUser })

@@ -1,11 +1,11 @@
 ---
 title: NestJS
-description: Use Katman as a NestJS controller — Express or Fastify under the hood.
+description: Use Silgi as a NestJS controller — Express or Fastify under the hood.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
 
-Register Katman as a NestJS controller. Works with both Express and Fastify adapters.
+Register Silgi as a NestJS controller. Works with both Express and Fastify adapters.
 
 ## Setup
 
@@ -13,10 +13,10 @@ Register Katman as a NestJS controller. Works with both Express and Fastify adap
 // @noErrors
 // rpc.controller.ts
 import { Controller, All, Req, Res } from '@nestjs/common'
-import { katmanNestHandler } from 'katman/nestjs'
+import { silgiNestHandler } from 'silgi/nestjs'
 import { appRouter } from './rpc'
 
-const rpcHandler = katmanNestHandler(appRouter, {
+const rpcHandler = silgiNestHandler(appRouter, {
   context: (req) => ({ db: getDB(), user: req.user }),
 })
 
@@ -42,7 +42,7 @@ The context factory receives the Express/Fastify request. Access guards, pipes, 
 
 ```ts twoslash
 // @noErrors
-katmanNestHandler(appRouter, {
+silgiNestHandler(appRouter, {
   context: (req) => ({
     user: req.user, // from NestJS AuthGuard
     ip: req.ip,
@@ -52,8 +52,8 @@ katmanNestHandler(appRouter, {
 ```
 
 <Callout type='info'>
-  NestJS's own dependency injection, guards, and interceptors run before the Katman handler. You can use `@UseGuards()`,
-  `@UseInterceptors()`, etc. alongside Katman.
+  NestJS's own dependency injection, guards, and interceptors run before the Silgi handler. You can use `@UseGuards()`,
+  `@UseInterceptors()`, etc. alongside Silgi.
 </Callout>
 
 ## What's next?

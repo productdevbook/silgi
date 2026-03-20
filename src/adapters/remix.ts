@@ -1,13 +1,13 @@
 /**
- * Remix adapter — use Katman with Remix action/loader routes.
+ * Remix adapter — use Silgi with Remix action/loader routes.
  *
  * @example
  * ```ts
  * // app/routes/rpc.$.tsx
- * import { katmanRemix } from "katman/remix"
+ * import { silgiRemix } from "silgi/remix"
  * import { appRouter } from "~/server/rpc"
  *
- * const handler = katmanRemix(appRouter, {
+ * const handler = silgiRemix(appRouter, {
  *   prefix: "/rpc",
  *   context: (req) => ({ db: getDB() }),
  * })
@@ -26,9 +26,9 @@ export interface RemixAdapterOptions<TCtx extends Record<string, unknown>> {
 
 /**
  * Create a Remix action/loader handler.
- * Uses Katman's handler() — full Fetch API + content negotiation.
+ * Uses Silgi's handler() — full Fetch API + content negotiation.
  */
-export function katmanRemix<TCtx extends Record<string, unknown>>(
+export function silgiRemix<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: RemixAdapterOptions<TCtx> = {},
 ): (args: { request: Request; params: Record<string, string> }) => Promise<Response> {
@@ -37,8 +37,8 @@ export function katmanRemix<TCtx extends Record<string, unknown>>(
 
   return async ({ request }) => {
     if (!_handler) {
-      const { katman } = await import('../katman.ts')
-      const k = katman({ context: options.context ?? (() => ({}) as TCtx) })
+      const { silgi } = await import('../silgi.ts')
+      const k = silgi({ context: options.context ?? (() => ({}) as TCtx) })
       _handler = k.handler(router)
     }
 

@@ -1,12 +1,12 @@
 /**
- * katman() — the main entry point.
+ * silgi() — the main entry point.
  *
- * Creates a Katman instance with typed context.
+ * Creates a Silgi instance with typed context.
  * All procedure/middleware factories are methods on this instance,
  * so context type flows automatically.
  *
  * Usage:
- *   const k = katman({ context: (req) => ({ db, headers }) })
+ *   const k = silgi({ context: (req) => ({ db, headers }) })
  *   export const { query, mutation, guard, wrap, router, handler } = k
  */
 
@@ -30,7 +30,7 @@ import {
   MSGPACK_CONTENT_TYPE,
 } from './codec/msgpack.ts'
 import { compileProcedure, compileRouter, ContextPool } from './compile.ts'
-import { KatmanError, toKatmanError, isErrorStatus } from './core/error.ts'
+import { SilgiError, toSilgiError, isErrorStatus } from './core/error.ts'
 import { ValidationError, validateSchema } from './core/schema.ts'
 import { iteratorToEventStream } from './core/sse.ts'
 import { stringifyJSON, parseEmptyableJSON, once } from './core/utils.ts'
@@ -57,7 +57,7 @@ import type { Hookable, HookCallback } from 'hookable'
 
 // ── Lifecycle Hooks ─────────────────────────────────
 
-export interface KatmanHooks {
+export interface SilgiHooks {
   /** Called before a request is processed */
   request: (event: { path: string; input: unknown }) => void
   /** Called after a successful response */
@@ -68,20 +68,20 @@ export interface KatmanHooks {
   'serve:start': (event: { url: string; port: number; hostname: string }) => void
 }
 
-// ── Katman Instance ─────────────────────────────────
+// ── Silgi Instance ─────────────────────────────────
 
-export interface KatmanConfig<TCtx extends Record<string, unknown>> {
+export interface SilgiConfig<TCtx extends Record<string, unknown>> {
   context: (req: Request) => TCtx | Promise<TCtx>
   /** Register lifecycle hooks */
-  hooks?: Partial<{ [K in keyof KatmanHooks]: KatmanHooks[K] | KatmanHooks[K][] }>
+  hooks?: Partial<{ [K in keyof SilgiHooks]: SilgiHooks[K] | SilgiHooks[K][] }>
 }
 
-export interface KatmanInstance<TBaseCtx extends Record<string, unknown>> {
+export interface SilgiInstance<TBaseCtx extends Record<string, unknown>> {
   /** Register a lifecycle hook */
-  hook: Hookable<KatmanHooks>['hook']
+  hook: Hookable<SilgiHooks>['hook']
 
   /** Remove a lifecycle hook */
-  removeHook: Hookable<KatmanHooks>['removeHook']
+  removeHook: Hookable<SilgiHooks>['removeHook']
   /** Create a guard middleware (flat, zero-closure) */
   guard: GuardFactory<TBaseCtx>
 
@@ -207,11 +207,11 @@ function createProcedure(type: ProcedureType, ...args: unknown[]): ProcedureDef 
 }
 
 /**
- * Create a Katman RPC instance with typed context.
+ * Create a Silgi RPC instance with typed context.
  *
  * @example
  * ```ts
- * const k = katman({
+ * const k = silgi({
  *   context: (req) => ({ db: getDB(), user: getUser(req) }),
  *   hooks: {
  *     request: ({ path }) => console.log(`-> ${path}`),
@@ -220,24 +220,24 @@ function createProcedure(type: ProcedureType, ...args: unknown[]): ProcedureDef 
  * const { query, mutation, guard, wrap, router, serve } = k
  * ```
  */
-export function katman<TBaseCtx extends Record<string, unknown>>(
-  config: KatmanConfig<TBaseCtx>,
-): KatmanInstance<TBaseCtx> {
+export function silgi<TBaseCtx extends Record<string, unknown>>(
+  config: SilgiConfig<TBaseCtx>,
+): SilgiInstance<TBaseCtx> {
   const contextFactory = config.context
 
   // Lifecycle hooks (sync fast-path when no hooks registered)
-  const hooks = createHooks<KatmanHooks>()
+  const hooks = createHooks<SilgiHooks>()
   if (config.hooks) {
     for (const [name, fn] of Object.entries(config.hooks)) {
       if (Array.isArray(fn)) {
-        for (const f of fn) hooks.hook(name as keyof KatmanHooks, f as any)
+        for (const f of fn) hooks.hook(name as keyof SilgiHooks, f as any)
       } else if (fn) {
-        hooks.hook(name as keyof KatmanHooks, fn as any)
+        hooks.hook(name as keyof SilgiHooks, fn as any)
       }
     }
   }
 
-  const instance: KatmanInstance<TBaseCtx> = {
+  const instance: SilgiInstance<TBaseCtx> = {
     hook: hooks.hook,
     removeHook: hooks.removeHook.bind(hooks),
 
@@ -306,7 +306,7 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
             const content = await resolveScalarLocal()
             if (!content) {
               console.warn(
-                '  [katman] cdn: "local" requires @scalar/api-reference installed.\n' +
+                '  [silgi] cdn: "local" requires @scalar/api-reference installed.\n' +
                   '           Run: pnpm add @scalar/api-reference\n' +
                   '           Falling back to CDN.',
               )
@@ -333,7 +333,7 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
               res.end(specHtml)
               return
             }
-            if (pathname === '__katman/scalar.js' && scalarLocalJs) {
+            if (pathname === '__silgi/scalar.js' && scalarLocalJs) {
               res.writeHead(200, {
                 'content-type': 'application/javascript',
                 'content-length': Buffer.byteLength(scalarLocalJs),
@@ -434,7 +434,7 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
 
           const handleError = (err: unknown) => {
             if (!res.headersSent) {
-              const e = err instanceof KatmanError ? err : toKatmanError(err)
+              const e = err instanceof SilgiError ? err : toSilgiError(err)
               const body = stringifyJSON(e.toJSON())
               res.writeHead(e.status, { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) })
               res.end(body)
@@ -495,7 +495,7 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
             if (body.length + d.length > MAX_BODY_SIZE) {
               aborted = true
               req.destroy()
-              handleError(new KatmanError('PAYLOAD_TOO_LARGE', { status: 413, message: 'Request body too large' }))
+              handleError(new SilgiError('PAYLOAD_TOO_LARGE', { status: 413, message: 'Request body too large' }))
               return
             }
             body += d
@@ -506,7 +506,7 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
             try {
               input = body ? JSON.parse(body) : undefined
             } catch {
-              handleError(new KatmanError('BAD_REQUEST', { status: 400, message: 'Invalid JSON body' }))
+              handleError(new SilgiError('BAD_REQUEST', { status: 400, message: 'Invalid JSON body' }))
               return
             }
             hooks.callHook('request', { path: pathname, input })
@@ -541,7 +541,7 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
         const protocol = useHttp2 ? 'https' : 'http'
         server.listen(port, hostname, () => {
           const url = `${protocol}://${hostname}:${port}`
-          console.log(`\nKatman server running at ${url}`)
+          console.log(`\nSilgi server running at ${url}`)
           if (useHttp2) console.log(`  HTTP/2 enabled (with HTTP/1.1 fallback)`)
           if (useWs) console.log(`  WebSocket RPC at ws://${hostname}:${port}`)
           if (scalarEnabled) console.log(`  Scalar API Reference at ${url}/reference`)
@@ -619,7 +619,7 @@ function encodeResponse(
 function createFetchHandler(
   routerDef: RouterDef,
   contextFactory: (req: Request) => Record<string, unknown> | Promise<Record<string, unknown>>,
-  hooks?: Hookable<KatmanHooks>,
+  hooks?: Hookable<SilgiHooks>,
 ): (request: Request) => Promise<Response> {
   // Compile router tree into JIT-compiled radix router
   let compiledRouter = routerCache.get(routerDef)
@@ -731,7 +731,7 @@ function createFetchHandler(
         const errBody = { code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } }
         return encodeResponse(errBody, 400, fmt)
       }
-      const e = error instanceof KatmanError ? error : toKatmanError(error)
+      const e = error instanceof SilgiError ? error : toSilgiError(error)
       return encodeResponse(e.toJSON(), e.status, fmt)
     } finally {
       ctxPool.release(ctx)
@@ -741,5 +741,5 @@ function createFetchHandler(
 
 // ── Re-exports ──────────────────────────────────────
 
-export { KatmanError, toKatmanError, isErrorStatus } from './core/error.ts'
+export { SilgiError, toSilgiError, isErrorStatus } from './core/error.ts'
 export { type, validateSchema, ValidationError } from './core/schema.ts'

@@ -7,7 +7,7 @@
  *
  * @example
  * ```ts
- * import { coerceGuard } from "katman/plugins"
+ * import { coerceGuard } from "silgi/plugins"
  *
  * const getUser = k
  *   .$use(coerceGuard)

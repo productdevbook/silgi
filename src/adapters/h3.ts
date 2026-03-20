@@ -1,20 +1,20 @@
 /**
- * H3 v2 adapter — use Katman with Nitro, Nuxt, or any H3 server.
+ * H3 v2 adapter — use Silgi with Nitro, Nuxt, or any H3 server.
  *
  * @example
  * ```ts
  * import { H3 } from "h3"
- * import { katmanH3 } from "katman/h3"
+ * import { silgiH3 } from "silgi/h3"
  *
  * const app = new H3()
- * app.all("/rpc/**", katmanH3(appRouter, {
+ * app.all("/rpc/**", silgiH3(appRouter, {
  *   context: (event) => ({ db: getDB(), user: event.context.user }),
  * }))
  * ```
  */
 
 import { compileRouter } from '../compile.ts'
-import { KatmanError, toKatmanError } from '../core/error.ts'
+import { SilgiError, toSilgiError } from '../core/error.ts'
 import { ValidationError } from '../core/schema.ts'
 
 import type { RouterDef } from '../types.ts'
@@ -27,12 +27,12 @@ export interface H3AdapterOptions<TCtx extends Record<string, unknown>> {
 }
 
 /**
- * Create an H3 v2 handler that routes to Katman procedures.
+ * Create an H3 v2 handler that routes to Silgi procedures.
  *
  * H3 v2 uses `new H3()`, `defineHandler`, `event.req.json()`, etc.
  * Works with H3 v2, Nitro v3, and Nuxt 4.
  */
-export function katmanH3<TCtx extends Record<string, unknown>>(
+export function silgiH3<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: H3AdapterOptions<TCtx> = {},
 ): (event: any) => Promise<unknown> {
@@ -98,7 +98,7 @@ export function katmanH3<TCtx extends Record<string, unknown>>(
       if (error instanceof ValidationError) {
         return { code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } }
       }
-      const e = error instanceof KatmanError ? error : toKatmanError(error)
+      const e = error instanceof SilgiError ? error : toSilgiError(error)
       return e.toJSON()
     }
   }

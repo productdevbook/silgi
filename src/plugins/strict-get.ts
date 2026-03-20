@@ -6,7 +6,7 @@
  *
  * @example
  * ```ts
- * import { strictGetGuard } from "katman/plugins"
+ * import { strictGetGuard } from "silgi/plugins"
  *
  * const listUsers = k
  *   .$use(strictGetGuard)
@@ -14,7 +14,7 @@
  * ```
  */
 
-import { KatmanError } from '../core/error.ts'
+import { SilgiError } from '../core/error.ts'
 
 import type { GuardDef } from '../types.ts'
 
@@ -28,7 +28,7 @@ export const strictGetGuard: GuardDef<Record<string, unknown>> = {
     const method = ctx.method as string | undefined
     // Only block if method info is available and it's not GET/HEAD
     if (method && method !== 'GET' && method !== 'HEAD') {
-      throw new KatmanError('METHOD_NOT_ALLOWED', {
+      throw new SilgiError('METHOD_NOT_ALLOWED', {
         status: 405,
         message: `Expected GET, received ${method}`,
       })

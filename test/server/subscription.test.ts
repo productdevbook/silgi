@@ -4,9 +4,9 @@
 
 import { describe, it, expect } from 'vitest'
 
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 
-const k = katman({ context: () => ({}) })
+const k = silgi({ context: () => ({}) })
 
 const router = k.router({
   countdown: k.subscription(async function* () {

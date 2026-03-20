@@ -1,13 +1,13 @@
 /**
- * Next.js adapter — use Katman with App Router API routes.
+ * Next.js adapter — use Silgi with App Router API routes.
  *
  * @example
  * ```ts
  * // app/api/rpc/[...path]/route.ts
- * import { katmanNextjs } from "katman/nextjs"
+ * import { silgiNextjs } from "silgi/nextjs"
  * import { appRouter } from "~/server/rpc"
  *
- * const handler = katmanNextjs(appRouter, {
+ * const handler = silgiNextjs(appRouter, {
  *   context: (req) => ({ db: getDB() }),
  * })
  *
@@ -27,25 +27,25 @@ export interface NextjsAdapterOptions<TCtx extends Record<string, unknown>> {
 /**
  * Create a Next.js App Router route handler.
  *
- * Uses Katman's handler() internally — full Fetch API support
+ * Uses Silgi's handler() internally — full Fetch API support
  * including content negotiation (JSON, MessagePack, devalue).
  *
  * The handler strips the prefix from the URL path before dispatching
- * to the Katman router.
+ * to the Silgi router.
  */
-export function katmanNextjs<TCtx extends Record<string, unknown>>(
+export function silgiNextjs<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: NextjsAdapterOptions<TCtx> = {},
 ): (req: Request) => Promise<Response> {
   const prefix = options.prefix ?? '/api/rpc'
 
-  // Lazy import to avoid bundling katman() in edge runtime
+  // Lazy import to avoid bundling silgi() in edge runtime
   let _handler: ((req: Request) => Promise<Response>) | null = null
 
   return async (req: Request): Promise<Response> => {
     if (!_handler) {
-      const { katman } = await import('../katman.ts')
-      const k = katman({
+      const { silgi } = await import('../silgi.ts')
+      const k = silgi({
         context: options.context ?? (() => ({}) as TCtx),
       })
       _handler = k.handler(router)

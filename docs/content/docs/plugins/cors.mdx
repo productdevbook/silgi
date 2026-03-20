@@ -8,13 +8,13 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 
 When your API runs on one domain (like `api.example.com`) and your frontend on another (like `app.example.com`), browsers block the requests by default. CORS headers tell the browser it's safe to proceed.
 
-Katman provides `corsHeaders()` — a function that returns the right headers for your configuration.
+Silgi provides `corsHeaders()` — a function that returns the right headers for your configuration.
 
 ## Basic usage
 
 ```ts twoslash
 // @noErrors
-import { corsHeaders } from 'katman/cors'
+import { corsHeaders } from 'silgi/cors'
 
 const headers = corsHeaders({
   origin: 'https://app.example.com',
@@ -41,7 +41,7 @@ The default (no `origin` option or `origin: "*"`) allows any origin:
 
 ```ts twoslash
 // @noErrors
-import { corsHeaders } from 'katman/cors'
+import { corsHeaders } from 'silgi/cors'
 
 const headers = corsHeaders()
 // "access-control-allow-origin": "*"
@@ -58,7 +58,7 @@ Pass an array to allow several specific origins:
 
 ```ts twoslash
 // @noErrors
-import { corsHeaders } from 'katman/cors'
+import { corsHeaders } from 'silgi/cors'
 
 const headers = corsHeaders(
   {
@@ -68,7 +68,7 @@ const headers = corsHeaders(
 )
 ```
 
-The second argument is the requesting origin (from the `Origin` header on the incoming request). Katman checks if it's in the list and responds with the matching origin. A `Vary: Origin` header is automatically included so caches work correctly.
+The second argument is the requesting origin (from the `Origin` header on the incoming request). Silgi checks if it's in the list and responds with the matching origin. A `Vary: Origin` header is automatically included so caches work correctly.
 
 ## Dynamic origin matching
 
@@ -76,7 +76,7 @@ For more complex rules, pass a function:
 
 ```ts twoslash
 // @noErrors
-import { corsHeaders } from 'katman/cors'
+import { corsHeaders } from 'silgi/cors'
 
 const headers = corsHeaders(
   {
@@ -107,7 +107,7 @@ If you're using `handler()` with a custom server, you can wrap it to add CORS he
 
 ```ts twoslash
 // @noErrors
-import { corsHeaders } from 'katman/cors'
+import { corsHeaders } from 'silgi/cors'
 
 const handle = k.handler(appRouter)
 const cors = corsHeaders({ origin: 'https://app.example.com', credentials: true })

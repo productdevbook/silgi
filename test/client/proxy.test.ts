@@ -83,8 +83,8 @@ describe('safe()', () => {
   })
 
   it('handles typed errors', async () => {
-    const { KatmanError } = await import('#src/core/error.ts')
-    const err = new KatmanError('NOT_FOUND', { status: 404, message: 'nope' })
+    const { SilgiError } = await import('#src/core/error.ts')
+    const err = new SilgiError('NOT_FOUND', { status: 404, message: 'nope' })
     const result = await safe<string, typeof err>(Promise.reject(err))
     expect(result.isError).toBe(true)
     expect(result.error?.code).toBe('NOT_FOUND')

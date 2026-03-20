@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { toKatmanError } from '#src/core/error.ts'
-import { katman } from '#src/katman.ts'
+import { toSilgiError } from '#src/core/error.ts'
+import { silgi } from '#src/silgi.ts'
 
-describe('toKatmanError — information disclosure', () => {
+describe('toSilgiError — information disclosure', () => {
   it('should NOT leak internal error messages to clients', () => {
     const internalError = new Error('connect ECONNREFUSED 10.0.0.5:5432')
-    const katmanErr = toKatmanError(internalError)
-    const json = katmanErr.toJSON()
+    const silgiErr = toSilgiError(internalError)
+    const json = silgiErr.toJSON()
 
     // The serialized error sent to clients must NOT contain internal details
     expect(json.message).not.toContain('ECONNREFUSED')
@@ -17,8 +17,8 @@ describe('toKatmanError — information disclosure', () => {
 
   it('should NOT leak file paths', () => {
     const fsError = new Error("ENOENT: no such file or directory, open '/etc/app/config.secret'")
-    const katmanErr = toKatmanError(fsError)
-    const json = katmanErr.toJSON()
+    const silgiErr = toSilgiError(fsError)
+    const json = silgiErr.toJSON()
 
     expect(json.message).not.toContain('ENOENT')
     expect(json.message).not.toContain('/etc/app')
@@ -26,14 +26,14 @@ describe('toKatmanError — information disclosure', () => {
 
   it('preserves cause for server-side logging', () => {
     const original = new Error('DB connection failed')
-    const katmanErr = toKatmanError(original)
+    const silgiErr = toSilgiError(original)
 
     // Internal cause should be accessible server-side
-    expect(katmanErr.cause).toBe(original)
+    expect(silgiErr.cause).toBe(original)
   })
 
   it('handler should not expose internal errors in response body', async () => {
-    const k = katman({ context: () => ({}) })
+    const k = silgi({ context: () => ({}) })
     const router = k.router({
       broken: k.$resolve(() => {
         throw new Error('SELECT * FROM secret_table WHERE password = ...')

@@ -1,7 +1,7 @@
 /**
  * ofetch client link — integration tests.
  *
- * Spins up a real katman server and tests the ofetch-based client.
+ * Spins up a real silgi server and tests the ofetch-based client.
  */
 
 import { createServer } from 'node:http'
@@ -11,14 +11,14 @@ import { z } from 'zod'
 
 import { createLink } from '#src/client/adapters/ofetch/index.ts'
 import { createClient } from '#src/client/client.ts'
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 
 import type { InferClient } from '#src/types.ts'
 import type { Server } from 'node:http'
 
 // ── Server Setup ────────────────────────────────────
 
-const k = katman({
+const k = silgi({
   context: () => ({
     db: {
       users: [

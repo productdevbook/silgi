@@ -59,7 +59,7 @@ const clientLoader = browserCollections.docs.createClientLoader({
   ) {
     return (
       <DocsPage toc={toc}>
-        <title>{`${frontmatter.title} — Katman`}</title>
+        <title>{`${frontmatter.title} — Silgi`}</title>
         <meta name='description' content={frontmatter.description} />
         <meta property='og:title' content={frontmatter.title} />
         <meta property='og:description' content={frontmatter.description} />

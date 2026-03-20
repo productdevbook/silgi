@@ -6,7 +6,7 @@
  *
  * @example
  * ```ts
- * import { createPublisher, MemoryPubSub } from "katman/plugins"
+ * import { createPublisher, MemoryPubSub } from "silgi/plugins"
  *
  * const pubsub = createPublisher(new MemoryPubSub())
  *

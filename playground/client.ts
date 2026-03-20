@@ -1,5 +1,5 @@
 /**
- * Katman Playground — Client
+ * Silgi Playground — Client
  *
  * Demonstrates:
  *  1.  createClient proxy (type-safe)
@@ -17,13 +17,13 @@
  * (Start server first: pnpm play)
  */
 
-import { createClient, safe, KatmanError } from 'katman/client'
-import { withInterceptors } from 'katman/client'
-import { RPCLink } from 'katman/client/fetch'
-import { withRetry, withDedupe, withCSRF } from 'katman/client/plugins'
+import { createClient, safe, SilgiError } from 'silgi/client'
+import { withInterceptors } from 'silgi/client'
+import { RPCLink } from 'silgi/client/fetch'
+import { withRetry, withDedupe, withCSRF } from 'silgi/client/plugins'
 
 import type { AppRouter } from './server.ts'
-import type { InferClient } from 'katman'
+import type { InferClient } from 'silgi'
 
 const BASE = 'http://127.0.0.1:3456'
 const AUTH_TOKEN = 'secret-token'
@@ -57,7 +57,7 @@ const interceptedLink = withInterceptors(baseLink, {
     console.log(`    [interceptor] ← ${path.join('/')} (${durationMs.toFixed(1)}ms)`)
   },
   onError: ({ path, error }) => {
-    const msg = error instanceof KatmanError ? error.code : String(error)
+    const msg = error instanceof SilgiError ? error.code : String(error)
     console.log(`    [interceptor] ✗ ${path.join('/')} — ${msg}`)
   },
 })
@@ -70,7 +70,7 @@ const link = withCSRF(
       maxRetries: 2,
       retryDelay: 100,
       shouldRetry: (error) => {
-        if (error instanceof KatmanError) return error.status >= 500
+        if (error instanceof SilgiError) return error.status >= 500
         return true // network errors etc.
       },
     }),
@@ -85,7 +85,7 @@ const client = createClient<InferClient<AppRouter>>(link)
 
 async function main() {
   console.log('\n╔══════════════════════════════════════════════╗')
-  console.log('║      Katman Client — Full Feature Demo       ║')
+  console.log('║      Silgi Client — Full Feature Demo       ║')
   console.log('╚══════════════════════════════════════════════╝')
 
   // ── Health Check ───────────────────────────────────
@@ -110,16 +110,16 @@ async function main() {
   hr('4. Create User (auth + timing + lifecycle)')
   const newUser = await client.users.create({
     name: 'Diana',
-    email: 'diana@katman.dev',
+    email: 'diana@silgi.dev',
     role: 'user',
   })
   console.log(`Created: #${newUser.id} ${newUser.name} <${newUser.email}>`)
 
   // ── Typed Error: CONFLICT ──────────────────────────
   hr('5. Duplicate Email → CONFLICT (typed error)')
-  const conflictResult = await safe(client.users.create({ name: 'Clone', email: 'diana@katman.dev' }))
+  const conflictResult = await safe(client.users.create({ name: 'Clone', email: 'diana@silgi.dev' }))
   if (conflictResult.isError) {
-    const err = conflictResult.error as KatmanError
+    const err = conflictResult.error as SilgiError
     console.log(`Error: ${err.code} (${err.status})`)
     console.log(`Defined: ${(err as any).defined}`)
   }
@@ -131,7 +131,7 @@ async function main() {
   const noAuthClient = createClient<InferClient<AppRouter>>(noAuthLink)
   const authResult = await safe(noAuthClient.users.create({ name: 'X', email: 'x@test.com' }))
   if (authResult.isError) {
-    const err = authResult.error as KatmanError
+    const err = authResult.error as SilgiError
     console.log(`Error: ${err.code} (${err.status}) — ${err.message}`)
   }
 
@@ -139,7 +139,7 @@ async function main() {
   hr('7. Get User #999 → NOT_FOUND')
   const notFoundResult = await safe(client.users.get({ id: 999 }))
   if (notFoundResult.isError) {
-    const err = notFoundResult.error as KatmanError
+    const err = notFoundResult.error as SilgiError
     console.log(`Error: ${err.code} (${err.status}) — ${err.message}`)
   }
 
@@ -152,7 +152,7 @@ async function main() {
   // ── Posts: Create ──────────────────────────────────
   hr('9. Create Post (auth + lifecycle)')
   const newPost = await client.posts.create({
-    title: 'Katman is Fast',
+    title: 'Silgi is Fast',
     body: '6.2x faster than oRPC with compiled pipelines',
     published: true,
   })
@@ -167,7 +167,7 @@ async function main() {
   hr('11. Delete User #999 → NOT_FOUND')
   const deleteResult = await safe(client.users.delete({ id: 999 }))
   if (deleteResult.isError) {
-    const err = deleteResult.error as KatmanError
+    const err = deleteResult.error as SilgiError
     console.log(`Error: ${err.code} (${err.status})`)
   }
 

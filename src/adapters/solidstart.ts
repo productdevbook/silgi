@@ -1,13 +1,13 @@
 /**
- * SolidStart adapter — use Katman with SolidStart API routes.
+ * SolidStart adapter — use Silgi with SolidStart API routes.
  *
  * @example
  * ```ts
  * // src/routes/api/rpc/[...path].ts
- * import { katmanSolidStart } from "katman/solidstart"
+ * import { silgiSolidStart } from "silgi/solidstart"
  * import { appRouter } from "~/server/rpc"
  *
- * const handler = katmanSolidStart(appRouter, {
+ * const handler = silgiSolidStart(appRouter, {
  *   prefix: "/api/rpc",
  *   context: (event) => ({ db: getDB() }),
  * })
@@ -26,9 +26,9 @@ export interface SolidStartAdapterOptions<TCtx extends Record<string, unknown>> 
 
 /**
  * Create a SolidStart API route handler.
- * SolidStart uses Fetch API events — uses Katman's handler().
+ * SolidStart uses Fetch API events — uses Silgi's handler().
  */
-export function katmanSolidStart<TCtx extends Record<string, unknown>>(
+export function silgiSolidStart<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: SolidStartAdapterOptions<TCtx> = {},
 ): (event: any) => Promise<Response> {
@@ -39,8 +39,8 @@ export function katmanSolidStart<TCtx extends Record<string, unknown>>(
   return async (event: any) => {
     _currentEvent = event
     if (!_handler) {
-      const { katman } = await import('../katman.ts')
-      const k = katman({
+      const { silgi } = await import('../silgi.ts')
+      const k = silgi({
         context: (_req: Request) => {
           if (options.context) return options.context(_currentEvent)
           return {} as TCtx

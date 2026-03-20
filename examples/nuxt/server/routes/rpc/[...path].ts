@@ -1,7 +1,7 @@
-import { katmanNitro } from 'katman/nitro'
+import { silgiNitro } from 'silgi/nitro'
 
 import { appRouter } from '../../rpc'
 
-export default katmanNitro(appRouter, {
+export default silgiNitro(appRouter, {
   context: () => ({ db: 'nuxt-db' }),
 })

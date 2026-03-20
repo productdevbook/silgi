@@ -1,19 +1,19 @@
 /**
- * Katman — The fastest end-to-end type-safe RPC framework.
+ * Silgi — The fastest end-to-end type-safe RPC framework.
  *
  * 5x faster than oRPC. 6x less memory. Single package.
  *
  * @example
  * ```ts
- * import { katman, KatmanError } from "katman"
+ * import { silgi, SilgiError } from "silgi"
  * import { z } from "zod"
  *
- * const k = katman({ context: (req) => ({ db: getDB() }) })
+ * const k = silgi({ context: (req) => ({ db: getDB() }) })
  * const { query, mutation, guard, router, handler } = k
  *
  * const auth = guard(async (ctx) => {
  *   const user = await verify(ctx.headers.authorization)
- *   if (!user) throw new KatmanError("UNAUTHORIZED")
+ *   if (!user) throw new SilgiError("UNAUTHORIZED")
  *   return { user }
  * })
  *
@@ -36,8 +36,8 @@
  */
 
 // ── Main API ────────────────────────────────────────
-export { katman } from './katman.ts'
-export type { KatmanInstance, KatmanConfig } from './katman.ts'
+export { silgi } from './silgi.ts'
+export type { SilgiInstance, SilgiConfig } from './silgi.ts'
 
 // ── Builder ─────────────────────────────────────────
 export type { ProcedureBuilder, ProcedureBuilderWithOutput } from './builder.ts'
@@ -63,8 +63,8 @@ export type {
 } from './types.ts'
 
 // ── Error ───────────────────────────────────────────
-export { KatmanError, isDefinedError, toKatmanError } from './core/error.ts'
-export type { KatmanErrorCode, KatmanErrorOptions, KatmanErrorJSON } from './core/error.ts'
+export { SilgiError, isDefinedError, toSilgiError } from './core/error.ts'
+export type { SilgiErrorCode, SilgiErrorOptions, SilgiErrorJSON } from './core/error.ts'
 
 // ── Schema ──────────────────────────────────────────
 export { type, validateSchema, ValidationError } from './core/schema.ts'

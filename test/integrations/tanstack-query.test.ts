@@ -7,11 +7,11 @@ import { z } from 'zod'
 
 import { createClient } from '#src/client/client.ts'
 import { createQueryUtils } from '#src/integrations/tanstack-query/index.ts'
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 
 import type { ClientLink } from '#src/client/types.ts'
 
-const k = katman({ context: () => ({}) })
+const k = silgi({ context: () => ({}) })
 const appRouter = k.router({
   users: {
     list: k.$input(z.object({ limit: z.number().optional() })).$resolve(({ input }) => ({

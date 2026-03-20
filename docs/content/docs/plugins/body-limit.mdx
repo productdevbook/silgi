@@ -11,7 +11,7 @@ The body limit guard checks the `Content-Length` header before the procedure run
 
 ```ts twoslash
 // @noErrors
-import { bodyLimitGuard } from 'katman/plugins'
+import { bodyLimitGuard } from 'silgi/plugins'
 
 const upload = k
   .$use(bodyLimitGuard({ maxBytes: 5 * 1024 * 1024 })) // 5 MB

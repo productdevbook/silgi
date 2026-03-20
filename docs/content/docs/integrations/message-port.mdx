@@ -1,9 +1,9 @@
 ---
 title: Message Port
-description: Use Katman over MessagePort — Electron, browser extensions, Web Workers.
+description: Use Silgi over MessagePort — Electron, browser extensions, Web Workers.
 ---
 
-Katman can run over any `MessagePort`-compatible channel — Electron IPC, browser extension ports, Web Workers, iframes.
+Silgi can run over any `MessagePort`-compatible channel — Electron IPC, browser extension ports, Web Workers, iframes.
 
 ## Server side
 
@@ -11,12 +11,12 @@ Attach your router to a port:
 
 ```ts twoslash
 // @noErrors
-import { katmanMessagePort } from 'katman/message-port'
+import { silgiMessagePort } from 'silgi/message-port'
 import { appRouter } from './router'
 
 const port = getPort() // MessagePort, Worker, chrome.runtime.Port, etc.
 
-katmanMessagePort(appRouter, port, {
+silgiMessagePort(appRouter, port, {
   context: () => ({
     db: getDB(),
   }),
@@ -29,8 +29,8 @@ Connect to the same port from the other end:
 
 ```ts twoslash
 // @noErrors
-import { MessagePortLink } from 'katman/message-port'
-import { createClient } from 'katman/client'
+import { MessagePortLink } from 'silgi/message-port'
+import { createClient } from 'silgi/client'
 import type { AppRouter } from './router'
 
 const port = getPort()
@@ -47,11 +47,11 @@ const users = await client.users.list()
 ```ts twoslash
 // @noErrors
 // main.ts (main process)
-import { katmanMessagePort } from 'katman/message-port'
+import { silgiMessagePort } from 'silgi/message-port'
 
 ipcMain.handle('rpc-port', (event) => {
   const { port1, port2 } = new MessageChannelMain()
-  katmanMessagePort(appRouter, port1, { context: () => ({}) })
+  silgiMessagePort(appRouter, port1, { context: () => ({}) })
   event.senderFrame.postMessage('rpc-port', null, [port2])
 })
 ```
@@ -59,8 +59,8 @@ ipcMain.handle('rpc-port', (event) => {
 ```ts twoslash
 // @noErrors
 // renderer.ts (renderer process)
-import { MessagePortLink } from 'katman/message-port'
-import { createClient } from 'katman/client'
+import { MessagePortLink } from 'silgi/message-port'
+import { createClient } from 'silgi/client'
 
 const port = await getElectronPort()
 const client = createClient<AppRouter>({

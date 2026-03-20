@@ -1,28 +1,28 @@
 ---
 title: H3
-description: Use Katman with H3 v2, Nitro, and Nuxt server routes.
+description: Use Silgi with H3 v2, Nitro, and Nuxt server routes.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
 
-[H3](https://github.com/unjs/h3) is a minimal HTTP framework used by Nitro and Nuxt. Katman's H3 adapter lets you mount RPC procedures alongside your existing routes.
+[H3](https://github.com/unjs/h3) is a minimal HTTP framework used by Nitro and Nuxt. Silgi's H3 adapter lets you mount RPC procedures alongside your existing routes.
 
 ## Setup
 
 ```ts twoslash
 // @noErrors
 import { H3 } from 'h3'
-import { katmanH3 } from 'katman/h3'
+import { silgiH3 } from 'silgi/h3'
 
 const app = new H3()
 
 // Existing routes
 app.get('/api/health', () => ({ status: 'ok' }))
 
-// Katman RPC under /rpc prefix
+// Silgi RPC under /rpc prefix
 app.all(
   '/rpc/**',
-  katmanH3(appRouter, {
+  silgiH3(appRouter, {
     context: (event) => ({
       db: getDB(),
       user: event.context.user,
@@ -40,11 +40,11 @@ POST /rpc/users/create
 
 ## Context from H3
 
-The `context` function receives the H3 event. Use it to bridge H3's auth, session, or any middleware data into Katman's context:
+The `context` function receives the H3 event. Use it to bridge H3's auth, session, or any middleware data into Silgi's context:
 
 ```ts twoslash
 // @noErrors
-katmanH3(appRouter, {
+silgiH3(appRouter, {
   context: (event) => ({
     user: event.context.user, // from H3 middleware
     ip: event.req.headers.get('x-forwarded-for'),
@@ -59,10 +59,10 @@ In a Nitro or Nuxt project, create a catch-all server route:
 ```ts twoslash
 // @noErrors
 // server/routes/rpc/[...].ts
-import { katmanH3 } from 'katman/h3'
+import { silgiH3 } from 'silgi/h3'
 import { appRouter } from '~/server/rpc'
 
-export default katmanH3(appRouter, {
+export default silgiH3(appRouter, {
   prefix: '/rpc',
   context: (event) => ({ db: getDB() }),
 })

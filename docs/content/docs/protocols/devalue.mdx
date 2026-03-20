@@ -28,7 +28,7 @@ If your procedure returns any of these types, the client receives broken data wi
 
 ```ts twoslash
 // @noErrors
-import { encode, decode } from 'katman/devalue'
+import { encode, decode } from 'silgi/devalue'
 
 const original = {
   users: new Map([['alice', { id: 1 }]]),
@@ -99,7 +99,7 @@ If you need to use devalue outside of the client/server flow:
 
 ```ts twoslash
 // @noErrors
-import { encode, decode } from 'katman/devalue'
+import { encode, decode } from 'silgi/devalue'
 
 const str = encode(myData) // returns a string
 const data = decode(str) // returns the original value with types intact

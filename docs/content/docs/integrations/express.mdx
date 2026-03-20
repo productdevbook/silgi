@@ -1,18 +1,18 @@
 ---
 title: Express
-description: Mount Katman as Express middleware — run RPC and REST routes on the same server.
+description: Mount Silgi as Express middleware — run RPC and REST routes on the same server.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
 
-If you have an existing Express application, Katman can be mounted as middleware alongside your REST routes.
+If you have an existing Express application, Silgi can be mounted as middleware alongside your REST routes.
 
 ## Setup
 
 ```ts twoslash
 // @noErrors
 import express from 'express'
-import { katmanExpress } from 'katman/express'
+import { silgiExpress } from 'silgi/express'
 
 const app = express()
 app.use(express.json()) // Required for POST body parsing
@@ -20,10 +20,10 @@ app.use(express.json()) // Required for POST body parsing
 // Existing routes
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }))
 
-// Katman RPC under /rpc
+// Silgi RPC under /rpc
 app.use(
   '/rpc',
-  katmanExpress(appRouter, {
+  silgiExpress(appRouter, {
     context: (req) => ({
       db: getDB(),
       user: req.user,
@@ -41,7 +41,7 @@ The `context` function receives the Express request object. Bridge your existing
 
 ```ts twoslash
 // @noErrors
-katmanExpress(appRouter, {
+silgiExpress(appRouter, {
   context: (req) => ({
     user: req.user, // from passport or similar
     ip: req.ip,
@@ -58,7 +58,7 @@ katmanExpress(appRouter, {
 - Unmatched paths pass through to the next Express middleware (`next()`)
 
 <Callout type='info'>
-  Make sure `express.json()` middleware is registered before the Katman middleware — otherwise POST bodies won't be
+  Make sure `express.json()` middleware is registered before the Silgi middleware — otherwise POST bodies won't be
   parsed.
 </Callout>
 

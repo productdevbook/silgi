@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest'
 
-import { KatmanError, isDefinedError, toKatmanError, isKatmanErrorJSON, fromKatmanErrorJSON } from '#src/core/error.ts'
+import { SilgiError, isDefinedError, toSilgiError, isSilgiErrorJSON, fromSilgiErrorJSON } from '#src/core/error.ts'
 import { AsyncIteratorClass } from '#src/core/iterator.ts'
 import { validateSchema, type as typeSchema } from '#src/core/schema.ts'
 import { once, mergeHeaders } from '#src/core/utils.ts'
 
-// === KatmanError ===
-describe('KatmanError', () => {
+// === SilgiError ===
+describe('SilgiError', () => {
   it('creates with default status and message', () => {
-    const err = new KatmanError('NOT_FOUND')
+    const err = new SilgiError('NOT_FOUND')
     expect(err.code).toBe('NOT_FOUND')
     expect(err.status).toBe(404)
     expect(err.message).toBe('Not Found')
@@ -16,13 +16,13 @@ describe('KatmanError', () => {
   })
 
   it('creates with custom status and message', () => {
-    const err = new KatmanError('CUSTOM', { status: 418, message: "I'm a teapot" })
+    const err = new SilgiError('CUSTOM', { status: 418, message: "I'm a teapot" })
     expect(err.status).toBe(418)
     expect(err.message).toBe("I'm a teapot")
   })
 
   it('serializes to JSON', () => {
-    const err = new KatmanError('BAD_REQUEST', { data: { field: 'name' }, defined: true })
+    const err = new SilgiError('BAD_REQUEST', { data: { field: 'name' }, defined: true })
     const json = err.toJSON()
     expect(json.code).toBe('BAD_REQUEST')
     expect(json.status).toBe(400)
@@ -31,20 +31,20 @@ describe('KatmanError', () => {
   })
 
   it('instanceof works', () => {
-    const err = new KatmanError('UNAUTHORIZED')
-    expect(err instanceof KatmanError).toBe(true)
+    const err = new SilgiError('UNAUTHORIZED')
+    expect(err instanceof SilgiError).toBe(true)
     expect(err instanceof Error).toBe(true)
   })
 
   it('isDefinedError works', () => {
-    const defined = new KatmanError('CONFLICT', { defined: true })
-    const notDefined = new KatmanError('CONFLICT', { defined: false })
+    const defined = new SilgiError('CONFLICT', { defined: true })
+    const notDefined = new SilgiError('CONFLICT', { defined: false })
     expect(isDefinedError(defined)).toBe(true)
     expect(isDefinedError(notDefined)).toBe(false)
   })
 
-  it('toKatmanError wraps unknown errors without leaking internal message', () => {
-    const err = toKatmanError(new Error('boom'))
+  it('toSilgiError wraps unknown errors without leaking internal message', () => {
+    const err = toSilgiError(new Error('boom'))
     expect(err.code).toBe('INTERNAL_SERVER_ERROR')
     // Internal error messages must not be exposed to clients
     expect(err.message).toBe('Internal server error')
@@ -53,19 +53,19 @@ describe('KatmanError', () => {
     expect((err.cause as Error).message).toBe('boom')
   })
 
-  it('toKatmanError passes through KatmanError', () => {
-    const original = new KatmanError('NOT_FOUND')
-    expect(toKatmanError(original)).toBe(original)
+  it('toSilgiError passes through SilgiError', () => {
+    const original = new SilgiError('NOT_FOUND')
+    expect(toSilgiError(original)).toBe(original)
   })
 
-  it('isKatmanErrorJSON validates shape', () => {
-    expect(isKatmanErrorJSON({ code: 'X', status: 400, message: 'x' })).toBe(true)
-    expect(isKatmanErrorJSON({ code: 123 })).toBe(false)
-    expect(isKatmanErrorJSON(null)).toBe(false)
+  it('isSilgiErrorJSON validates shape', () => {
+    expect(isSilgiErrorJSON({ code: 'X', status: 400, message: 'x' })).toBe(true)
+    expect(isSilgiErrorJSON({ code: 123 })).toBe(false)
+    expect(isSilgiErrorJSON(null)).toBe(false)
   })
 
-  it('fromKatmanErrorJSON reconstructs', () => {
-    const err = fromKatmanErrorJSON({ defined: true, code: 'CONFLICT', status: 409, message: 'dup', data: null })
+  it('fromSilgiErrorJSON reconstructs', () => {
+    const err = fromSilgiErrorJSON({ defined: true, code: 'CONFLICT', status: 409, message: 'dup', data: null })
     expect(err.code).toBe('CONFLICT')
     expect(err.status).toBe(409)
     expect(err.defined).toBe(true)

@@ -5,7 +5,7 @@
  * Handles preflight OPTIONS requests automatically.
  */
 
-import type { KatmanHooks } from '../katman.ts'
+import type { SilgiHooks } from '../silgi.ts'
 
 export interface CORSOptions {
   origin?: string | string[] | ((origin: string) => boolean)
@@ -17,13 +17,13 @@ export interface CORSOptions {
 }
 
 /**
- * Create CORS hooks for katman().
+ * Create CORS hooks for silgi().
  *
  * @example
  * ```ts
- * import { cors } from "katman/cors"
+ * import { cors } from "silgi/cors"
  *
- * const k = katman({
+ * const k = silgi({
  *   context: (req) => ({}),
  *   hooks: cors({ origin: "https://app.example.com", credentials: true }),
  * })
@@ -32,7 +32,7 @@ export interface CORSOptions {
 export function cors(options: CORSOptions = {}): { headers: Record<string, string>; options: CORSOptions } {
   const origin = options.origin ?? '*'
   if (options.credentials && typeof origin === 'string' && origin === '*') {
-    throw new Error('[katman/cors] Cannot use credentials: true with origin: "*". Set an explicit origin.')
+    throw new Error('[silgi/cors] Cannot use credentials: true with origin: "*". Set an explicit origin.')
   }
   return {
     headers: corsHeaders(options),

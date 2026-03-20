@@ -1,11 +1,11 @@
 import { describe, it, expectTypeOf } from 'vitest'
 import { z } from 'zod'
 
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 
 import type { ProcedureDef, InferClient } from '#src/types.ts'
 
-const k = katman({
+const k = silgi({
   context: (req: Request) => ({
     headers: Object.fromEntries(req.headers) as Record<string, string>,
     db: { users: [] as { id: number; name: string }[] },

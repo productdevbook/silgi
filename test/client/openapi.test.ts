@@ -113,7 +113,7 @@ describe('OpenAPILink', () => {
     expect(mockFetch).toHaveBeenCalledWith('/api/health', expect.objectContaining({ method: 'POST' }))
   })
 
-  it('throws KatmanError on non-ok response', async () => {
+  it('throws SilgiError on non-ok response', async () => {
     const { OpenAPILink } = await import('#src/client/openapi.ts')
 
     const mockFetch = vi.fn().mockResolvedValue(

@@ -1,6 +1,6 @@
-import { createClient } from 'katman/client'
-import { createLink } from 'katman/client/ofetch'
-import { createQueryUtils } from 'katman/tanstack-query'
+import { createClient } from 'silgi/client'
+import { createLink } from 'silgi/client/ofetch'
+import { createQueryUtils } from 'silgi/tanstack-query'
 
 // Type-safe client: import your AppRouter type from the server
 // import type { AppRouter } from "../../standalone/server";

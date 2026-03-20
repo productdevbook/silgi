@@ -6,9 +6,9 @@ import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
 
 import { createAction, createActions, createFormAction } from '#src/integrations/react/index.ts'
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 
-const k = katman({ context: () => ({}) })
+const k = silgi({ context: () => ({}) })
 
 const appRouter = k.router({
   health: k.$resolve(() => ({ status: 'ok' })),

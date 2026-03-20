@@ -1,15 +1,15 @@
-import { katman, KatmanError } from 'katman'
+import { silgi, SilgiError } from 'silgi'
 import { z } from 'zod'
 
 const db = {
   users: [
-    { id: 1, name: 'Alice', email: 'alice@katman.dev' },
-    { id: 2, name: 'Bob', email: 'bob@katman.dev' },
+    { id: 1, name: 'Alice', email: 'alice@silgi.dev' },
+    { id: 2, name: 'Bob', email: 'bob@silgi.dev' },
   ],
   nextId: 3,
 }
 
-const k = katman({
+const k = silgi({
   context: (req) => ({
     db,
     headers: Object.fromEntries(req.headers),
@@ -20,7 +20,7 @@ const { query, mutation, guard, router } = k
 
 const auth = guard((ctx) => {
   const token = ctx.headers.authorization?.replace('Bearer ', '')
-  if (token !== 'secret') throw new KatmanError('UNAUTHORIZED')
+  if (token !== 'secret') throw new SilgiError('UNAUTHORIZED')
   return { userId: 1 }
 })
 

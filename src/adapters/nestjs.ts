@@ -1,14 +1,14 @@
 /**
- * NestJS adapter — register Katman as a NestJS controller.
+ * NestJS adapter — register Silgi as a NestJS controller.
  *
  * @example
  * ```ts
  * // rpc.controller.ts
  * import { Controller, All, Req, Res } from "@nestjs/common"
- * import { katmanNestHandler } from "katman/nestjs"
+ * import { silgiNestHandler } from "silgi/nestjs"
  * import { appRouter } from "./rpc"
  *
- * const rpcHandler = katmanNestHandler(appRouter, {
+ * const rpcHandler = silgiNestHandler(appRouter, {
  *   context: (req) => ({ db: getDB(), user: req.user }),
  * })
  *
@@ -23,7 +23,7 @@
  */
 
 import { compileRouter } from '../compile.ts'
-import { KatmanError, toKatmanError } from '../core/error.ts'
+import { SilgiError, toSilgiError } from '../core/error.ts'
 import { ValidationError } from '../core/schema.ts'
 
 import type { RouterDef } from '../types.ts'
@@ -39,7 +39,7 @@ export interface NestAdapterOptions<TCtx extends Record<string, unknown>> {
  * Use inside a `@Controller` with `@All("*")`.
  * Handles routing internally — NestJS only needs to mount the prefix.
  */
-export function katmanNestHandler<TCtx extends Record<string, unknown>>(
+export function silgiNestHandler<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: NestAdapterOptions<TCtx> = {},
 ): (req: any, res: any) => Promise<void> {
@@ -85,18 +85,18 @@ export function katmanNestHandler<TCtx extends Record<string, unknown>>(
           .json({ code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } })
         return
       }
-      const e = error instanceof KatmanError ? error : toKatmanError(error)
+      const e = error instanceof SilgiError ? error : toSilgiError(error)
       res.status(e.status).json(e.toJSON())
     }
   }
 }
 
 /**
- * Create a NestJS module configuration for Katman.
+ * Create a NestJS module configuration for Silgi.
  *
  * Returns an object that can be used with NestJS's dynamic module pattern.
  */
-export function createKatmanModule(router: RouterDef, options: NestAdapterOptions<any> = {}) {
-  const handler = katmanNestHandler(router, options)
+export function createSilgiModule(router: RouterDef, options: NestAdapterOptions<any> = {}) {
+  const handler = silgiNestHandler(router, options)
   return { handler, router }
 }

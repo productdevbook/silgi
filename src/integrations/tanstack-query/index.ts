@@ -1,6 +1,6 @@
 /**
  * TanStack Query integration — generates type-safe query/mutation options
- * from a Katman client.
+ * from a Silgi client.
  *
  * Works with: @tanstack/react-query, @tanstack/vue-query,
  * @tanstack/solid-query, @tanstack/svelte-query
@@ -49,7 +49,7 @@ export interface MutationOptionsIn<TInput, TOutput, TError> {
 }
 
 /** Sentinel value to disable a query in a type-safe way. */
-export const skipToken: unique symbol = Symbol.for('katman.skipToken')
+export const skipToken: unique symbol = Symbol.for('silgi.skipToken')
 export type SkipToken = typeof skipToken
 
 export interface InfiniteQueryOptionsIn<TInput, TOutput, TError, TPageParam> {
@@ -220,7 +220,7 @@ export type QueryUtils<T extends NestedClient> =
       : GeneralUtils
 
 /**
- * Create TanStack Query utilities from a Katman client.
+ * Create TanStack Query utilities from a Silgi client.
  *
  * Returns a recursive proxy that mirrors the client structure,
  * with `.queryOptions()`, `.mutationOptions()`, `.queryKey()` at each level.

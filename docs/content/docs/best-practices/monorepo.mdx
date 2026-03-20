@@ -33,9 +33,9 @@ Three packages, each with a single responsibility:
 
 | Package        | Responsibility           | Dependencies                    |
 | -------------- | ------------------------ | ------------------------------- |
-| `api-contract` | Shared types and schemas | `katman`, `zod`                 |
-| `api-server`   | Implements the contract  | `api-contract`, `katman`, `zod` |
-| `frontend`     | Consumes the API         | `api-contract`, `katman`        |
+| `api-contract` | Shared types and schemas | `silgi`, `zod`                 |
+| `api-server`   | Implements the contract  | `api-contract`, `silgi`, `zod` |
+| `frontend`     | Consumes the API         | `api-contract`, `silgi`        |
 
 ## 1. Define the contract
 
@@ -43,10 +43,10 @@ The contract package exports input/output schemas and the router type. No server
 
 ```ts twoslash title="packages/api-contract/src/index.ts"
 // @noErrors
-import { katman } from "katman"
+import { silgi } from "silgi"
 import { z } from "zod"
 
-const k = katman()
+const k = silgi()
 
 // Input schemas — shared between server and client
 export const UserInput = z.object({
@@ -80,10 +80,10 @@ The server package imports the schemas from the contract and provides real imple
 
 ```ts twoslash title="packages/api-server/src/server.ts"
 // @noErrors
-import { katman } from 'katman'
+import { silgi } from 'silgi'
 import { ListInput, UserInput } from 'api-contract'
 
-const k = katman({
+const k = silgi({
   context: (req) => ({
     db: getDB(),
     headers: Object.fromEntries(req.headers),
@@ -110,8 +110,8 @@ The frontend imports only the `AppRouter` type from the contract. No server code
 
 ```ts twoslash title="packages/frontend/src/client.ts"
 // @noErrors
-import { createClient } from 'katman/client'
-import { createLink } from 'katman/client/ofetch'
+import { createClient } from 'silgi/client'
+import { createLink } from 'silgi/client/ofetch'
 import type { AppRouter } from 'api-contract'
 
 const link = createLink({ url: 'http://localhost:3000' })
@@ -132,7 +132,7 @@ For stricter typing without importing the full router, use `InferContractClient`
 
 ```ts twoslash
 // @noErrors
-import type { InferContractClient } from 'katman'
+import type { InferContractClient } from 'silgi'
 import type { AppRouter } from 'api-contract'
 
 type Client = InferContractClient<AppRouter>
@@ -154,7 +154,7 @@ packages:
   "name": "api-server",
   "dependencies": {
     "api-contract": "workspace:*",
-    "katman": "latest",
+    "silgi": "latest",
     "zod": "latest"
   }
 }
@@ -165,7 +165,7 @@ packages:
   "name": "frontend",
   "dependencies": {
     "api-contract": "workspace:*",
-    "katman": "latest"
+    "silgi": "latest"
   }
 }
 ```

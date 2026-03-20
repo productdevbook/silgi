@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
 import { compileProcedure } from '#src/compile.ts'
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 
-const k = katman({ context: () => ({}) })
+const k = silgi({ context: () => ({}) })
 
 describe('applyGuardResult — prototype pollution protection', () => {
   it('should not allow __proto__ key from guard result to pollute context', async () => {

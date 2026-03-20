@@ -7,7 +7,7 @@
  *
  * @example
  * ```ts
- * import { mapInput } from "katman"
+ * import { mapInput } from "silgi"
  *
  * // Rename fields
  * const mapUserId = mapInput((input: { userId: string }) => ({
@@ -30,7 +30,7 @@ import type { WrapDef } from './types.ts'
  * The mapped input is set on the context as `__mappedInput` and picked up
  * by the pipeline.
  *
- * Note: Since Katman's pipeline receives input as a separate argument
+ * Note: Since Silgi's pipeline receives input as a separate argument
  * (not on ctx), mapInput works as a wrap that intercepts and transforms
  * before calling next().
  */

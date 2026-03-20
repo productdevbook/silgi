@@ -1,7 +1,7 @@
 /**
  * v2 serve() — HTTP integration tests.
  *
- * Tests the Node.js HTTP server created by katman().serve().
+ * Tests the Node.js HTTP server created by silgi().serve().
  */
 
 import { createServer } from 'node:http'
@@ -9,7 +9,7 @@ import { createServer } from 'node:http'
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { z } from 'zod'
 
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 
 import type { Server } from 'node:http'
 
@@ -22,7 +22,7 @@ const db = {
   ],
 }
 
-const k = katman({
+const k = silgi({
   context: (req: Request) => ({
     headers: Object.fromEntries(req.headers) as Record<string, string>,
     db,

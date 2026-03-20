@@ -6,13 +6,13 @@ import Fastify from 'fastify'
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { z } from 'zod'
 
-import { katmanFastify } from '#src/adapters/fastify.ts'
+import { silgiFastify } from '#src/adapters/fastify.ts'
 import { MSGPACK_CONTENT_TYPE } from '#src/codec/msgpack.ts'
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 
 import type { FastifyInstance } from 'fastify'
 
-const k = katman({ context: () => ({ db: true }) })
+const k = silgi({ context: () => ({ db: true }) })
 
 const appRouter = k.router({
   health: k.$resolve(() => ({ status: 'ok' })),
@@ -27,13 +27,13 @@ let app: FastifyInstance
 
 beforeAll(async () => {
   app = Fastify()
-  app.register(katmanFastify(appRouter))
+  app.register(silgiFastify(appRouter))
   await app.ready()
 })
 
 afterAll(() => app?.close())
 
-describe('katmanFastify (real Fastify)', () => {
+describe('silgiFastify (real Fastify)', () => {
   it('registers catch-all route for router dispatch', () => {
     const routes = app.printRoutes()
     expect(routes).toContain('*')
@@ -91,7 +91,7 @@ describe('katmanFastify (real Fastify)', () => {
 
   it('supports prefix via Fastify register', async () => {
     const prefixed = Fastify()
-    prefixed.register(katmanFastify(appRouter), { prefix: '/api' })
+    prefixed.register(silgiFastify(appRouter), { prefix: '/api' })
     await prefixed.ready()
 
     const res = await prefixed.inject({ method: 'POST', url: '/api/health' })
@@ -108,7 +108,7 @@ describe('katmanFastify (real Fastify)', () => {
   it('supports context factory', async () => {
     const withCtx = Fastify()
     withCtx.register(
-      katmanFastify(k.router({ whoami: k.$resolve(({ ctx }: any) => ({ fromCtx: ctx.userId })) }), {
+      silgiFastify(k.router({ whoami: k.$resolve(({ ctx }: any) => ({ fromCtx: ctx.userId })) }), {
         context: () => ({ userId: 42 }),
       }),
     )
@@ -123,14 +123,14 @@ describe('katmanFastify (real Fastify)', () => {
   it('coexists with native Fastify routes', async () => {
     const mixed = Fastify()
     mixed.get('/legacy', async () => ({ type: 'rest' }))
-    mixed.register(katmanFastify(appRouter), { prefix: '/rpc' })
+    mixed.register(silgiFastify(appRouter), { prefix: '/rpc' })
     await mixed.ready()
 
     // Native route
     const r1 = await mixed.inject({ method: 'GET', url: '/legacy' })
     expect(r1.json().type).toBe('rest')
 
-    // Katman route
+    // Silgi route
     const r2 = await mixed.inject({ method: 'POST', url: '/rpc/health' })
     expect(r2.json().status).toBe('ok')
 

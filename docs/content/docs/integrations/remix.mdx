@@ -1,9 +1,9 @@
 ---
 title: Remix
-description: Use Katman with Remix action/loader routes.
+description: Use Silgi with Remix action/loader routes.
 ---
 
-[Remix](https://remix.run) uses file-based routing with `action` and `loader` exports. Katman integrates via a catch-all splat route.
+[Remix](https://remix.run) uses file-based routing with `action` and `loader` exports. Silgi integrates via a catch-all splat route.
 
 ## Setup
 
@@ -12,10 +12,10 @@ Create a catch-all route:
 ```ts twoslash
 // @noErrors
 // app/routes/rpc.$.tsx
-import { katmanRemix } from 'katman/remix'
+import { silgiRemix } from 'silgi/remix'
 import { appRouter } from '~/server/rpc'
 
-const handler = katmanRemix(appRouter, {
+const handler = silgiRemix(appRouter, {
   prefix: '/rpc',
   context: (args) => ({
     db: getDB(),
@@ -41,7 +41,7 @@ The `context` function receives the standard Remix `LoaderFunctionArgs` / `Actio
 
 ```ts twoslash
 // @noErrors
-katmanRemix(appRouter, {
+silgiRemix(appRouter, {
   context: (args) => ({
     user: args.context.user, // from Remix server context
     params: args.params,

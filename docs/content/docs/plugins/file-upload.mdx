@@ -11,7 +11,7 @@ Parse multipart file uploads with size and MIME type validation. Files are avail
 
 ```ts twoslash
 // @noErrors
-import { fileGuard } from 'katman/plugins'
+import { fileGuard } from 'silgi/plugins'
 
 const uploadAvatar = k
   .$use(
@@ -53,7 +53,7 @@ For custom file handling, use `parseMultipart()` directly:
 
 ```ts twoslash
 // @noErrors
-import { parseMultipart } from 'katman/plugins'
+import { parseMultipart } from 'silgi/plugins'
 
 const upload = k.$resolve(async ({ ctx }) => {
   const { files, fields } = await parseMultipart(ctx.__request)

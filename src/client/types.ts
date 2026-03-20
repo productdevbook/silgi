@@ -2,7 +2,7 @@
  * Client type definitions.
  */
 
-import type { KatmanError } from '../core/error.ts'
+import type { SilgiError } from '../core/error.ts'
 
 export type ClientContext = Record<PropertyKey, unknown>
 
@@ -13,7 +13,7 @@ export interface ClientOptions<TContext extends ClientContext = ClientContext> {
 }
 
 /** A single procedure client — callable function */
-export type Client<TClientContext extends ClientContext, TInput, TOutput, TError = KatmanError> = (
+export type Client<TClientContext extends ClientContext, TInput, TOutput, TError = SilgiError> = (
   ...args: ClientRest<TClientContext, TInput>
 ) => Promise<TOutput>
 

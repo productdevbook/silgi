@@ -2,10 +2,10 @@ import { createMemoryStorage, setStorage } from 'ocache'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { z } from 'zod'
 
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 import { cacheQuery, setCacheStorage, invalidateQueryCache, createUnstorageAdapter } from '#src/plugins/cache.ts'
 
-const k = katman({ context: () => ({}) })
+const k = silgi({ context: () => ({}) })
 
 beforeEach(() => {
   // Reset to fresh memory storage before each test

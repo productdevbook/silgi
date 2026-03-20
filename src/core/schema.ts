@@ -38,7 +38,7 @@ export function type<TInput, TOutput = TInput>(
   return {
     '~standard': {
       version: 1,
-      vendor: 'katman',
+      vendor: 'silgi',
       validate(value) {
         return { value: mapFn ? mapFn(value as TInput) : (value as TOutput) }
       },

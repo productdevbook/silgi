@@ -1,7 +1,7 @@
 /**
  * Pino logging plugin — v2 hook-based.
  *
- * Logs request lifecycle events via katman hooks.
+ * Logs request lifecycle events via silgi hooks.
  */
 
 // ── Logger Interface (Pino-compatible) ──────────────
@@ -24,14 +24,14 @@ export interface LoggingOptions {
 }
 
 /**
- * Create logging hooks for katman().
+ * Create logging hooks for silgi().
  *
  * @example
  * ```ts
  * import pino from "pino"
- * import { loggingHooks } from "katman/pino"
+ * import { loggingHooks } from "silgi/pino"
  *
- * const k = katman({
+ * const k = silgi({
  *   context: (req) => ({}),
  *   hooks: loggingHooks({ logger: pino() }),
  * })

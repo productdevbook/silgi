@@ -2,12 +2,12 @@ import { describe, it, expect, vi } from 'vitest'
 import { z } from 'zod'
 
 import { compileProcedure } from '#src/compile.ts'
-import { KatmanError } from '#src/core/error.ts'
-import { katman } from '#src/katman.ts'
+import { SilgiError } from '#src/core/error.ts'
+import { silgi } from '#src/silgi.ts'
 
 // ── Setup ───────────────────────────────────────────
 
-const k = katman({
+const k = silgi({
   context: (req: Request) => ({
     headers: Object.fromEntries(req.headers) as Record<string, string>,
     db: { users: [{ id: 1, name: 'Alice', email: 'alice@test.com' }] },
@@ -193,7 +193,7 @@ describe('query() / mutation() / subscription()', () => {
 // ── fail() Tests ────────────────────────────────────
 
 describe('fail()', () => {
-  it('throws KatmanError with defined=true', async () => {
+  it('throws SilgiError with defined=true', async () => {
     const proc = k.$errors({ CONFLICT: 409 }).$resolve(async ({ fail }: any) => {
       fail('CONFLICT')
     })
@@ -344,7 +344,7 @@ describe('E2E: Full CRUD', () => {
     { id: 2, name: 'Bob', email: 'bob@test.com' },
   ]
 
-  const k2 = katman({
+  const k2 = silgi({
     context: (req: Request) => ({
       headers: Object.fromEntries(req.headers) as Record<string, string>,
     }),
@@ -352,7 +352,7 @@ describe('E2E: Full CRUD', () => {
 
   const auth = k2.guard(async (ctx) => {
     if (ctx.headers.authorization !== 'Bearer secret') {
-      throw new KatmanError('UNAUTHORIZED')
+      throw new SilgiError('UNAUTHORIZED')
     }
     return { userId: 1 }
   })
@@ -430,7 +430,7 @@ describe('E2E: Full CRUD', () => {
 // ── URL Params Tests ────────────────────────────────
 
 describe('URL params from route patterns', () => {
-  const k3 = katman({
+  const k3 = silgi({
     context: () => ({}),
   })
 

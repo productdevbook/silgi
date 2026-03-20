@@ -208,7 +208,7 @@ export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}):
   const doc: Record<string, unknown> = {
     openapi: '3.1.0',
     info: {
-      title: options.title ?? 'Katman API',
+      title: options.title ?? 'Silgi API',
       version: options.version ?? '1.0.0',
       ...(options.description ? { description: options.description } : {}),
       ...(options.contact ? { contact: options.contact } : {}),
@@ -250,11 +250,11 @@ export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}):
 const SCALAR_CDN_SOURCES = {
   cdn: 'https://cdn.jsdelivr.net/npm/@scalar/api-reference',
   unpkg: 'https://unpkg.com/@scalar/api-reference',
-  local: '/__katman/scalar.js',
+  local: '/__silgi/scalar.js',
 } as Record<string, string>
 
 export function scalarHTML(specUrl: string, options: ScalarOptions = {}): string {
-  const title = escapeHtml(options.title ?? 'Katman API')
+  const title = escapeHtml(options.title ?? 'Silgi API')
   const safeUrl = escapeHtml(specUrl)
   const cdnOption = options.cdn ?? 'cdn'
   const scriptSrc = escapeHtml(SCALAR_CDN_SOURCES[cdnOption] ?? cdnOption)

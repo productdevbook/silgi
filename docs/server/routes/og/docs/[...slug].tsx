@@ -3,7 +3,7 @@ import { defineEventHandler, getRouterParam, setResponseHeader, createError } fr
 
 import { source } from '../../../../src/lib/source'
 
-function KatmanOG({ title, description }: { title: string; description?: string }) {
+function SilgiOG({ title, description }: { title: string; description?: string }) {
   return (
     <div
       style={{
@@ -70,7 +70,7 @@ function KatmanOG({ title, description }: { title: string; description?: string 
         >
           <div style={{ width: '14px', height: '14px', borderRadius: '50%', backgroundColor: '#0a0908' }} />
         </div>
-        <span style={{ fontSize: '28px', fontWeight: 500, color: '#b5a892', letterSpacing: '-0.02em' }}>Katman</span>
+        <span style={{ fontSize: '28px', fontWeight: 500, color: '#b5a892', letterSpacing: '-0.02em' }}>Silgi</span>
       </div>
 
       {/* Title */}
@@ -120,7 +120,7 @@ function KatmanOG({ title, description }: { title: string; description?: string 
         >
           DOCS
         </span>
-        <span style={{ fontSize: '18px', color: '#5e5549' }}>katman.productdevbook.com</span>
+        <span style={{ fontSize: '18px', color: '#5e5549' }}>silgi.productdevbook.com</span>
       </div>
 
       {/* Border */}
@@ -149,7 +149,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'Page not found' })
   }
 
-  const response = new ImageResponse(<KatmanOG title={page.data.title} description={page.data.description} />, {
+  const response = new ImageResponse(<SilgiOG title={page.data.title} description={page.data.description} />, {
     width: 1200,
     height: 630,
     format: 'webp',

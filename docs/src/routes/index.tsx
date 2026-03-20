@@ -35,7 +35,7 @@ function Home() {
 
 function Hero() {
   const [pm, setPm] = useState<'pnpm' | 'npm' | 'bun'>('pnpm')
-  const cmd = { npm: 'npm i katman', pnpm: 'pnpm add katman', bun: 'bun add katman' }
+  const cmd = { npm: 'npm i silgi', pnpm: 'pnpm add silgi', bun: 'bun add silgi' }
 
   return (
     <section className='relative overflow-hidden k-grain'>
@@ -50,7 +50,7 @@ function Hero() {
                 The RPC Framework for the Web
               </h1>
               <p className='text-[var(--k-text)] md:text-lg max-w-[27rem] text-pretty font-normal leading-relaxed'>
-                Katman is a type-safe RPC framework with compiled pipelines powering the next generation of TypeScript
+                Silgi is a type-safe RPC framework with compiled pipelines powering the next generation of TypeScript
                 APIs.
               </p>
               <div className='flex items-center gap-4 mt-6'>
@@ -58,7 +58,7 @@ function Hero() {
                   Get Started
                 </Link>
                 <a
-                  href='https://github.com/productdevbook/katman'
+                  href='https://github.com/productdevbook/silgi'
                   target='_blank'
                   rel='noopener noreferrer'
                   className='k-btn k-btn--ghost'
@@ -105,17 +105,17 @@ function Hero() {
 }
 
 const CODE = [
-  '<span class="kw">import</span> { katman } <span class="kw">from</span> <span class="st">\'katman\'</span>',
+  '<span class="kw">import</span> { silgi } <span class="kw">from</span> <span class="st">\'silgi\'</span>',
   '<span class="kw">import</span> { z } <span class="kw">from</span> <span class="st">\'zod\'</span>',
   '',
-  '<span class="kw">const</span> k = <span class="fn">katman</span>({',
+  '<span class="kw">const</span> k = <span class="fn">silgi</span>({',
   '  context: (req) =&gt; ({ db: <span class="fn">getDB</span>() }),',
   '})',
   '',
   '<span class="cm">// Guard — flat, no callbacks</span>',
   '<span class="kw">const</span> auth = k.<span class="fn">guard</span>(<span class="kw">async</span> (ctx) =&gt; {',
   '  <span class="kw">const</span> user = <span class="kw">await</span> <span class="fn">verify</span>(ctx.headers.auth)',
-  '  <span class="kw">if</span> (!user) <span class="kw">throw new</span> <span class="fn">KatmanError</span>(<span class="st">\'UNAUTHORIZED\'</span>)',
+  '  <span class="kw">if</span> (!user) <span class="kw">throw new</span> <span class="fn">SilgiError</span>(<span class="st">\'UNAUTHORIZED\'</span>)',
   '  <span class="kw">return</span> { user }',
   '})',
   '',
@@ -470,7 +470,7 @@ function FooterCTA() {
     <section className='relative k-grain overflow-hidden'>
       <W border className='relative px-6 sm:px-10 py-24 lg:py-32 text-center flex flex-col items-center'>
         <h2 className='k-serif text-[clamp(2rem,4.5vw,3.2rem)] leading-[1.05] tracking-[-0.015em] mb-4 text-[var(--k-fg)]'>
-          Start building with Katman
+          Start building with Silgi
         </h2>
         <p className='text-[var(--k-text)] max-w-sm mb-10 font-normal leading-relaxed'>
           Prepare for a development environment that can finally keep pace with the speed of your mind.

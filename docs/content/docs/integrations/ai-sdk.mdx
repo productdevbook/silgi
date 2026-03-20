@@ -1,18 +1,18 @@
 ---
 title: AI SDK
-description: Turn Katman procedures into AI tools — LLMs call your API through function calling.
+description: Turn Silgi procedures into AI tools — LLMs call your API through function calling.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
 import { Step, Steps } from 'fumadocs-ui/components/steps'
 
-The [Vercel AI SDK](https://sdk.vercel.ai) lets you connect LLMs to **tools** — functions the model can call when it needs data or wants to take actions. Katman can automatically convert your procedures into AI tools, extracting JSON Schema from your Zod input schemas.
+The [Vercel AI SDK](https://sdk.vercel.ai) lets you connect LLMs to **tools** — functions the model can call when it needs data or wants to take actions. Silgi can automatically convert your procedures into AI tools, extracting JSON Schema from your Zod input schemas.
 
 This means your existing API becomes callable by AI models with zero extra code.
 
 ## Prerequisites
 
-You need a Katman [router](/docs/getting-started) and the AI SDK:
+You need a Silgi [router](/docs/getting-started) and the AI SDK:
 
 ```bash
 npm install ai @ai-sdk/openai
@@ -29,7 +29,7 @@ npm install ai @ai-sdk/openai
 
 ```ts twoslash
 // @noErrors
-import { routerToTools } from 'katman/ai'
+import { routerToTools } from 'silgi/ai'
 import { appRouter } from './router'
 
 const tools = routerToTools(appRouter)
@@ -54,14 +54,14 @@ const { text } = await generateText({
 })
 ```
 
-The model sees your procedures as callable functions. It reads the descriptions and parameter schemas, decides which tools to call, and Katman executes them.
+The model sees your procedures as callable functions. It reads the descriptions and parameter schemas, decides which tools to call, and Silgi executes them.
 
 </Step>
 </Steps>
 
 ## How it works
 
-For each procedure, Katman:
+For each procedure, Silgi:
 
 1. **Extracts a description** from `route.description` or `route.summary` in your procedure definition. Falls back to `"Call {name}"`.
 2. **Converts the Zod input schema** to JSON Schema, which is the format LLMs use for function calling.
@@ -88,7 +88,7 @@ For more control, convert individual procedures instead of the whole router:
 
 ```ts twoslash
 // @noErrors
-import { procedureToTool } from 'katman/ai'
+import { procedureToTool } from 'silgi/ai'
 
 const searchTool = procedureToTool('search', appRouter.search, {
   description: 'Search the database for items matching a query',
@@ -163,6 +163,6 @@ For procedures without an input schema, the tool accepts an empty object.
 
 ## What's next?
 
-- [Getting Started](/docs/getting-started) — set up a Katman router to convert into tools
+- [Getting Started](/docs/getting-started) — set up a Silgi router to convert into tools
 - [Procedures](/docs/procedures) — add route metadata that becomes tool descriptions
 - [Integrations](/docs/integrations) — other available integrations

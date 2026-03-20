@@ -6,9 +6,9 @@
 
 import { z } from 'zod'
 
-import { katman } from '../src/katman.ts'
+import { silgi } from '../src/silgi.ts'
 
-const k = katman({ context: () => ({ db: true }) })
+const k = silgi({ context: () => ({ db: true }) })
 
 const router = k.router({
   health: k.$resolve(() => ({ status: 'ok', runtime: typeof Bun !== 'undefined' ? 'bun' : 'node' })),

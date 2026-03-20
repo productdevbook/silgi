@@ -1,26 +1,26 @@
 ---
 title: Hono
-description: Use Katman with Hono on any runtime — Node.js, Bun, Deno, Cloudflare Workers.
+description: Use Silgi with Hono on any runtime — Node.js, Bun, Deno, Cloudflare Workers.
 ---
 
-[Hono](https://hono.dev) is a fast web framework that runs everywhere. Katman's Hono adapter mounts your procedures as a Hono handler.
+[Hono](https://hono.dev) is a fast web framework that runs everywhere. Silgi's Hono adapter mounts your procedures as a Hono handler.
 
 ## Setup
 
 ```ts twoslash
 // @noErrors
 import { Hono } from 'hono'
-import { katmanHono } from 'katman/hono'
+import { silgiHono } from 'silgi/hono'
 
 const app = new Hono()
 
 // Existing routes
 app.get('/api/health', (c) => c.json({ status: 'ok' }))
 
-// Katman RPC
+// Silgi RPC
 app.all(
   '/rpc/*',
-  katmanHono(appRouter, {
+  silgiHono(appRouter, {
     context: (c) => ({
       db: getDB(),
       user: c.get('user'),
@@ -37,7 +37,7 @@ The `context` function receives Hono's `Context` object. Access middleware data 
 
 ```ts twoslash
 // @noErrors
-katmanHono(appRouter, {
+silgiHono(appRouter, {
   context: (c) => ({
     user: c.get('user'), // from Hono middleware
     requestId: c.get('requestId'),
@@ -51,12 +51,12 @@ katmanHono(appRouter, {
 ```ts twoslash
 // @noErrors
 import { Hono } from 'hono'
-import { katmanHono } from 'katman/hono'
+import { silgiHono } from 'silgi/hono'
 
 const app = new Hono()
 app.all(
   '/rpc/*',
-  katmanHono(appRouter, {
+  silgiHono(appRouter, {
     context: (c) => ({ db: c.env.DB }),
   }),
 )

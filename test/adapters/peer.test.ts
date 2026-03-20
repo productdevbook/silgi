@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 
-const k = katman({ context: () => ({ db: 'test' }) })
+const k = silgi({ context: () => ({ db: 'test' }) })
 
 describe('createPeer() — bidirectional RPC', () => {
   it("two peers call each other's procedures", async () => {

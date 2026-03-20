@@ -6,7 +6,7 @@
  *
  * @example
  * ```ts
- * import { createBatchHandler } from "katman/plugins"
+ * import { createBatchHandler } from "silgi/plugins"
  *
  * const batchHandler = createBatchHandler(appRouter, {
  *   context: (req) => ({ db: getDB() }),
@@ -18,7 +18,7 @@
  */
 
 import { compileRouter } from '../compile.ts'
-import { KatmanError, toKatmanError } from '../core/error.ts'
+import { SilgiError, toSilgiError } from '../core/error.ts'
 import { ValidationError } from '../core/schema.ts'
 
 import type { FlatRouter } from '../compile.ts'
@@ -107,7 +107,7 @@ export function createBatchHandler<TCtx extends Record<string, unknown>>(
               error: { code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } },
             }
           }
-          const e = error instanceof KatmanError ? error : toKatmanError(error)
+          const e = error instanceof SilgiError ? error : toSilgiError(error)
           return { error: e.toJSON() as any }
         }
       }),

@@ -23,12 +23,12 @@ describe('fromTRPC()', () => {
       },
     }
 
-    const katmanRouter = fromTRPC(mockRouter)
+    const silgiRouter = fromTRPC(mockRouter)
 
-    expect(katmanRouter.health).toBeDefined()
-    expect((katmanRouter.health as any).type).toBe('query')
+    expect(silgiRouter.health).toBeDefined()
+    expect((silgiRouter.health as any).type).toBe('query')
 
-    const handler = compileProcedure(katmanRouter.health as any)
+    const handler = compileProcedure(silgiRouter.health as any)
     const result = await handler({}, undefined, AbortSignal.timeout(5000))
     expect(result).toEqual({ status: 'ok' })
   })

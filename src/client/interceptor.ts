@@ -6,7 +6,7 @@
  *
  * @example
  * ```ts
- * import { withInterceptors } from "katman/client"
+ * import { withInterceptors } from "silgi/client"
  *
  * const link = withInterceptors(baseLink, {
  *   onRequest({ path, input }) {

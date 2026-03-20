@@ -1,5 +1,5 @@
 /**
- * Message Port adapter — use Katman over MessagePort/MessageChannel.
+ * Message Port adapter — use Silgi over MessagePort/MessageChannel.
  *
  * Works with Electron (main↔renderer), browser extensions (background↔popup),
  * Web Workers, and Node.js Worker Threads.
@@ -7,15 +7,15 @@
  * @example
  * ```ts
  * // Worker / Electron main
- * import { katmanMessagePort } from "katman/message-port"
+ * import { silgiMessagePort } from "silgi/message-port"
  *
- * const dispose = katmanMessagePort(appRouter, port, {
+ * const dispose = silgiMessagePort(appRouter, port, {
  *   context: () => ({ db: getDB() }),
  * })
  *
  * // Client side
- * import { MessagePortLink } from "katman/message-port"
- * import { createClient } from "katman/client"
+ * import { MessagePortLink } from "silgi/message-port"
+ * import { createClient } from "silgi/client"
  *
  * const client = createClient<AppRouter>(new MessagePortLink(port))
  * const users = await client.users.list({ limit: 10 })
@@ -23,7 +23,7 @@
  */
 
 import { compileRouter } from '../compile.ts'
-import { KatmanError, toKatmanError } from '../core/error.ts'
+import { SilgiError, toSilgiError } from '../core/error.ts'
 import { ValidationError } from '../core/schema.ts'
 
 import type { ClientLink, ClientOptions, ClientContext } from '../client/types.ts'
@@ -34,7 +34,7 @@ export interface MessagePortAdapterOptions<TCtx extends Record<string, unknown>>
 }
 
 interface RPCMessage {
-  __katman: true
+  __silgi: true
   __type: 'request'
   id: string
   path: string
@@ -42,7 +42,7 @@ interface RPCMessage {
 }
 
 interface RPCResponse {
-  __katman: true
+  __silgi: true
   __type: 'response'
   id: string
   result?: unknown
@@ -50,11 +50,11 @@ interface RPCResponse {
 }
 
 /**
- * Attach Katman to a MessagePort (server side).
+ * Attach Silgi to a MessagePort (server side).
  * Listens for RPC messages and responds with results.
  * Returns a dispose function to stop listening.
  */
-export function katmanMessagePort<TCtx extends Record<string, unknown>>(
+export function silgiMessagePort<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   port: {
     postMessage(msg: unknown): void
@@ -67,12 +67,12 @@ export function katmanMessagePort<TCtx extends Record<string, unknown>>(
 
   const handler = async (event: { data: unknown }) => {
     const msg = event.data as RPCMessage
-    if (!msg || typeof msg !== 'object' || !msg.__katman || msg.__type !== 'request') return
+    if (!msg || typeof msg !== 'object' || !msg.__silgi || msg.__type !== 'request') return
 
     const match = flatRouter('POST', '/' + msg.path)
     if (!match) {
       port.postMessage({
-        __katman: true,
+        __silgi: true,
         __type: 'response',
         id: msg.id,
         error: { code: 'NOT_FOUND', status: 404, message: 'Procedure not found' },
@@ -93,15 +93,15 @@ export function katmanMessagePort<TCtx extends Record<string, unknown>>(
 
       const signal = new AbortController().signal
       const result = await route.handler(ctx, msg.input, signal)
-      port.postMessage({ __katman: true, __type: 'response', id: msg.id, result } satisfies RPCResponse)
+      port.postMessage({ __silgi: true, __type: 'response', id: msg.id, result } satisfies RPCResponse)
     } catch (error) {
       const e =
         error instanceof ValidationError
           ? { code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } }
-          : error instanceof KatmanError
+          : error instanceof SilgiError
             ? error.toJSON()
-            : toKatmanError(error).toJSON()
-      port.postMessage({ __katman: true, __type: 'response', id: msg.id, error: e } satisfies RPCResponse)
+            : toSilgiError(error).toJSON()
+      port.postMessage({ __silgi: true, __type: 'response', id: msg.id, error: e } satisfies RPCResponse)
     }
   }
 
@@ -128,13 +128,13 @@ export class MessagePortLink<TCtx extends ClientContext = ClientContext> impleme
     this.#port = port
     port.addEventListener('message', (event: { data: unknown }) => {
       const msg = event.data as RPCResponse
-      if (!msg || typeof msg !== 'object' || !msg.__katman || msg.__type !== 'response') return
+      if (!msg || typeof msg !== 'object' || !msg.__silgi || msg.__type !== 'response') return
       const pending = this.#pending.get(msg.id)
       if (!pending) return
       this.#pending.delete(msg.id)
       if (msg.error) {
         pending.reject(
-          new KatmanError(msg.error.code, {
+          new SilgiError(msg.error.code, {
             status: msg.error.status,
             message: msg.error.message,
             data: msg.error.data,
@@ -151,7 +151,7 @@ export class MessagePortLink<TCtx extends ClientContext = ClientContext> impleme
       const id = String(this.#nextId++)
       this.#pending.set(id, { resolve, reject })
       this.#port.postMessage({
-        __katman: true,
+        __silgi: true,
         __type: 'request',
         id,
         path: path.join('/'),

@@ -6,7 +6,7 @@
  *
  * @example
  * ```ts
- * import { mergeClients } from "katman/client"
+ * import { mergeClients } from "silgi/client"
  *
  * const client = mergeClients({
  *   users: usersClient,

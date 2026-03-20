@@ -1,13 +1,13 @@
 /**
- * Fastify adapter — register katman router as a Fastify plugin.
+ * Fastify adapter — register silgi router as a Fastify plugin.
  *
  * @example
  * ```ts
  * import Fastify from "fastify"
- * import { katmanFastify } from "katman/fastify"
+ * import { silgiFastify } from "silgi/fastify"
  *
  * const app = Fastify()
- * app.register(katmanFastify(appRouter), { prefix: "/rpc" })
+ * app.register(silgiFastify(appRouter), { prefix: "/rpc" })
  * app.listen({ port: 3000 })
  * ```
  */
@@ -15,23 +15,23 @@
 import { encode as devalueEncode, acceptsDevalue, DEVALUE_CONTENT_TYPE } from '../codec/devalue.ts'
 import { encode as msgpackEncode, acceptsMsgpack, MSGPACK_CONTENT_TYPE } from '../codec/msgpack.ts'
 import { compileRouter } from '../compile.ts'
-import { KatmanError, toKatmanError } from '../core/error.ts'
+import { SilgiError, toSilgiError } from '../core/error.ts'
 import { ValidationError } from '../core/schema.ts'
 
 import type { CompiledRouterFn } from '../compile.ts'
 import type { RouterDef } from '../types.ts'
 
-export interface KatmanFastifyOptions {
+export interface SilgiFastifyOptions {
   /** Context factory — receives Fastify request */
   context?: (req: any) => Record<string, unknown> | Promise<Record<string, unknown>>
 }
 
 /**
- * Create a Fastify plugin from a katman router.
+ * Create a Fastify plugin from a silgi router.
  *
  * Uses a single wildcard route with the compiled radix router for dispatch.
  */
-export function katmanFastify(routerDef: RouterDef, options: KatmanFastifyOptions = {}) {
+export function silgiFastify(routerDef: RouterDef, options: SilgiFastifyOptions = {}) {
   const compiledRouter: CompiledRouterFn = compileRouter(routerDef)
   const contextFactory = options.context ?? (() => ({}))
 
@@ -54,7 +54,7 @@ export function katmanFastify(routerDef: RouterDef, options: KatmanFastifyOption
         const baseCtx = await contextFactory(req)
         Object.assign(ctx, baseCtx)
       } catch (err) {
-        const e = err instanceof KatmanError ? err : toKatmanError(err)
+        const e = err instanceof SilgiError ? err : toSilgiError(err)
         return reply.status(e.status).send(e.toJSON())
       }
 
@@ -91,7 +91,7 @@ export function katmanFastify(routerDef: RouterDef, options: KatmanFastifyOption
             data: { issues: error.issues },
           })
         }
-        const e = error instanceof KatmanError ? error : toKatmanError(error)
+        const e = error instanceof SilgiError ? error : toSilgiError(error)
         return reply.status(e.status).send(e.toJSON())
       }
     })

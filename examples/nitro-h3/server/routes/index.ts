@@ -1,7 +1,7 @@
 import { defineHandler } from 'nitro/h3'
 
 export default defineHandler(() => ({
-  name: 'Katman Nitro Playground',
+  name: 'Silgi Nitro Playground',
   routes: {
     'POST /rpc/health': 'Health check',
     'POST /rpc/users/list': 'List users (input: { limit?: number })',

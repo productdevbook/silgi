@@ -9,14 +9,14 @@ import { z } from 'zod'
 
 import { createLink } from '#src/client/adapters/ofetch/index.ts'
 import { createClient } from '#src/client/client.ts'
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 
 import type { InferClient } from '#src/types.ts'
 import type { Server } from 'node:http'
 
 // ── Server ─────────────────────────────────────────
 
-const k = katman({
+const k = silgi({
   context: () => ({ db: { users: [{ id: 1, name: 'Alice', email: 'a@test.com' }] } }),
 })
 
@@ -174,7 +174,7 @@ describe('E2E type roundtrip', () => {
   })
 
   it('handler passes through raw Response from resolver', async () => {
-    const k2 = katman({ context: () => ({}) })
+    const k2 = silgi({ context: () => ({}) })
     const router = k2.router({
       download: k2.$resolve(
         () =>
@@ -193,7 +193,7 @@ describe('E2E type roundtrip', () => {
   })
 
   it('handler passes through ReadableStream as octet-stream', async () => {
-    const k2 = katman({ context: () => ({}) })
+    const k2 = silgi({ context: () => ({}) })
     const router = k2.router({
       stream: k2.$resolve(() => {
         const encoder = new TextEncoder()

@@ -1,8 +1,8 @@
-import { katmanNextjs } from 'katman/nextjs'
+import { silgiNextjs } from 'silgi/nextjs'
 
 import { appRouter } from '../../../../server/rpc'
 
-const handler = katmanNextjs(appRouter, {
+const handler = silgiNextjs(appRouter, {
   prefix: '/api/rpc',
   context: () => ({ db: 'nextjs-db' }),
 })

@@ -1,16 +1,16 @@
 /**
  * Cookie helpers — parse, set, and delete cookies.
  *
- * Lightweight utilities for working with cookies in Katman handlers.
+ * Lightweight utilities for working with cookies in Silgi handlers.
  * No dependencies. Works with both serve() and handler().
  *
  * @example
  * ```ts
- * import { getCookie, setCookie, deleteCookie } from "katman/cookies"
+ * import { getCookie, setCookie, deleteCookie } from "silgi/cookies"
  *
  * const auth = k.guard((ctx) => {
  *   const token = getCookie(ctx.headers, "session")
- *   if (!token) throw new KatmanError("UNAUTHORIZED")
+ *   if (!token) throw new SilgiError("UNAUTHORIZED")
  *   return { sessionToken: token }
  * })
  * ```

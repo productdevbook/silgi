@@ -1,16 +1,16 @@
 import { describe, it, expect, afterAll } from 'vitest'
 import { z } from 'zod'
 
-import { katman, KatmanError } from '#src/katman.ts'
+import { silgi, SilgiError } from '#src/silgi.ts'
 
-const k = katman({ context: () => ({ db: 'test' }) })
+const k = silgi({ context: () => ({ db: 'test' }) })
 
 const testRouter = k.router({
   health: k.$resolve(() => ({ status: 'ok' })),
   echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
   greet: k.$input(z.object({ name: z.string() })).$resolve(({ input }) => ({ hello: input.name })),
   fail: k.$resolve(() => {
-    throw new KatmanError('NOT_FOUND', { message: 'nope' })
+    throw new SilgiError('NOT_FOUND', { message: 'nope' })
   }),
 })
 
@@ -23,7 +23,7 @@ async function post(url: string, body?: unknown): Promise<{ status: number; data
   return { status: res.status, data: await res.json() }
 }
 
-describe('katmanNestHandler() — real Express server', () => {
+describe('silgiNestHandler() — real Express server', () => {
   let url: string
   let close: () => void
 
@@ -31,9 +31,9 @@ describe('katmanNestHandler() — real Express server', () => {
 
   it('starts and handles requests like a NestJS controller', async () => {
     const express = (await import('express')).default
-    const { katmanNestHandler } = await import('#src/adapters/nestjs.ts')
+    const { silgiNestHandler } = await import('#src/adapters/nestjs.ts')
 
-    const rpcHandler = katmanNestHandler(testRouter, {
+    const rpcHandler = silgiNestHandler(testRouter, {
       context: (req: any) => ({ ip: req.ip }),
     })
 

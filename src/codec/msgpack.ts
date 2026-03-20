@@ -1,5 +1,5 @@
 /**
- * MessagePack codec for Katman binary protocol.
+ * MessagePack codec for Silgi binary protocol.
  *
  * 2-4x faster encoding, ~50% smaller payloads vs JSON.
  * No competitor (oRPC, tRPC, Hono) offers binary transport.

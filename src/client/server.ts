@@ -6,7 +6,7 @@
  *
  * @example
  * ```ts
- * import { createServerClient } from "katman/client/server"
+ * import { createServerClient } from "silgi/client/server"
  *
  * const client = createServerClient(appRouter, {
  *   context: () => ({ db: getDB() }),

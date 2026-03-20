@@ -11,7 +11,7 @@ When procedures receive GET requests, all values arrive as strings from the quer
 
 ```ts twoslash
 // @noErrors
-import { coerceGuard } from 'katman/plugins'
+import { coerceGuard } from 'silgi/plugins'
 
 const getUser = k
   .$use(coerceGuard)
@@ -43,7 +43,7 @@ The coercion functions are also exported for use outside of guards:
 
 ```ts twoslash
 // @noErrors
-import { coerceValue, coerceObject } from 'katman/plugins'
+import { coerceValue, coerceObject } from 'silgi/plugins'
 
 coerceValue('42') // 42
 coerceValue('true') // true

@@ -1,7 +1,7 @@
 import { appRouter } from '$lib/server/rpc'
-import { katmanSvelteKit } from 'katman/sveltekit'
+import { silgiSvelteKit } from 'silgi/sveltekit'
 
-const handler = katmanSvelteKit(appRouter, {
+const handler = silgiSvelteKit(appRouter, {
   prefix: '/api/rpc',
   context: () => ({ db: 'sveltekit-db' }),
 })

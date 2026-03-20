@@ -7,7 +7,7 @@ import { Callout } from 'fumadocs-ui/components/callout'
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 import { Step, Steps } from 'fumadocs-ui/components/steps'
 
-Katman gives you two ways to run your API: `serve()` for a quick Node.js server, and `handler()` for any runtime that supports the Fetch API (Bun, Deno, Cloudflare Workers, etc.).
+Silgi gives you two ways to run your API: `serve()` for a quick Node.js server, and `handler()` for any runtime that supports the Fetch API (Bun, Deno, Cloudflare Workers, etc.).
 
 ## serve()
 
@@ -15,10 +15,10 @@ The simplest way to get a server running. One call, and you have an HTTP server 
 
 ```ts twoslash
 // @noErrors
-import { katman } from 'katman'
+import { silgi } from 'silgi'
 import { z } from 'zod'
 
-const k = katman({
+const k = silgi({
   context: (req) => ({ db: getDB() }),
 })
 
@@ -34,7 +34,7 @@ k.serve(appRouter, {
 Run it with `npx tsx src/server.ts` and you'll see:
 
 ```
-Katman server running at http://127.0.0.1:3000
+Silgi server running at http://127.0.0.1:3000
 ```
 
 ### All options
@@ -56,7 +56,7 @@ k.serve(appRouter, {
 
 | Option     | Type                       | Default       | Description                                                                                   |
 | ---------- | -------------------------- | ------------- | --------------------------------------------------------------------------------------------- |
-| `port`     | `number`                   | `3000`        | Port to listen on. If it's taken, Katman automatically picks the next free port in 3000-3100. |
+| `port`     | `number`                   | `3000`        | Port to listen on. If it's taken, Silgi automatically picks the next free port in 3000-3100. |
 | `hostname` | `string`                   | `"127.0.0.1"` | Network interface. Use `"0.0.0.0"` to accept connections from other machines.                 |
 | `scalar`   | `boolean \| ScalarOptions` | `false`       | Enable auto-generated API docs at `/reference`.                                               |
 | `ws`       | `boolean`                  | `false`       | Enable WebSocket RPC on the same port.                                                        |
@@ -68,7 +68,7 @@ If your requested port is already in use, `serve()` finds the next available one
 
 ## handler()
 
-For runtimes other than Node.js, or when you want to plug Katman into an existing server, use `handler()`. It returns a standard Fetch API function: `(Request) => Promise<Response>`.
+For runtimes other than Node.js, or when you want to plug Silgi into an existing server, use `handler()`. It returns a standard Fetch API function: `(Request) => Promise<Response>`.
 
 ```ts twoslash
 // @noErrors
@@ -131,7 +131,7 @@ The server also checks `Content-Type` on incoming POST requests to decode the bo
 
 ## Scalar API docs
 
-Katman can generate an OpenAPI 3.1.0 spec from your router and serve an interactive API reference powered by [Scalar](https://scalar.com):
+Silgi can generate an OpenAPI 3.1.0 spec from your router and serve an interactive API reference powered by [Scalar](https://scalar.com):
 
 ```ts twoslash
 // @noErrors
@@ -157,7 +157,7 @@ Pass an options object instead of `true`:
 k.serve(appRouter, {
   scalar: {
     title: 'My API',
-    description: 'Built with Katman',
+    description: 'Built with Silgi',
     version: '2.0.0',
     servers: [{ url: 'https://api.example.com' }],
     contact: { email: 'dev@example.com' },
@@ -188,7 +188,7 @@ k.serve(appRouter, {
 | Custom URL        | Any URL string, e.g. `'/assets/scalar.js'` for self-hosting     |
 
 <Callout>
-  The `'local'` option requires `@scalar/api-reference` as a dependency. If the package is not found, Katman falls back
+  The `'local'` option requires `@scalar/api-reference` as a dependency. If the package is not found, Silgi falls back
   to CDN with a warning.
 </Callout>
 
@@ -269,7 +269,7 @@ k.serve(appRouter, {
 Output:
 
 ```
-Katman server running at https://127.0.0.1:443
+Silgi server running at https://127.0.0.1:443
   HTTP/2 enabled (with HTTP/1.1 fallback)
 ```
 
@@ -293,7 +293,7 @@ k.serve(appRouter, {
 ```
 
 ```
-Katman server running at http://127.0.0.1:3000
+Silgi server running at http://127.0.0.1:3000
   WebSocket RPC at ws://127.0.0.1:3000
 ```
 
@@ -301,11 +301,11 @@ HTTP and WebSocket share the same port. The server detects WebSocket upgrade req
 
 ## Lifecycle hooks
 
-Katman fires hooks at key points during request processing. Register them in the `hooks` option when creating the instance:
+Silgi fires hooks at key points during request processing. Register them in the `hooks` option when creating the instance:
 
 ```ts twoslash
 // @noErrors
-const k = katman({
+const k = silgi({
   context: (req) => ({ db: getDB() }),
   hooks: {
     request: ({ path, input }) => {
@@ -370,7 +370,7 @@ const downloadPdf = k.$input(z.object({ id: z.string() })).$resolve(async ({ inp
 
 ### Returning a ReadableStream
 
-Return a `ReadableStream` for binary streaming. Katman sends it with `application/octet-stream`:
+Return a `ReadableStream` for binary streaming. Silgi sends it with `application/octet-stream`:
 
 ```ts twoslash
 // @noErrors
@@ -398,7 +398,7 @@ For server-side code where you need to call a procedure directly — without HTT
 
 ```ts twoslash
 // @noErrors
-import { callable } from 'katman'
+import { callable } from 'silgi'
 
 const getUsers = k
   .$input(z.object({ limit: z.number().optional() }))
@@ -418,6 +418,6 @@ The compiled pipeline (guards, wraps, validation) runs exactly as it would throu
 
 - [Client](/docs/client) — connect to your server from the browser or another service
 - [Middleware](/docs/middleware) — guards and wraps that run inside your request pipeline
-- [Fastify integration](/docs/integrations/fastify) — mount Katman inside an existing Fastify app
+- [Fastify integration](/docs/integrations/fastify) — mount Silgi inside an existing Fastify app
 - [Plugins](/docs/plugins) — add CORS, logging, rate limiting, and tracing
 - [Protocols](/docs/protocols) — learn about JSON, MessagePack, devalue, and WebSocket

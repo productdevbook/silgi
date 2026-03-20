@@ -3,18 +3,18 @@ import { createServer } from 'node:http'
 import { describe, it, expect, afterAll } from 'vitest'
 import { z } from 'zod'
 
-import { katman, KatmanError } from '#src/katman.ts'
+import { silgi, SilgiError } from '#src/silgi.ts'
 
 import type { Server } from 'node:http'
 
-const k = katman({ context: () => ({ db: 'test' }) })
+const k = silgi({ context: () => ({ db: 'test' }) })
 
 const testRouter = k.router({
   health: k.$resolve(() => ({ status: 'ok' })),
   echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
   greet: k.$input(z.object({ name: z.string() })).$resolve(({ input }) => ({ hello: input.name })),
   fail: k.$resolve(() => {
-    throw new KatmanError('NOT_FOUND', { message: 'nope' })
+    throw new SilgiError('NOT_FOUND', { message: 'nope' })
   }),
 })
 
@@ -38,7 +38,7 @@ async function post(url: string, body?: unknown): Promise<{ status: number; data
   return { status: res.status, data: await res.json() }
 }
 
-describe('katmanH3() — real H3', () => {
+describe('silgiH3() — real H3', () => {
   let url: string
   let close: () => void
 
@@ -46,10 +46,10 @@ describe('katmanH3() — real H3', () => {
 
   it('starts and handles requests', async () => {
     const { H3 } = await import('h3')
-    const { katmanH3 } = await import('#src/adapters/h3.ts')
+    const { silgiH3 } = await import('#src/adapters/h3.ts')
 
     const app = new H3()
-    const handler = katmanH3(testRouter, { prefix: '/rpc' })
+    const handler = silgiH3(testRouter, { prefix: '/rpc' })
     app.all('/rpc/**', (event: any) => handler(event))
 
     const server = createServer(async (req, res) => {

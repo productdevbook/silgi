@@ -7,7 +7,7 @@
  * @example
  * ```ts
  * // Server (SSR)
- * import { prefetchQueries, dehydrate } from "katman/tanstack-query/ssr"
+ * import { prefetchQueries, dehydrate } from "silgi/tanstack-query/ssr"
  *
  * const queryClient = new QueryClient()
  * await prefetchQueries(queryClient, utils, [
@@ -37,7 +37,7 @@ export async function prefetchQueries(
 
 /**
  * Dehydrate the query client for SSR transfer.
- * Wraps TanStack Query's dehydrate with Katman-aware serialization.
+ * Wraps TanStack Query's dehydrate with Silgi-aware serialization.
  */
 export function dehydrate(queryClient: any): unknown {
   // Use TanStack Query's built-in dehydrate
@@ -58,7 +58,7 @@ export function dehydrate(queryClient: any): unknown {
 
 /**
  * Create a custom serializer for SSR hydration that handles
- * Katman-specific types (Date, Map, etc.) during dehydration.
+ * Silgi-specific types (Date, Map, etc.) during dehydration.
  */
 export function createSSRSerializer() {
   return {

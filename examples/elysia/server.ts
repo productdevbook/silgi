@@ -1,9 +1,9 @@
 import { Elysia } from 'elysia'
-import { katman } from 'katman'
-import { katmanElysia } from 'katman/elysia'
+import { silgi } from 'silgi'
+import { silgiElysia } from 'silgi/elysia'
 import { z } from 'zod'
 
-const k = katman({ context: () => ({ db: 'elysia-db' }) })
+const k = silgi({ context: () => ({ db: 'elysia-db' }) })
 
 const appRouter = k.router({
   health: k.$resolve(() => ({ status: 'ok', framework: 'elysia' })),
@@ -12,8 +12,8 @@ const appRouter = k.router({
 })
 
 const app = new Elysia()
-  .get('/', () => ({ name: 'Katman + Elysia', docs: '/rpc/health' }))
-  .use(katmanElysia(appRouter, { prefix: '/rpc' }))
+  .get('/', () => ({ name: 'Silgi + Elysia', docs: '/rpc/health' }))
+  .use(silgiElysia(appRouter, { prefix: '/rpc' }))
   .listen(3000)
 
-console.log(`Katman + Elysia running at http://localhost:${app.server?.port}`)
+console.log(`Silgi + Elysia running at http://localhost:${app.server?.port}`)

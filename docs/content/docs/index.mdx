@@ -1,27 +1,27 @@
 ---
 title: Introduction
-description: What is Katman and why should you use it?
+description: What is Silgi and why should you use it?
 ---
 
 import { Cards, Card } from 'fumadocs-ui/components/card'
 
-## What is Katman?
+## What is Silgi?
 
-Katman is a TypeScript library that lets you build APIs with full type safety from the server all the way to the client. You define your API procedures once, and TypeScript makes sure everything is connected correctly — inputs, outputs, errors, and context.
+Silgi is a TypeScript library that lets you build APIs with full type safety from the server all the way to the client. You define your API procedures once, and TypeScript makes sure everything is connected correctly — inputs, outputs, errors, and context.
 
 The name comes from the Turkish word for "layer". The idea is simple: you build your API in clean, composable layers. Each layer has one job.
 
 ## How does it work?
 
-You write functions on the server. Katman compiles them into a fast pipeline at startup. Then you call those functions from the client with full autocomplete — no code generation, no manual type definitions.
+You write functions on the server. Silgi compiles them into a fast pipeline at startup. Then you call those functions from the client with full autocomplete — no code generation, no manual type definitions.
 
 ```ts twoslash
 // @noErrors
-import { katman } from 'katman'
+import { silgi } from 'silgi'
 import { z } from 'zod'
 
 // 1. Create an instance
-const k = katman({
+const k = silgi({
   context: (req) => ({ db: getDB() }),
 })
 
@@ -41,18 +41,18 @@ That's it. The client gets full types automatically.
 
 ## Key ideas
 
-**Single package.** You install one thing: `katman`. Server, client, plugins, codecs — all included. No juggling five scoped packages.
+**Single package.** You install one thing: `silgi`. Server, client, plugins, codecs — all included. No juggling five scoped packages.
 
-**Standard Schema.** Katman doesn't lock you into Zod. It uses the Standard Schema spec, so Valibot and ArkType work too.
+**Standard Schema.** Silgi doesn't lock you into Zod. It uses the Standard Schema spec, so Valibot and ArkType work too.
 
-**Compiled pipeline.** When your server starts, Katman pre-links all your middleware into a direct function chain. No closures are created per request.
+**Compiled pipeline.** When your server starts, Silgi pre-links all your middleware into a direct function chain. No closures are created per request.
 
 **Multiple protocols.** JSON by default, MessagePack for binary, devalue for rich types like Date and Map. The server picks the right format based on what the client asks for.
 
 ## Next steps
 
 <Cards>
-  <Card title='Getting Started' description='Install Katman and build your first API.' href='/docs/getting-started' />
+  <Card title='Getting Started' description='Install Silgi and build your first API.' href='/docs/getting-started' />
   <Card title='Core Concepts' description='Understand procedures, guards, wraps, and hooks.' href='/docs/concepts' />
   <Card title='Server' description='Learn about serve(), handler(), and deployment.' href='/docs/server' />
   <Card title='Client' description='Set up the type-safe client.' href='/docs/client' />

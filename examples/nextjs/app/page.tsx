@@ -25,7 +25,7 @@ export default function Home() {
 
   return (
     <main style={{ padding: '2rem', fontFamily: 'system-ui' }}>
-      <h1>Katman + Next.js</h1>
+      <h1>Silgi + Next.js</h1>
       <p>Health: {health ? `${health.status} (${health.framework})` : 'loading...'}</p>
       <div style={{ marginTop: '1rem' }}>
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder='Enter your name' />

@@ -5,7 +5,7 @@ description: Create reusable guards, wraps, and hooks.
 
 import { Callout } from 'fumadocs-ui/components/callout'
 
-Katman has no special plugin API. A "plugin" is a guard, a wrap, a set of lifecycle hooks, or a combination — packaged for reuse. This page shows how to build and share your own.
+Silgi has no special plugin API. A "plugin" is a guard, a wrap, a set of lifecycle hooks, or a combination — packaged for reuse. This page shows how to build and share your own.
 
 ## Custom guard — tenant isolation
 
@@ -13,9 +13,9 @@ A guard that reads a tenant ID from the request and adds it to the context. Ever
 
 ```ts twoslash
 // @noErrors
-import { katman, KatmanError } from 'katman'
+import { silgi, SilgiError } from 'silgi'
 
-const k = katman({
+const k = silgi({
   context: (req) => ({
     headers: Object.fromEntries(req.headers),
   }),
@@ -25,12 +25,12 @@ const k = katman({
 export const tenantGuard = k.guard(async (ctx) => {
   const tenantId = ctx.headers['x-tenant-id']
   if (!tenantId) {
-    throw new KatmanError('BAD_REQUEST', { message: 'Missing X-Tenant-Id header' })
+    throw new SilgiError('BAD_REQUEST', { message: 'Missing X-Tenant-Id header' })
   }
 
   const tenant = await db.tenants.findById(tenantId)
   if (!tenant) {
-    throw new KatmanError('NOT_FOUND', { message: 'Tenant not found' })
+    throw new SilgiError('NOT_FOUND', { message: 'Tenant not found' })
   }
 
   return { tenant } // ctx.tenant is now typed
@@ -62,7 +62,7 @@ export function createTenantGuard(options: { headerName?: string; required?: boo
     const tenantId = ctx.headers[header]
 
     if (!tenantId && options.required !== false) {
-      throw new KatmanError('BAD_REQUEST', {
+      throw new SilgiError('BAD_REQUEST', {
         message: `Missing ${header} header`,
       })
     }
@@ -130,7 +130,7 @@ For cross-cutting concerns that apply to every procedure, lifecycle hooks are cl
 
 ```ts twoslash
 // @noErrors
-import { lifecycleWrap } from 'katman'
+import { lifecycleWrap } from 'silgi'
 
 export function createMetricsPlugin(metrics: MetricsClient) {
   return lifecycleWrap({
@@ -160,7 +160,7 @@ Or apply it globally via instance-level hooks:
 
 ```ts twoslash
 // @noErrors
-const k = katman({
+const k = silgi({
   context: (req) => ({ db: getDB() }),
   hooks: {
     request: () => metrics.increment('rpc.requests'),
@@ -217,16 +217,16 @@ const deleteUser = k.$use(auth, auditGuard, auditWrap).$resolve(({ input, ctx })
 
 If you want to publish your plugin as an npm package:
 
-1. Export factory functions, not instances — let consumers pass their own `katman` instance or options
+1. Export factory functions, not instances — let consumers pass their own `silgi` instance or options
 2. Use TypeScript generics so the guard/wrap types compose with any context
 3. Document what the plugin adds to `ctx` and what it expects
 
 ```ts twoslash
 // @noErrors
-// katman-plugin-tenant/index.ts
-import type { KatmanInstance } from 'katman'
+// silgi-plugin-tenant/index.ts
+import type { SilgiInstance } from 'silgi'
 
-export function createTenantPlugin<T extends KatmanInstance>(k: T) {
+export function createTenantPlugin<T extends SilgiInstance>(k: T) {
   const tenantGuard = k.guard(async (ctx) => {
     // ...
     return { tenant }
@@ -240,7 +240,7 @@ Consumers install and use it:
 
 ```ts twoslash
 // @noErrors
-import { createTenantPlugin } from 'katman-plugin-tenant'
+import { createTenantPlugin } from 'silgi-plugin-tenant'
 
 const { tenantGuard } = createTenantPlugin(k)
 ```

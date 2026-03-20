@@ -11,7 +11,7 @@ The batch handler processes multiple procedure calls in one HTTP round-trip. It 
 
 ```ts twoslash
 // @noErrors
-import { createBatchHandler } from 'katman/plugins'
+import { createBatchHandler } from 'silgi/plugins'
 
 const batchHandler = createBatchHandler(appRouter, {
   context: (req) => ({ db: getDB() }),
@@ -81,7 +81,7 @@ Use `BatchLink` from the client plugins:
 
 ```ts twoslash
 // @noErrors
-import { BatchLink } from 'katman/client/plugins'
+import { BatchLink } from 'silgi/client/plugins'
 
 const link = new BatchLink({
   url: 'http://localhost:3000',

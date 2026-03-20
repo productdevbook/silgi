@@ -6,7 +6,7 @@
  *
  * @example
  * ```ts
- * import { DynamicLink } from "katman/client"
+ * import { DynamicLink } from "silgi/client"
  *
  * const link = new DynamicLink((path, input, options) => {
  *   if (options.context?.cache) return cachedLink

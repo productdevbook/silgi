@@ -1,6 +1,6 @@
 ---
 title: Peer-to-Peer
-description: Bidirectional RPC between two Katman instances — Electron, Web Workers, browser extensions.
+description: Bidirectional RPC between two Silgi instances — Electron, Web Workers, browser extensions.
 ---
 
 Two peers that can call each other's procedures simultaneously. Uses MessagePort or any bidirectional channel.
@@ -9,7 +9,7 @@ Two peers that can call each other's procedures simultaneously. Uses MessagePort
 
 ```ts twoslash
 // @noErrors
-import { createPeer } from 'katman/peer'
+import { createPeer } from 'silgi/peer'
 
 // Peer A (e.g., Electron main process)
 const peerA = createPeer(mainRouter, channel.port1)

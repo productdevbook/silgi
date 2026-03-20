@@ -1,16 +1,16 @@
 ---
 title: OpenAPI Client
-description: Consume any OpenAPI endpoint as a typed Katman client.
+description: Consume any OpenAPI endpoint as a typed Silgi client.
 ---
 
-Use `OpenAPILink` to consume any OpenAPI-described API through the Katman client interface. Bring your own spec — Katman maps operations to procedure calls.
+Use `OpenAPILink` to consume any OpenAPI-described API through the Silgi client interface. Bring your own spec — Silgi maps operations to procedure calls.
 
 ## Setup
 
 ```ts twoslash
 // @noErrors
-import { OpenAPILink } from 'katman/client/openapi'
-import { createClient } from 'katman/client'
+import { OpenAPILink } from 'silgi/client/openapi'
+import { createClient } from 'silgi/client'
 import type { PetStore } from './petstore.types' // generated types
 
 const client = createClient<PetStore>({

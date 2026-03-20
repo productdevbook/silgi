@@ -6,7 +6,7 @@
  *
  * @example
  * ```ts
- * import { lazy } from "katman"
+ * import { lazy } from "silgi"
  *
  * const appRouter = k.router({
  *   users: lazy(() => import("./routes/users.ts")),

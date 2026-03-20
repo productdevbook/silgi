@@ -1,24 +1,24 @@
 <p align="center">
   <br>
-  <img src=".github/assets/cover.png" alt="Katman — Type-safe RPC framework for TypeScript" width="100%">
+  <img src=".github/assets/cover.png" alt="Silgi — Type-safe RPC framework for TypeScript" width="100%">
   <br><br>
-  <a href="https://npmjs.com/package/katman"><img src="https://img.shields.io/npm/v/katman?style=flat&colorA=0a0908&colorB=edc462" alt="npm version"></a>
-  <a href="https://npmjs.com/package/katman"><img src="https://img.shields.io/npm/dm/katman?style=flat&colorA=0a0908&colorB=edc462" alt="npm downloads"></a>
-  <a href="https://github.com/productdevbook/katman/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/productdevbook/katman/ci.yml?style=flat&colorA=0a0908&colorB=edc462" alt="CI"></a>
-  <a href="https://github.com/productdevbook/katman/blob/main/LICENSE"><img src="https://img.shields.io/github/license/productdevbook/katman?style=flat&colorA=0a0908&colorB=edc462" alt="license"></a>
+  <a href="https://npmjs.com/package/silgi"><img src="https://img.shields.io/npm/v/silgi?style=flat&colorA=0a0908&colorB=edc462" alt="npm version"></a>
+  <a href="https://npmjs.com/package/silgi"><img src="https://img.shields.io/npm/dm/silgi?style=flat&colorA=0a0908&colorB=edc462" alt="npm downloads"></a>
+  <a href="https://github.com/productdevbook/silgi/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/productdevbook/silgi/ci.yml?style=flat&colorA=0a0908&colorB=edc462" alt="CI"></a>
+  <a href="https://github.com/productdevbook/silgi/blob/main/LICENSE"><img src="https://img.shields.io/github/license/productdevbook/silgi?style=flat&colorA=0a0908&colorB=edc462" alt="license"></a>
 </p>
 
 ## Quick Start
 
 ```bash
-npm install katman
+npm install silgi
 ```
 
 ```ts
-import { katman } from 'katman'
+import { silgi } from 'silgi'
 import { z } from 'zod'
 
-const k = katman({ context: (req) => ({ db: getDB() }) })
+const k = silgi({ context: (req) => ({ db: getDB() }) })
 
 const appRouter = k.router({
   users: {
@@ -45,21 +45,21 @@ k.serve(appRouter, { port: 3000, scalar: true })
 | | Import |
 |---|---|
 | Standalone | `k.serve()` / `k.handler()` |
-| Nitro v3 | `katman/nitro` |
-| H3 v2 | `katman/h3` |
-| Hono | `katman/hono` |
-| Express | `katman/express` |
-| Fastify | `katman/fastify` |
-| Elysia | `katman/elysia` |
-| Next.js | `katman/nextjs` |
-| Nuxt | via `katman/nitro` |
-| SvelteKit | `katman/sveltekit` |
-| Remix | `katman/remix` |
-| Astro | `katman/astro` |
-| SolidStart | `katman/solidstart` |
-| NestJS | `katman/nestjs` |
-| AWS Lambda | `katman/aws-lambda` |
-| MessagePort | `katman/message-port` |
+| Nitro v3 | `silgi/nitro` |
+| H3 v2 | `silgi/h3` |
+| Hono | `silgi/hono` |
+| Express | `silgi/express` |
+| Fastify | `silgi/fastify` |
+| Elysia | `silgi/elysia` |
+| Next.js | `silgi/nextjs` |
+| Nuxt | via `silgi/nitro` |
+| SvelteKit | `silgi/sveltekit` |
+| Remix | `silgi/remix` |
+| Astro | `silgi/astro` |
+| SolidStart | `silgi/solidstart` |
+| NestJS | `silgi/nestjs` |
+| AWS Lambda | `silgi/aws-lambda` |
+| MessagePort | `silgi/message-port` |
 
 ## Integrations
 
@@ -71,17 +71,17 @@ k.serve(appRouter, { port: 3000, scalar: true })
 ## Examples
 
 ```bash
-npx giget@latest gh:productdevbook/katman/examples/standalone my-app
-npx giget@latest gh:productdevbook/katman/examples/hono my-hono-app
-npx giget@latest gh:productdevbook/katman/examples/nextjs my-nextjs-app
-npx giget@latest gh:productdevbook/katman/examples/nuxt my-nuxt-app
+npx giget@latest gh:productdevbook/silgi/examples/standalone my-app
+npx giget@latest gh:productdevbook/silgi/examples/hono my-hono-app
+npx giget@latest gh:productdevbook/silgi/examples/nextjs my-nextjs-app
+npx giget@latest gh:productdevbook/silgi/examples/nuxt my-nuxt-app
 ```
 
 10 examples: standalone, hono, express, elysia, nitro, nitro-h3, nextjs, nuxt, sveltekit, client-react.
 
 ## Documentation
 
-[katman.silgi.dev](https://katman.silgi.dev)
+[silgi.silgi.dev](https://silgi.silgi.dev)
 
 ## Credits
 

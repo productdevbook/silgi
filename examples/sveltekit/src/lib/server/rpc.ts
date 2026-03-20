@@ -1,7 +1,7 @@
-import { katman } from 'katman'
+import { silgi } from 'silgi'
 import { z } from 'zod'
 
-const k = katman({ context: () => ({ db: 'sveltekit-db' }) })
+const k = silgi({ context: () => ({ db: 'sveltekit-db' }) })
 
 export const appRouter = k.router({
   health: k.$resolve(() => ({ status: 'ok', framework: 'sveltekit' })),

@@ -6,7 +6,7 @@ import { queryUtils, client } from './client'
 export default function App() {
   const [name, setName] = useState('World')
 
-  // Use Katman TanStack Query utils for type-safe queries
+  // Use Silgi TanStack Query utils for type-safe queries
   const health = useQuery(queryUtils.health.queryOptions({ input: undefined as never }))
 
   const echo = useQuery(queryUtils.echo.queryOptions({ input: { msg: 'Hello from React!' } }))
@@ -18,8 +18,8 @@ export default function App() {
 
   return (
     <main style={{ padding: '2rem', fontFamily: 'system-ui', maxWidth: 600 }}>
-      <h1>Katman React Client</h1>
-      <p style={{ color: '#666' }}>Connects to any Katman server (standalone, Hono, Express, etc.)</p>
+      <h1>Silgi React Client</h1>
+      <p style={{ color: '#666' }}>Connects to any Silgi server (standalone, Hono, Express, etc.)</p>
 
       <section style={{ marginTop: '1.5rem' }}>
         <h2>Health</h2>

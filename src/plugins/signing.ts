@@ -5,7 +5,7 @@
  *
  * @example
  * ```ts
- * import { sign, unsign, encrypt, decrypt } from "katman/plugins"
+ * import { sign, unsign, encrypt, decrypt } from "silgi/plugins"
  *
  * // Sign a value (tamper-proof)
  * const signed = await sign("user:123", "my-secret")

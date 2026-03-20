@@ -1,12 +1,12 @@
 ---
 title: Protocols
-description: Katman supports three wire formats — JSON, MessagePack, and devalue — plus WebSocket for persistent connections.
+description: Silgi supports three wire formats — JSON, MessagePack, and devalue — plus WebSocket for persistent connections.
 ---
 
 import { Cards, Card } from 'fumadocs-ui/components/card'
 import { Callout } from 'fumadocs-ui/components/callout'
 
-When a client sends a request, the server needs to agree on how to encode the data. Katman handles this automatically through **content negotiation** — the client says what format it wants via the `Accept` header, and the server responds accordingly. No configuration needed.
+When a client sends a request, the server needs to agree on how to encode the data. Silgi handles this automatically through **content negotiation** — the client says what format it wants via the `Accept` header, and the server responds accordingly. No configuration needed.
 
 ## The three formats
 
@@ -32,13 +32,13 @@ Accept: application/x-msgpack         --> MessagePack
 Accept: application/x-devalue+json    --> devalue
 ```
 
-For request bodies, the server checks `Content-Type` and decodes accordingly. This all happens inside Katman — you don't need to configure anything on the server.
+For request bodies, the server checks `Content-Type` and decodes accordingly. This all happens inside Silgi — you don't need to configure anything on the server.
 
 On the client side, setting `binary: true` in `createLink` switches to MessagePack automatically:
 
 ```ts twoslash
 // @noErrors
-import { createLink } from 'katman/client/ofetch'
+import { createLink } from 'silgi/client/ofetch'
 
 const link = createLink({
   url: 'http://localhost:3000',

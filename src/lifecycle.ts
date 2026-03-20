@@ -6,7 +6,7 @@
  *
  * @example
  * ```ts
- * import { lifecycleWrap } from "katman"
+ * import { lifecycleWrap } from "silgi"
  *
  * const logging = lifecycleWrap({
  *   onStart: () => console.log("procedure started"),

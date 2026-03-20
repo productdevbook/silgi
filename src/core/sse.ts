@@ -14,7 +14,7 @@ import { AsyncIteratorClass } from './iterator.ts'
 
 // === Event Metadata ===
 
-const EVENT_META_SYMBOL = Symbol.for('katman.event.meta')
+const EVENT_META_SYMBOL = Symbol.for('silgi.event.meta')
 
 export interface EventMeta {
   id?: string

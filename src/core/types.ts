@@ -1,5 +1,5 @@
 /**
- * Core type definitions for Katman RPC framework.
+ * Core type definitions for Silgi RPC framework.
  */
 
 export type Context = Record<PropertyKey, unknown>

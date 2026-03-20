@@ -5,12 +5,12 @@
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
 
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 
 // ── Setup ──────────────────────────────────────────
 
-function createApp(hooks?: Parameters<typeof katman>[0]['hooks']) {
-  const k = katman({
+function createApp(hooks?: Parameters<typeof silgi>[0]['hooks']) {
+  const k = silgi({
     context: () => ({ db: true }),
     hooks,
   })

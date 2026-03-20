@@ -13,7 +13,7 @@
  */
 
 import { analyzeHandler } from './analyze.ts'
-import { KatmanError } from './core/error.ts'
+import { SilgiError } from './core/error.ts'
 import { validateSchema } from './core/schema.ts'
 import { compileStringify } from './fast-stringify.ts'
 
@@ -48,12 +48,12 @@ function createFail(errors: ErrorDef): (code: string, data?: unknown) => never {
     const status = typeof def === 'number' ? def : (def?.status ?? 500)
     const message =
       typeof def === 'object' && def !== null && 'message' in def ? (def as { message?: string }).message : undefined
-    throw new KatmanError(code, { status, message, data, defined: true })
+    throw new SilgiError(code, { status, message, data, defined: true })
   }
 }
 
 function noopFail(code: string, data?: unknown): never {
-  throw new KatmanError(code, { data, defined: false })
+  throw new SilgiError(code, { data, defined: false })
 }
 
 // ── Guard Application (inline, no closure) ──────────

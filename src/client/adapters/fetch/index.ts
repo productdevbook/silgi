@@ -2,7 +2,7 @@
  * Fetch transport — HTTP client for browser and Node.js.
  */
 
-import { KatmanError, isKatmanErrorJSON, fromKatmanErrorJSON, isErrorStatus } from '../../../core/error.ts'
+import { SilgiError, isSilgiErrorJSON, fromSilgiErrorJSON, isErrorStatus } from '../../../core/error.ts'
 import { stringifyJSON, parseEmptyableJSON } from '../../../core/utils.ts'
 
 import type { ClientLink, ClientContext, ClientOptions } from '../../types.ts'
@@ -73,10 +73,10 @@ export class RPCLink<TClientContext extends ClientContext = ClientContext> imple
     const responseBody = responseText ? parseEmptyableJSON(responseText) : undefined
 
     if (isErrorStatus(response.status)) {
-      if (isKatmanErrorJSON(responseBody)) {
-        throw fromKatmanErrorJSON(responseBody)
+      if (isSilgiErrorJSON(responseBody)) {
+        throw fromSilgiErrorJSON(responseBody)
       }
-      throw new KatmanError('INTERNAL_SERVER_ERROR', {
+      throw new SilgiError('INTERNAL_SERVER_ERROR', {
         status: response.status,
         message: `HTTP ${response.status}`,
         data: responseBody,

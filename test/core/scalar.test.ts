@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
 
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 import { scalarHTML, generateOpenAPI, resolveScalarLocal } from '#src/scalar.ts'
 
 describe('scalarHTML', () => {
@@ -41,18 +41,18 @@ describe('scalarHTML', () => {
   })
 
   it('uses custom title', () => {
-    const html = scalarHTML('/spec.json', { title: 'Katman Playground' })
-    expect(html).toContain('<title>Katman Playground — Scalar</title>')
+    const html = scalarHTML('/spec.json', { title: 'Silgi Playground' })
+    expect(html).toContain('<title>Silgi Playground — Scalar</title>')
   })
 
-  it('defaults title to Katman API', () => {
+  it('defaults title to Silgi API', () => {
     const html = scalarHTML('/spec.json')
-    expect(html).toContain('<title>Katman API — Scalar</title>')
+    expect(html).toContain('<title>Silgi API — Scalar</title>')
   })
 
-  it('cdn: "local" — points to /__katman/scalar.js', () => {
+  it('cdn: "local" — points to /__silgi/scalar.js', () => {
     const html = scalarHTML('/openapi.json', { cdn: 'local' })
-    expect(html).toContain('src="/__katman/scalar.js"')
+    expect(html).toContain('src="/__silgi/scalar.js"')
     expect(html).not.toContain('jsdelivr')
     expect(html).not.toContain('unpkg')
   })
@@ -67,7 +67,7 @@ describe('resolveScalarLocal', () => {
 })
 
 describe('generateOpenAPI', () => {
-  const k = katman({ context: () => ({}) })
+  const k = silgi({ context: () => ({}) })
 
   it('generates valid OpenAPI 3.1.0 doc', () => {
     const router = k.router({
@@ -75,7 +75,7 @@ describe('generateOpenAPI', () => {
     })
     const spec = generateOpenAPI(router)
     expect(spec.openapi).toBe('3.1.0')
-    expect((spec.info as any).title).toBe('Katman API')
+    expect((spec.info as any).title).toBe('Silgi API')
   })
 
   it('includes error responses in spec', () => {

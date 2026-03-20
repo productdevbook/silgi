@@ -14,7 +14,7 @@ import nodeAdapter from 'crossws/adapters/node'
 
 import { encode as msgpackEncode, decode as msgpackDecode } from './codec/msgpack.ts'
 import { compileRouter } from './compile.ts'
-import { KatmanError, toKatmanError } from './core/error.ts'
+import { SilgiError, toSilgiError } from './core/error.ts'
 import { stringifyJSON } from './core/utils.ts'
 
 import type { FlatRouter } from './compile.ts'
@@ -39,7 +39,7 @@ interface RPCRequest {
  * @example
  * ```ts
  * import { createServer } from "node:http";
- * import { attachWebSocket } from "katman/ws";
+ * import { attachWebSocket } from "silgi/ws";
  *
  * const server = createServer(httpHandler);
  * attachWebSocket(server, appRouter);
@@ -106,7 +106,7 @@ export function attachWebSocket(server: HttpServer, routerDef: RouterDef, option
               }
               send(peer, { id, data: null, done: true })
             } catch (err) {
-              const e = err instanceof KatmanError ? err : toKatmanError(err)
+              const e = err instanceof SilgiError ? err : toSilgiError(err)
               send(peer, { id, error: e.toJSON() })
             }
             return
@@ -115,7 +115,7 @@ export function attachWebSocket(server: HttpServer, routerDef: RouterDef, option
           // Single response
           send(peer, { id, result: output })
         } catch (err) {
-          const e = err instanceof KatmanError ? err : toKatmanError(err)
+          const e = err instanceof SilgiError ? err : toSilgiError(err)
           send(peer, { id, error: e.toJSON() })
         }
       },
@@ -125,7 +125,7 @@ export function attachWebSocket(server: HttpServer, routerDef: RouterDef, option
       },
 
       error(_peer, error) {
-        console.error('[katman:ws] error:', error)
+        console.error('[silgi:ws] error:', error)
       },
     },
   })

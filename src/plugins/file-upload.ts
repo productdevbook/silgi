@@ -6,7 +6,7 @@
  *
  * @example
  * ```ts
- * import { fileInput, fileGuard } from "katman/plugins"
+ * import { fileInput, fileGuard } from "silgi/plugins"
  *
  * const uploadAvatar = k
  *   .$use(fileGuard({ maxFileSize: 5 * 1024 * 1024, allowedTypes: ["image/*"] }))
@@ -18,7 +18,7 @@
  * ```
  */
 
-import { KatmanError } from '../core/error.ts'
+import { SilgiError } from '../core/error.ts'
 
 import type { GuardDef } from '../types.ts'
 
@@ -56,14 +56,14 @@ export function fileGuard(options: FileGuardOptions = {}): GuardDef<Record<strin
     fn: (ctx: Record<string, unknown>) => {
       const files = ctx.__files as UploadedFile[] | undefined
       if (!files || files.length === 0) {
-        throw new KatmanError('BAD_REQUEST', {
+        throw new SilgiError('BAD_REQUEST', {
           status: 400,
           message: 'No file uploaded',
         })
       }
 
       if (files.length > maxFiles) {
-        throw new KatmanError('BAD_REQUEST', {
+        throw new SilgiError('BAD_REQUEST', {
           status: 400,
           message: `Too many files: ${files.length} (max ${maxFiles})`,
         })
@@ -71,7 +71,7 @@ export function fileGuard(options: FileGuardOptions = {}): GuardDef<Record<strin
 
       for (const file of files) {
         if (file.size > maxFileSize) {
-          throw new KatmanError('PAYLOAD_TOO_LARGE', {
+          throw new SilgiError('PAYLOAD_TOO_LARGE', {
             status: 413,
             message: `File too large: ${file.size} bytes (max ${maxFileSize})`,
             data: { maxFileSize, actualSize: file.size, fileName: file.name },
@@ -79,7 +79,7 @@ export function fileGuard(options: FileGuardOptions = {}): GuardDef<Record<strin
         }
 
         if (allowedTypes && !matchesMimeType(file.type, allowedTypes)) {
-          throw new KatmanError('BAD_REQUEST', {
+          throw new SilgiError('BAD_REQUEST', {
             status: 400,
             message: `File type not allowed: ${file.type}`,
             data: { allowedTypes, actualType: file.type, fileName: file.name },

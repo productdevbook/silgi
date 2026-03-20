@@ -8,12 +8,12 @@
 import { ofetch, FetchError } from 'ofetch'
 
 import { encode as msgpackEncode, decode as msgpackDecode, MSGPACK_CONTENT_TYPE } from '../../../codec/msgpack.ts'
-import { KatmanError, isKatmanErrorJSON, fromKatmanErrorJSON, isErrorStatus } from '../../../core/error.ts'
+import { SilgiError, isSilgiErrorJSON, fromSilgiErrorJSON, isErrorStatus } from '../../../core/error.ts'
 
 import type { ClientLink, ClientContext, ClientOptions } from '../../types.ts'
 import type { FetchOptions, FetchContext } from 'ofetch'
 
-export interface KatmanLinkOptions<TClientContext extends ClientContext = ClientContext> {
+export interface SilgiLinkOptions<TClientContext extends ClientContext = ClientContext> {
   /** Server base URL (e.g. "http://localhost:3000") */
   url: string
 
@@ -40,12 +40,12 @@ export interface KatmanLinkOptions<TClientContext extends ClientContext = Client
 }
 
 /**
- * Create a Katman client link powered by ofetch.
+ * Create a Silgi client link powered by ofetch.
  *
  * @example
  * ```ts
- * import { createClient } from "katman/client"
- * import { createLink } from "katman/client/ofetch"
+ * import { createClient } from "silgi/client"
+ * import { createLink } from "silgi/client/ofetch"
  *
  * const link = createLink({ url: "http://localhost:3000" })
  * const client = createClient<AppRouter>(link)
@@ -53,7 +53,7 @@ export interface KatmanLinkOptions<TClientContext extends ClientContext = Client
  * ```
  */
 export function createLink<TClientContext extends ClientContext = ClientContext>(
-  options: KatmanLinkOptions<TClientContext>,
+  options: SilgiLinkOptions<TClientContext>,
 ): ClientLink<TClientContext> {
   const baseUrl = options.url.endsWith('/') ? options.url.slice(0, -1) : options.url
   const defaultTimeout = options.timeout ?? 30_000
@@ -115,22 +115,22 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
         // Decode response
         const decoded = binary ? msgpackDecode(new Uint8Array(data as ArrayBuffer)) : data
 
-        if (isKatmanErrorJSON(decoded)) {
-          throw fromKatmanErrorJSON(decoded as any)
+        if (isSilgiErrorJSON(decoded)) {
+          throw fromSilgiErrorJSON(decoded as any)
         }
 
         return decoded
       } catch (error) {
-        // Re-throw KatmanError as-is
-        if (error instanceof KatmanError) throw error
+        // Re-throw SilgiError as-is
+        if (error instanceof SilgiError) throw error
 
-        // Convert FetchError to KatmanError
+        // Convert FetchError to SilgiError
         if (error instanceof FetchError) {
           const responseData = error.data
-          if (isKatmanErrorJSON(responseData)) {
-            throw fromKatmanErrorJSON(responseData)
+          if (isSilgiErrorJSON(responseData)) {
+            throw fromSilgiErrorJSON(responseData)
           }
-          throw new KatmanError('INTERNAL_SERVER_ERROR', {
+          throw new SilgiError('INTERNAL_SERVER_ERROR', {
             status: error.status ?? 500,
             message: error.message,
             data: responseData,

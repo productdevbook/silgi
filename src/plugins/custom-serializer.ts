@@ -6,7 +6,7 @@
  *
  * @example
  * ```ts
- * import { createSerializer } from "katman/plugins"
+ * import { createSerializer } from "silgi/plugins"
  *
  * const serializer = createSerializer()
  *   .register("Date", {

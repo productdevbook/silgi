@@ -1,13 +1,13 @@
 /**
- * SvelteKit adapter — use Katman with SvelteKit API routes.
+ * SvelteKit adapter — use Silgi with SvelteKit API routes.
  *
  * @example
  * ```ts
  * // src/routes/api/rpc/[...path]/+server.ts
- * import { katmanSvelteKit } from "katman/sveltekit"
+ * import { silgiSvelteKit } from "silgi/sveltekit"
  * import { appRouter } from "$lib/server/rpc"
  *
- * const handler = katmanSvelteKit(appRouter, {
+ * const handler = silgiSvelteKit(appRouter, {
  *   context: (event) => ({ db: getDB(), user: event.locals.user }),
  * })
  *
@@ -29,9 +29,9 @@ export interface SvelteKitAdapterOptions<TCtx extends Record<string, unknown>> {
  * Create a SvelteKit request handler.
  *
  * SvelteKit passes a RequestEvent with `.request` (standard Request).
- * The handler uses Katman's handler() for full protocol support.
+ * The handler uses Silgi's handler() for full protocol support.
  */
-export function katmanSvelteKit<TCtx extends Record<string, unknown>>(
+export function silgiSvelteKit<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: SvelteKitAdapterOptions<TCtx> = {},
 ): (event: any) => Promise<Response> {
@@ -43,8 +43,8 @@ export function katmanSvelteKit<TCtx extends Record<string, unknown>>(
   return async (event: any): Promise<Response> => {
     _currentEvent = event
     if (!_handler) {
-      const { katman } = await import('../katman.ts')
-      const k = katman({
+      const { silgi } = await import('../silgi.ts')
+      const k = silgi({
         context: (_req: Request) => {
           if (options.context) return options.context(_currentEvent)
           return {} as TCtx

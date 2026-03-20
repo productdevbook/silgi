@@ -1,12 +1,12 @@
 ---
 title: Middleware
-description: Guards and wraps — the two kinds of middleware in Katman, when to use each, and how they execute.
+description: Guards and wraps — the two kinds of middleware in Silgi, when to use each, and how they execute.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 
-Middleware lets you run code before (and sometimes after) a procedure. Katman has two kinds: **guards** and **wraps**. They solve different problems, so understanding the difference is important.
+Middleware lets you run code before (and sometimes after) a procedure. Silgi has two kinds: **guards** and **wraps**. They solve different problems, so understanding the difference is important.
 
 ## Guards
 
@@ -18,9 +18,9 @@ A guard is a function that receives the current context and either:
 
 ```ts twoslash
 // @noErrors
-import { katman, KatmanError } from 'katman'
+import { silgi, SilgiError } from 'silgi'
 
-const k = katman({
+const k = silgi({
   context: (req) => ({
     headers: Object.fromEntries(req.headers),
   }),
@@ -30,7 +30,7 @@ const { guard } = k
 // This guard verifies a token and adds `user` to the context
 const auth = guard(async (ctx) => {
   const token = ctx.headers.authorization?.replace('Bearer ', '')
-  if (!token) throw new KatmanError('UNAUTHORIZED')
+  if (!token) throw new SilgiError('UNAUTHORIZED')
 
   const user = await verifyToken(token)
   return { user } // now ctx.user is available downstream
@@ -54,7 +54,7 @@ If you don't need to add anything to the context, just don't return anything. Th
 // @noErrors
 const adminOnly = guard((ctx) => {
   if (ctx.user.role !== 'admin') {
-    throw new KatmanError('FORBIDDEN')
+    throw new SilgiError('FORBIDDEN')
   }
   // no return — ctx is unchanged
 })
@@ -70,7 +70,7 @@ const auth = guard({
   errors: { UNAUTHORIZED: 401 },
   fn: async (ctx) => {
     const token = ctx.headers.authorization?.replace('Bearer ', '')
-    if (!token) throw new KatmanError('UNAUTHORIZED')
+    if (!token) throw new SilgiError('UNAUTHORIZED')
     return { user: await verifyToken(token) }
   },
 })
@@ -88,7 +88,7 @@ const createPost = k
 The simple `guard(fn)` form still works exactly as before. Use `guard({ errors, fn })` when you want the guard's errors to be part of the typed API contract. See [Typed Errors](/docs/errors#typed-guard-errors) for more details.
 
 <Callout type='info'>
-  Guards can be synchronous or asynchronous. When they're sync, Katman skips the async overhead entirely — no Promises
+  Guards can be synchronous or asynchronous. When they're sync, Silgi skips the async overhead entirely — no Promises
   are created.
 </Callout>
 
@@ -194,7 +194,7 @@ export const auth = guard(async (ctx) => {
 })
 
 export const adminOnly = guard((ctx) => {
-  if (ctx.user.role !== 'admin') throw new KatmanError('FORBIDDEN')
+  if (ctx.user.role !== 'admin') throw new SilgiError('FORBIDDEN')
 })
 
 export const timing = wrap(async (ctx, next) => {
@@ -222,7 +222,7 @@ Instead of writing try/catch/finally in every wrap, use `lifecycleWrap` for a de
 
 ```ts twoslash
 // @noErrors
-import { lifecycleWrap } from 'katman'
+import { lifecycleWrap } from 'silgi'
 
 const logging = lifecycleWrap({
   onStart: ({ ctx }) => console.log('started'),
@@ -243,7 +243,7 @@ All four hooks are optional. They're purely for side effects — the procedure r
 | `onError`   | When the procedure throws (error is re-thrown after the hook) |
 | `onFinish`  | Always — success or failure (like `finally`)                  |
 
-This is different from the global [lifecycle hooks](/docs/server#lifecycle-hooks) on the katman instance — `lifecycleWrap` applies per-procedure via `.$use()`.
+This is different from the global [lifecycle hooks](/docs/server#lifecycle-hooks) on the silgi instance — `lifecycleWrap` applies per-procedure via `.$use()`.
 
 ## Input mapping
 
@@ -251,7 +251,7 @@ Transform the input shape before a procedure runs with `mapInput`:
 
 ```ts twoslash
 // @noErrors
-import { mapInput } from 'katman'
+import { mapInput } from 'silgi'
 
 const renameUserId = mapInput((input: { userId: string }) => ({
   id: input.userId,

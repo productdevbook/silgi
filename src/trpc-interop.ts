@@ -1,38 +1,38 @@
 /**
- * tRPC interop — convert tRPC routers to Katman routers.
+ * tRPC interop — convert tRPC routers to Silgi routers.
  *
- * Enables incremental migration from tRPC to Katman.
- * Wraps each tRPC procedure as a Katman ProcedureDef.
+ * Enables incremental migration from tRPC to Silgi.
+ * Wraps each tRPC procedure as a Silgi ProcedureDef.
  *
  * @example
  * ```ts
- * import { fromTRPC } from "katman/trpc"
+ * import { fromTRPC } from "silgi/trpc"
  * import { trpcRouter } from "./trpc-router"
  *
- * const katmanRouter = fromTRPC(trpcRouter)
+ * const silgiRouter = fromTRPC(trpcRouter)
  *
- * // Now use with Katman's serve(), handler(), etc.
- * k.serve(katmanRouter, { port: 3000 })
+ * // Now use with Silgi's serve(), handler(), etc.
+ * k.serve(silgiRouter, { port: 3000 })
  * ```
  */
 
 import type { ProcedureDef, RouterDef } from './types.ts'
 
 /**
- * Convert a tRPC router to a Katman RouterDef.
+ * Convert a tRPC router to a Silgi RouterDef.
  *
  * Walks the tRPC router's `_def.procedures` and wraps each one as
- * a Katman ProcedureDef that calls the tRPC procedure's resolver.
+ * a Silgi ProcedureDef that calls the tRPC procedure's resolver.
  *
  * Supports:
  * - tRPC v10 and v11 routers
  * - Queries, mutations, and subscriptions
  * - Input schemas (passed through as-is)
- * - Middleware (runs inside tRPC, not Katman's pipeline)
+ * - Middleware (runs inside tRPC, not Silgi's pipeline)
  *
  * Does NOT support:
- * - Converting tRPC middleware to Katman guards/wraps
- * - tRPC context factories (use Katman's context instead)
+ * - Converting tRPC middleware to Silgi guards/wraps
+ * - tRPC context factories (use Silgi's context instead)
  */
 export function fromTRPC(trpcRouter: unknown): RouterDef {
   if (!trpcRouter || typeof trpcRouter !== 'object') {

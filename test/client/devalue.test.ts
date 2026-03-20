@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest'
 
 import { encode, decode, DEVALUE_CONTENT_TYPE } from '#src/codec/devalue.ts'
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 
 // ── Codec Unit Tests ────────────────────────────────
 
@@ -76,7 +76,7 @@ describe('devalue codec', () => {
 // ── Server Content Negotiation ──────────────────────
 
 describe('devalue server integration', () => {
-  const k = katman({ context: () => ({}) })
+  const k = silgi({ context: () => ({}) })
   const router = k.router({
     time: k.$resolve(() => ({ now: new Date(), status: 'ok' })),
     echo: k.$resolve(({ input }: any) => input),

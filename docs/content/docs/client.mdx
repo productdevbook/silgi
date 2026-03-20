@@ -7,7 +7,7 @@ import { Callout } from 'fumadocs-ui/components/callout'
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 import { Step, Steps } from 'fumadocs-ui/components/steps'
 
-The Katman client gives you a fully typed proxy that mirrors your server's router structure. You call procedures like local functions, and TypeScript knows every input and output type.
+The Silgi client gives you a fully typed proxy that mirrors your server's router structure. You call procedures like local functions, and TypeScript knows every input and output type.
 
 ## Setup
 
@@ -22,7 +22,7 @@ A link tells the client _how_ to send requests to the server. The built-in link 
 
 ```ts twoslash
 // @noErrors
-import { createLink } from 'katman/client/ofetch'
+import { createLink } from 'silgi/client/ofetch'
 
 const link = createLink({
   url: 'http://localhost:3000',
@@ -33,7 +33,7 @@ Relative URLs work too — useful with dev server proxies or same-origin deploym
 
 ```ts twoslash
 // @noErrors
-import { createLink } from 'katman/client/ofetch'
+import { createLink } from 'silgi/client/ofetch'
 
 const link = createLink({ url: '/api' })
 // Calls resolve to /api/users/list, /api/health, etc.
@@ -48,8 +48,8 @@ Pass the link to `createClient` with your router type as the generic parameter:
 
 ```ts twoslash
 // @noErrors
-import { createClient } from 'katman/client'
-import { createLink } from 'katman/client/ofetch'
+import { createClient } from 'silgi/client'
+import { createLink } from 'silgi/client/ofetch'
 import type { AppRouter } from './server' // export type AppRouter = typeof appRouter
 
 const link = createLink({ url: 'http://localhost:3000' })
@@ -106,7 +106,7 @@ You can also use the `InferClient` utility type, which extracts the client type 
 
 ```ts twoslash
 // @noErrors
-import type { InferClient } from 'katman'
+import type { InferClient } from 'silgi'
 
 type Client = InferClient<typeof appRouter>
 // Client.users.list: (input: { limit?: number }) => Promise<User[]>
@@ -248,16 +248,16 @@ Available per-call options:
 
 ## Error handling
 
-Server errors are reconstructed as `KatmanError` instances on the client. You can catch them with try/catch:
+Server errors are reconstructed as `SilgiError` instances on the client. You can catch them with try/catch:
 
 ```ts twoslash
 // @noErrors
-import { KatmanError } from 'katman'
+import { SilgiError } from 'silgi'
 
 try {
   await client.users.delete({ id: 1 })
 } catch (error) {
-  if (error instanceof KatmanError) {
+  if (error instanceof SilgiError) {
     console.log(error.code) // "FORBIDDEN"
     console.log(error.status) // 403
     console.log(error.data) // { reason: "Not the owner" }
@@ -269,7 +269,7 @@ Or use the `safe()` wrapper to avoid try/catch entirely:
 
 ```ts twoslash
 // @noErrors
-import { safe } from 'katman/client'
+import { safe } from 'silgi/client'
 
 const { error, data, isError, isSuccess } = await safe(client.users.delete({ id: 1 }))
 
@@ -288,7 +288,7 @@ For SSR, server components, or testing — use `createServerClient` to get the s
 
 ```ts twoslash
 // @noErrors
-import { createServerClient } from 'katman/client/server'
+import { createServerClient } from 'silgi/client/server'
 
 const client = createServerClient(appRouter, {
   context: () => ({ db: getDB() }),
@@ -313,7 +313,7 @@ A `DynamicLink` lets you route requests to different links at runtime. The facto
 
 ```ts twoslash
 // @noErrors
-import { createClient, DynamicLink } from 'katman/client'
+import { createClient, DynamicLink } from 'silgi/client'
 
 const link = new DynamicLink((path, input, options) => {
   if (path[0] === 'admin') return adminLink
@@ -327,11 +327,11 @@ This is useful when different parts of your API live on different servers, or wh
 
 ## mergeClients
 
-Combine multiple Katman clients into a single object. Each client can point to a different server — the merged result keeps full type safety:
+Combine multiple Silgi clients into a single object. Each client can point to a different server — the merged result keeps full type safety:
 
 ```ts twoslash
 // @noErrors
-import { mergeClients } from 'katman/client'
+import { mergeClients } from 'silgi/client'
 
 const client = mergeClients({
   users: usersClient,
@@ -344,11 +344,11 @@ const client = mergeClients({
 
 ## withInterceptors
 
-Wrap any link with lifecycle hooks. Unlike ofetch interceptors (which are HTTP-level), these run at the Katman procedure level and receive the procedure path and input:
+Wrap any link with lifecycle hooks. Unlike ofetch interceptors (which are HTTP-level), these run at the Silgi procedure level and receive the procedure path and input:
 
 ```ts twoslash
 // @noErrors
-import { withInterceptors } from 'katman/client'
+import { withInterceptors } from 'silgi/client'
 
 const link = withInterceptors(baseLink, {
   onRequest({ path, input }) {

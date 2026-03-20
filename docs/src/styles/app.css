@@ -4,7 +4,7 @@
 @import 'fumadocs-ui/css/preset.css';
 @import 'fumadocs-twoslash/twoslash.css';
 
-/* ─── Fumadocs theme — Katman brand colors ────────── */
+/* ─── Fumadocs theme — Silgi brand colors ────────── */
 
 @theme {
   --color-fd-primary: oklch(0.75 0.12 75);

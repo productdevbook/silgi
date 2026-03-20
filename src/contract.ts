@@ -7,7 +7,7 @@
  * @example
  * ```ts
  * // packages/api-contract/index.ts (shared)
- * import { contract } from "katman/contract"
+ * import { contract } from "silgi/contract"
  * import { z } from "zod"
  *
  * export const api = contract({
@@ -27,7 +27,7 @@
  * })
  *
  * // packages/api-server/index.ts (backend)
- * import { implement } from "katman/contract"
+ * import { implement } from "silgi/contract"
  * import { api } from "api-contract"
  *
  * const router = implement(api, (k) => ({
@@ -42,7 +42,7 @@
  *
  * // packages/frontend/index.ts (client — no server import!)
  * import type { api } from "api-contract"
- * import type { InferContractClient } from "katman/contract"
+ * import type { InferContractClient } from "silgi/contract"
  *
  * type Client = InferContractClient<typeof api>
  * // Client.users.list: (input: { limit?: number }) => Promise<User[]>
@@ -106,7 +106,7 @@ type ImplementRouter<T extends ContractRouter> = {
 // ── Implement Function ──────────────────────────────
 
 /**
- * Implement a contract — returns a katman RouterDef.
+ * Implement a contract — returns a silgi RouterDef.
  * Type-safe: implementation must match the contract.
  */
 export function implement<T extends ContractRouter>(

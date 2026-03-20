@@ -1,23 +1,23 @@
 /**
- * Shared Katman router — used by the Nitro catch-all route.
+ * Shared Silgi router — used by the Nitro catch-all route.
  */
-import { katman, KatmanError } from 'katman'
+import { silgi, SilgiError } from 'silgi'
 import { z } from 'zod'
 
 // ── In-memory DB ─────────────────────────────────────
 
 export const db = {
   users: [
-    { id: 1, name: 'Alice', email: 'alice@katman.dev' },
-    { id: 2, name: 'Bob', email: 'bob@katman.dev' },
-    { id: 3, name: 'Charlie', email: 'charlie@katman.dev' },
+    { id: 1, name: 'Alice', email: 'alice@silgi.dev' },
+    { id: 2, name: 'Bob', email: 'bob@silgi.dev' },
+    { id: 3, name: 'Charlie', email: 'charlie@silgi.dev' },
   ],
   nextId: 4,
 }
 
-// ── Katman Instance ──────────────────────────────────
+// ── Silgi Instance ──────────────────────────────────
 
-const k = katman({
+const k = silgi({
   context: () => ({ db }),
 })
 
@@ -28,7 +28,7 @@ const { query, mutation, guard, router } = k
 const auth = guard((ctx) => {
   const token = (ctx as any).token as string | undefined
   if (token !== 'secret-token') {
-    throw new KatmanError('UNAUTHORIZED', { message: 'Invalid token' })
+    throw new SilgiError('UNAUTHORIZED', { message: 'Invalid token' })
   }
   return { userId: 1 }
 })
@@ -48,7 +48,7 @@ const listUsers = query(z.object({ limit: z.number().min(1).max(100).optional() 
 
 const getUser = query(z.object({ id: z.number() }), ({ input, ctx }) => {
   const user = ctx.db.users.find((u) => u.id === input.id)
-  if (!user) throw new KatmanError('NOT_FOUND', { message: `User #${input.id} not found` })
+  if (!user) throw new SilgiError('NOT_FOUND', { message: `User #${input.id} not found` })
   return user
 })
 

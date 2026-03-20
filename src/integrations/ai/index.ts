@@ -1,14 +1,14 @@
 /**
- * Vercel AI SDK integration — expose katman procedures as AI tools.
+ * Vercel AI SDK integration — expose silgi procedures as AI tools.
  *
- * Converts katman router procedures into AI SDK tools that can be
+ * Converts silgi router procedures into AI SDK tools that can be
  * called by LLMs via function calling / tool use.
  *
  * @example
  * ```ts
  * import { generateText } from "ai"
  * import { openai } from "@ai-sdk/openai"
- * import { routerToTools } from "katman/ai"
+ * import { routerToTools } from "silgi/ai"
  *
  * const tools = routerToTools(appRouter)
  *
@@ -27,7 +27,7 @@ import { compileProcedure } from '../../compile.ts'
 import type { RouterDef, ProcedureDef } from '../../types.ts'
 
 /**
- * Convert a single katman procedure into an AI SDK tool.
+ * Convert a single silgi procedure into an AI SDK tool.
  */
 export function procedureToTool(name: string, procedure: ProcedureDef, options?: { description?: string }) {
   const handler = compileProcedure(procedure)
@@ -52,7 +52,7 @@ export function procedureToTool(name: string, procedure: ProcedureDef, options?:
 }
 
 /**
- * Convert all procedures in a katman router into AI SDK tools.
+ * Convert all procedures in a silgi router into AI SDK tools.
  * Nested routers are flattened with underscore separators.
  *
  * @example

@@ -1,13 +1,13 @@
 /**
- * OpenAPI Client Link — consume any OpenAPI endpoint as a Katman client.
+ * OpenAPI Client Link — consume any OpenAPI endpoint as a Silgi client.
  *
- * Unlike RPCLink (which uses Katman's wire protocol), OpenAPILink sends
+ * Unlike RPCLink (which uses Silgi's wire protocol), OpenAPILink sends
  * standard REST requests based on an OpenAPI spec.
  *
  * @example
  * ```ts
- * import { OpenAPILink } from "katman/client/openapi"
- * import { createClient } from "katman/client"
+ * import { OpenAPILink } from "silgi/client/openapi"
+ * import { createClient } from "silgi/client"
  *
  * const link = new OpenAPILink({
  *   url: "https://api.example.com",
@@ -19,7 +19,7 @@
  * ```
  */
 
-import { KatmanError } from '../core/error.ts'
+import { SilgiError } from '../core/error.ts'
 
 import type { ClientLink, ClientContext, ClientOptions } from './types.ts'
 
@@ -105,7 +105,7 @@ export class OpenAPILink<TCtx extends ClientContext = ClientContext> implements 
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => null)
-      throw new KatmanError(errorBody?.code ?? `HTTP_${response.status}`, {
+      throw new SilgiError(errorBody?.code ?? `HTTP_${response.status}`, {
         status: response.status,
         message: errorBody?.message ?? response.statusText,
         data: errorBody,

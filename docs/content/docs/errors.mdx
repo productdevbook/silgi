@@ -6,7 +6,7 @@ description: Define error maps, use fail() for type-safe errors, and handle them
 import { Callout } from 'fumadocs-ui/components/callout'
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 
-Most APIs handle errors with generic try/catch and status codes. Katman takes a different approach: you declare the errors a procedure can produce upfront, and TypeScript enforces them on both sides.
+Most APIs handle errors with generic try/catch and status codes. Silgi takes a different approach: you declare the errors a procedure can produce upfront, and TypeScript enforces them on both sides.
 
 ## Error maps
 
@@ -45,7 +45,7 @@ When you define errors via `.$errors()`, the `fail()` function in your resolver 
 - If the error has a `data` schema, `fail()` requires a second argument matching that schema
 - If the error has no `data`, the second argument is optional
 
-`fail()` throws a `KatmanError` internally. It has a return type of `never`, so TypeScript knows that code after `fail()` won't run — no need for `return` after it.
+`fail()` throws a `SilgiError` internally. It has a return type of `never`, so TypeScript knows that code after `fail()` won't run — no need for `return` after it.
 
 <Callout type='info'>
   `fail()` is only typed when you use `.$errors()`. Without it, `fail()` still works but accepts any string
@@ -73,30 +73,30 @@ const errors = {
 
 The shorthand is fine when you just need a code and status. Use the full config when you want to attach structured data to the error.
 
-## KatmanError
+## SilgiError
 
-Under the hood, `fail()` throws a `KatmanError`. You can also throw one directly from anywhere — guards, wraps, context factories, or resolvers:
+Under the hood, `fail()` throws a `SilgiError`. You can also throw one directly from anywhere — guards, wraps, context factories, or resolvers:
 
 ```ts twoslash
 // @noErrors
-import { KatmanError } from 'katman'
+import { SilgiError } from 'silgi'
 
 // Common codes are mapped to HTTP statuses automatically
-throw new KatmanError('NOT_FOUND') // 404
-throw new KatmanError('UNAUTHORIZED') // 401
-throw new KatmanError('BAD_REQUEST') // 400
-throw new KatmanError('FORBIDDEN') // 403
-throw new KatmanError('TOO_MANY_REQUESTS') // 429
-throw new KatmanError('INTERNAL_SERVER_ERROR') // 500
+throw new SilgiError('NOT_FOUND') // 404
+throw new SilgiError('UNAUTHORIZED') // 401
+throw new SilgiError('BAD_REQUEST') // 400
+throw new SilgiError('FORBIDDEN') // 403
+throw new SilgiError('TOO_MANY_REQUESTS') // 429
+throw new SilgiError('INTERNAL_SERVER_ERROR') // 500
 ```
 
 You can also create custom errors with any code:
 
 ```ts twoslash
 // @noErrors
-import { KatmanError } from 'katman'
+import { SilgiError } from 'silgi'
 
-throw new KatmanError('PAYMENT_REQUIRED', {
+throw new SilgiError('PAYMENT_REQUIRED', {
   status: 402,
   message: 'Upgrade to Pro to use this feature',
   data: { plan: 'pro', price: 29 },
@@ -141,18 +141,18 @@ The `defined` field tells you whether this error came from an error map (`true`)
 
 ## Client-side error handling
 
-Errors thrown on the server are reconstructed as `KatmanError` instances on the client. You have two ways to handle them:
+Errors thrown on the server are reconstructed as `SilgiError` instances on the client. You have two ways to handle them:
 
 <Tabs items={['try/catch', 'safe() wrapper']}>
   <Tab value="try/catch">
   ```ts twoslash
 // @noErrors
-import { KatmanError } from "katman"
+import { SilgiError } from "silgi"
 
 try {
 await client.users.delete({ id: 1 })
 } catch (error) {
-if (error instanceof KatmanError) {
+if (error instanceof SilgiError) {
 console.log(error.code) // "FORBIDDEN"
 console.log(error.status) // 403
 console.log(error.message) // "You don't own this resource"
@@ -174,7 +174,7 @@ The `safe()` helper wraps a promise and returns a result object instead of throw
 
 ```ts twoslash
 // @noErrors
-import { safe } from "katman/client"
+import { safe } from "silgi/client"
 
 const result = await safe(client.users.delete({ id: 1 }))
 
@@ -199,7 +199,7 @@ The `safe()` function returns an object with:
 
 ## Validation errors
 
-When input validation fails (the data doesn't match your Zod/Valibot schema), Katman automatically returns a `400 BAD_REQUEST` with the validation issues:
+When input validation fails (the data doesn't match your Zod/Valibot schema), Silgi automatically returns a `400 BAD_REQUEST` with the validation issues:
 
 ```json
 {
@@ -222,9 +222,9 @@ Guards can throw errors too. A common pattern is an auth guard that throws `UNAU
 // @noErrors
 const auth = k.guard(async (ctx) => {
   const token = ctx.headers.authorization
-  if (!token) throw new KatmanError('UNAUTHORIZED')
+  if (!token) throw new SilgiError('UNAUTHORIZED')
   const user = await verifyToken(token)
-  if (!user) throw new KatmanError('UNAUTHORIZED', { message: 'Invalid token' })
+  if (!user) throw new SilgiError('UNAUTHORIZED', { message: 'Invalid token' })
   return { user }
 })
 ```
@@ -241,7 +241,7 @@ const auth = k.guard({
   errors: { UNAUTHORIZED: 401 },
   fn: async (ctx) => {
     const token = ctx.headers.authorization
-    if (!token) throw new KatmanError('UNAUTHORIZED')
+    if (!token) throw new SilgiError('UNAUTHORIZED')
     return { user: await verifyToken(token) }
   },
 })
@@ -249,7 +249,7 @@ const auth = k.guard({
 const rateLimit = k.guard({
   errors: { RATE_LIMITED: 429 },
   fn: (ctx) => {
-    if (tooManyRequests(ctx)) throw new KatmanError('RATE_LIMITED')
+    if (tooManyRequests(ctx)) throw new SilgiError('RATE_LIMITED')
   },
 })
 

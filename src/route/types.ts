@@ -1,5 +1,5 @@
 /**
- * Katman Router — Type definitions.
+ * Silgi Router — Type definitions.
  */
 
 /** Matched route result */

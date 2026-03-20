@@ -2,9 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## What is Katman
+## What is Silgi
 
-Katman is an end-to-end type-safe RPC framework for TypeScript — a single-package alternative to tRPC and oRPC. It ships compiled pipelines, supports every major runtime/framework, and is heavily optimized for V8 performance.
+Silgi is an end-to-end type-safe RPC framework for TypeScript — a single-package alternative to tRPC and oRPC. It ships compiled pipelines, supports every major runtime/framework, and is heavily optimized for V8 performance.
 
 ## Commands
 
@@ -29,14 +29,14 @@ pnpm bench:memory   # Memory profiling (--expose-gc)
 
 ### Core Flow
 
-`katman()` factory → procedures (`query`/`mutation`/`subscription`) → `router()` → `handler()`/`serve()` → adapter
+`silgi()` factory → procedures (`query`/`mutation`/`subscription`) → `router()` → `handler()`/`serve()` → adapter
 
 ### Key Modules (src/)
 
-- **katman.ts** — Factory function. Creates typed instance with `query()`, `mutation()`, `guard()`, `wrap()`, `router()`, `handler()`, `serve()`
+- **silgi.ts** — Factory function. Creates typed instance with `query()`, `mutation()`, `guard()`, `wrap()`, `router()`, `handler()`, `serve()`
 - **compile.ts** — Pipeline compiler. Unrolls 0-4 guards into specialized code paths (no loop), uses ContextPool for zero per-request allocation, compiles router into flat Map for O(1) lookup
 - **types.ts** — `ProcedureDef` (fixed 7-property shape for V8 hidden class alignment), `RouterDef`, type inference helpers (`InferContextFromUse`, `InferSchemaInput`, `InferSchemaOutput`, `InferClient`)
-- **core/error.ts** — `KatmanError` with cross-realm instanceof via global WeakSet registry. Error codes are UPPER_SNAKE_CASE
+- **core/error.ts** — `SilgiError` with cross-realm instanceof via global WeakSet registry. Error codes are UPPER_SNAKE_CASE
 - **core/schema.ts** — Standard Schema v1 bridge (Zod, Valibot, ArkType). Generic `validateSchema()` function
 - **core/sse.ts** — Server-Sent Events / streaming support
 - **client/client.ts** — `createClient()` proxy-based RPC client with cached sub-proxy Map and `safe()` wrapper for `[error, data]` tuples
@@ -114,17 +114,17 @@ When showing package install commands, always provide all three package managers
 <Tabs items={['pnpm', 'npm', 'bun']}>
   <Tab value='pnpm'>
   ```bash
-  pnpm add katman
+  pnpm add silgi
   ```
   </Tab>
   <Tab value='npm'>
   ```bash
-  npm install katman
+  npm install silgi
   ```
   </Tab>
   <Tab value='bun'>
   ```bash
-  bun add katman
+  bun add silgi
   ```
   </Tab>
 </Tabs>

@@ -1,5 +1,5 @@
 /**
- * Katman v2 API — Type definitions.
+ * Silgi v2 API — Type definitions.
  *
  * Every procedure has the EXACT same shape (7 properties, same order)
  * → V8 assigns ONE hidden class → monomorphic inline caches.

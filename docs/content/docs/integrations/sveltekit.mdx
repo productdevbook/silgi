@@ -1,19 +1,19 @@
 ---
 title: SvelteKit
-description: Use Katman with SvelteKit API routes — catch-all endpoint with full type safety.
+description: Use Silgi with SvelteKit API routes — catch-all endpoint with full type safety.
 ---
 
-[SvelteKit](https://kit.svelte.dev) uses file-based API routes. Katman integrates via a catch-all `+server.ts`.
+[SvelteKit](https://kit.svelte.dev) uses file-based API routes. Silgi integrates via a catch-all `+server.ts`.
 
 ## Setup
 
 ```ts twoslash
 // @noErrors
 // src/routes/api/rpc/[...path]/+server.ts
-import { katmanSvelteKit } from 'katman/sveltekit'
+import { silgiSvelteKit } from 'silgi/sveltekit'
 import { appRouter } from '$lib/server/rpc'
 
-const handler = katmanSvelteKit(appRouter, {
+const handler = silgiSvelteKit(appRouter, {
   prefix: '/api/rpc',
   context: (event) => ({
     db: getDB(),
@@ -41,7 +41,7 @@ export async function handle({ event, resolve }) {
 ```ts twoslash
 // @noErrors
 // src/routes/api/rpc/[...path]/+server.ts
-const handler = katmanSvelteKit(appRouter, {
+const handler = silgiSvelteKit(appRouter, {
   context: (event) => ({
     user: event.locals.user,
   }),

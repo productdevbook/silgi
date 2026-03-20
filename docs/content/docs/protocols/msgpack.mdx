@@ -26,8 +26,8 @@ Enable binary mode with one flag:
 
 ```ts twoslash
 // @noErrors
-import { createLink } from 'katman/client/ofetch'
-import { createClient } from 'katman/client'
+import { createLink } from 'silgi/client/ofetch'
+import { createClient } from 'silgi/client'
 
 const link = createLink({
   url: 'http://localhost:3000',
@@ -58,11 +58,11 @@ No server configuration is needed. Both `serve()` and `handler()` support this o
 
 ## Direct API
 
-If you need to encode/decode MessagePack manually (for example, in a custom transport), Katman exports the codec:
+If you need to encode/decode MessagePack manually (for example, in a custom transport), Silgi exports the codec:
 
 ```ts twoslash
 // @noErrors
-import { encode, decode } from 'katman/msgpack'
+import { encode, decode } from 'silgi/msgpack'
 
 // Encode to binary
 const buf = encode({ name: 'Alice', joined: new Date() })
@@ -97,7 +97,7 @@ You can also use MessagePack over WebSocket for even lower overhead:
 
 ```ts twoslash
 // @noErrors
-import { attachWebSocket } from 'katman/ws'
+import { attachWebSocket } from 'silgi/ws'
 
 attachWebSocket(server, appRouter, { binary: true })
 ```

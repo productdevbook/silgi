@@ -11,7 +11,7 @@ The compression wrap attaches encoding hints to the context for transport-level 
 
 ```ts twoslash
 // @noErrors
-import { compressionWrap } from 'katman/plugins'
+import { compressionWrap } from 'silgi/plugins'
 
 const listUsers = k.$use(compressionWrap()).$resolve(({ ctx }) => ctx.db.users.findMany())
 ```

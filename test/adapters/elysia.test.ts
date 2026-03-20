@@ -3,18 +3,18 @@ import { createServer } from 'node:http'
 import { describe, it, expect, afterAll } from 'vitest'
 import { z } from 'zod'
 
-import { katman, KatmanError } from '#src/katman.ts'
+import { silgi, SilgiError } from '#src/silgi.ts'
 
 import type { Server } from 'node:http'
 
-const k = katman({ context: () => ({ db: 'test' }) })
+const k = silgi({ context: () => ({ db: 'test' }) })
 
 const testRouter = k.router({
   health: k.$resolve(() => ({ status: 'ok' })),
   echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
   greet: k.$input(z.object({ name: z.string() })).$resolve(({ input }) => ({ hello: input.name })),
   fail: k.$resolve(() => {
-    throw new KatmanError('NOT_FOUND', { message: 'nope' })
+    throw new SilgiError('NOT_FOUND', { message: 'nope' })
   }),
 })
 
@@ -38,7 +38,7 @@ async function post(url: string, body?: unknown): Promise<{ status: number; data
   return { status: res.status, data: await res.json() }
 }
 
-describe('katmanElysia() — real Elysia', () => {
+describe('silgiElysia() — real Elysia', () => {
   let url: string
   let close: () => void
 
@@ -46,9 +46,9 @@ describe('katmanElysia() — real Elysia', () => {
 
   it('starts and handles requests', async () => {
     const { Elysia } = await import('elysia')
-    const { katmanElysia } = await import('#src/adapters/elysia.ts')
+    const { silgiElysia } = await import('#src/adapters/elysia.ts')
 
-    const plugin = katmanElysia(testRouter, { prefix: '/rpc' })
+    const plugin = silgiElysia(testRouter, { prefix: '/rpc' })
 
     const app = new Elysia()
     plugin(app)

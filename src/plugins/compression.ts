@@ -6,7 +6,7 @@
  *
  * @example
  * ```ts
- * import { compressionWrap } from "katman/plugins"
+ * import { compressionWrap } from "silgi/plugins"
  *
  * const listUsers = k
  *   .$use(compressionWrap())

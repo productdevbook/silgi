@@ -1,18 +1,18 @@
 /**
- * AWS Lambda adapter — deploy Katman as a Lambda function.
+ * AWS Lambda adapter — deploy Silgi as a Lambda function.
  *
  * @example
  * ```ts
- * import { katmanLambda } from "katman/aws-lambda"
+ * import { silgiLambda } from "silgi/aws-lambda"
  *
- * export const handler = katmanLambda(appRouter, {
+ * export const handler = silgiLambda(appRouter, {
  *   context: (event) => ({ db: getDB(), userId: event.requestContext?.authorizer?.userId }),
  * })
  * ```
  */
 
 import { compileRouter } from '../compile.ts'
-import { KatmanError, toKatmanError } from '../core/error.ts'
+import { SilgiError, toSilgiError } from '../core/error.ts'
 import { ValidationError } from '../core/schema.ts'
 
 import type { RouterDef } from '../types.ts'
@@ -41,11 +41,11 @@ interface LambdaResponse {
 }
 
 /**
- * Create an AWS Lambda handler from a Katman router.
+ * Create an AWS Lambda handler from a Silgi router.
  *
  * Supports API Gateway v1 (REST) and v2 (HTTP) event formats.
  */
-export function katmanLambda<TCtx extends Record<string, unknown>>(
+export function silgiLambda<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: LambdaAdapterOptions<TCtx> = {},
 ): (event: LambdaEvent) => Promise<LambdaResponse> {
@@ -116,7 +116,7 @@ export function katmanLambda<TCtx extends Record<string, unknown>>(
           }),
         }
       }
-      const e = error instanceof KatmanError ? error : toKatmanError(error)
+      const e = error instanceof SilgiError ? error : toSilgiError(error)
       return {
         statusCode: e.status,
         headers: { 'content-type': 'application/json' },

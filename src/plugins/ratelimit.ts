@@ -5,7 +5,7 @@
  * Pluggable: swap MemoryRateLimiter for Redis/Upstash/etc.
  */
 
-import { KatmanError } from '../core/error.ts'
+import { SilgiError } from '../core/error.ts'
 
 import type { GuardDef } from '../types.ts'
 
@@ -84,7 +84,7 @@ export interface RateLimitGuardOptions {
  *
  * @example
  * ```ts
- * import { rateLimitGuard, MemoryRateLimiter } from "katman/ratelimit"
+ * import { rateLimitGuard, MemoryRateLimiter } from "silgi/ratelimit"
  *
  * const rateLimit = rateLimitGuard({
  *   limiter: new MemoryRateLimiter({ limit: 100, windowMs: 60_000 }),
@@ -104,7 +104,7 @@ export function rateLimitGuard(options: RateLimitGuardOptions): GuardDef<any, an
       const result = await options.limiter.limit(key)
 
       if (!result.success) {
-        throw new KatmanError('TOO_MANY_REQUESTS', {
+        throw new SilgiError('TOO_MANY_REQUESTS', {
           status: 429,
           message: options.message ?? 'Rate limit exceeded',
           data: {

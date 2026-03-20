@@ -6,7 +6,7 @@ description: HMAC-SHA256 signing and AES-256-GCM encryption — tamper-proof and
 import { Callout } from 'fumadocs-ui/components/callout'
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 
-Katman provides `sign`/`unsign` for tamper-proof data and `encrypt`/`decrypt` for confidential data. Both use the Web Crypto API — works in Node.js, Bun, Deno, and Cloudflare Workers.
+Silgi provides `sign`/`unsign` for tamper-proof data and `encrypt`/`decrypt` for confidential data. Both use the Web Crypto API — works in Node.js, Bun, Deno, and Cloudflare Workers.
 
 ## Signing (HMAC-SHA256)
 
@@ -14,7 +14,7 @@ Signing proves that a value hasn't been tampered with. The value is still readab
 
 ```ts twoslash
 // @noErrors
-import { sign, unsign } from 'katman/plugins'
+import { sign, unsign } from 'silgi/plugins'
 
 // Sign a value
 const signed = await sign('user:123', 'my-secret-key')
@@ -31,8 +31,8 @@ Common use cases: session tokens in cookies, CSRF tokens, signed URLs.
 
 ```ts twoslash
 // @noErrors
-import { sign, unsign } from 'katman/plugins'
-import { setCookie, getCookie } from 'katman/cookies'
+import { sign, unsign } from 'silgi/plugins'
+import { setCookie, getCookie } from 'silgi/cookies'
 
 // Set a signed session cookie
 const signed = await sign(userId, SECRET)
@@ -41,7 +41,7 @@ const header = setCookie('session', signed, { httpOnly: true })
 // Read and verify
 const raw = getCookie(ctx.headers, 'session')
 const userId = raw ? await unsign(raw, SECRET) : null
-if (!userId) throw new KatmanError('UNAUTHORIZED')
+if (!userId) throw new SilgiError('UNAUTHORIZED')
 ```
 
 ## Encryption (AES-256-GCM)
@@ -50,7 +50,7 @@ Encryption makes data unreadable without the secret. Uses PBKDF2 key derivation 
 
 ```ts twoslash
 // @noErrors
-import { encrypt, decrypt } from 'katman/plugins'
+import { encrypt, decrypt } from 'silgi/plugins'
 
 const encrypted = await encrypt('sensitive-data', 'my-secret-key')
 // "base64url-encoded-blob"

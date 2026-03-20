@@ -1,12 +1,12 @@
 /**
- * Peer-to-peer adapter — bidirectional RPC between two Katman instances.
+ * Peer-to-peer adapter — bidirectional RPC between two Silgi instances.
  *
  * Both sides can be client AND server simultaneously. Uses MessagePort
  * or any bidirectional channel (WebSocket, WebRTC DataChannel, etc.).
  *
  * @example
  * ```ts
- * import { createPeer } from "katman/peer"
+ * import { createPeer } from "silgi/peer"
  *
  * const peerA = createPeer(routerA, channel.port1)
  * const peerB = createPeer(routerB, channel.port2)
@@ -21,7 +21,7 @@
 
 import { createClient } from '../client/client.ts'
 
-import { katmanMessagePort, MessagePortLink } from './message-port.ts'
+import { silgiMessagePort, MessagePortLink } from './message-port.ts'
 
 import type { RouterDef } from '../types.ts'
 
@@ -49,7 +49,7 @@ export function createPeer(
   },
   options: PeerOptions<Record<string, unknown>> = {},
 ): Peer {
-  const dispose = katmanMessagePort(localRouter, port, options)
+  const dispose = silgiMessagePort(localRouter, port, options)
   const link = new MessagePortLink(port)
   const client = createClient(link)
 

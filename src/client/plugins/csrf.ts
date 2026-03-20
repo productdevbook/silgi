@@ -20,7 +20,7 @@ export function withCSRF<TClientContext extends ClientContext>(
   options: CSRFLinkOptions = {},
 ): ClientLink<TClientContext> {
   const headerName = options.headerName ?? 'x-csrf-token'
-  const headerValue = options.headerValue ?? 'katman'
+  const headerValue = options.headerValue ?? 'silgi'
 
   return {
     call(path, input, callOptions) {

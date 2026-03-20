@@ -14,7 +14,7 @@
  *
  * @example
  * ```ts
- * import { cacheQuery, setCacheStorage } from 'katman/cache'
+ * import { cacheQuery, setCacheStorage } from 'silgi/cache'
  *
  * // Basic: cache for 60 seconds with SWR
  * const listUsers = k
@@ -22,7 +22,7 @@
  *   .$resolve(({ ctx }) => ctx.db.users.findMany())
  *
  * // With unstorage backend (Redis)
- * import { createUnstorageAdapter } from 'katman/cache'
+ * import { createUnstorageAdapter } from 'silgi/cache'
  * import { createStorage } from 'unstorage'
  * import redisDriver from 'unstorage/drivers/redis'
  *
@@ -179,7 +179,7 @@ export function cacheQuery<T = unknown>(options: CacheQueryOptions<T> = {}): Wra
 
         cachedFn = defineCachedFunction(async (_input: unknown) => currentNext!(), {
           name: resolvedName,
-          group: 'katman',
+          group: 'silgi',
           maxAge,
           swr,
           staleMaxAge,
@@ -196,7 +196,7 @@ export function cacheQuery<T = unknown>(options: CacheQueryOptions<T> = {}): Wra
             : undefined,
           getKey: (input: unknown) => {
             const key = keyFn(input)
-            keySet.add(`/cache:katman:${resolvedName}:${key}.json`)
+            keySet.add(`/cache:silgi:${resolvedName}:${key}.json`)
             return key
           },
         })
@@ -245,7 +245,7 @@ export async function invalidateQueryCache(name: string): Promise<void> {
  *
  * @example
  * ```ts
- * import { setCacheStorage, createUnstorageAdapter } from 'katman/cache'
+ * import { setCacheStorage, createUnstorageAdapter } from 'silgi/cache'
  * import { createStorage } from 'unstorage'
  * import redisDriver from 'unstorage/drivers/redis'
  *

@@ -9,7 +9,7 @@ Register custom type handlers that run during JSON stringify/parse. Useful when 
 
 ```ts twoslash
 // @noErrors
-import { createSerializer } from 'katman/plugins'
+import { createSerializer } from 'silgi/plugins'
 
 const serializer = createSerializer()
   .register('Date', {
@@ -54,7 +54,7 @@ The reviver unwraps them back to the original type on parse.
 | Need Date, Map, Set, BigInt                | [devalue](/docs/protocols/devalue) (built-in, zero config) |
 | Need custom classes (Money, Decimal, etc.) | Custom serializer                                          |
 | Need control over wire format              | Custom serializer                                          |
-| Client and server both use Katman          | devalue                                                    |
+| Client and server both use Silgi          | devalue                                                    |
 
 ## What's next?
 

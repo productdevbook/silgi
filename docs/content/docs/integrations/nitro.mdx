@@ -1,24 +1,24 @@
 ---
 title: Nitro
-description: Use Katman with Nitro v3 — as the server framework (like Hono) or alongside H3 routes.
+description: Use Silgi with Nitro v3 — as the server framework (like Hono) or alongside H3 routes.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 
-[Nitro](https://nitro.build) is the server engine behind Nuxt and TanStack Start. Katman integrates with Nitro in two ways: as the **server framework** (replacing H3, like Hono does) or alongside **H3 file-system routes**.
+[Nitro](https://nitro.build) is the server engine behind Nuxt and TanStack Start. Silgi integrates with Nitro in two ways: as the **server framework** (replacing H3, like Hono does) or alongside **H3 file-system routes**.
 
 ## Direct mode (recommended)
 
-Just like [Hono with Nitro](https://github.com/nitrojs/nitro/tree/main/examples/hono), export an object with a `fetch` method from `server.ts`. Nitro detects it and uses Katman as the server framework:
+Just like [Hono with Nitro](https://github.com/nitrojs/nitro/tree/main/examples/hono), export an object with a `fetch` method from `server.ts`. Nitro detects it and uses Silgi as the server framework:
 
 ```ts twoslash
 // @noErrors
 // server.ts
-import { katman, KatmanError } from 'katman'
+import { silgi, SilgiError } from 'silgi'
 import { z } from 'zod'
 
-const k = katman({
+const k = silgi({
   context: (req) => ({
     db: getDB(),
     headers: Object.fromEntries(req.headers),
@@ -39,7 +39,7 @@ const appRouter = router({ health, users: { list: listUsers } })
 export default { fetch: handler(appRouter) }
 ```
 
-No H3, no file-system routing, no `katmanNitro` adapter — Katman IS the framework. Full content negotiation (JSON, MessagePack, devalue) works out of the box.
+No H3, no file-system routing, no `silgiNitro` adapter — Silgi IS the framework. Full content negotiation (JSON, MessagePack, devalue) works out of the box.
 
 ```
 POST /health          → { status: "ok" }
@@ -53,15 +53,15 @@ POST /users/list      → [{ id: 1, name: "Alice" }, ...]
 
 ## H3 mode
 
-If you need Nitro's file-system routing or want to mix Katman with H3 routes, use the `katmanNitro` adapter:
+If you need Nitro's file-system routing or want to mix Silgi with H3 routes, use the `silgiNitro` adapter:
 
 ```ts twoslash
 // @noErrors
 // server/routes/rpc/[...path].ts
-import { katmanNitro } from 'katman/nitro'
+import { silgiNitro } from 'silgi/nitro'
 import { appRouter } from '~/server/rpc'
 
-export default katmanNitro(appRouter, {
+export default silgiNitro(appRouter, {
   context: (event) => ({
     db: getDB(),
     user: event.context.auth,
@@ -91,7 +91,7 @@ export default defineMiddleware((event) => {
 ```ts twoslash
 // @noErrors
 // server/routes/rpc/[...path].ts
-export default katmanNitro(appRouter, {
+export default silgiNitro(appRouter, {
   context: (event) => ({
     user: event.context.auth,
   }),
@@ -102,8 +102,8 @@ export default katmanNitro(appRouter, {
 
 | Scenario                                           | Mode                                |
 | -------------------------------------------------- | ----------------------------------- |
-| New project, Katman is the only framework          | **Direct** (`{ fetch: handler() }`) |
-| Existing Nitro/Nuxt app, adding RPC                | **H3** (`katmanNitro()`)            |
+| New project, Silgi is the only framework          | **Direct** (`{ fetch: handler() }`) |
+| Existing Nitro/Nuxt app, adding RPC                | **H3** (`silgiNitro()`)            |
 | Need H3 middleware (auth, session, etc.)           | **H3**                              |
 | Want full protocol support (msgpack, devalue, SSE) | **Direct**                          |
 
@@ -115,8 +115,8 @@ export default katmanNitro(appRouter, {
 
 Working examples in the repo:
 
-- [`examples/nitro`](https://github.com/productdevbook/katman/tree/main/examples/nitro) — direct mode
-- [`examples/nitro-h3`](https://github.com/productdevbook/katman/tree/main/examples/nitro-h3) — H3 file-system routing
+- [`examples/nitro`](https://github.com/productdevbook/silgi/tree/main/examples/nitro) — direct mode
+- [`examples/nitro-h3`](https://github.com/productdevbook/silgi/tree/main/examples/nitro-h3) — H3 file-system routing
 
 ## What's next?
 

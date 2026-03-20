@@ -13,7 +13,7 @@ import { z } from 'zod'
 import { createLink } from '#src/client/adapters/ofetch/index.ts'
 import { createClient } from '#src/client/client.ts'
 import { encode, decode, acceptsMsgpack, isMsgpack, MSGPACK_CONTENT_TYPE } from '#src/codec/msgpack.ts'
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 
 import type { InferClient } from '#src/types.ts'
 import type { Server } from 'node:http'
@@ -68,7 +68,7 @@ describe('msgpack codec', () => {
 // ── End-to-End Binary Transport ─────────────────────
 
 describe('binary transport (end-to-end)', () => {
-  const k = katman({ context: () => ({ db: true }) })
+  const k = silgi({ context: () => ({ db: true }) })
 
   const appRouter = k.router({
     health: k.$resolve(() => ({ status: 'ok', ts: Date.now() })),

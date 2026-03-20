@@ -1,19 +1,19 @@
 /**
- * Nitro v3 adapter — use Katman with Nitro server routes.
+ * Nitro v3 adapter — use Silgi with Nitro server routes.
  *
  * Nitro v3 uses H3 v2 under the hood with `defineHandler` from `nitro/h3`.
  * This adapter creates a catch-all route handler that dispatches to
- * Katman procedures.
+ * Silgi procedures.
  *
  * ## File-system routing
  *
  * Create a catch-all route at `server/routes/rpc/[...path].ts`:
  *
  * ```ts
- * import { katmanNitro } from "katman/nitro"
+ * import { silgiNitro } from "silgi/nitro"
  * import { appRouter } from "~/server/rpc"
  *
- * export default katmanNitro(appRouter, {
+ * export default silgiNitro(appRouter, {
  *   context: (event) => ({
  *     db: getDB(),
  *     user: event.context.auth,
@@ -31,9 +31,9 @@
  *
  * ```ts
  * // server/routes/[...].ts (catch-all)
- * import { katmanNitro } from "katman/nitro"
+ * import { silgiNitro } from "silgi/nitro"
  *
- * export default katmanNitro(appRouter, {
+ * export default silgiNitro(appRouter, {
  *   prefix: "/rpc",
  *   context: (event) => ({ db: getDB() }),
  * })
@@ -41,7 +41,7 @@
  */
 
 import { compileRouter } from '../compile.ts'
-import { KatmanError, toKatmanError } from '../core/error.ts'
+import { SilgiError, toSilgiError } from '../core/error.ts'
 import { ValidationError } from '../core/schema.ts'
 
 import type { FlatRouter } from '../compile.ts'
@@ -82,12 +82,12 @@ interface NitroEvent {
 }
 
 /**
- * Create a Nitro v3 handler that dispatches to Katman procedures.
+ * Create a Nitro v3 handler that dispatches to Silgi procedures.
  *
  * Returns a function compatible with `defineHandler` from `nitro/h3`.
  * Nitro auto-serializes the return value as JSON.
  */
-export function katmanNitro<TCtx extends Record<string, unknown>>(
+export function silgiNitro<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: NitroAdapterOptions<TCtx> = {},
 ): (event: NitroEvent) => Promise<unknown> {
@@ -155,7 +155,7 @@ export function katmanNitro<TCtx extends Record<string, unknown>>(
           data: { issues: error.issues },
         }
       }
-      const e = error instanceof KatmanError ? error : toKatmanError(error)
+      const e = error instanceof SilgiError ? error : toSilgiError(error)
       return e.toJSON()
     }
   }

@@ -1,9 +1,9 @@
 import express from 'express'
-import { katman } from 'katman'
-import { katmanExpress } from 'katman/express'
+import { silgi } from 'silgi'
+import { silgiExpress } from 'silgi/express'
 import { z } from 'zod'
 
-const k = katman({ context: () => ({ db: 'express-db' }) })
+const k = silgi({ context: () => ({ db: 'express-db' }) })
 
 const appRouter = k.router({
   health: k.$resolve(() => ({ status: 'ok', framework: 'express' })),
@@ -15,11 +15,11 @@ const app = express()
 app.use(express.json())
 
 app.get('/', (_req, res) => {
-  res.json({ name: 'Katman + Express', docs: '/rpc/health' })
+  res.json({ name: 'Silgi + Express', docs: '/rpc/health' })
 })
 
-app.use('/rpc', katmanExpress(appRouter))
+app.use('/rpc', silgiExpress(appRouter))
 
 app.listen(3000, () => {
-  console.log('Katman + Express running at http://localhost:3000')
+  console.log('Silgi + Express running at http://localhost:3000')
 })

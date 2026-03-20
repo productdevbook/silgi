@@ -12,14 +12,14 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { WebSocket } from 'ws'
 import { z } from 'zod'
 
-import { katman } from '#src/katman.ts'
+import { silgi } from '#src/silgi.ts'
 import { attachWebSocket } from '#src/ws.ts'
 
 import type { Server } from 'node:http'
 
 // ── Setup ──────────────────────────────────────────
 
-const k = katman({ context: () => ({}) })
+const k = silgi({ context: () => ({}) })
 
 const appRouter = k.router({
   health: k.$resolve(() => ({ status: 'ok' })),

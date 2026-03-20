@@ -1,5 +1,5 @@
 /**
- * Router benchmark — Katman compiled vs rou3 compiled.
+ * Router benchmark — Silgi compiled vs rou3 compiled.
  *
  * Run: node --experimental-strip-types bench/router.ts
  */
@@ -31,7 +31,7 @@ const paths = [
   '/cdn/**:path',
 ]
 
-// Katman
+// Silgi
 const kr = createRouter()
 for (const p of paths) addRoute(kr, 'GET', p, { path: p })
 const kc = compileRouter(kr)
@@ -49,42 +49,42 @@ for (const [path, label] of [
 ] as const) {
   const km = kc('GET', path)
   const rm = rc('GET', path)
-  if (!km || !rm) console.error(`FAIL ${label}: katman=${!!km} rou3=${!!rm}`)
+  if (!km || !rm) console.error(`FAIL ${label}: silgi=${!!km} rou3=${!!rm}`)
 }
 
 // ── Benchmarks ──────────────────────────────────────
 
 summary(() => {
   compact(() => {
-    bench('katman: static /users/list', () => kc('GET', '/users/list'))
+    bench('silgi: static /users/list', () => kc('GET', '/users/list'))
     bench('rou3:   static /users/list', () => rc('GET', '/users/list'))
   })
 })
 
 summary(() => {
   compact(() => {
-    bench('katman: param /users/123', () => kc('GET', '/users/123'))
+    bench('silgi: param /users/123', () => kc('GET', '/users/123'))
     bench('rou3:   param /users/123', () => rc('GET', '/users/123'))
   })
 })
 
 summary(() => {
   compact(() => {
-    bench('katman: deep /users/1/posts/2', () => kc('GET', '/users/1/posts/2'))
+    bench('silgi: deep /users/1/posts/2', () => kc('GET', '/users/1/posts/2'))
     bench('rou3:   deep /users/1/posts/2', () => rc('GET', '/users/1/posts/2'))
   })
 })
 
 summary(() => {
   compact(() => {
-    bench('katman: wildcard /files/a/b/c', () => kc('GET', '/files/a/b/c'))
+    bench('silgi: wildcard /files/a/b/c', () => kc('GET', '/files/a/b/c'))
     bench('rou3:   wildcard /files/a/b/c', () => rc('GET', '/files/a/b/c'))
   })
 })
 
 summary(() => {
   compact(() => {
-    bench('katman: miss /missing/deep', () => kc('GET', '/missing/deep'))
+    bench('silgi: miss /missing/deep', () => kc('GET', '/missing/deep'))
     bench('rou3:   miss /missing/deep', () => rc('GET', '/missing/deep'))
   })
 })
