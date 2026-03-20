@@ -84,11 +84,9 @@ const auth = guard((ctx) => {
 })
 
 // A procedure with input validation
-const listUsers = k
-  .$input(z.object({ limit: z.number().min(1).max(100).optional() }))
-  .$resolve(({ input, ctx }) => {
-    return ctx.db.users.findMany({ take: input.limit ?? 10 })
-  })
+const listUsers = k.$input(z.object({ limit: z.number().min(1).max(100).optional() })).$resolve(({ input, ctx }) => {
+  return ctx.db.users.findMany({ take: input.limit ?? 10 })
+})
 
 // A procedure that requires authentication
 const createUser = k

@@ -437,11 +437,9 @@ describe('URL params from route patterns', () => {
   it('surfaces :id param from route pattern to resolve context', async () => {
     const router = k3.router({
       users: {
-        byId: k3
-          .$route({ path: '/users/:id', method: 'GET' })
-          .$resolve(async ({ params }: any) => {
-            return { userId: params.id }
-          }),
+        byId: k3.$route({ path: '/users/:id', method: 'GET' }).$resolve(async ({ params }: any) => {
+          return { userId: params.id }
+        }),
       },
     })
     const handle = k3.handler(router)

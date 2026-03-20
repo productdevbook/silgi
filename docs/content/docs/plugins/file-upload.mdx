@@ -42,11 +42,9 @@ Set `maxFiles` to allow multiple uploads. Files are available as `ctx.files`:
 
 ```ts twoslash
 // @noErrors
-const uploadPhotos = k
-  .$use(fileGuard({ maxFiles: 10, allowedTypes: ['image/*'] }))
-  .$resolve(async ({ ctx }) => {
-    return ctx.files.map((f) => ({ name: f.name, size: f.size }))
-  })
+const uploadPhotos = k.$use(fileGuard({ maxFiles: 10, allowedTypes: ['image/*'] })).$resolve(async ({ ctx }) => {
+  return ctx.files.map((f) => ({ name: f.name, size: f.size }))
+})
 ```
 
 ## Manual parsing

@@ -45,13 +45,9 @@ const tracing = otelWrap(trace.getTracer('my-service'))
 
 ```ts twoslash
 // @noErrors
-const listUsers = k
-  .$use(tracing)
-  .$resolve(({ ctx }) => ctx.db.users.findMany())
+const listUsers = k.$use(tracing).$resolve(({ ctx }) => ctx.db.users.findMany())
 
-const createUser = k
-  .$use(auth, tracing)
-  .$resolve(({ ctx, input }) => ctx.db.users.create(input))
+const createUser = k.$use(auth, tracing).$resolve(({ ctx, input }) => ctx.db.users.create(input))
 ```
 
 </Step>

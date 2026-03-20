@@ -216,14 +216,14 @@ const listUsers = k
 
 The `route` field accepts:
 
-| Property             | Description                                    |
-| -------------------- | ---------------------------------------------- |
-| `summary`            | Short description shown in the endpoint list   |
-| `description`        | Longer description shown in the detail view    |
-| `tags`               | Group endpoints by tag                         |
-| `deprecated`         | Mark an endpoint as deprecated                 |
-| `successStatus`      | Override the default 200 status                |
-| `successDescription` | Describe what a successful response looks like |
+| Property             | Description                                      |
+| -------------------- | ------------------------------------------------ |
+| `summary`            | Short description shown in the endpoint list     |
+| `description`        | Longer description shown in the detail view      |
+| `tags`               | Group endpoints by tag                           |
+| `deprecated`         | Mark an endpoint as deprecated                   |
+| `successStatus`      | Override the default 200 status                  |
+| `successDescription` | Describe what a successful response looks like   |
 | `cache`              | Cache-Control header for GET procedure responses |
 
 ## Caching
@@ -233,14 +233,10 @@ Add a `cache` option to `route` to set `Cache-Control` headers on query response
 ```ts twoslash
 // @noErrors
 // Shorthand: cache for 60 seconds
-const listUsers = k
-  .$route({ cache: 60 })
-  .$resolve(({ ctx }) => ctx.db.users.findMany())
+const listUsers = k.$route({ cache: 60 }).$resolve(({ ctx }) => ctx.db.users.findMany())
 
 // Full control: custom Cache-Control value
-const getConfig = k
-  .$route({ cache: 'public, max-age=300, stale-while-revalidate=60' })
-  .$resolve(() => loadConfig())
+const getConfig = k.$route({ cache: 'public, max-age=300, stale-while-revalidate=60' }).$resolve(() => loadConfig())
 ```
 
 | Value    | Behavior                                          |
@@ -361,17 +357,15 @@ Return a standard `Response` object for complete control over status, headers, a
 
 ```ts twoslash
 // @noErrors
-const downloadPdf = k
-  .$input(z.object({ id: z.string() }))
-  .$resolve(async ({ input, ctx }) => {
-    const pdf = await ctx.storage.getFile(input.id)
-    return new Response(pdf, {
-      headers: {
-        'content-type': 'application/pdf',
-        'content-disposition': `attachment; filename="${input.id}.pdf"`,
-      },
-    })
+const downloadPdf = k.$input(z.object({ id: z.string() })).$resolve(async ({ input, ctx }) => {
+  const pdf = await ctx.storage.getFile(input.id)
+  return new Response(pdf, {
+    headers: {
+      'content-type': 'application/pdf',
+      'content-disposition': `attachment; filename="${input.id}.pdf"`,
+    },
   })
+})
 ```
 
 ### Returning a ReadableStream
@@ -381,16 +375,16 @@ Return a `ReadableStream` for binary streaming. Katman sends it with `applicatio
 ```ts twoslash
 // @noErrors
 const exportCsv = k.$resolve(async ({ ctx }) => {
-    return new ReadableStream({
-      async start(controller) {
-        controller.enqueue(new TextEncoder().encode('id,name\n'))
-        for await (const user of ctx.db.users.cursor()) {
-          controller.enqueue(new TextEncoder().encode(`${user.id},${user.name}\n`))
-        }
-        controller.close()
-      },
-    })
+  return new ReadableStream({
+    async start(controller) {
+      controller.enqueue(new TextEncoder().encode('id,name\n'))
+      for await (const user of ctx.db.users.cursor()) {
+        controller.enqueue(new TextEncoder().encode(`${user.id},${user.name}\n`))
+      }
+      controller.close()
+    },
   })
+})
 ```
 
 <Callout type='info'>
@@ -408,9 +402,7 @@ import { callable } from 'katman'
 
 const getUsers = k
   .$input(z.object({ limit: z.number().optional() }))
-  .$resolve(({ input, ctx }) =>
-    ctx.db.users.findMany({ take: input.limit }),
-  )
+  .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))
 
 const getUsersFn = callable(getUsers, {
   context: () => ({ db: getDB() }),

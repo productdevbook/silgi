@@ -217,16 +217,16 @@ const users = await client.users.list({ limit: 10 })
 
 ## Concept mapping
 
-| tRPC                        | Katman                       | Notes                                               |
-| --------------------------- | ---------------------------- | --------------------------------------------------- |
-| `t.procedure`               | `k.$resolve()` / `k.$input().$resolve()` | Katman uses builder methods                |
-| `t.router()`                | `k.router()`                 | Same nesting                                        |
-| `t.middleware()`            | `k.guard()` or `k.wrap()`    | Guards for auth, wraps for before+after             |
-| `TRPCError`                 | `KatmanError`                | Same code names                                     |
-| `createTRPCProxyClient()`   | `createClient()`             | Same proxy pattern                                  |
-| `httpBatchLink`             | `createLink()`               | Batching via separate plugin                        |
-| `@trpc/react-query`         | `katman/tanstack-query`      | `createQueryUtils()` instead of `createTRPCReact()` |
-| `ctx` via `createContext()` | `context:` in `katman()`     | Factory runs per request                            |
+| tRPC                        | Katman                                   | Notes                                               |
+| --------------------------- | ---------------------------------------- | --------------------------------------------------- |
+| `t.procedure`               | `k.$resolve()` / `k.$input().$resolve()` | Katman uses builder methods                         |
+| `t.router()`                | `k.router()`                             | Same nesting                                        |
+| `t.middleware()`            | `k.guard()` or `k.wrap()`                | Guards for auth, wraps for before+after             |
+| `TRPCError`                 | `KatmanError`                            | Same code names                                     |
+| `createTRPCProxyClient()`   | `createClient()`                         | Same proxy pattern                                  |
+| `httpBatchLink`             | `createLink()`                           | Batching via separate plugin                        |
+| `@trpc/react-query`         | `katman/tanstack-query`                  | `createQueryUtils()` instead of `createTRPCReact()` |
+| `ctx` via `createContext()` | `context:` in `katman()`                 | Factory runs per request                            |
 
 ## What you gain
 

@@ -16,9 +16,7 @@ Wrap a query with `cacheQuery()` to cache its results:
 // @noErrors
 import { cacheQuery } from 'katman/cache'
 
-const listUsers = k
-  .$use(cacheQuery({ maxAge: 60 }))
-  .$resolve(({ ctx }) => ctx.db.users.findMany())
+const listUsers = k.$use(cacheQuery({ maxAge: 60 })).$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
 
 The first call runs the resolver and caches the result. Subsequent calls with the same input return the cached value for 60 seconds.

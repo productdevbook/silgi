@@ -41,11 +41,9 @@ When a procedure uses this guard, TypeScript knows that `ctx.user` exists:
 
 ```ts twoslash
 // @noErrors
-const me = k
-  .$use(auth)
-  .$resolve(({ ctx }) => {
-    return ctx.user // typed as User — no cast needed
-  })
+const me = k.$use(auth).$resolve(({ ctx }) => {
+  return ctx.user // typed as User — no cast needed
+})
 ```
 
 ### Validation-only guards
@@ -213,13 +211,9 @@ Then use them wherever you need:
 // @noErrors
 import { auth, adminOnly, timing } from './middleware'
 
-const listUsers = k
-  .$use(auth, timing)
-  .$resolve(({ ctx }) => ctx.db.users.findMany())
+const listUsers = k.$use(auth, timing).$resolve(({ ctx }) => ctx.db.users.findMany())
 
-const deleteUser = k
-  .$use(auth, adminOnly, timing)
-  .$resolve(({ ctx, input }) => ctx.db.users.delete(input.id))
+const deleteUser = k.$use(auth, adminOnly, timing).$resolve(({ ctx, input }) => ctx.db.users.delete(input.id))
 ```
 
 ## Lifecycle hooks
@@ -237,9 +231,7 @@ const logging = lifecycleWrap({
   onFinish: ({ durationMs }) => metrics.record(durationMs),
 })
 
-const listUsers = k
-  .$use(logging)
-  .$resolve(({ ctx }) => ctx.db.users.findMany())
+const listUsers = k.$use(logging).$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
 
 All four hooks are optional. They're purely for side effects — the procedure result is never modified.
@@ -265,9 +257,7 @@ const renameUserId = mapInput((input: { userId: string }) => ({
   id: input.userId,
 }))
 
-const getUser = k
-  .$use(renameUserId)
-  .$resolve(({ input }) => db.users.find(input.id))
+const getUser = k.$use(renameUserId).$resolve(({ input }) => db.users.find(input.id))
 ```
 
 Useful for adapting between client and server naming conventions, or pre-processing input in a reusable way.

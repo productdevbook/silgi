@@ -41,14 +41,12 @@ Use it in any procedure:
 
 ```ts twoslash
 // @noErrors
-const listUsers = k
-  .$use(tenantGuard)
-  .$resolve(({ ctx }) => {
-    // ctx.tenant is typed — TypeScript knows it exists
-    return ctx.db.users.findMany({
-      where: { tenantId: ctx.tenant.id },
-    })
+const listUsers = k.$use(tenantGuard).$resolve(({ ctx }) => {
+  // ctx.tenant is typed — TypeScript knows it exists
+  return ctx.db.users.findMany({
+    where: { tenantId: ctx.tenant.id },
   })
+})
 ```
 
 ### Making it configurable
@@ -118,9 +116,7 @@ Use it:
 // @noErrors
 const cacheOneMinute = createCacheWrap({ ttl: 60_000 })
 
-const listProducts = k
-  .$use(cacheOneMinute)
-  .$resolve(({ ctx }) => ctx.db.products.findMany())
+const listProducts = k.$use(cacheOneMinute).$resolve(({ ctx }) => ctx.db.products.findMany())
 ```
 
 <Callout>
@@ -157,9 +153,7 @@ Apply it per-procedure:
 // @noErrors
 const metrics = createMetricsPlugin(statsd)
 
-const listUsers = k
-  .$use(metrics)
-  .$resolve(({ ctx }) => ctx.db.users.findMany())
+const listUsers = k.$use(metrics).$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
 
 Or apply it globally via instance-level hooks:
@@ -213,12 +207,10 @@ Use both:
 // @noErrors
 const { auditGuard, auditWrap } = createAuditPlugin({ logger })
 
-const deleteUser = k
-  .$use(auth, auditGuard, auditWrap)
-  .$resolve(({ input, ctx }) => {
-    ctx.auditTrail.push(`Deleted user ${input.id}`)
-    return ctx.db.users.delete(input.id)
-  })
+const deleteUser = k.$use(auth, auditGuard, auditWrap).$resolve(({ input, ctx }) => {
+  ctx.auditTrail.push(`Deleted user ${input.id}`)
+  return ctx.db.users.delete(input.id)
+})
 ```
 
 ## Packaging for distribution

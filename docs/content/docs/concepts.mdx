@@ -31,10 +31,10 @@ Guards can add to the context. If a guard returns `{ user }`, then `ctx.user` be
 
 A procedure is a single API function. It takes an input, does something, and returns an output. All procedures default to POST. Use `.$route({ method: 'GET' })` for cacheable reads, and `subscription()` for streaming.
 
-| Type           | What it does                                     |
-| -------------- | ------------------------------------------------ |
+| Type           | What it does                                                                                                  |
+| -------------- | ------------------------------------------------------------------------------------------------------------- |
 | procedure      | Handles a request and returns a response. Default method is POST. Use `.$route({ method: 'GET' })` for reads. |
-| `subscription` | Streams data over time. Uses Server-Sent Events. |
+| `subscription` | Streams data over time. Uses Server-Sent Events.                                                              |
 
 See the [Procedures](/docs/procedures) page for how to write them.
 

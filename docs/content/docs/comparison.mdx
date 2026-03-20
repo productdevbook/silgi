@@ -132,13 +132,13 @@ For simple routes, all four are within 10% — TCP overhead dominates. As middle
 
 JIT-compiled radix tree router vs rou3's compiled router.
 
-| Scenario               | Katman        | rou3         |                 |
-| ---------------------- | ------------- | ------------ | --------------- |
-| Static `/users/list`   | **3.1 ns**    | 3.9 ns       | **1.23x faster** |
-| Param `/users/123`     | **22.0 ns**   | 25.6 ns      | **1.16x faster** |
-| Deep `/users/1/posts/2`| **23.7 ns**   | 26.6 ns      | **1.12x faster** |
-| Wildcard `/files/a/b/c`| **19.2 ns**   | 91.3 ns      | **4.75x faster** |
-| Miss `/missing/deep`   | **4.5 ns**    | 22.3 ns      | **4.96x faster** |
+| Scenario                | Katman      | rou3    |                  |
+| ----------------------- | ----------- | ------- | ---------------- |
+| Static `/users/list`    | **3.1 ns**  | 3.9 ns  | **1.23x faster** |
+| Param `/users/123`      | **22.0 ns** | 25.6 ns | **1.16x faster** |
+| Deep `/users/1/posts/2` | **23.7 ns** | 26.6 ns | **1.12x faster** |
+| Wildcard `/files/a/b/c` | **19.2 ns** | 91.3 ns | **4.75x faster** |
+| Miss `/missing/deep`    | **4.5 ns**  | 22.3 ns | **4.96x faster** |
 
 Katman's router uses indexOf fast path for simple branches (avoids `split()`), switch-based charCodeAt dispatch, and compile-time `substring()` for wildcards.
 
@@ -177,9 +177,7 @@ WebSocket eliminates TCP handshake overhead. All three are close — H3 is sligh
 - **Real-world APIs** spend 95%+ of time in DB queries and business logic. Pipeline overhead matters most for high-throughput, low-latency services.
 - All benchmarks are sequential (1 connection). Concurrent load may show different characteristics.
 
-<Callout>
-  Reproduce on your hardware: `node --experimental-strip-types bench/router.ts`
-</Callout>
+<Callout>Reproduce on your hardware: `node --experimental-strip-types bench/router.ts`</Callout>
 
 ## Where oRPC is ahead
 

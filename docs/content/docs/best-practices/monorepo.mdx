@@ -90,9 +90,7 @@ const k = katman({
   }),
 })
 
-const listUsers = k
-  .$input(ListInput)
-  .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit ?? 10 }))
+const listUsers = k.$input(ListInput).$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit ?? 10 }))
 
 const createUser = k
   .$use(auth)
