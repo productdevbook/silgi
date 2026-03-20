@@ -24,7 +24,7 @@
 </script>
 
 <main style="padding: 2rem; font-family: system-ui">
-  <h1>Katman + SvelteKit</h1>
+  <h1>Silgi + SvelteKit</h1>
   <p>Health: {health ? `${health.status} (${health.framework})` : "loading..."}</p>
   <div style="margin-top: 1rem">
     <input bind:value={name} placeholder="Enter your name" />
