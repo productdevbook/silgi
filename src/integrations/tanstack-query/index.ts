@@ -41,7 +41,7 @@ export interface QueryOptionsIn<TInput, TOutput, _TError> {
   select?: (data: TOutput) => unknown
 }
 
-export interface MutationOptionsIn<TInput, TOutput, _TError> {
+export interface MutationOptionsIn<TInput, TOutput, TError> {
   onSuccess?: (data: TOutput, input: TInput) => void
   onError?: (error: TError, input: TInput) => void
   onSettled?: (data: TOutput | undefined, error: TError | null, input: TInput) => void
