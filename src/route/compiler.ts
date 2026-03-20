@@ -24,13 +24,13 @@ export function compileRouter<T>(
   const uid = { n: 0 }
 
   const sw = emitSwitch(ctx, refs)
-  const tree = emitTree(ctx.root, refs, pre, uid, 1)
 
-  if (!sw && !tree) return () => undefined
+  const hasRoutes = sw || ctx.root.static || ctx.root.param || ctx.root.wildcard
+  if (!hasRoutes) return () => undefined
 
   // Each first-char group gets its own branch function
   let branchDefs = ''
-  let dispatch = ''
+  const dispatchCases: string[] = []
 
   if (ctx.root.static) {
     const byChar = new Map<number, Array<[string, RouteNode<any>]>>()
@@ -41,44 +41,144 @@ export function compileRouter<T>(
       byChar.get(ch)!.push([key, child])
     }
 
-    if (byChar.size > 0) dispatch += 'var c=p.charCodeAt(1);'
-
-    let hasIf = false
     for (const [ch, entries] of byChar) {
-      // Branch body: split once, then recursive tree match
-      let body = 'var s=p.split("/"),l=s.length;'
-      let innerIf = false
-      for (const [key, child] of entries) {
-        const childPrefix = 1 + key.length + 1 // "/key/" length
-        const nodeCode = emitNode(child, refs, pre, uid, 2, childPrefix)
-        if (!nodeCode) continue
-        body += `${innerIf ? 'else ' : ''}if(s[1]===${JSON.stringify(key)}){${nodeCode}}`
-        innerIf = true
+      // Check if ALL entries in this group are simple leaves (indexOf fast path)
+      const allSimple = entries.every(([, child]) =>
+        !child.static
+        && !(child.param && child.wildcard)
+        && !child.param?.static && !child.param?.param && !child.param?.wildcard
+        && !_hasMultiParam(child.param),
+      )
+
+      let body: string
+      let hasContent = false
+
+      if (allSimple) {
+        // indexOf fast path — zero allocation for all entries
+        body = 'var _i=p.indexOf("/",1);if(_i===-1)_i=p.length;'
+        let innerIf = false
+
+        for (const [key, child] of entries) {
+          const kl = key.length
+          const prefixEnd = 1 + kl
+          const childPrefix = prefixEnd + 1
+
+          let segCheck: string
+          if (entries.length === 1 && kl <= 6) {
+            segCheck = `_i===${prefixEnd}`
+            for (let c = 1; c < kl; c++) {
+              segCheck += `&&p.charCodeAt(${1 + c})===${key.charCodeAt(c)}`
+            }
+          } else {
+            segCheck = `_i===${prefixEnd}&&p.substring(1,${prefixEnd})===${JSON.stringify(key)}`
+          }
+
+          let inner = ''
+          const inSwitch = !!ctx.static['/' + key]
+
+          if (child.methods && !inSwitch) {
+            let hasParams = false
+            for (const m in child.methods) {
+              if (child.methods[m]?.some((e: MethodEntry<any>) => e.paramMap?.length)) { hasParams = true; break }
+            }
+            if (!hasParams) {
+              inner += emitTerminal(child.methods, refs, `p.length===${prefixEnd}`)
+            }
+          }
+
+          if (child.param?.methods) {
+            for (const method in child.param.methods) {
+              const pentries = child.param.methods[method]
+              if (!pentries) continue
+              for (const entry of pentries) {
+                if (!entry.paramMap?.length) continue
+                const d = addRef(refs, entry.data)
+                const g = method ? `m===${JSON.stringify(method)}&&` : ''
+                const { po, ro } = allocP(pre, uid, entry.paramMap, entry)
+
+                if (entry.catchAll) {
+                  const pn = pmName(entry.paramMap[0]!)
+                  const lastPm = entry.paramMap[entry.paramMap.length - 1]!
+                  const zeroOk = lastPm[2] || lastPm[1] === '_'
+                  if (zeroOk) {
+                    inner += `if(${g}p.length>=${prefixEnd}){${po}${safe(pn)}=p.length>${prefixEnd}?p.substring(${childPrefix}):"";${ro}.data=$${d};return ${ro}}`
+                  } else {
+                    inner += `if(${g}p.length>${childPrefix}){${po}${safe(pn)}=p.substring(${childPrefix});${ro}.data=$${d};return ${ro}}`
+                  }
+                  continue
+                }
+
+                if (entry.paramMap.length === 1) {
+                  let rx = ''
+                  for (let r = 0; r < (entry.paramRegex?.length || 0); r++) {
+                    if (entry.paramRegex[r]) {
+                      const ri = addRef(refs, entry.paramRegex[r])
+                      rx += `&&$${ri}.test(p.substring(${childPrefix}))`
+                    }
+                  }
+                  inner += `{var _j=p.indexOf("/",${childPrefix});if(${g}p.length>${childPrefix}&&_j===-1${rx}){` +
+                    emitAssign(po, entry.paramMap[0]!, `p.substring(${childPrefix})`, entry.paramRegex, refs, uid) +
+                    `${ro}.data=$${d};return ${ro}}}`
+                }
+              }
+            }
+          }
+
+          if (child.wildcard?.methods) {
+            inner += emitWildcardSlice(child.wildcard.methods, refs, pre, uid, childPrefix)
+          }
+
+          if (!inner) continue
+          body += `${innerIf ? 'else ' : ''}if(${segCheck}){${inner}}`
+          innerIf = true
+          hasContent = true
+        }
+      } else {
+        // Complex tree — use split
+        body = 'var s=p.split("/"),l=s.length;'
+        let innerIf = false
+        for (const [key, child] of entries) {
+          const childPrefix = 1 + key.length + 1
+          const inSwitch = !!ctx.static['/' + key]
+          const nodeCode = emitNode(child, refs, pre, uid, 2, childPrefix, inSwitch)
+          if (!nodeCode) continue
+          body += `${innerIf ? 'else ' : ''}if(s[1]===${JSON.stringify(key)}){${nodeCode}}`
+          innerIf = true
+          hasContent = true
+        }
       }
 
-      if (innerIf) {
+      if (hasContent) {
         const bn = `_b${uid.n++}`
         branchDefs += `var ${bn}=function(m,p){${body}};`
-        dispatch += `${hasIf ? 'else ' : ''}if(c===${ch}){var _t=${bn}(m,p);if(_t)return _t}`
-        hasIf = true
+        dispatchCases.push(`case ${ch}:{var _t=${bn}(m,p);if(_t)return _t}break;`)
       }
     }
   }
 
   // Root-level param
+  let rootParam = ''
   if (ctx.root.param) {
     const paramCode = emitParamNode(ctx.root.param, refs, pre, uid, 1)
     if (paramCode) {
       const bn = `_b${uid.n++}`
       branchDefs += `var ${bn}=function(m,p){var s=p.split("/"),l=s.length;${paramCode}};`
-      dispatch += `{var _t=${bn}(m,p);if(_t)return _t}`
+      rootParam = `{var _t=${bn}(m,p);if(_t)return _t}`
     }
   }
 
   // Root-level wildcard
+  let rootWild = ''
   if (ctx.root.wildcard?.methods) {
-    dispatch += emitWildcardSlice(ctx.root.wildcard.methods, refs, pre, uid, 1)
+    rootWild = emitWildcardSlice(ctx.root.wildcard.methods, refs, pre, uid, 1)
   }
+
+  // Build dispatch: switch on charCodeAt(1) instead of if-else chain
+  let dispatch = ''
+  if (dispatchCases.length > 0) {
+    dispatch = `switch(p.charCodeAt(1)){${dispatchCases.join('')}}`
+  }
+  dispatch += rootParam + rootWild
 
   const code = `${pre.join(';')};${branchDefs}return(m,p)=>{if(p.length>1&&p.charCodeAt(p.length-1)===47)p=p.slice(0,-1);${sw}${dispatch}}`
   return new Function(...refs.map((_, i) => `$${i}`), code)(...refs)
@@ -95,15 +195,15 @@ function emitSwitch(ctx: RouterContext<any>, refs: unknown[]): string {
     const norm = key.endsWith('/') && key.length > 1 ? key.slice(0, -1) : key
     if (seen.has(norm)) continue
     seen.add(norm)
+    // Group all methods under one case — trailing slash already normalized
+    let checks = ''
     for (const m in node.methods) {
       const e = node.methods[m]?.[0]
       if (!e) continue
       const d = addRef(refs, e.data)
-      const g = m ? `if(m===${JSON.stringify(m)})` : ''
-      cases.push(`case ${JSON.stringify(norm)}:`)
-      if (norm.length > 1) cases.push(`case ${JSON.stringify(norm + '/')}:`)
-      cases.push(`${g}{_rs.data=$${d};return _rs}break;`)
+      checks += m ? `if(m===${JSON.stringify(m)}){_rs.data=$${d};return _rs}` : `{_rs.data=$${d};return _rs}`
     }
+    if (checks) cases.push(`case ${JSON.stringify(norm)}:${checks}break;`)
   }
   return cases.length ? `switch(p){${cases.join('')}}` : ''
 }
@@ -119,19 +219,19 @@ function emitNode(
   uid: { n: number },
   depth: number,
   prefixLen?: number, // known string offset — undefined after param
+  skipStaticTerminal?: boolean, // true when static terminal is already in switch
 ): string {
   let code = ''
 
   // Terminal: this node has handlers
   if (node.methods) {
-    // Check if any handler has params — if so, use param-aware terminal
     let hasParams = false
     for (const m in node.methods) {
       if (node.methods[m]?.some((e: MethodEntry<any>) => e.paramMap?.length)) { hasParams = true; break }
     }
     if (hasParams) {
       code += emitParamTerminal(node.methods, refs, pre, uid, depth)
-    } else {
+    } else if (!skipStaticTerminal) {
       code += emitTerminal(node.methods, refs, `l===${depth}`)
     }
   }
@@ -474,8 +574,13 @@ function emitAssign(
   return `${po}${safe(pn)}=${segExpr};`
 }
 
-function emitTree(root: RouteNode<any>, refs: unknown[], pre: string[], uid: { n: number }, depth: number): string {
-  return emitNode(root, refs, pre, uid, depth)
+
+function _hasMultiParam(node: RouteNode<any> | undefined): boolean {
+  if (!node?.methods) return false
+  for (const m in node.methods) {
+    if (node.methods[m]?.some(e => e.paramMap && e.paramMap.length > 1)) return true
+  }
+  return false
 }
 
 function pmName(pm: [number, string | RegExp, boolean]): string {
