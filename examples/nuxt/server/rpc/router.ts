@@ -1,4 +1,5 @@
 import * as auth from './auth'
+import * as demo from './demo'
 import { s } from './instance'
 import * as todos from './todos'
 
@@ -13,6 +14,12 @@ export const appRouter = s.router({
     create: todos.create,
     toggle: todos.toggle,
     remove: todos.remove,
+  },
+  demo: {
+    slow: demo.slow,
+    cached: demo.cached,
+    clock: demo.clock,
+    compute: demo.compute,
   },
 })
 
