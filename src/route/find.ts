@@ -77,10 +77,12 @@ function _lookup<T>(
       const entries = node.param.methods[method] || node.param.methods['']
       if (entries?.[0]?.paramMap?.[entries[0].paramMap.length - 1]?.[2]) return entries[0]
     }
-    // Wildcard fallback (** matches zero segments)
+    // Wildcard fallback — only if the route is optional (**, :path*, not :path+)
     if (node.wildcard?.methods) {
       const entries = node.wildcard.methods[method] || node.wildcard.methods['']
-      if (entries) return entries[0]
+      if (entries?.[0]?.paramMap?.[entries[0].paramMap.length - 1]?.[2] /* optional */ || entries?.[0]?.catchAll) {
+        return entries[0]
+      }
     }
     return undefined
   }
@@ -156,6 +158,18 @@ function _extractParams(
       continue
     }
 
+    // Check if this param has a regex with capture groups
+    if (paramRegex?.[idx]) {
+      const rxMatch = paramRegex[idx]!.exec(segments[idx]!)
+      if (rxMatch && rxMatch.length > 1) {
+        // Multiple capture groups (e.g., file-*-*.png → 2 groups)
+        for (let g = 1; g < rxMatch.length; g++) {
+          const groupName = String(parseInt(name as string) + g - 1)
+          params[groupName] = rxMatch[g]!
+        }
+        continue
+      }
+    }
     params[name] = segments[idx]!
   }
   return params

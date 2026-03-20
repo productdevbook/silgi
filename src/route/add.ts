@@ -150,19 +150,7 @@ export function addRoute<T>(
 
       if (!node.param) node.param = { key: '*' }
 
-      // Check for modifier at end
-      if (paramSeg.endsWith('+')) {
-        if (!node.wildcard) node.wildcard = { key: '**' }
-        node = node.wildcard
-        paramMap.push([i, paramSeg.slice(0, -1), false])
-        break
-      }
-      if (paramSeg.endsWith('*')) {
-        if (!node.wildcard) node.wildcard = { key: '**' }
-        node = node.wildcard
-        paramMap.push([i, paramSeg.slice(0, -1), true])
-        break
-      }
+      // Modifiers (+, *) are handled by expandModifiers before reaching here
 
       let optional = false
       if (paramSeg.endsWith('?')) {
@@ -229,15 +217,26 @@ function expandModifiers(path: string): string[] | null {
   const segments = path.split('/')
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i]!
-    const m = seg.match(/^(.*:[\w-]+(?:\([^)]*\))?)([?])$/)
+    const m = seg.match(/^(.*:[\w-]+(?:\([^)]*\))?)([?+*])$/)
     if (!m) continue
-    // Only handle optional mid-path (not at end — end is handled inline)
-    if (i < segments.length - 1) {
-      const pre = segments.slice(0, i)
-      const suf = segments.slice(i + 1)
-      const withParam = pre.concat(m[1]!).concat(suf).join('/')
-      const withoutParam = pre.concat(suf).join('/')
-      return [withParam, withoutParam]
+    const pre = segments.slice(0, i)
+    const suf = segments.slice(i + 1)
+    const modifier = m[2]!
+    const baseName = m[1]!.match(/:([\w-]+)/)?.[1] || '_'
+
+    // Filter empty segments from pre (leading /)
+    const cleanPre = pre.filter(Boolean)
+
+    if (modifier === '?') {
+      if (i < segments.length - 1) {
+        return ['/' + cleanPre.concat(m[1]!).concat(suf).join('/'), '/' + cleanPre.concat(suf).join('/')]
+      }
+    } else if (modifier === '+') {
+      return ['/' + [...cleanPre, `**:${baseName}`, ...suf].join('/')]
+    } else if (modifier === '*') {
+      const wc = '/' + [...cleanPre, `**:${baseName}`, ...suf].join('/')
+      const without = '/' + [...cleanPre, ...suf].join('/')
+      return [wc, without]
     }
   }
   return null
