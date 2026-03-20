@@ -20,6 +20,7 @@ describe('silgiNitro() — real NitroEvent', () => {
     const handler = silgiNitro(testRouter)
 
     const event = {
+      method: 'POST',
       url: new URL('http://localhost/rpc/health'),
       path: '/rpc/health',
       req: {
@@ -41,6 +42,7 @@ describe('silgiNitro() — real NitroEvent', () => {
     const handler = silgiNitro(testRouter, { prefix: '/rpc' })
 
     const event = {
+      method: 'POST',
       url: new URL('http://localhost/rpc/echo'),
       path: '/rpc/echo',
       req: {
@@ -62,6 +64,7 @@ describe('silgiNitro() — real NitroEvent', () => {
     const handler = silgiNitro(testRouter)
 
     const event = {
+      method: 'POST',
       url: new URL('http://localhost/nope'),
       path: '/nope',
       req: {
@@ -88,6 +91,7 @@ describe('silgiNitro() — real NitroEvent', () => {
     })
 
     const event = {
+      method: 'POST',
       url: new URL('http://localhost/whoami'),
       path: '/whoami',
       req: {
@@ -109,6 +113,7 @@ describe('silgiNitro() — real NitroEvent', () => {
     const handler = silgiNitro(testRouter, { prefix: '/rpc' })
 
     const event = {
+      method: 'POST',
       url: new URL('http://localhost/rpc/echo'),
       path: '/rpc/echo',
       req: {
@@ -131,6 +136,7 @@ describe('silgiNitro() — real NitroEvent', () => {
     const handler = silgiNitro(testRouter, { prefix: '/rpc' })
 
     const event = {
+      method: 'GET',
       url: new URL('http://localhost/rpc/echo?data=' + encodeURIComponent(JSON.stringify({ msg: 'query' }))),
       path: '/rpc/echo',
       req: {

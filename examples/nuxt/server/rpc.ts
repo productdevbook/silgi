@@ -27,28 +27,24 @@ const s = silgi({
 
 // ── Procedures ──────────────────────────────────────
 
-const list = s
-  .$route({ method: 'GET' })
-  .$resolve(({ ctx }) => ctx.todos)
+const list = s.$route({ method: 'GET' }).$resolve(({ ctx }) => ctx.todos)
 
-const create = s
-  .$input(z.object({ title: z.string().min(1).max(200) }))
-  .$resolve(({ input, ctx }) => {
-    const todo: Todo = {
-      id: nextId++,
-      title: input.title,
-      completed: false,
-      createdAt: new Date().toISOString(),
-    }
-    ctx.todos.push(todo)
-    return todo
-  })
+const create = s.$input(z.object({ title: z.string().min(1).max(200) })).$resolve(({ input, ctx }) => {
+  const todo: Todo = {
+    id: nextId++,
+    title: input.title,
+    completed: false,
+    createdAt: new Date().toISOString(),
+  }
+  ctx.todos.push(todo)
+  return todo
+})
 
 const toggle = s
   .$input(z.object({ id: z.number() }))
   .$errors({ NOT_FOUND: 404 })
   .$resolve(({ input, ctx, fail }) => {
-    const todo = ctx.todos.find(t => t.id === input.id)
+    const todo = ctx.todos.find((t) => t.id === input.id)
     if (!todo) fail('NOT_FOUND')
     todo.completed = !todo.completed
     return todo
@@ -58,7 +54,7 @@ const remove = s
   .$input(z.object({ id: z.number() }))
   .$errors({ NOT_FOUND: 404 })
   .$resolve(({ input, ctx, fail }) => {
-    const idx = ctx.todos.findIndex(t => t.id === input.id)
+    const idx = ctx.todos.findIndex((t) => t.id === input.id)
     if (idx === -1) fail('NOT_FOUND')
     ctx.todos.splice(idx, 1)
     return { ok: true }

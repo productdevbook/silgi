@@ -2,42 +2,32 @@
  * Nitro v3 adapter — use Silgi with Nitro server routes.
  *
  * Nitro v3 uses H3 v2 under the hood with `defineHandler` from `nitro/h3`.
- * This adapter creates a catch-all route handler that dispatches to
- * Silgi procedures.
  *
  * ## File-system routing
  *
  * Create a catch-all route at `server/routes/rpc/[...path].ts`:
  *
  * ```ts
- * import { silgiNitro } from "silgi/nitro"
+ * import { defineHandler } from "nitro/h3"
+ * import { compileRouter } from "silgi/compile"
  * import { appRouter } from "~/server/rpc"
  *
- * export default silgiNitro(appRouter, {
- *   context: (event) => ({
- *     db: getDB(),
- *     user: event.context.auth,
- *   }),
+ * const compiledRouter = compileRouter(appRouter)
+ *
+ * export default defineHandler(async (event) => {
+ *   const path = event.context.params?.path || ""
+ *   const match = compiledRouter(event.method, "/" + path)
+ *   if (!match) return { code: "NOT_FOUND", status: 404 }
+ *
+ *   const input = event.method === "POST"
+ *     ? await event.req.json().catch(() => undefined)
+ *     : undefined
+ *
+ *   return await match.data.handler({}, input, new AbortController().signal)
  * })
  * ```
  *
- * This handles all requests under `/rpc/*`:
- * - `POST /rpc/users/list` → calls `users.list`
- * - `GET /rpc/users/get?data={"id":1}` → calls `users.get`
- *
- * ## With explicit prefix
- *
- * If you prefer a single entry handler instead of FS routing:
- *
- * ```ts
- * // server/routes/[...].ts (catch-all)
- * import { silgiNitro } from "silgi/nitro"
- *
- * export default silgiNitro(appRouter, {
- *   prefix: "/rpc",
- *   context: (event) => ({ db: getDB() }),
- * })
- * ```
+ * For full context + error handling, use the `silgiNitro` helper below.
  */
 
 import { compileRouter } from '../compile.ts'
@@ -56,23 +46,18 @@ export interface NitroAdapterOptions<TCtx extends Record<string, unknown>> {
    * Route prefix to strip from the path.
    * When using FS routing at `server/routes/rpc/[...path].ts`,
    * leave this undefined — the path param is used directly.
-   * When using a catch-all handler, set this to strip the prefix.
    */
   prefix?: string
 }
 
-/** Minimal Nitro/H3 v2 event shape */
+/** Nitro v3 / H3 v2 event shape */
 interface NitroEvent {
-  url: URL
+  method: string
   path: string
+  url: URL
   req: {
-    method: string
-    headers: Headers
     json(): Promise<unknown>
     text(): Promise<string>
-  }
-  res: {
-    headers: Headers
   }
   context: {
     params: Record<string, string>
@@ -92,35 +77,29 @@ export function silgiNitro<TCtx extends Record<string, unknown>>(
 ): (event: NitroEvent) => Promise<unknown> {
   const flatRouter = compileRouter(router)
   const prefix = options.prefix
+
   return async (event: NitroEvent) => {
-    // Resolve procedure path
     let procedurePath: string
 
-    // Option 1: FS routing — path comes from [...path] param
+    // FS routing: path comes from [...path] param
     const pathParam = event.context.params?.path
     if (pathParam && !prefix) {
-      // Nitro joins catch-all segments with "/"
       procedurePath = pathParam
     } else {
-      // Option 2: Explicit prefix — strip from event.path
+      // Explicit prefix: strip from event.path
       const rawPath = event.path ?? event.url?.pathname ?? '/'
       procedurePath = prefix ? stripPrefix(rawPath, prefix) : stripLeadingSlash(rawPath)
     }
 
-    const match = flatRouter(event.req.method, '/' + procedurePath)
+    const method = event.method
+    const match = flatRouter(method, '/' + procedurePath)
     if (!match) {
-      return {
-        code: 'NOT_FOUND',
-        status: 404,
-        message: 'Procedure not found',
-      }
+      return { code: 'NOT_FOUND', status: 404, message: 'Procedure not found' }
     }
     const route = match.data
 
     try {
-      // Build context
       const ctx: Record<string, unknown> = Object.create(null)
-      // Surface URL params from radix router match
       if (match.params) ctx.params = match.params
       if (options.context) {
         const baseCtx = await options.context(event)
@@ -128,31 +107,20 @@ export function silgiNitro<TCtx extends Record<string, unknown>>(
         for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = baseCtx[keys[i]!]
       }
 
-      // Parse input
       let input: unknown
-      const method = event.req.method
-
       if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
-        // Nitro v3 / H3 v2: event.req.json()
         input = await event.req.json().catch(() => undefined)
       } else {
-        // GET: check searchParams
         const data = event.url.searchParams.get('data')
         if (data) input = JSON.parse(data)
       }
 
-      // Execute compiled pipeline
-      const signal = (event.req as any)?.signal ?? new AbortController().signal
+      const signal = new AbortController().signal
       const output = await route.handler(ctx, input, signal)
       return output
     } catch (error) {
       if (error instanceof ValidationError) {
-        return {
-          code: 'BAD_REQUEST',
-          status: 400,
-          message: error.message,
-          data: { issues: error.issues },
-        }
+        return { code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } }
       }
       const e = error instanceof SilgiError ? error : toSilgiError(error)
       return e.toJSON()
