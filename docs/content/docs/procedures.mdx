@@ -17,10 +17,10 @@ The simplest way. Just pass a resolve function:
 import { z } from 'zod'
 
 // No input
-const health = k.$resolve(() => ({ status: 'ok' }))
+const health = s.$resolve(() => ({ status: 'ok' }))
 
 // With input validation
-const getUser = k.$input(z.object({ id: z.number() })).$resolve(({ input, ctx }) => ctx.db.users.findById(input.id))
+const getUser = s.$input(z.object({ id: z.number() })).$resolve(({ input, ctx }) => ctx.db.users.findById(input.id))
 ```
 
 When you use `$input()`, Silgi validates the input before your function runs. If validation fails, the client gets a 400 error automatically.
@@ -68,7 +68,7 @@ Every procedure has a `resolve` function. It receives one object with four prope
 
 ```ts twoslash
 // @noErrors
-const myProcedure = k.$resolve(({ input, ctx, fail, signal }) => {
+const myProcedure = s.$resolve(({ input, ctx, fail, signal }) => {
   // input  — the validated input (or undefined if no schema)
   // ctx    — the context object (from context factory + guards)
   // fail   — throws a typed error (only if `errors` is defined)
@@ -100,7 +100,7 @@ A subscription is a procedure that returns an async generator. The server sends 
 
 ```ts twoslash
 // @noErrors
-const countdown = k.subscription(async function* () {
+const countdown = s.subscription(async function* () {
   for (let i = 5; i > 0; i--) {
     yield { count: i }
     await new Promise((r) => setTimeout(r, 1000))
@@ -140,7 +140,7 @@ Procedures are grouped into routers. You can nest them:
 
 ```ts twoslash
 // @noErrors
-const appRouter = k.router({
+const appRouter = s.router({
   health: healthCheck,
   users: {
     list: listUsers,
@@ -174,7 +174,7 @@ Metadata is stored on the procedure definition and can be read by middleware:
 
 ```ts twoslash
 // @noErrors
-const cacheWrap = k.wrap(async (ctx, next) => {
+const cacheWrap = s.wrap(async (ctx, next) => {
   // Access meta from the procedure being executed
   // Useful for conditional caching, logging, authorization policies
   return next()

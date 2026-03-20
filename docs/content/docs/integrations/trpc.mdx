@@ -17,7 +17,7 @@ import { trpcRouter } from './trpc-router'
 const silgiRouter = fromTRPC(trpcRouter)
 
 // Now use with Silgi's serve(), handler(), etc.
-k.serve(silgiRouter, { port: 3000 })
+s.serve(silgiRouter, { port: 3000 })
 ```
 
 ## What gets converted

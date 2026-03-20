@@ -9,14 +9,14 @@ const db = {
   nextId: 3,
 }
 
-const k = silgi({
+const s = silgi({
   context: (req) => ({
     db,
     headers: Object.fromEntries(req.headers),
   }),
 })
 
-const { query, mutation, guard, router } = k
+const { query, mutation, guard, router } = s
 
 const auth = guard((ctx) => {
   const token = ctx.headers.authorization?.replace('Bearer ', '')
@@ -42,7 +42,7 @@ const appRouter = router({
   },
 })
 
-k.serve(appRouter, {
+s.serve(appRouter, {
   port: 3000,
   scalar: true,
 })

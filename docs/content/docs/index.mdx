@@ -21,7 +21,7 @@ import { silgi } from 'silgi'
 import { z } from 'zod'
 
 // 1. Create an instance
-const k = silgi({
+const s = silgi({
   context: (req) => ({ db: getDB() }),
 })
 
@@ -31,10 +31,10 @@ const getUsers = k
   .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))
 
 // 3. Create a router
-const appRouter = k.router({ getUsers })
+const appRouter = s.router({ getUsers })
 
 // 4. Start the server
-k.serve(appRouter, { port: 3000 })
+s.serve(appRouter, { port: 3000 })
 ```
 
 That's it. The client gets full types automatically.

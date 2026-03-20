@@ -17,11 +17,11 @@ export const db = {
 
 // ── Silgi Instance ──────────────────────────────────
 
-const k = silgi({
+const s = silgi({
   context: () => ({ db }),
 })
 
-const { query, mutation, guard, router } = k
+const { query, mutation, guard, router } = s
 
 // ── Middleware ────────────────────────────────────────
 

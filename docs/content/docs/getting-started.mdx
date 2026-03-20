@@ -49,7 +49,7 @@ This is where you tell Silgi how to build the context for each request. The cont
 // @noErrors
 import { silgi } from 'silgi'
 
-const k = silgi({
+const s = silgi({
   context: (req) => ({
     // This runs on every request.
     // Whatever you return here is available as `ctx` in procedures.
@@ -58,7 +58,7 @@ const k = silgi({
 })
 
 // Export the helpers you need
-export const { guard, wrap, router } = k
+export const { guard, wrap, router } = s
 export { k }
 ```
 
@@ -84,7 +84,7 @@ const auth = guard((ctx) => {
 })
 
 // A procedure with input validation
-const listUsers = k.$input(z.object({ limit: z.number().min(1).max(100).optional() })).$resolve(({ input, ctx }) => {
+const listUsers = s.$input(z.object({ limit: z.number().min(1).max(100).optional() })).$resolve(({ input, ctx }) => {
   return ctx.db.users.findMany({ take: input.limit ?? 10 })
 })
 
@@ -120,7 +120,7 @@ const appRouter = router({
   },
 })
 
-k.serve(appRouter, {
+s.serve(appRouter, {
   port: 3000,
   scalar: true, // Serves API docs at /reference
 })

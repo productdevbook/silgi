@@ -27,11 +27,11 @@ If you're using `serve()`, add `ws: true`:
 // @noErrors
 import { silgi } from 'silgi'
 
-const k = silgi({ context: (req) => ({}) })
-const { subscription, router } = k
+const s = silgi({ context: (req) => ({}) })
+const { subscription, router } = s
 
 const appRouter = router({
-  health: k.$resolve(() => ({ status: 'ok' })),
+  health: s.$resolve(() => ({ status: 'ok' })),
   countdown: subscription(async function* () {
     for (let i = 5; i > 0; i--) {
       yield { count: i }
@@ -40,7 +40,7 @@ const appRouter = router({
   }),
 })
 
-k.serve(appRouter, {
+s.serve(appRouter, {
   port: 3000,
   ws: true,
 })
@@ -92,7 +92,7 @@ If the procedure fails, the server sends an error:
 
 ### Streaming (subscriptions)
 
-For procedures defined with `k.subscription()`, the server sends multiple `data` messages followed by a `done` signal:
+For procedures defined with `s.subscription()`, the server sends multiple `data` messages followed by a `done` signal:
 
 ```json
 { "id": "3", "data": { "count": 5 } }
@@ -185,4 +185,4 @@ With binary mode, messages are sent as MessagePack-encoded binary frames instead
 - [MessagePack](/docs/protocols/msgpack) — binary encoding for smaller payloads
 - [devalue](/docs/protocols/devalue) — rich type serialization for Date, Map, Set
 - [Server](/docs/server) — `serve()` options and lifecycle hooks
-- [Procedures](/docs/procedures) — defining subscriptions with `k.subscription()`
+- [Procedures](/docs/procedures) — defining subscriptions with `s.subscription()`

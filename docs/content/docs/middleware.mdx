@@ -20,12 +20,12 @@ A guard is a function that receives the current context and either:
 // @noErrors
 import { silgi, SilgiError } from 'silgi'
 
-const k = silgi({
+const s = silgi({
   context: (req) => ({
     headers: Object.fromEntries(req.headers),
   }),
 })
-const { guard } = k
+const { guard } = s
 
 // This guard verifies a token and adds `user` to the context
 const auth = guard(async (ctx) => {
@@ -41,7 +41,7 @@ When a procedure uses this guard, TypeScript knows that `ctx.user` exists:
 
 ```ts twoslash
 // @noErrors
-const me = k.$use(auth).$resolve(({ ctx }) => {
+const me = s.$use(auth).$resolve(({ ctx }) => {
   return ctx.user // typed as User — no cast needed
 })
 ```
@@ -98,7 +98,7 @@ A wrap is an "onion-style" middleware. It receives the context and a `next()` fu
 
 ```ts twoslash
 // @noErrors
-const timing = k.wrap(async (ctx, next) => {
+const timing = s.wrap(async (ctx, next) => {
   const start = performance.now()
   const result = await next()
   console.log(`Procedure took ${performance.now() - start}ms`)
@@ -116,7 +116,7 @@ Wraps are useful for:
 
 ```ts twoslash
 // @noErrors
-const withSentry = k.wrap(async (ctx, next) => {
+const withSentry = s.wrap(async (ctx, next) => {
   try {
     return await next()
   } catch (error) {
@@ -211,9 +211,9 @@ Then use them wherever you need:
 // @noErrors
 import { auth, adminOnly, timing } from './middleware'
 
-const listUsers = k.$use(auth, timing).$resolve(({ ctx }) => ctx.db.users.findMany())
+const listUsers = s.$use(auth, timing).$resolve(({ ctx }) => ctx.db.users.findMany())
 
-const deleteUser = k.$use(auth, adminOnly, timing).$resolve(({ ctx, input }) => ctx.db.users.delete(input.id))
+const deleteUser = s.$use(auth, adminOnly, timing).$resolve(({ ctx, input }) => ctx.db.users.delete(input.id))
 ```
 
 ## Lifecycle hooks
@@ -231,7 +231,7 @@ const logging = lifecycleWrap({
   onFinish: ({ durationMs }) => metrics.record(durationMs),
 })
 
-const listUsers = k.$use(logging).$resolve(({ ctx }) => ctx.db.users.findMany())
+const listUsers = s.$use(logging).$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
 
 All four hooks are optional. They're purely for side effects — the procedure result is never modified.
@@ -257,7 +257,7 @@ const renameUserId = mapInput((input: { userId: string }) => ({
   id: input.userId,
 }))
 
-const getUser = k.$use(renameUserId).$resolve(({ input }) => db.users.find(input.id))
+const getUser = s.$use(renameUserId).$resolve(({ input }) => db.users.find(input.id))
 ```
 
 Useful for adapting between client and server naming conventions, or pre-processing input in a reusable way.

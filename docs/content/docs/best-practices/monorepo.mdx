@@ -46,7 +46,7 @@ The contract package exports input/output schemas and the router type. No server
 import { silgi } from "silgi"
 import { z } from "zod"
 
-const k = silgi()
+const s = silgi()
 
 // Input schemas — shared between server and client
 export const UserInput = z.object({
@@ -59,10 +59,10 @@ export const ListInput = z.object({
 })
 
 // Procedure definitions — schemas only, no implementation
-const listUsers = k.$input(ListInput).$resolve(() => {} as any)
-const createUser = k.$input(UserInput).$resolve(() => {} as any)
+const listUsers = s.$input(ListInput).$resolve(() => {} as any)
+const createUser = s.$input(UserInput).$resolve(() => {} as any)
 
-export const contractRouter = k.router({
+export const contractRouter = s.router({
   users: { list: listUsers, create: createUser },
 })
 
@@ -83,25 +83,25 @@ The server package imports the schemas from the contract and provides real imple
 import { silgi } from 'silgi'
 import { ListInput, UserInput } from 'api-contract'
 
-const k = silgi({
+const s = silgi({
   context: (req) => ({
     db: getDB(),
     headers: Object.fromEntries(req.headers),
   }),
 })
 
-const listUsers = k.$input(ListInput).$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit ?? 10 }))
+const listUsers = s.$input(ListInput).$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit ?? 10 }))
 
 const createUser = k
   .$use(auth)
   .$input(UserInput)
   .$resolve(({ input, ctx }) => ctx.db.users.create(input))
 
-const appRouter = k.router({
+const appRouter = s.router({
   users: { list: listUsers, create: createUser },
 })
 
-k.serve(appRouter, { port: 3000 })
+s.serve(appRouter, { port: 3000 })
 ```
 
 ## 3. Consume on the frontend

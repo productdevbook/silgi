@@ -20,14 +20,14 @@ const db = {
 
 // ── Silgi Instance ──────────────────────────────────
 
-const k = silgi({
+const s = silgi({
   context: (req) => ({
     db,
     headers: Object.fromEntries(req.headers),
   }),
 })
 
-const { query, mutation, guard, router, handler } = k
+const { query, mutation, guard, router, handler } = s
 
 // ── Middleware ────────────────────────────────────────
 

@@ -109,7 +109,7 @@ If you're using `handler()` with a custom server, you can wrap it to add CORS he
 // @noErrors
 import { corsHeaders } from 'silgi/cors'
 
-const handle = k.handler(appRouter)
+const handle = s.handler(appRouter)
 const cors = corsHeaders({ origin: 'https://app.example.com', credentials: true })
 
 async function fetch(request: Request): Promise<Response> {

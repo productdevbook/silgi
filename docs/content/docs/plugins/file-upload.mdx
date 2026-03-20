@@ -42,7 +42,7 @@ Set `maxFiles` to allow multiple uploads. Files are available as `ctx.files`:
 
 ```ts twoslash
 // @noErrors
-const uploadPhotos = k.$use(fileGuard({ maxFiles: 10, allowedTypes: ['image/*'] })).$resolve(async ({ ctx }) => {
+const uploadPhotos = s.$use(fileGuard({ maxFiles: 10, allowedTypes: ['image/*'] })).$resolve(async ({ ctx }) => {
   return ctx.files.map((f) => ({ name: f.name, size: f.size }))
 })
 ```
@@ -55,7 +55,7 @@ For custom file handling, use `parseMultipart()` directly:
 // @noErrors
 import { parseMultipart } from 'silgi/plugins'
 
-const upload = k.$resolve(async ({ ctx }) => {
+const upload = s.$resolve(async ({ ctx }) => {
   const { files, fields } = await parseMultipart(ctx.__request)
   return { fileCount: files.length, caption: fields.caption }
 })

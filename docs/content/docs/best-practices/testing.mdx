@@ -122,7 +122,7 @@ When you need to test the actual HTTP layer — status codes, headers, content n
 
 ```ts twoslash
 // @noErrors
-const handle = k.handler(appRouter)
+const handle = s.handler(appRouter)
 
 describe('HTTP behavior', () => {
   it('returns 200 with JSON', async () => {

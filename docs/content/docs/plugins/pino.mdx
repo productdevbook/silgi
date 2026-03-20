@@ -15,7 +15,7 @@ import { silgi } from 'silgi'
 import pino from 'pino'
 import { loggingHooks } from 'silgi/pino'
 
-const k = silgi({
+const s = silgi({
   context: (req) => ({ db: getDB() }),
   hooks: loggingHooks({ logger: pino() }),
 })
@@ -92,7 +92,7 @@ This means you're not locked into Pino. Any logger with compatible methods works
 // @noErrors
 import { loggingHooks } from 'silgi/pino'
 
-const k = silgi({
+const s = silgi({
   context: (req) => ({}),
   hooks: {
     ...loggingHooks({ logger: pino() }),

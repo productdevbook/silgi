@@ -220,7 +220,7 @@ Guards can throw errors too. A common pattern is an auth guard that throws `UNAU
 
 ```ts twoslash
 // @noErrors
-const auth = k.guard(async (ctx) => {
+const auth = s.guard(async (ctx) => {
   const token = ctx.headers.authorization
   if (!token) throw new SilgiError('UNAUTHORIZED')
   const user = await verifyToken(token)
@@ -237,7 +237,7 @@ Guards can declare their own error maps. When a procedure uses that guard, the e
 
 ```ts twoslash
 // @noErrors
-const auth = k.guard({
+const auth = s.guard({
   errors: { UNAUTHORIZED: 401 },
   fn: async (ctx) => {
     const token = ctx.headers.authorization
@@ -246,7 +246,7 @@ const auth = k.guard({
   },
 })
 
-const rateLimit = k.guard({
+const rateLimit = s.guard({
   errors: { RATE_LIMITED: 429 },
   fn: (ctx) => {
     if (tooManyRequests(ctx)) throw new SilgiError('RATE_LIMITED')
@@ -269,7 +269,7 @@ This gives you three things:
 - **Runtime** — `fail('UNAUTHORIZED')` produces the correct 401 status code
 
 <Callout type='info'>
-  The simple `k.guard(fn)` form still works. The `k.guard({ errors, fn })` form is opt-in — use it when you want the guard's errors to be part of the typed contract.
+  The simple `s.guard(fn)` form still works. The `s.guard({ errors, fn })` form is opt-in — use it when you want the guard's errors to be part of the typed contract.
 </Callout>
 
 ## What's next?

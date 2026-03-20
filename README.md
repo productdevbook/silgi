@@ -18,9 +18,9 @@ npm install silgi
 import { silgi } from 'silgi'
 import { z } from 'zod'
 
-const k = silgi({ context: (req) => ({ db: getDB() }) })
+const s = silgi({ context: (req) => ({ db: getDB() }) })
 
-const appRouter = k.router({
+const appRouter = s.router({
   users: {
     list: k
       .$input(z.object({ limit: z.number().optional() }))
@@ -28,7 +28,7 @@ const appRouter = k.router({
   },
 })
 
-k.serve(appRouter, { port: 3000, scalar: true })
+s.serve(appRouter, { port: 3000, scalar: true })
 ```
 
 ## Features
@@ -44,7 +44,7 @@ k.serve(appRouter, { port: 3000, scalar: true })
 
 | | Import |
 |---|---|
-| Standalone | `k.serve()` / `k.handler()` |
+| Standalone | `s.serve()` / `s.handler()` |
 | Nitro v3 | `silgi/nitro` |
 | H3 v2 | `silgi/h3` |
 | Hono | `silgi/hono` |
@@ -81,7 +81,7 @@ npx giget@latest gh:productdevbook/silgi/examples/nuxt my-nuxt-app
 
 ## Documentation
 
-[silgi.silgi.dev](https://silgi.silgi.dev)
+[silgi.dev](https://silgi.dev)
 
 ## Credits
 

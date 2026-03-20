@@ -16,7 +16,7 @@ Wrap a query with `cacheQuery()` to cache its results:
 // @noErrors
 import { cacheQuery } from 'silgi/cache'
 
-const listUsers = k.$use(cacheQuery({ maxAge: 60 })).$resolve(({ ctx }) => ctx.db.users.findMany())
+const listUsers = s.$use(cacheQuery({ maxAge: 60 })).$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
 
 The first call runs the resolver and caches the result. Subsequent calls with the same input return the cached value for 60 seconds.
@@ -81,7 +81,7 @@ const listUsers = k
   .$use(cacheQuery({ maxAge: 300, name: 'users_list' }))
   .$resolve(({ ctx }) => ctx.db.users.findMany())
 
-const createUser = k.$resolve(async ({ input, ctx }) => {
+const createUser = s.$resolve(async ({ input, ctx }) => {
   const user = await ctx.db.users.create(input)
   await invalidateQueryCache('users_list') // clear the cache
   return user

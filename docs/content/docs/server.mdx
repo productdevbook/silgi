@@ -18,15 +18,15 @@ The simplest way to get a server running. One call, and you have an HTTP server 
 import { silgi } from 'silgi'
 import { z } from 'zod'
 
-const k = silgi({
+const s = silgi({
   context: (req) => ({ db: getDB() }),
 })
 
-const appRouter = k.router({
-  health: k.$resolve(() => ({ status: 'ok' })),
+const appRouter = s.router({
+  health: s.$resolve(() => ({ status: 'ok' })),
 })
 
-k.serve(appRouter, {
+s.serve(appRouter, {
   port: 3000,
 })
 ```
@@ -41,7 +41,7 @@ Silgi server running at http://127.0.0.1:3000
 
 ```ts twoslash
 // @noErrors
-k.serve(appRouter, {
+s.serve(appRouter, {
   port: 3000, // auto-finds next available if busy
   hostname: '0.0.0.0', // bind to all interfaces
   scalar: true, // API docs at /reference
@@ -72,7 +72,7 @@ For runtimes other than Node.js, or when you want to plug Silgi into an existing
 
 ```ts twoslash
 // @noErrors
-const handle = k.handler(appRouter)
+const handle = s.handler(appRouter)
 // handle is: (request: Request) => Promise<Response>
 ```
 
@@ -82,7 +82,7 @@ This works everywhere the Web Fetch API exists:
   <Tab value="Bun">
   ```ts twoslash
 // @noErrors
-const handle = k.handler(appRouter)
+const handle = s.handler(appRouter)
 
 Bun.serve({
 port: 3000,
@@ -94,7 +94,7 @@ fetch: handle,
 <Tab value="Deno">
 ```ts twoslash
 // @noErrors
-const handle = k.handler(appRouter)
+const handle = s.handler(appRouter)
 
 Deno.serve({ port: 3000 }, handle)
 ````
@@ -103,7 +103,7 @@ Deno.serve({ port: 3000 }, handle)
   <Tab value="Cloudflare Workers">
   ```ts twoslash
 // @noErrors
-const handle = k.handler(appRouter)
+const handle = s.handler(appRouter)
 
 export default {
   fetch: handle,
@@ -135,7 +135,7 @@ Silgi can generate an OpenAPI 3.1.0 spec from your router and serve an interacti
 
 ```ts twoslash
 // @noErrors
-k.serve(appRouter, {
+s.serve(appRouter, {
   port: 3000,
   scalar: true,
 })
@@ -154,7 +154,7 @@ Pass an options object instead of `true`:
 
 ```ts twoslash
 // @noErrors
-k.serve(appRouter, {
+s.serve(appRouter, {
   scalar: {
     title: 'My API',
     description: 'Built with Silgi',
@@ -172,7 +172,7 @@ By default, the Scalar UI JavaScript is loaded from a CDN. You can change this w
 
 ```ts twoslash
 // @noErrors
-k.serve(appRouter, {
+s.serve(appRouter, {
   scalar: {
     title: 'My API',
     cdn: 'local', // serve from node_modules (offline)
@@ -233,10 +233,10 @@ Add a `cache` option to `route` to set `Cache-Control` headers on query response
 ```ts twoslash
 // @noErrors
 // Shorthand: cache for 60 seconds
-const listUsers = k.$route({ cache: 60 }).$resolve(({ ctx }) => ctx.db.users.findMany())
+const listUsers = s.$route({ cache: 60 }).$resolve(({ ctx }) => ctx.db.users.findMany())
 
 // Full control: custom Cache-Control value
-const getConfig = k.$route({ cache: 'public, max-age=300, stale-while-revalidate=60' }).$resolve(() => loadConfig())
+const getConfig = s.$route({ cache: 'public, max-age=300, stale-while-revalidate=60' }).$resolve(() => loadConfig())
 ```
 
 | Value    | Behavior                                          |
@@ -257,7 +257,7 @@ For production deployments that benefit from multiplexing and header compression
 
 ```ts twoslash
 // @noErrors
-k.serve(appRouter, {
+s.serve(appRouter, {
   port: 443,
   http2: {
     cert: './certs/cert.pem',
@@ -286,7 +286,7 @@ Enable bidirectional RPC alongside the HTTP server:
 
 ```ts twoslash
 // @noErrors
-k.serve(appRouter, {
+s.serve(appRouter, {
   port: 3000,
   ws: true,
 })
@@ -305,7 +305,7 @@ Silgi fires hooks at key points during request processing. Register them in the 
 
 ```ts twoslash
 // @noErrors
-const k = silgi({
+const s = silgi({
   context: (req) => ({ db: getDB() }),
   hooks: {
     request: ({ path, input }) => {
@@ -329,7 +329,7 @@ You can also add or remove hooks after the instance is created:
 ```ts twoslash
 // @noErrors
 // Add a hook
-k.hook('error', ({ error }) => reportToSentry(error))
+s.hook('error', ({ error }) => reportToSentry(error))
 
 // Remove a hook
 k.removeHook('error', myHookFn)
@@ -357,7 +357,7 @@ Return a standard `Response` object for complete control over status, headers, a
 
 ```ts twoslash
 // @noErrors
-const downloadPdf = k.$input(z.object({ id: z.string() })).$resolve(async ({ input, ctx }) => {
+const downloadPdf = s.$input(z.object({ id: z.string() })).$resolve(async ({ input, ctx }) => {
   const pdf = await ctx.storage.getFile(input.id)
   return new Response(pdf, {
     headers: {
@@ -374,7 +374,7 @@ Return a `ReadableStream` for binary streaming. Silgi sends it with `application
 
 ```ts twoslash
 // @noErrors
-const exportCsv = k.$resolve(async ({ ctx }) => {
+const exportCsv = s.$resolve(async ({ ctx }) => {
   return new ReadableStream({
     async start(controller) {
       controller.enqueue(new TextEncoder().encode('id,name\n'))

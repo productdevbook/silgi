@@ -45,9 +45,9 @@ Add the guard to every mutation via a shared middleware array:
 // @noErrors
 const limit = bodyLimitGuard({ maxBytes: 2 * 1024 * 1024 })
 
-const createUser = k.$use(auth, limit).$resolve(({ input, ctx }) => ctx.db.users.create(input))
+const createUser = s.$use(auth, limit).$resolve(({ input, ctx }) => ctx.db.users.create(input))
 
-const createPost = k.$use(auth, limit).$resolve(({ input, ctx }) => ctx.db.posts.create(input))
+const createPost = s.$use(auth, limit).$resolve(({ input, ctx }) => ctx.db.posts.create(input))
 ```
 
 <Callout>

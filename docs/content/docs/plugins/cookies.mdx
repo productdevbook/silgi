@@ -14,7 +14,7 @@ Lightweight cookie utilities for Silgi handlers. No dependencies. Works with bot
 // @noErrors
 import { getCookie, parseCookies } from 'silgi/cookies'
 
-const auth = k.guard((ctx) => {
+const auth = s.guard((ctx) => {
   const token = getCookie(ctx.headers, 'session')
   if (!token) throw new SilgiError('UNAUTHORIZED')
   return { sessionToken: token }

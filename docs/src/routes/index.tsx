@@ -337,7 +337,7 @@ function ServerGrid() {
         <Cell>
           <CT t='serve()' d='One-line Node.js server. Auto port finding, HTTP/2 with TLS, WebSocket on same port.' />
           <div className='mt-5 rounded-lg border border-[var(--k-line)] bg-[var(--k-raised)] p-4 k-mono text-[12px] text-[var(--k-dim)]'>
-            <p>k.serve(router, {'{'}</p>
+            <p>s.serve(router, {'{'}</p>
             <p>
               &nbsp; port: <span style={{ color: 'var(--k-code-nr)' }}>3000</span>,
             </p>

@@ -12,7 +12,7 @@ Silgi has a built-in `serve()` function that creates its own HTTP server. But if
 
 | Approach                | When                                  |
 | ----------------------- | ------------------------------------- |
-| `k.serve(router)`       | New project, Silgi-only server       |
+| `s.serve(router)`       | New project, Silgi-only server       |
 | `silgiFastify(router)` | Adding RPC to an existing Fastify app |
 
 ## Setup
@@ -31,7 +31,7 @@ npm install fastify
 
 ### Create your Silgi router
 
-If you haven't defined a router yet, see the [Getting Started](/docs/getting-started) guide. You need a router object — the same one you'd pass to `k.serve()`.
+If you haven't defined a router yet, see the [Getting Started](/docs/getting-started) guide. You need a router object — the same one you'd pass to `s.serve()`.
 
 </Step>
 <Step>

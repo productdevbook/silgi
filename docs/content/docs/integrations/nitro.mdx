@@ -18,16 +18,16 @@ Just like [Hono with Nitro](https://github.com/nitrojs/nitro/tree/main/examples/
 import { silgi, SilgiError } from 'silgi'
 import { z } from 'zod'
 
-const k = silgi({
+const s = silgi({
   context: (req) => ({
     db: getDB(),
     headers: Object.fromEntries(req.headers),
   }),
 })
 
-const { guard, router, handler } = k
+const { guard, router, handler } = s
 
-const health = k.$resolve(() => ({ status: 'ok' }))
+const health = s.$resolve(() => ({ status: 'ok' }))
 
 const listUsers = k
   .$input(z.object({ limit: z.number().optional() }))

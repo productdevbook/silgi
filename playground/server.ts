@@ -107,7 +107,7 @@ const serializer = createSerializer()
 
 // ── Silgi Instance ──────────────────────────────────
 
-const k = silgi({
+const s = silgi({
   context: (req: Request) => ({
     headers: Object.fromEntries(req.headers) as Record<string, string>,
     db,
@@ -128,7 +128,7 @@ const k = silgi({
   },
 })
 
-const { query, mutation, subscription, guard, wrap, router } = k
+const { query, mutation, subscription, guard, wrap, router } = s
 
 // ── CORS (hook-based) ────────────────────────────────
 
@@ -495,7 +495,7 @@ const batchHandler = createBatchHandler(appRouter, {
 
 // ── Serve ────────────────────────────────────────────
 
-k.serve(appRouter, {
+s.serve(appRouter, {
   port: Number(process.env.PORT) || 3456,
   scalar: {
     title: 'Silgi Playground',

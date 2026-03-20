@@ -15,14 +15,14 @@ A guard that reads a tenant ID from the request and adds it to the context. Ever
 // @noErrors
 import { silgi, SilgiError } from 'silgi'
 
-const k = silgi({
+const s = silgi({
   context: (req) => ({
     headers: Object.fromEntries(req.headers),
   }),
 })
 
 // The guard
-export const tenantGuard = k.guard(async (ctx) => {
+export const tenantGuard = s.guard(async (ctx) => {
   const tenantId = ctx.headers['x-tenant-id']
   if (!tenantId) {
     throw new SilgiError('BAD_REQUEST', { message: 'Missing X-Tenant-Id header' })
@@ -41,7 +41,7 @@ Use it in any procedure:
 
 ```ts twoslash
 // @noErrors
-const listUsers = k.$use(tenantGuard).$resolve(({ ctx }) => {
+const listUsers = s.$use(tenantGuard).$resolve(({ ctx }) => {
   // ctx.tenant is typed — TypeScript knows it exists
   return ctx.db.users.findMany({
     where: { tenantId: ctx.tenant.id },
@@ -58,7 +58,7 @@ Wrap the guard in a factory function to accept options:
 export function createTenantGuard(options: { headerName?: string; required?: boolean }) {
   const header = options.headerName ?? 'x-tenant-id'
 
-  return k.guard(async (ctx) => {
+  return s.guard(async (ctx) => {
     const tenantId = ctx.headers[header]
 
     if (!tenantId && options.required !== false) {
@@ -90,7 +90,7 @@ export function createCacheWrap(
   const ttl = options.ttl ?? 60_000 // 1 minute default
   const cache = new Map<string, { value: unknown; expires: number }>()
 
-  return k.wrap(async (ctx, next) => {
+  return s.wrap(async (ctx, next) => {
     const key = options.keyFn ? options.keyFn(ctx, ctx.__input) : JSON.stringify(ctx.__input)
 
     const cached = cache.get(key)
@@ -116,7 +116,7 @@ Use it:
 // @noErrors
 const cacheOneMinute = createCacheWrap({ ttl: 60_000 })
 
-const listProducts = k.$use(cacheOneMinute).$resolve(({ ctx }) => ctx.db.products.findMany())
+const listProducts = s.$use(cacheOneMinute).$resolve(({ ctx }) => ctx.db.products.findMany())
 ```
 
 <Callout>
@@ -153,14 +153,14 @@ Apply it per-procedure:
 // @noErrors
 const metrics = createMetricsPlugin(statsd)
 
-const listUsers = k.$use(metrics).$resolve(({ ctx }) => ctx.db.users.findMany())
+const listUsers = s.$use(metrics).$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
 
 Or apply it globally via instance-level hooks:
 
 ```ts twoslash
 // @noErrors
-const k = silgi({
+const s = silgi({
   context: (req) => ({ db: getDB() }),
   hooks: {
     request: () => metrics.increment('rpc.requests'),
@@ -177,13 +177,13 @@ A real plugin often combines a guard, a wrap, and hooks. Package them together:
 ```ts twoslash
 // @noErrors
 export function createAuditPlugin(options: { logger: Logger }) {
-  const auditGuard = k.guard((ctx) => {
+  const auditGuard = s.guard((ctx) => {
     return {
       auditTrail: [] as string[],
     }
   })
 
-  const auditWrap = k.wrap(async (ctx, next) => {
+  const auditWrap = s.wrap(async (ctx, next) => {
     const result = await next()
 
     if (ctx.auditTrail.length > 0) {
@@ -207,7 +207,7 @@ Use both:
 // @noErrors
 const { auditGuard, auditWrap } = createAuditPlugin({ logger })
 
-const deleteUser = k.$use(auth, auditGuard, auditWrap).$resolve(({ input, ctx }) => {
+const deleteUser = s.$use(auth, auditGuard, auditWrap).$resolve(({ input, ctx }) => {
   ctx.auditTrail.push(`Deleted user ${input.id}`)
   return ctx.db.users.delete(input.id)
 })
@@ -227,7 +227,7 @@ If you want to publish your plugin as an npm package:
 import type { SilgiInstance } from 'silgi'
 
 export function createTenantPlugin<T extends SilgiInstance>(k: T) {
-  const tenantGuard = k.guard(async (ctx) => {
+  const tenantGuard = s.guard(async (ctx) => {
     // ...
     return { tenant }
   })

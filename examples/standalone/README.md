@@ -1,6 +1,6 @@
 # Silgi — Standalone Example
 
-Standalone Silgi server with `k.serve()`. No framework needed.
+Standalone Silgi server with `s.serve()`. No framework needed.
 
 ## Quick Start
 

@@ -4,11 +4,11 @@ import { silgi } from 'silgi'
 import { silgiHono } from 'silgi/hono'
 import { z } from 'zod'
 
-const k = silgi({ context: () => ({ db: 'hono-db' }) })
+const s = silgi({ context: () => ({ db: 'hono-db' }) })
 
-const appRouter = k.router({
-  health: k.$resolve(() => ({ status: 'ok', framework: 'hono' })),
-  echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
+const appRouter = s.router({
+  health: s.$resolve(() => ({ status: 'ok', framework: 'hono' })),
+  echo: s.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
 })
 
 const app = new Hono()

@@ -35,7 +35,7 @@ const createUser = k
 
 ```ts twoslash
 // @noErrors
-const onUserCreated = k.subscription(async function* () {
+const onUserCreated = s.subscription(async function* () {
   yield* pubsub.subscribe('user:created')
 })
 ```

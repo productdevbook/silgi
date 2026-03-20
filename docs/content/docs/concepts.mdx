@@ -15,7 +15,7 @@ Every request starts by running your **context factory**. This is a function you
 // @noErrors
 import { silgi } from 'silgi'
 
-const k = silgi({
+const s = silgi({
   context: (req) => ({
     db: getDB(),
     headers: Object.fromEntries(req.headers),
@@ -46,7 +46,7 @@ Middleware runs before (and sometimes after) a procedure. Silgi has two kinds:
 
 ```ts twoslash
 // @noErrors
-const auth = k.guard(async (ctx) => {
+const auth = s.guard(async (ctx) => {
   const user = await verifyToken(ctx.headers.authorization)
   if (!user) throw new SilgiError('UNAUTHORIZED')
   return { user } // added to ctx
@@ -57,7 +57,7 @@ const auth = k.guard(async (ctx) => {
 
 ```ts twoslash
 // @noErrors
-const timing = k.wrap(async (ctx, next) => {
+const timing = s.wrap(async (ctx, next) => {
   const start = Date.now()
   const result = await next()
   console.log(`Took ${Date.now() - start}ms`)
