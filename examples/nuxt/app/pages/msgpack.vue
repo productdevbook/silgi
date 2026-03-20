@@ -1,63 +1,58 @@
 <script setup lang="ts">
-interface Todo {
-  id: number
-  title: string
-  completed: boolean
-  createdAt: string
-}
+import { createClient } from 'silgi/client'
+import { createLink } from 'silgi/client/ofetch'
 
+import type { AppRouter } from '../server/rpc/router'
 
-const todos = ref<Todo[]>([])
+const link = createLink({ url: '', binary: true })
+const client = createClient<AppRouter>(link)
+
+const todos = ref<any[]>([])
 const newTitle = ref('')
 const loading = ref(true)
-
+const responseInfo = ref('')
 
 onMounted(async () => {
   await fetchTodos()
 })
 
-
 async function fetchTodos() {
   loading.value = true
-  const data = await $fetch('/todos/list', { method: 'GET' })
-  todos.value = data as Todo[]
+  const start = performance.now()
+  const data = await client.todos.list()
+  const ms = (performance.now() - start).toFixed(1)
+  todos.value = data as any[]
+  responseInfo.value = `MessagePack (binary) — ${ms}ms`
   loading.value = false
 }
 
-
 async function addTodo() {
   if (!newTitle.value.trim()) return
-  await $fetch('/todos/create', {
-    method: 'POST',
-    body: { title: newTitle.value.trim() },
-  })
+  await client.todos.create({ title: newTitle.value.trim() })
   newTitle.value = ''
   await fetchTodos()
 }
 
-
 async function toggleTodo(id: number) {
-  await $fetch('/todos/toggle', {
-    method: 'POST',
-    body: { id },
-  })
+  await client.todos.toggle({ id })
   await fetchTodos()
 }
 
-
 async function removeTodo(id: number) {
-  await $fetch('/todos/remove', {
-    method: 'POST',
-    body: { id },
-  })
+  await client.todos.remove({ id })
   await fetchTodos()
 }
 </script>
 
 <template>
   <main class="mx-auto max-w-lg px-4 py-12 font-sans">
-    <h1 class="mb-1 text-2xl font-bold">Silgi + Nuxt — Todo</h1>
-    <p class="mb-6 text-sm text-gray-400">Type-safe RPC with Silgi</p>
+    <div class="mb-6 flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-bold">MessagePack Protocol</h1>
+        <p class="text-xs text-gray-400">{{ responseInfo }}</p>
+      </div>
+      <NuxtLink to="/" class="text-sm text-gray-400 hover:text-gray-600">← Back</NuxtLink>
+    </div>
 
     <form class="mb-6 flex gap-2" @submit.prevent="addTodo">
       <input
@@ -65,10 +60,7 @@ async function removeTodo(id: number) {
         placeholder="What needs to be done?"
         class="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-gray-400"
       />
-      <button
-        type="submit"
-        class="cursor-pointer rounded-lg bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-800"
-      >
+      <button type="submit" class="cursor-pointer rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700">
         Add
       </button>
     </form>
@@ -81,19 +73,11 @@ async function removeTodo(id: number) {
         <span class="flex-1 text-sm" :class="todo.completed ? 'text-gray-400 line-through' : 'text-gray-900'">
           {{ todo.title }}
         </span>
-        <button
-          class="cursor-pointer border-none bg-transparent text-xs text-red-600 hover:text-red-800"
-          @click="removeTodo(todo.id)"
-        >
+        <button class="cursor-pointer border-none bg-transparent text-xs text-red-600 hover:text-red-800" @click="removeTodo(todo.id)">
           Delete
         </button>
       </li>
-
-      <li v-if="todos.length === 0" class="py-4 text-center text-sm text-gray-400">No todos yet. Add one above.</li>
+      <li v-if="todos.length === 0" class="py-4 text-center text-sm text-gray-400">No todos yet.</li>
     </ul>
-
-    <p v-if="todos.length > 0" class="mt-4 text-xs text-gray-400">
-      {{ todos.filter((t) => t.completed).length }} / {{ todos.length }} completed
-    </p>
   </main>
 </template>
