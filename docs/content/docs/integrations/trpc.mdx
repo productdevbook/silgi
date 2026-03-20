@@ -24,8 +24,8 @@ k.serve(katmanRouter, { port: 3000 })
 
 | tRPC                     | Katman                      |
 | ------------------------ | --------------------------- |
-| `query` procedure        | `query` ProcedureDef        |
-| `mutation` procedure     | `mutation` ProcedureDef     |
+| `query` procedure        | ProcedureDef (GET)          |
+| `mutation` procedure     | ProcedureDef (POST)         |
 | `subscription` procedure | `subscription` ProcedureDef |
 | Input schemas (Zod)      | Passed through as-is        |
 | Nested routers           | Nested RouterDef            |

@@ -68,10 +68,9 @@ export const listUsers = t.procedure.input(z.object({ limit: z.number().optional
 // @noErrors
 import { z } from "zod"
 
-const listUsers = k.query(
-  z.object({ limit: z.number().optional() }),
-  ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
-)
+const listUsers = k
+  .$input(z.object({ limit: z.number().optional() }))
+  .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))
 ````
 
   </Tab>
@@ -109,7 +108,7 @@ const auth = k.guard(async (ctx) => {
   return { user: ctx.session.user }
 })
 
-const createUser = k.mutation()
+const createUser = k
   .$use(auth)
   .$input(z.object({ name: z.string() }))
   .$resolve(({ input, ctx }) => {
@@ -149,7 +148,7 @@ import { KatmanError } from "katman"
 throw new KatmanError("NOT_FOUND", { message: "User not found" })
 
 // Option 2: Typed errors with fail()
-const deleteUser = k.mutation()
+const deleteUser = k
   .$errors({ NOT_FOUND: 404, FORBIDDEN: 403 })
   .$resolve(({ input, ctx, fail }) => {
     const user = ctx.db.users.find(input.id)
@@ -220,7 +219,7 @@ const users = await client.users.list({ limit: 10 })
 
 | tRPC                        | Katman                       | Notes                                               |
 | --------------------------- | ---------------------------- | --------------------------------------------------- |
-| `t.procedure`               | `k.query()` / `k.mutation()` | Katman uses separate methods                        |
+| `t.procedure`               | `k.$resolve()` / `k.$input().$resolve()` | Katman uses builder methods                |
 | `t.router()`                | `k.router()`                 | Same nesting                                        |
 | `t.middleware()`            | `k.guard()` or `k.wrap()`    | Guards for auth, wraps for before+after             |
 | `TRPCError`                 | `KatmanError`                | Same code names                                     |

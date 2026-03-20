@@ -58,7 +58,7 @@ const k = katman({
 })
 
 // Export the helpers you need
-export const { query, mutation, guard, wrap, router } = k
+export const { guard, wrap, router } = k
 export { k }
 ```
 
@@ -67,14 +67,11 @@ export { k }
 
 ### Define your procedures
 
-A **procedure** is a single API endpoint. There are two kinds:
-
-- `query` — for reading data (like GET)
-- `mutation` — for writing data (like POST)
+A **procedure** is a single API endpoint. All procedures default to POST. Use `.$route({ method: 'GET' })` for read-only endpoints.
 
 ```ts twoslash title="src/server.ts"
 // @noErrors
-import { k, query, mutation, guard, router } from './rpc'
+import { k, guard, router } from './rpc'
 import { KatmanError } from 'katman'
 import { z } from 'zod'
 
@@ -86,13 +83,13 @@ const auth = guard((ctx) => {
   return { userId: 1 }
 })
 
-// A query with input validation
-const listUsers = query(z.object({ limit: z.number().min(1).max(100).optional() }), ({ input, ctx }) => {
+// A procedure with input validation
+const listUsers = k.$input(z.object({ limit: z.number().min(1).max(100).optional() })).$resolve(({ input, ctx }) => {
   return ctx.db.users.findMany({ take: input.limit ?? 10 })
 })
 
-// A mutation that requires authentication
-const createUser = mutation()
+// A procedure that requires authentication
+const createUser = k
   .$use(auth)
   .$input(
     z.object({
@@ -173,6 +170,6 @@ In a real project, you would import the router type and use `InferClient<typeof 
 Now that you have a working API, learn about the building blocks:
 
 - [Core Concepts](/docs/concepts) — how context, guards, and wraps work together
-- [Procedures](/docs/procedures) — the two forms: short and builder
+- [Procedures](/docs/procedures) — the builder pattern for defining endpoints
 - [Server](/docs/server) — serve(), handler(), HTTP/2, Scalar
 - [Client](/docs/client) — ofetch link, binary mode, interceptors

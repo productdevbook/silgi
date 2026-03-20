@@ -14,7 +14,6 @@ The body limit guard checks the `Content-Length` header before the procedure run
 import { bodyLimitGuard } from 'katman/plugins'
 
 const upload = k
-  .mutation()
   .$use(bodyLimitGuard({ maxBytes: 5 * 1024 * 1024 })) // 5 MB
   .$input(z.object({ file: z.string() }))
   .$resolve(({ input, ctx }) => ctx.storage.upload(input))
@@ -47,12 +46,10 @@ Add the guard to every mutation via a shared middleware array:
 const limit = bodyLimitGuard({ maxBytes: 2 * 1024 * 1024 })
 
 const createUser = k
-  .mutation()
   .$use(auth, limit)
   .$resolve(({ input, ctx }) => ctx.db.users.create(input))
 
 const createPost = k
-  .mutation()
   .$use(auth, limit)
   .$resolve(({ input, ctx }) => ctx.db.posts.create(input))
 ```

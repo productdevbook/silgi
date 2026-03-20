@@ -13,11 +13,10 @@ When procedures receive GET requests, all values arrive as strings from the quer
 // @noErrors
 import { coerceGuard } from 'katman/plugins'
 
-const getUser = k.query({
-  use: [coerceGuard],
-  input: z.object({ id: z.number(), active: z.boolean().optional() }),
-  resolve: ({ input }) => db.users.find(input.id),
-})
+const getUser = k
+  .$use(coerceGuard)
+  .$input(z.object({ id: z.number(), active: z.boolean().optional() }))
+  .$resolve(({ input }) => db.users.find(input.id))
 
 // GET /users/get?data={"id":"42","active":"true"}
 // Without coercion: validation fails (string "42" is not a number)

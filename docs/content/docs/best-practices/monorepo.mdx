@@ -59,8 +59,8 @@ export const ListInput = z.object({
 })
 
 // Procedure definitions — schemas only, no implementation
-const listUsers = k.query(ListInput, () => {} as any)
-const createUser = k.mutation(UserInput, () => {} as any)
+const listUsers = k.$input(ListInput).$resolve(() => {} as any)
+const createUser = k.$input(UserInput).$resolve(() => {} as any)
 
 export const contractRouter = k.router({
   users: { list: listUsers, create: createUser },
@@ -90,10 +90,9 @@ const k = katman({
   }),
 })
 
-const listUsers = k.query(ListInput, ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit ?? 10 }))
+const listUsers = k.$input(ListInput).$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit ?? 10 }))
 
 const createUser = k
-  .mutation()
   .$use(auth)
   .$input(UserInput)
   .$resolve(({ input, ctx }) => ctx.db.users.create(input))

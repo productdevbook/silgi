@@ -13,10 +13,10 @@ The strict GET guard rejects non-GET requests with `405 Method Not Allowed`. App
 // @noErrors
 import { strictGetGuard } from 'katman/plugins'
 
-const listUsers = k.query({
-  use: [strictGetGuard],
-  resolve: ({ ctx }) => ctx.db.users.findMany(),
-})
+const listUsers = k
+  .$route({ method: 'GET' })
+  .$use(strictGetGuard)
+  .$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
 
 A `POST` request to this procedure returns:

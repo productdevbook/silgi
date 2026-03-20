@@ -1,40 +1,39 @@
 ---
 title: Procedures
-description: Two ways to define an API endpoint — short form and builder.
+description: Define API endpoints with the builder pattern — $resolve, $input, $use, and more.
 ---
 
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 import { Callout } from 'fumadocs-ui/components/callout'
 
-A procedure is a single endpoint in your API. You create them with `query()`, `mutation()`, or `subscription()`.
+A procedure is a single endpoint in your API. You create them with the builder methods `$resolve()`, `$input()`, `$use()`, etc. Subscriptions use `subscription()`.
 
-## Short form
+## Simple form
 
-The simplest way. Pass a schema and a function:
+The simplest way. Just pass a resolve function:
 
 ```ts twoslash
 // @noErrors
 import { z } from 'zod'
 
 // No input
-const health = k.query(() => ({ status: 'ok' }))
+const health = k.$resolve(() => ({ status: 'ok' }))
 
 // With input validation
-const getUser = k.query(z.object({ id: z.number() }), ({ input, ctx }) => ctx.db.users.findById(input.id))
+const getUser = k.$input(z.object({ id: z.number() })).$resolve(({ input, ctx }) => ctx.db.users.findById(input.id))
 ```
 
-The first argument is the input schema. Katman validates the input before your function runs. If validation fails, the client gets a 400 error automatically.
+When you use `$input()`, Katman validates the input before your function runs. If validation fails, the client gets a 400 error automatically.
 
 ## Builder
 
-When you need middleware, error definitions, or output validation, use the builder pattern:
+When you need middleware, error definitions, or output validation, chain builder methods:
 
 ```ts twoslash
 // @noErrors
 import { z } from 'zod'
 
 const createUser = k
-  .mutation()
   .$use(auth) // middleware
   .$input(z.object({ name: z.string() })) // input validation
   .$output(z.object({ id: z.number() })) // output validation (optional)
@@ -69,7 +68,7 @@ Every procedure has a `resolve` function. It receives one object with four prope
 
 ```ts twoslash
 // @noErrors
-const myProcedure = k.query().$resolve(({ input, ctx, fail, signal }) => {
+const myProcedure = k.$resolve(({ input, ctx, fail, signal }) => {
   // input  — the validated input (or undefined if no schema)
   // ctx    — the context object (from context factory + guards)
   // fail   — throws a typed error (only if `errors` is defined)
@@ -77,13 +76,23 @@ const myProcedure = k.query().$resolve(({ input, ctx, fail, signal }) => {
 })
 ```
 
-## Queries vs mutations
+## HTTP method
 
-The difference is semantic, not technical. Both work the same way under the hood. The distinction helps with:
+By default, all procedures use POST. To use GET (for cacheable reads), set the method via `$route()`:
 
-- **Caching**: Queries can be cached. Mutations should not.
-- **Retries**: Queries are safe to retry. Mutations might not be.
-- **HTTP method**: Queries map to GET, mutations to POST (in OpenAPI).
+```ts twoslash
+// @noErrors
+const listUsers = k
+  .$route({ method: 'GET' })
+  .$input(z.object({ limit: z.number().optional() }))
+  .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))
+```
+
+The method distinction helps with:
+
+- **Caching**: GET procedures can be cached by browsers and CDNs. POST procedures should not.
+- **Retries**: GET procedures are safe to retry. POST procedures might not be.
+- **OpenAPI**: GET procedures map to GET endpoints, POST to POST endpoints.
 
 ## Subscriptions
 
@@ -116,7 +125,6 @@ const PostSchema = z.object({
 })
 
 const createPost = k
-  .mutation()
   .$input(z.object({ title: z.string(), body: z.string() }))
   .$output(PostSchema)
   .$errors({ CONFLICT: 409 })
@@ -157,7 +165,6 @@ Attach custom key-value metadata to any procedure using `.$meta()`:
 ```ts twoslash
 // @noErrors
 const listUsers = k
-  .query()
   .$input(z.object({ limit: z.number().optional() }))
   .$meta({ cacheable: true, rateLimit: 100 })
   .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))

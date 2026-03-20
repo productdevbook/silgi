@@ -17,7 +17,6 @@ Wrap a query with `cacheQuery()` to cache its results:
 import { cacheQuery } from 'katman/cache'
 
 const listUsers = k
-  .query()
   .$use(cacheQuery({ maxAge: 60 }))
   .$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
@@ -60,7 +59,7 @@ Skip the cache entirely for specific requests, or force a refresh:
 // @noErrors
 import { cacheQuery } from 'katman/cache'
 
-const listUsers = k.query()
+const listUsers = k
   .$use(cacheQuery({
     maxAge: 300,
     // Admin users bypass cache
@@ -80,11 +79,11 @@ Invalidate cached queries by name — typically after a mutation:
 // @noErrors
 import { cacheQuery, invalidateQueryCache } from 'katman/cache'
 
-const listUsers = k.query()
+const listUsers = k
   .$use(cacheQuery({ maxAge: 300, name: 'users_list' }))
   .$resolve(({ ctx }) => ctx.db.users.findMany())
 
-const createUser = k.mutation(async ({ input, ctx }) => {
+const createUser = k.$resolve(async ({ input, ctx }) => {
   const user = await ctx.db.users.create(input)
   await invalidateQueryCache('users_list') // clear the cache
   return user

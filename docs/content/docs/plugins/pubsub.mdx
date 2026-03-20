@@ -21,7 +21,6 @@ const pubsub = createPublisher(new MemoryPubSub())
 ```ts twoslash
 // @noErrors
 const createUser = k
-  .mutation()
   .$input(z.object({ name: z.string(), email: z.string().email() }))
   .$resolve(async ({ input, ctx }) => {
     const user = await ctx.db.users.create(input)

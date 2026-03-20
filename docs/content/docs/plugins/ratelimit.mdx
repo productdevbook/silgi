@@ -28,7 +28,6 @@ Then add it to any procedure:
 ```ts twoslash
 // @noErrors
 const listUsers = k
-  .query()
   .$use(rateLimit)
   .$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
@@ -76,7 +75,6 @@ When the guard passes (the client is within the limit), it adds rate limit info 
 ```ts twoslash
 // @noErrors
 const listUsers = k
-  .query()
   .$use(rateLimit)
   .$resolve(({ ctx }) => {
     // ctx.rateLimit is available after the guard runs
@@ -203,8 +201,8 @@ const authLimit = rateLimitGuard({
   keyFn: (ctx) => ctx.user.id,
 })
 
-const listUsers = k.query().$use(publicLimit).$resolve(...)
-const createUser = k.mutation().$use(auth, authLimit).$resolve(...)
+const listUsers = k.$use(publicLimit).$resolve(...)
+const createUser = k.$use(auth, authLimit).$resolve(...)
 ```
 
 ## What's next?

@@ -71,14 +71,13 @@ This means your existing route metadata doubles as AI tool documentation:
 
 ```ts twoslash
 // @noErrors
-const listUsers = k.query({
-  input: z.object({ limit: z.number().optional() }),
-  route: {
+const listUsers = k
+  .$input(z.object({ limit: z.number().optional() }))
+  .$route({
     summary: 'List all registered users',
     description: 'Returns a list of users, optionally limited by count.',
-  },
-  resolve: ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
-})
+  })
+  .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))
 ```
 
 The AI model sees `"List all registered users"` as the tool description and knows it can pass `{ limit: number }` as input.

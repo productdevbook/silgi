@@ -13,10 +13,9 @@ The compression wrap attaches encoding hints to the context for transport-level 
 // @noErrors
 import { compressionWrap } from 'katman/plugins'
 
-const listUsers = k.query({
-  use: [compressionWrap()],
-  resolve: ({ ctx }) => ctx.db.users.findMany(),
-})
+const listUsers = k
+  .$use(compressionWrap())
+  .$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
 
 ## Options

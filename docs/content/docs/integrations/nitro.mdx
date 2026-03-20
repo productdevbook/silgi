@@ -25,11 +25,11 @@ const k = katman({
   }),
 })
 
-const { query, mutation, guard, router, handler } = k
+const { guard, router, handler } = k
 
-const health = query(() => ({ status: 'ok' }))
+const health = k.$resolve(() => ({ status: 'ok' }))
 
-const listUsers = query(z.object({ limit: z.number().optional() }), ({ input, ctx }) =>
+const listUsers = k.$input(z.object({ limit: z.number().optional() })).$resolve(({ input, ctx }) =>
   ctx.db.users.findMany({ take: input.limit }),
 )
 

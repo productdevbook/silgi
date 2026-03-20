@@ -25,7 +25,7 @@ const k = katman({
     headers: Object.fromEntries(req.headers),
   }),
 })
-const { guard, query } = k
+const { guard } = k
 
 // This guard verifies a token and adds `user` to the context
 const auth = guard(async (ctx) => {
@@ -41,7 +41,7 @@ When a procedure uses this guard, TypeScript knows that `ctx.user` exists:
 
 ```ts twoslash
 // @noErrors
-const me = query()
+const me = k
   .$use(auth)
   .$resolve(({ ctx }) => {
     return ctx.user // typed as User — no cast needed
@@ -79,7 +79,6 @@ const auth = guard({
 
 // In the procedure, fail() knows about 'UNAUTHORIZED' from the guard
 const createPost = k
-  .mutation()
   .$use(auth)
   .$errors({ CONFLICT: 409 })
   .$resolve(({ fail }) => {
@@ -155,9 +154,8 @@ When you stack middleware via `.$use()`, guards always run first (in order), the
 ```ts twoslash
 // @noErrors
 const proc = k
-  .mutation()
   .$use(auth, rateLimit, adminOnly, timing, withSentry)
-  //    ────── guards ──────────   ────── wraps ──────
+  //   ────── guards ──────────   ────── wraps ──────
   .$resolve(({ ctx, input }) => {
     // your handler
   })
@@ -215,11 +213,11 @@ Then use them wherever you need:
 // @noErrors
 import { auth, adminOnly, timing } from './middleware'
 
-const listUsers = query()
+const listUsers = k
   .$use(auth, timing)
   .$resolve(({ ctx }) => ctx.db.users.findMany())
 
-const deleteUser = mutation()
+const deleteUser = k
   .$use(auth, adminOnly, timing)
   .$resolve(({ ctx, input }) => ctx.db.users.delete(input.id))
 ```
@@ -240,7 +238,6 @@ const logging = lifecycleWrap({
 })
 
 const listUsers = k
-  .query()
   .$use(logging)
   .$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
@@ -269,7 +266,6 @@ const renameUserId = mapInput((input: { userId: string }) => ({
 }))
 
 const getUser = k
-  .query()
   .$use(renameUserId)
   .$resolve(({ input }) => db.users.find(input.id))
 ```

@@ -23,7 +23,7 @@ const k = katman({
 })
 
 const appRouter = k.router({
-  health: k.query(() => ({ status: 'ok' })),
+  health: k.$resolve(() => ({ status: 'ok' })),
 })
 
 k.serve(appRouter, {
@@ -204,15 +204,14 @@ The generated docs pull information from your procedure definitions. Add `route`
 
 ```ts twoslash
 // @noErrors
-const listUsers = k.query({
-  input: z.object({ limit: z.number().optional() }),
-  route: {
+const listUsers = k
+  .$input(z.object({ limit: z.number().optional() }))
+  .$route({
     summary: 'List all users',
     description: 'Returns a paginated list of users, ordered by creation date.',
     tags: ['users'],
-  },
-  resolve: ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
-})
+  })
+  .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))
 ```
 
 The `route` field accepts:
@@ -225,7 +224,7 @@ The `route` field accepts:
 | `deprecated`         | Mark an endpoint as deprecated                 |
 | `successStatus`      | Override the default 200 status                |
 | `successDescription` | Describe what a successful response looks like |
-| `cache`              | Cache-Control header for query responses       |
+| `cache`              | Cache-Control header for GET procedure responses |
 
 ## Caching
 
@@ -234,16 +233,14 @@ Add a `cache` option to `route` to set `Cache-Control` headers on query response
 ```ts twoslash
 // @noErrors
 // Shorthand: cache for 60 seconds
-const listUsers = k.query({
-  route: { cache: 60 },
-  resolve: ({ ctx }) => ctx.db.users.findMany(),
-})
+const listUsers = k
+  .$route({ cache: 60 })
+  .$resolve(({ ctx }) => ctx.db.users.findMany())
 
 // Full control: custom Cache-Control value
-const getConfig = k.query({
-  route: { cache: 'public, max-age=300, stale-while-revalidate=60' },
-  resolve: () => loadConfig(),
-})
+const getConfig = k
+  .$route({ cache: 'public, max-age=300, stale-while-revalidate=60' })
+  .$resolve(() => loadConfig())
 ```
 
 | Value    | Behavior                                          |
@@ -254,8 +251,8 @@ const getConfig = k.query({
 The cache header is compiled once at startup and added to every response for that procedure — zero per-request overhead.
 
 <Callout type='info'>
-  Caching only applies to query procedures. Mutations and subscriptions never get Cache-Control headers, even if you set
-  `cache` on them.
+  Caching only applies to GET procedures (`.$route({ method: 'GET' })`). POST procedures and subscriptions never get
+  Cache-Control headers, even if you set `cache` on them.
 </Callout>
 
 ## HTTP/2
@@ -364,9 +361,9 @@ Return a standard `Response` object for complete control over status, headers, a
 
 ```ts twoslash
 // @noErrors
-const downloadPdf = k.query({
-  input: z.object({ id: z.string() }),
-  resolve: async ({ input, ctx }) => {
+const downloadPdf = k
+  .$input(z.object({ id: z.string() }))
+  .$resolve(async ({ input, ctx }) => {
     const pdf = await ctx.storage.getFile(input.id)
     return new Response(pdf, {
       headers: {
@@ -374,8 +371,7 @@ const downloadPdf = k.query({
         'content-disposition': `attachment; filename="${input.id}.pdf"`,
       },
     })
-  },
-})
+  })
 ```
 
 ### Returning a ReadableStream
@@ -384,8 +380,7 @@ Return a `ReadableStream` for binary streaming. Katman sends it with `applicatio
 
 ```ts twoslash
 // @noErrors
-const exportCsv = k.query({
-  resolve: async ({ ctx }) => {
+const exportCsv = k.$resolve(async ({ ctx }) => {
     return new ReadableStream({
       async start(controller) {
         controller.enqueue(new TextEncoder().encode('id,name\n'))
@@ -395,8 +390,7 @@ const exportCsv = k.query({
         controller.close()
       },
     })
-  },
-})
+  })
 ```
 
 <Callout type='info'>
@@ -412,7 +406,7 @@ For server-side code where you need to call a procedure directly — without HTT
 // @noErrors
 import { callable } from 'katman'
 
-const getUsers = k.query(z.object({ limit: z.number().optional() }), ({ input, ctx }) =>
+const getUsers = k.$input(z.object({ limit: z.number().optional() })).$resolve(({ input, ctx }) =>
   ctx.db.users.findMany({ take: input.limit }),
 )
 

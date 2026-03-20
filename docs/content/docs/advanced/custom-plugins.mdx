@@ -42,7 +42,6 @@ Use it in any procedure:
 ```ts twoslash
 // @noErrors
 const listUsers = k
-  .query()
   .$use(tenantGuard)
   .$resolve(({ ctx }) => {
     // ctx.tenant is typed — TypeScript knows it exists
@@ -120,7 +119,6 @@ Use it:
 const cacheOneMinute = createCacheWrap({ ttl: 60_000 })
 
 const listProducts = k
-  .query()
   .$use(cacheOneMinute)
   .$resolve(({ ctx }) => ctx.db.products.findMany())
 ```
@@ -160,7 +158,6 @@ Apply it per-procedure:
 const metrics = createMetricsPlugin(statsd)
 
 const listUsers = k
-  .query()
   .$use(metrics)
   .$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
@@ -217,7 +214,6 @@ Use both:
 const { auditGuard, auditWrap } = createAuditPlugin({ logger })
 
 const deleteUser = k
-  .mutation()
   .$use(auth, auditGuard, auditWrap)
   .$resolve(({ input, ctx }) => {
     ctx.auditTrail.push(`Deleted user ${input.id}`)
