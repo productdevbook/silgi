@@ -39,9 +39,9 @@ export const remove = s
   .$output(OkSchema)
   .$errors({ NOT_FOUND: 404 })
   .$resolve(({ input, ctx, fail }) => {
-    const list = ctx.todos
-    const idx = list.findIndex((t) => t.id === input.id)
+    const todos = ctx.todos
+    const idx = todos.findIndex((t) => t.id === input.id)
     if (idx === -1) return fail('NOT_FOUND')
-    list.splice(idx, 1)
+    todos.splice(idx, 1)
     return { ok: true }
   })
