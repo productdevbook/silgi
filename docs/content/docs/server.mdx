@@ -7,11 +7,11 @@ import { Callout } from 'fumadocs-ui/components/callout'
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 import { Step, Steps } from 'fumadocs-ui/components/steps'
 
-Silgi gives you two ways to run your API: `serve()` for a quick Node.js server, and `handler()` for any runtime that supports the Fetch API (Bun, Deno, Cloudflare Workers, etc.).
+Silgi gives you two ways to run your API: `serve()` for a universal server (Node.js, Deno, Bun — powered by [srvx](https://srvx.h3.dev)), and `handler()` for a raw Fetch API function you can plug into anything.
 
 ## serve()
 
-The simplest way to get a server running. One call, and you have an HTTP server with automatic port selection, optional API docs, and WebSocket support:
+The simplest way to get a server running. Uses [srvx](https://srvx.h3.dev) under the hood — works on Node.js, Deno, and Bun with zero config:
 
 ```ts twoslash
 // @noErrors
@@ -62,13 +62,13 @@ s.serve(appRouter, {
 | `ws`       | `boolean`                  | `false`       | Enable WebSocket RPC on the same port.                                                       |
 | `http2`    | `{ cert, key }`            | `undefined`   | Enable HTTP/2 with TLS certificates. Falls back to HTTP/1.1 for older clients.               |
 
-### Automatic port selection
+### Runtime support
 
-If your requested port is already in use, `serve()` finds the next available one in the 3000-3100 range. You never need to handle `EADDRINUSE` yourself.
+`serve()` uses [srvx](https://srvx.h3.dev) — the same server runs on Node.js, Deno, and Bun without code changes. TLS and HTTP/2 work on all runtimes.
 
 ## handler()
 
-For runtimes other than Node.js, or when you want to plug Silgi into an existing server, use `handler()`. It returns a standard Fetch API function: `(Request) => Promise<Response>`.
+Returns a standard Fetch API function: `(Request) => Promise<Response>`. Use it with Nitro, Cloudflare Workers, or any platform that supports the Fetch API.
 
 ```ts twoslash
 // @noErrors
@@ -76,44 +76,38 @@ const handle = s.handler(appRouter)
 // handle is: (request: Request) => Promise<Response>
 ```
 
-This works everywhere the Web Fetch API exists:
+### With Nitro / Nuxt
 
-<Tabs items={['Bun', 'Deno', 'Cloudflare Workers']}>
-  <Tab value="Bun">
-  ```ts twoslash
-// @noErrors
-const handle = s.handler(appRouter)
+```ts title="server.ts"
+export default { fetch: s.handler(appRouter) }
+```
 
-Bun.serve({
-port: 3000,
-fetch: handle,
-})
+### With Cloudflare Workers
 
-````
-</Tab>
-<Tab value="Deno">
 ```ts twoslash
 // @noErrors
-const handle = s.handler(appRouter)
-
-Deno.serve({ port: 3000 }, handle)
-````
-
-  </Tab>
-  <Tab value="Cloudflare Workers">
-  ```ts twoslash
-// @noErrors
-const handle = s.handler(appRouter)
-
 export default {
-  fetch: handle,
+  fetch: s.handler(appRouter),
 }
-  ```
-  </Tab>
-</Tabs>
+```
+
+### handler() options
+
+You can pass options to enable API docs:
+
+```ts twoslash
+// @noErrors
+const handle = s.handler(appRouter, {
+  scalar: true, // serves /openapi.json and /reference
+})
+```
+
+| Option   | Type                       | Default | Description                                      |
+| -------- | -------------------------- | ------- | ------------------------------------------------ |
+| `scalar` | `boolean \| ScalarOptions` | `false` | Enable Scalar API docs at `/reference` and `/openapi.json` |
 
 <Callout type='info'>
-  `handler()` supports content negotiation automatically. If the client sends an `Accept: application/x-msgpack` header,
+  Both `serve()` and `handler()` support content negotiation automatically. If the client sends an `Accept: application/x-msgpack` header,
   the response is encoded as MessagePack. Same for devalue. JSON is the default fallback.
 </Callout>
 
