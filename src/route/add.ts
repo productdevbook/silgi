@@ -55,10 +55,14 @@ export function addRoute<T>(
     // Single wildcard: * or *.ext
     if (segment === '*' || (segment.includes('*') && !segment.startsWith('**'))) {
       isStatic = false
+      // Single wildcard is optional — also match at current node (without this segment)
+      if (segment === '*') {
+        _setMethod(node, method, data, [...paramMap], [...paramRegex], hasRegex, false)
+      }
       if (!node.param) node.param = { key: '*' }
       node = node.param
-      // Unnamed wildcard uses numeric index
-      paramMap.push([i, String(paramMap.length), false])
+      // Unnamed wildcard uses numeric index — optional (matches zero segments)
+      paramMap.push([i, String(paramMap.length), true])
 
       // Segment wildcard pattern (*.png, file-*-*.png)
       if (segment !== '*') {
