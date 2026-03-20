@@ -1,27 +1,41 @@
-# Silgi + Nuxt — Todo App
+# Silgi + Nuxt
 
-A todo app built with Silgi RPC and Nuxt 5 via the `serverEntry` config.
+Full-featured demo with Silgi RPC and Nuxt 5.
 
-## Quick Start
+## Pages
 
-```bash
-npx giget@latest gh:productdevbook/silgi/examples/nuxt my-nuxt-app
-cd my-nuxt-app
-pnpm install
-pnpm dev
-```
-
-## Endpoints
-
-- `GET /todos/list` — list all todos
-- `POST /todos/create` — create a todo (`{ "title": "..." }`)
-- `POST /todos/toggle` — toggle completed (`{ "id": 1 }`)
-- `POST /todos/remove` — delete a todo (`{ "id": 1 }`)
+- `/` — Home (page list)
+- `/todos` — CRUD todo list with typed Silgi client
+- `/auth` — Login/logout with auth guard
+- `/errors` — Error handling demo (NOT_FOUND, validation, unauthorized)
+- `/json` — JSON protocol
+- `/msgpack` — MessagePack binary protocol
+- `/devalue` — devalue rich type protocol
+- `/reference` — Scalar API docs
 
 ## Structure
 
 ```
-server/server.ts   — Silgi procedures + router + fetch export
-nuxt.config.ts     — nitro.serverEntry points to server.ts
-app.vue            — Vue todo UI
+server.ts                         — Entry: exports { fetch } with scalar
+server/rpc/
+  instance.ts                     — silgi() instance
+  router.ts                       — Root router
+  guards.ts                       — Auth guard
+  auth/
+    index.ts                      — login, logout, me
+    schema.ts                     — Users, sessions, tokens
+  todos/
+    index.ts                      — list, create, toggle, remove
+    schema.ts                     — Zod schemas + store
+app/
+  app.vue                         — NuxtPage
+  composables/useClient.ts        — Silgi typed client
+  pages/                          — Vue pages
+```
+
+## Quick Start
+
+```bash
+pnpm install
+pnpm dev
 ```

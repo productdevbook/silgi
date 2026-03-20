@@ -11,9 +11,7 @@ const s = silgi({ context: () => ({ db: 'test' }) })
 
 const appRouter = s.router({
   health: s.$resolve(() => ({ status: 'ok' })),
-  echo: s
-    .$input(z.object({ msg: z.string() }))
-    .$resolve(({ input }) => ({ echo: input.msg })),
+  echo: s.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
 })
 
 // Use handler() directly with srvx — same thing serve() does internally
@@ -70,7 +68,7 @@ describe('silgi + srvx universal server', () => {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'accept': 'application/x-msgpack',
+        accept: 'application/x-msgpack',
       },
       body: JSON.stringify({ msg: 'binary' }),
     })

@@ -102,13 +102,13 @@ const handle = s.handler(appRouter, {
 })
 ```
 
-| Option   | Type                       | Default | Description                                      |
-| -------- | -------------------------- | ------- | ------------------------------------------------ |
+| Option   | Type                       | Default | Description                                                |
+| -------- | -------------------------- | ------- | ---------------------------------------------------------- |
 | `scalar` | `boolean \| ScalarOptions` | `false` | Enable Scalar API docs at `/reference` and `/openapi.json` |
 
 <Callout type='info'>
-  Both `serve()` and `handler()` support content negotiation automatically. If the client sends an `Accept: application/x-msgpack` header,
-  the response is encoded as MessagePack. Same for devalue. JSON is the default fallback.
+  Both `serve()` and `handler()` support content negotiation automatically. If the client sends an `Accept:
+  application/x-msgpack` header, the response is encoded as MessagePack. Same for devalue. JSON is the default fallback.
 </Callout>
 
 ## Content negotiation
