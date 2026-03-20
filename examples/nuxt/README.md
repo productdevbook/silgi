@@ -1,8 +1,6 @@
-# Silgi + Nuxt
+# Silgi + Nuxt — Todo App
 
-Silgi RPC integrated with Nuxt 5 via the `silgiNitro` adapter on a catch-all server route.
-
-Demonstrates a Nitro catch-all route at `server/routes/rpc/[...path].ts` and a Vue page that calls the endpoints.
+A todo app built with Silgi RPC and Nuxt 5 via the `silgiNitro` adapter.
 
 ## Quick Start
 
@@ -15,6 +13,16 @@ pnpm dev
 
 ## Endpoints
 
-- `POST /rpc/health` -- health check
-- `POST /rpc/echo` -- echo (`{ "msg": "hello" }`)
-- `POST /rpc/greet` -- greet (`{ "name": "World" }`)
+- `GET /rpc/todos/list` — list all todos
+- `POST /rpc/todos/create` — create a todo (`{ "title": "..." }`)
+- `POST /rpc/todos/toggle` — toggle completed (`{ "id": 1 }`)
+- `POST /rpc/todos/remove` — delete a todo (`{ "id": 1 }`)
+
+## Structure
+
+```
+server/
+  rpc.ts                    — Silgi procedures + router
+  routes/rpc/[...path].ts   — Nitro catch-all route
+app.vue                     — Vue todo UI
+```
