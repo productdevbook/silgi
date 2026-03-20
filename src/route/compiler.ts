@@ -67,7 +67,7 @@ export function compileRouter<T>(
 
   // Root-level param
   if (ctx.root.param) {
-    const paramCode = emitNode(ctx.root.param, refs, pre, uid, 1)
+    const paramCode = emitParamNode(ctx.root.param, refs, pre, uid, 1)
     if (paramCode) {
       const bn = `_b${uid.n++}`
       branchDefs += `var ${bn}=function(m,p){var s=p.split("/"),l=s.length;${paramCode}};`
@@ -220,9 +220,11 @@ function emitParamNode(
     }
   }
 
-  // Recurse into children
+  // Recurse into children — create a virtual node WITHOUT methods
+  // to avoid re-emitting terminal handlers that were already handled above
   if (node.static || node.param || node.wildcard) {
-    code += emitNode(node, refs, pre, uid, depth + 1)
+    const childNode = { key: node.key, static: node.static, param: node.param, wildcard: node.wildcard } as RouteNode<any>
+    code += emitNode(childNode, refs, pre, uid, depth + 1)
   }
 
   return code
