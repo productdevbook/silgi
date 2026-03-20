@@ -124,7 +124,16 @@ function emitNode(
 
   // Terminal: this node has handlers
   if (node.methods) {
-    code += emitTerminal(node.methods, refs, `l===${depth}`)
+    // Check if any handler has params — if so, use param-aware terminal
+    let hasParams = false
+    for (const m in node.methods) {
+      if (node.methods[m]?.some((e: MethodEntry<any>) => e.paramMap?.length)) { hasParams = true; break }
+    }
+    if (hasParams) {
+      code += emitParamTerminal(node.methods, refs, pre, uid, depth)
+    } else {
+      code += emitTerminal(node.methods, refs, `l===${depth}`)
+    }
   }
 
   let hasIf = false
@@ -228,6 +237,53 @@ function emitParamNode(
   }
 
   return code
+}
+
+// ── Param-aware terminal ────────────────────────────
+
+function emitParamTerminal(
+  methods: Record<string, MethodEntry<any>[] | undefined>,
+  refs: unknown[], pre: string[], uid: { n: number },
+  depth: number,
+): string {
+  let c = ''
+  for (const m in methods) {
+    const entries = methods[m]
+    if (!entries) continue
+    for (const entry of entries) {
+      const d = addRef(refs, entry.data)
+      const g = m ? `m===${JSON.stringify(m)}&&` : ''
+
+      if (!entry.paramMap?.length) {
+        c += `if(${g}l===${depth}){_rs.data=$${d};return _rs}`
+        continue
+      }
+
+      const pc = entry.paramMap.length
+      const lastIdx = entry.paramMap[pc - 1]![0]
+      const expLen = lastIdx + 2
+      const lastOpt = entry.paramMap[pc - 1]![2]
+      const lenCk = lastOpt ? `(l===${expLen}||l===${expLen - 1})` : `l===${expLen}`
+
+      const { po, ro } = allocP(pre, uid, entry.paramMap)
+      let asgn = ''
+      for (let i = 0; i < pc; i++) {
+        const [si] = entry.paramMap[i]!
+        asgn += `${po}${safe(pmName(entry.paramMap[i]!))}=s[${si + 1}];`
+      }
+
+      let rx = ''
+      for (let i = 0; i < (entry.paramRegex?.length || 0); i++) {
+        if (entry.paramRegex[i]) {
+          const pmI = entry.paramMap.findIndex(([idx]) => idx === i)
+          if (pmI !== -1) rx += `&&${entry.paramRegex[i]!.toString()}.test(s[${entry.paramMap[pmI]![0] + 1}])`
+        }
+      }
+
+      c += `if(${g}${lenCk}${rx}){${asgn}${ro}.data=$${d};return ${ro}}`
+    }
+  }
+  return c
 }
 
 // ── Terminal ────────────────────────────────────────
