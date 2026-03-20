@@ -28,7 +28,8 @@ export function addRoute<T>(
   data: T,
 ): void {
   // Handle escape sequences: \: → FFFD_A, \* → FFFD_B, \( → FFFD_C etc.
-  const hasEscapes = path.includes('\\')
+  // Only detect escapes for known sequences — \d, \w etc in regex are NOT escapes
+  const hasEscapes = /\\[:\*\(\)\{\}]/.test(path)
   if (hasEscapes) {
     path = path
       .replace(/\\:/g, '\uFFFDA')
