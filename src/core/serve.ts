@@ -46,9 +46,10 @@ export async function createServeHandler(
   const url = server.url || `http://${hostname}:${port}`
 
   // Attach WebSocket if enabled
-  if (options?.ws && (server as any).node) {
+  if (options?.ws && server.node?.server) {
     const { attachWebSocket } = await import('../ws.ts')
-    attachWebSocket((server as any).node, routerDef)
+    const nodeServer = server.node.server as import('node:http').Server
+    attachWebSocket(nodeServer, routerDef)
   }
 
   console.log(`\nSilgi server running at ${url}`)
