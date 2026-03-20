@@ -128,17 +128,19 @@ Real HTTP servers, real TCP connections, 3000 sequential requests per scenario.
 
 For simple routes, all four are within 10% — TCP overhead dominates. As middleware complexity grows, Katman's compiled pipeline pulls ahead: **1.5x faster than oRPC** and **1.2-1.3x faster than H3/Hono** with guards + validation.
 
-### Katman serve() vs Nitro v3 (real server)
+### Router performance (Katman compiled vs rou3)
 
-Real Nitro dev server process vs Katman `serve()`, 2000 requests.
+JIT-compiled radix tree router vs rou3's compiled router.
 
-| Scenario               | Katman serve()          | Nitro v3 (real)     |                 |
-| ---------------------- | ----------------------- | ------------------- | --------------- |
-| Health (no middleware) | **102µs** / 9,781 req/s | 238µs / 4,208 req/s | **2.3x faster** |
-| List + Zod validation  | **108µs** / 9,250 req/s | 231µs / 4,322 req/s | **2.1x faster** |
-| Guard + Zod validation | **108µs** / 9,268 req/s | 223µs / 4,484 req/s | **2.1x faster** |
+| Scenario               | Katman        | rou3         |                 |
+| ---------------------- | ------------- | ------------ | --------------- |
+| Static `/users/list`   | **3.1 ns**    | 3.9 ns       | **1.23x faster** |
+| Param `/users/123`     | **22.0 ns**   | 25.6 ns      | **1.16x faster** |
+| Deep `/users/1/posts/2`| **23.7 ns**   | 26.6 ns      | **1.12x faster** |
+| Wildcard `/files/a/b/c`| **19.2 ns**   | 91.3 ns      | **4.75x faster** |
+| Miss `/missing/deep`   | **4.5 ns**    | 22.3 ns      | **4.96x faster** |
 
-Nitro adds srvx abstraction, H3 middleware chain, and Node→Fetch conversion per request. Production builds would be faster, but the H3/srvx layer remains.
+Katman's router uses indexOf fast path for simple branches (avoids `split()`), switch-based charCodeAt dispatch, and compile-time `substring()` for wildcards.
 
 ### Tail latency (p99)
 
@@ -173,13 +175,10 @@ WebSocket eliminates TCP handshake overhead. All three are close — H3 is sligh
 ### What the benchmarks don't show
 
 - **Real-world APIs** spend 95%+ of time in DB queries and business logic. Pipeline overhead matters most for high-throughput, low-latency services.
-- **Nitro production** would be faster than dev mode (watcher/HMR overhead removed).
 - All benchmarks are sequential (1 connection). Concurrent load may show different characteristics.
 
 <Callout>
-  Reproduce on your hardware: ```bash node --experimental-strip-types bench/vs-all.ts # Katman vs oRPC vs H3 vs Hono
-  node --experimental-strip-types bench/vs-nitro.ts # vs real Nitro server node --experimental-strip-types
-  bench/pipeline.ts # pipeline only (no HTTP) ```
+  Reproduce on your hardware: `node --experimental-strip-types bench/router.ts`
 </Callout>
 
 ## Where oRPC is ahead
