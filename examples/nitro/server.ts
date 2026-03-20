@@ -2,7 +2,7 @@
  * Silgi + Nitro — direct integration (like Hono + Nitro).
  *
  * Export an object with a `fetch` method — Nitro uses it as the server.
- * No H3, no silgiH3 adapter needed — just handler().
+ * No adapters needed — just handler().
  */
 import { silgi, SilgiError } from 'silgi'
 import { z } from 'zod'

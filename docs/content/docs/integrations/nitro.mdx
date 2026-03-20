@@ -1,21 +1,19 @@
 ---
 title: Nitro
-description: Use Silgi with Nitro v3 — as the server framework (like Hono) or alongside H3 routes.
+description: Use Silgi with Nitro v3 — custom server entry with serverEntry config.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 
-[Nitro](https://nitro.build) is the server engine behind Nuxt and TanStack Start. Silgi integrates with Nitro in two ways: as the **server framework** (replacing H3, like Hono does) or alongside **H3 file-system routes**.
+[Nitro](https://nitro.build) is the server engine behind Nuxt and TanStack Start. Silgi integrates with Nitro using the `serverEntry` config — Silgi becomes the server framework, just like Hono does.
 
-## Direct mode (recommended)
+## Setup
 
-Just like [Hono with Nitro](https://github.com/nitrojs/nitro/tree/main/examples/hono), export an object with a `fetch` method from `server.ts`. Nitro detects it and uses Silgi as the server framework:
+Create a `server.ts` that exports a `fetch` handler:
 
-```ts twoslash
+```ts twoslash title="server.ts"
 // @noErrors
-// server.ts
-import { silgi, SilgiError } from 'silgi'
+import { silgi } from 'silgi'
 import { z } from 'zod'
 
 const s = silgi({
@@ -25,21 +23,29 @@ const s = silgi({
   }),
 })
 
-const { guard, router, handler } = s
-
 const health = s.$resolve(() => ({ status: 'ok' }))
 
-const listUsers = k
+const listUsers = s
   .$input(z.object({ limit: z.number().optional() }))
   .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))
 
-const appRouter = router({ health, users: { list: listUsers } })
+const appRouter = s.router({ health, users: { list: listUsers } })
 
-// Export with fetch — Nitro uses it directly
-export default { fetch: handler(appRouter) }
+export default { fetch: s.handler(appRouter) }
 ```
 
-No H3, no file-system routing, no `silgiH3` adapter — Silgi IS the framework. Full content negotiation (JSON, MessagePack, devalue) works out of the box.
+Point Nitro to it:
+
+```ts title="nitro.config.ts"
+import { defineNitroConfig } from 'nitro/config'
+
+export default defineNitroConfig({
+  compatibilityDate: '2025-01-01',
+  serverEntry: './server.ts',
+})
+```
+
+That's it. No file-system routing, no adapters — Silgi IS the framework.
 
 ```
 POST /health          → { status: "ok" }
@@ -51,75 +57,20 @@ POST /users/list      → [{ id: 1, name: "Alice" }, ...]
   requests through it.
 </Callout>
 
-## H3 mode
+## Nuxt
 
-If you need Nitro's file-system routing or want to mix Silgi with H3 routes, use the `silgiH3` adapter:
+For Nuxt apps, use the same `server.ts` entry. Add it to your Nuxt config:
 
-```ts twoslash
-// @noErrors
-// server/routes/rpc/[...path].ts
-import { silgiH3 } from 'silgi/h3'
-import { appRouter } from '~/server/rpc'
-
-export default silgiH3(appRouter, {
-  context: (event) => ({
-    db: getDB(),
-    user: event.context.auth,
-  }),
+```ts title="nuxt.config.ts"
+export default defineNuxtConfig({
+  compatibilityDate: '2025-01-01',
+  nitro: {
+    serverEntry: './server/server.ts',
+  },
 })
 ```
-
-Nitro maps `[...path]` to the procedure path:
-
-```
-POST /rpc/users/list     → users/list
-POST /rpc/users/create   → users/create
-```
-
-### Context from Nitro middleware
-
-```ts twoslash
-// @noErrors
-// server/middleware/auth.ts
-import { defineMiddleware } from 'nitro/h3'
-
-export default defineMiddleware((event) => {
-  event.context.auth = verifyToken(event.req.headers.get('authorization'))
-})
-```
-
-```ts twoslash
-// @noErrors
-// server/routes/rpc/[...path].ts
-export default silgiH3(appRouter, {
-  context: (event) => ({
-    user: event.context.auth,
-  }),
-})
-```
-
-## Which mode to choose?
-
-| Scenario                                           | Mode                                |
-| -------------------------------------------------- | ----------------------------------- |
-| New project, Silgi is the only framework           | **Direct** (`{ fetch: handler() }`) |
-| Existing Nitro/Nuxt app, adding RPC                | **H3** (`silgiH3()`)                |
-| Need H3 middleware (auth, session, etc.)           | **H3**                              |
-| Want full protocol support (msgpack, devalue, SSE) | **Direct**                          |
-
-<Callout type='info'>
-  Both modes target Nitro v3 (H3 v2). For Nitro v2 (Nuxt 3), use the [H3 adapter](/docs/integrations/h3) instead.
-</Callout>
-
-## Examples
-
-Working examples in the repo:
-
-- [`examples/nitro`](https://github.com/productdevbook/silgi/tree/main/examples/nitro) — direct mode
-- [`examples/nitro-h3`](https://github.com/productdevbook/silgi/tree/main/examples/nitro-h3) — H3 file-system routing
 
 ## What's next?
 
-- [H3](/docs/integrations/h3) — lower-level H3 v2 adapter
 - [Server](/docs/server) — standalone `serve()` with full protocol support
 - [Integrations](/docs/integrations) — other available integrations

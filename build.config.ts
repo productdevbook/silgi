@@ -22,7 +22,6 @@ export default defineBuildConfig({
         './src/plugins/pino.ts',
         './src/plugins/ratelimit.ts',
         './src/adapters/fastify.ts',
-        './src/adapters/h3.ts',
         './src/adapters/hono.ts',
         './src/adapters/express.ts',
         './src/adapters/aws-lambda.ts',

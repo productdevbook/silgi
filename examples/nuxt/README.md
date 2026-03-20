@@ -1,6 +1,6 @@
 # Silgi + Nuxt — Todo App
 
-A todo app built with Silgi RPC and Nuxt 5 via the `silgiH3` adapter.
+A todo app built with Silgi RPC and Nuxt 5 via the `serverEntry` config.
 
 ## Quick Start
 
@@ -13,16 +13,15 @@ pnpm dev
 
 ## Endpoints
 
-- `GET /rpc/todos/list` — list all todos
-- `POST /rpc/todos/create` — create a todo (`{ "title": "..." }`)
-- `POST /rpc/todos/toggle` — toggle completed (`{ "id": 1 }`)
-- `POST /rpc/todos/remove` — delete a todo (`{ "id": 1 }`)
+- `GET /todos/list` — list all todos
+- `POST /todos/create` — create a todo (`{ "title": "..." }`)
+- `POST /todos/toggle` — toggle completed (`{ "id": 1 }`)
+- `POST /todos/remove` — delete a todo (`{ "id": 1 }`)
 
 ## Structure
 
 ```
-server/
-  rpc.ts                    — Silgi procedures + router
-  routes/rpc/[...path].ts   — Nitro catch-all route
-app.vue                     — Vue todo UI
+server/server.ts   — Silgi procedures + router + fetch export
+nuxt.config.ts     — nitro.serverEntry points to server.ts
+app.vue            — Vue todo UI
 ```

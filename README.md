@@ -46,7 +46,6 @@ s.serve(appRouter, { port: 3000, scalar: true })
 |---|---|
 | Standalone | `s.serve()` / `s.handler()` |
 | Nitro v3 | `silgi/nitro` |
-| H3 v2 | `silgi/h3` |
 | Hono | `silgi/hono` |
 | Express | `silgi/express` |
 | Fastify | `silgi/fastify` |

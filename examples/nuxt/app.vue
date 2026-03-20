@@ -19,7 +19,7 @@ onMounted(async () => {
 
 async function fetchTodos() {
   loading.value = true
-  const data = await $fetch('/rpc/todos/list', { method: 'GET' })
+  const data = await $fetch('/todos/list', { method: 'GET' })
   todos.value = data as Todo[]
   loading.value = false
 }
@@ -27,7 +27,7 @@ async function fetchTodos() {
 
 async function addTodo() {
   if (!newTitle.value.trim()) return
-  await $fetch('/rpc/todos/create', {
+  await $fetch('/todos/create', {
     method: 'POST',
     body: { title: newTitle.value.trim() },
   })
@@ -37,7 +37,7 @@ async function addTodo() {
 
 
 async function toggleTodo(id: number) {
-  await $fetch('/rpc/todos/toggle', {
+  await $fetch('/todos/toggle', {
     method: 'POST',
     body: { id },
   })
@@ -46,7 +46,7 @@ async function toggleTodo(id: number) {
 
 
 async function removeTodo(id: number) {
-  await $fetch('/rpc/todos/remove', {
+  await $fetch('/todos/remove', {
     method: 'POST',
     body: { id },
   })

@@ -131,10 +131,6 @@
       "import": "./dist/plugins/cookies.mjs",
       "types": "./dist/plugins/cookies.d.mts"
     },
-    "./h3": {
-      "import": "./dist/adapters/h3.mjs",
-      "types": "./dist/adapters/h3.d.mts"
-    },
     "./hono": {
       "import": "./dist/adapters/hono.mjs",
       "types": "./dist/adapters/hono.d.mts"
