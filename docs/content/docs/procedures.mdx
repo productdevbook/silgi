@@ -20,7 +20,9 @@ import { z } from 'zod'
 const health = k.$resolve(() => ({ status: 'ok' }))
 
 // With input validation
-const getUser = k.$input(z.object({ id: z.number() })).$resolve(({ input, ctx }) => ctx.db.users.findById(input.id))
+const getUser = k
+  .$input(z.object({ id: z.number() }))
+  .$resolve(({ input, ctx }) => ctx.db.users.findById(input.id))
 ```
 
 When you use `$input()`, Katman validates the input before your function runs. If validation fails, the client gets a 400 error automatically.

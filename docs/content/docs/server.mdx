@@ -406,9 +406,11 @@ For server-side code where you need to call a procedure directly — without HTT
 // @noErrors
 import { callable } from 'katman'
 
-const getUsers = k.$input(z.object({ limit: z.number().optional() })).$resolve(({ input, ctx }) =>
-  ctx.db.users.findMany({ take: input.limit }),
-)
+const getUsers = k
+  .$input(z.object({ limit: z.number().optional() }))
+  .$resolve(({ input, ctx }) =>
+    ctx.db.users.findMany({ take: input.limit }),
+  )
 
 const getUsersFn = callable(getUsers, {
   context: () => ({ db: getDB() }),

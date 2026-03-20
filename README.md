@@ -22,9 +22,9 @@ const k = katman({ context: (req) => ({ db: getDB() }) })
 
 const appRouter = k.router({
   users: {
-    list: k.$input(z.object({ limit: z.number().optional() })).$resolve(
-      ({ input, ctx }) => ctx.db.users.find({ take: input.limit }),
-    ),
+    list: k
+      .$input(z.object({ limit: z.number().optional() }))
+      .$resolve(({ input, ctx }) => ctx.db.users.find({ take: input.limit })),
   },
 })
 

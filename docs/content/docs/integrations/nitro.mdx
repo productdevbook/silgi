@@ -29,9 +29,11 @@ const { guard, router, handler } = k
 
 const health = k.$resolve(() => ({ status: 'ok' }))
 
-const listUsers = k.$input(z.object({ limit: z.number().optional() })).$resolve(({ input, ctx }) =>
-  ctx.db.users.findMany({ take: input.limit }),
-)
+const listUsers = k
+  .$input(z.object({ limit: z.number().optional() }))
+  .$resolve(({ input, ctx }) =>
+    ctx.db.users.findMany({ take: input.limit }),
+  )
 
 const appRouter = router({ health, users: { list: listUsers } })
 
