@@ -21,8 +21,10 @@ const todos: Todo[] = [
 
 // ── Silgi instance ──────────────────────────────────
 
+export const contextFactory = () => ({ todos })
+
 const s = silgi({
-  context: () => ({ todos }),
+  context: contextFactory,
 })
 
 // ── Procedures ──────────────────────────────────────
