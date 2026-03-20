@@ -218,7 +218,8 @@
     "ocache": "^0.1.2",
     "ofetch": "2.0.0-alpha.3",
     "ohash": "^2.0.11",
-    "srvx": "^0.11.12"
+    "srvx": "^0.11.12",
+    "unstorage": "^2.0.0-alpha.6"
   },
   "devDependencies": {
     "@nuxt/test-utils": "^4.0.0",
@@ -250,14 +251,10 @@
     "zod": "^4.3.6"
   },
   "peerDependencies": {
-    "@scalar/api-reference": ">=1.0.0",
-    "unstorage": ">=2.0.0-alpha.7"
+    "@scalar/api-reference": ">=1.0.0"
   },
   "peerDependenciesMeta": {
     "@scalar/api-reference": {
-      "optional": true
-    },
-    "unstorage": {
       "optional": true
     }
   },
