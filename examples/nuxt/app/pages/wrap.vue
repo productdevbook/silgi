@@ -2,6 +2,7 @@
 const client = useClient()
 
 
+// Timing wrap
 const result = ref<any>(null)
 const loading = ref(false)
 const duration = ref('')
@@ -16,16 +17,35 @@ async function callSlow() {
 }
 
 
-const cached = ref<any>(null)
+// HTTP Cache
+const httpCache = ref<any>(null)
 
 
-async function callCached() {
+async function callHttpCached() {
   const start = performance.now()
-  cached.value = await client.demo.cached()
-  cached.value._clientMs = `${(performance.now() - start).toFixed(0)}ms`
+  httpCache.value = await client.demo.httpCached()
+  httpCache.value._ms = `${(performance.now() - start).toFixed(0)}ms`
 }
 
 
+// Server Cache (ocache)
+const serverCache = ref<any>(null)
+
+
+async function callServerCached() {
+  const start = performance.now()
+  serverCache.value = await client.demo.serverCached()
+  serverCache.value._ms = `${(performance.now() - start).toFixed(0)}ms`
+}
+
+
+async function invalidate() {
+  await client.demo.invalidateCache()
+  serverCache.value = null
+}
+
+
+// Compute
 const computeResult = ref('')
 const a = ref(10)
 const b = ref(3)
@@ -41,7 +61,7 @@ async function callCompute() {
 <template>
   <main class="mx-auto max-w-lg px-4 py-12 font-sans">
     <div class="mb-6 flex items-center justify-between">
-      <h1 class="text-xl font-bold">Wrap & Features</h1>
+      <h1 class="text-xl font-bold">Wrap, Cache & Features</h1>
       <NuxtLink to="/" class="text-sm text-gray-400 hover:text-gray-600">← Back</NuxtLink>
     </div>
 
@@ -53,7 +73,7 @@ async function callCompute() {
         :disabled="loading"
         @click="callSlow"
       >
-        {{ loading ? 'Running...' : 'Call slow endpoint (100ms delay)' }}
+        {{ loading ? 'Running...' : 'Call slow endpoint (100ms)' }}
       </button>
       <div v-if="result" class="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm">
         <p>{{ result.message }}</p>
@@ -61,18 +81,41 @@ async function callCompute() {
       </div>
     </section>
 
-    <!-- Cache -->
+    <!-- HTTP Cache -->
     <section class="mb-8">
-      <h2 class="mb-2 text-sm font-semibold uppercase text-gray-500">Response Cache</h2>
-      <button class="rounded-lg border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50" @click="callCached">
-        Fetch cached value
+      <h2 class="mb-2 text-sm font-semibold uppercase text-gray-500">HTTP Cache ($route)</h2>
+      <button class="rounded-lg border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50" @click="callHttpCached">
+        Fetch
       </button>
-      <div v-if="cached" class="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm">
+      <div v-if="httpCache" class="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm">
         <p>
-          Random: <strong>{{ cached.value.toFixed(4) }}</strong>
+          Random: <strong>{{ httpCache.value.toFixed(4) }}</strong>
         </p>
-        <p class="text-xs text-gray-400">{{ cached.note }}</p>
-        <p class="text-xs text-gray-400">Client: {{ cached._clientMs }}</p>
+        <p class="text-xs text-blue-400">{{ httpCache.note }}</p>
+        <p class="text-xs text-blue-400">{{ httpCache._ms }}</p>
+      </div>
+    </section>
+
+    <!-- Server Cache (ocache) -->
+    <section class="mb-8">
+      <h2 class="mb-2 text-sm font-semibold uppercase text-gray-500">Server Cache (ocache)</h2>
+      <div class="flex gap-2">
+        <button class="rounded-lg border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50" @click="callServerCached">
+          Fetch
+        </button>
+        <button
+          class="rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+          @click="invalidate"
+        >
+          Invalidate
+        </button>
+      </div>
+      <div v-if="serverCache" class="mt-3 rounded-lg border border-green-100 bg-green-50 p-3 text-sm">
+        <p>
+          Random: <strong>{{ serverCache.value.toFixed(4) }}</strong>
+        </p>
+        <p class="text-xs text-green-600">DB calls: {{ serverCache.dbCalls }} · {{ serverCache.note }}</p>
+        <p class="text-xs text-green-400">{{ serverCache._ms }}</p>
       </div>
     </section>
 

@@ -1,3 +1,4 @@
+import { cacheQuery, invalidateQueryCache } from 'silgi/cache'
 import { z } from 'zod'
 
 import { s } from '../instance'
@@ -17,13 +18,36 @@ export const slow = s.$use(timingWrap).$resolve(async () => {
   return { message: 'Done after 100ms', timestamp: Date.now() }
 })
 
-// ── Cache demo ─────────────────────────────────────
+// ── HTTP Cache (Cache-Control header) ──────────────
 
-export const cached = s.$route({ cache: 5 }).$resolve(() => ({
+export const httpCached = s.$route({ cache: 5 }).$resolve(() => ({
   value: Math.random(),
   generatedAt: new Date().toISOString(),
-  note: 'This value is cached for 5 seconds (Cache-Control: public, max-age=5)',
+  type: 'http',
+  note: 'Cache-Control: public, max-age=5 — browser/CDN only',
 }))
+
+// ── Server Cache (ocache — in-memory, Redis, etc.) ─
+
+let dbCallCount = 0
+
+export const serverCached = s.$use(cacheQuery({ maxAge: 10, name: 'expensive-query' })).$resolve(async () => {
+  dbCallCount++
+  // Simulate expensive DB query
+  await new Promise((r) => setTimeout(r, 50))
+  return {
+    value: Math.random(),
+    dbCalls: dbCallCount,
+    generatedAt: new Date().toISOString(),
+    type: 'server',
+    note: 'ocache: 10s TTL, SWR enabled — same result for repeated calls',
+  }
+})
+
+export const invalidateCache = s.$resolve(async () => {
+  await invalidateQueryCache('expensive-query')
+  return { ok: true, message: 'Cache invalidated' }
+})
 
 // ── Subscription / SSE ─────────────────────────────
 
@@ -34,7 +58,7 @@ export const clock = s.subscription(async function* () {
   }
 })
 
-// ── Input coercion demo ────────────────────────────
+// ── Input validation demo ──────────────────────────
 
 export const compute = s
   .$input(

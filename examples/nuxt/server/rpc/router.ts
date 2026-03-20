@@ -17,7 +17,9 @@ export const appRouter = s.router({
   },
   demo: {
     slow: demo.slow,
-    cached: demo.cached,
+    httpCached: demo.httpCached,
+    serverCached: demo.serverCached,
+    invalidateCache: demo.invalidateCache,
     clock: demo.clock,
     compute: demo.compute,
   },
