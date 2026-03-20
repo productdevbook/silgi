@@ -205,18 +205,6 @@ Being honest about oRPC's strengths:
 - **HTTP/2 support** — one-flag TLS setup
 - **Auto port selection** — no `EADDRINUSE` handling needed
 
-## When to choose what
-
-| You need                                     | Choose                                                   |
-| -------------------------------------------- | -------------------------------------------------------- |
-| Simplest setup (1 install, everything works) | **Katman**                                               |
-| Largest ecosystem, niche integrations        | **oRPC**                                                 |
-| Migrate from tRPC                            | **Katman** (`fromTRPC()`) or **oRPC** (`toORPCRouter()`) |
-| Contract-first with OpenAPI                  | **Katman**, **oRPC**, or **ts-rest**                     |
-| Cloudflare Durable Objects                   | **oRPC**                                                 |
-| Lowest per-request latency                   | **Katman**                                               |
-| Already using Hono as your framework         | **Hono** native                                          |
-
 ## What's next?
 
 - [Getting Started](/docs/getting-started) — build your first Katman API
