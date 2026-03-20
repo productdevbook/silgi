@@ -55,7 +55,7 @@ export function findRoute<T>(
   if (!match) return undefined
 
   if (match.paramMap) {
-    return { data: match.data, params: _extractParams(segments, match.paramMap, match.catchAll) }
+    return { data: match.data, params: _extractParams(segments, match.paramMap, match.catchAll, match.paramRegex) }
   }
   return { data: match.data }
 }
@@ -131,19 +131,32 @@ function _extractParams(
   segments: string[],
   paramMap: ParamMapEntry[],
   catchAll?: boolean,
+  paramRegex?: RegExp[],
 ): Record<string, string> {
   const params: Record<string, string> = Object.create(null)
   for (let i = 0; i < paramMap.length; i++) {
     const [idx, name] = paramMap[i]!
-    const paramName = typeof name === 'string' ? name : String(i)
     if (idx >= segments.length) continue
 
     // Catch-all: join remaining segments
     if (catchAll && i === paramMap.length - 1) {
+      const paramName = typeof name === 'string' ? name : String(i)
       params[paramName] = segments.slice(idx).join('/')
       continue
     }
-    params[paramName] = segments[idx]!
+
+    // Regex with named groups — extract from match
+    if (name instanceof RegExp) {
+      const match = name.exec(segments[idx]!)
+      if (match?.groups) {
+        for (const [k, v] of Object.entries(match.groups)) {
+          if (v !== undefined) params[k] = v
+        }
+      }
+      continue
+    }
+
+    params[name] = segments[idx]!
   }
   return params
 }
