@@ -35,3 +35,60 @@ describe('handler() — Fetch API baseline', () => {
     expect(r3.status).toBe(404)
   })
 })
+
+describe('handler() — empty body with content-type headers', () => {
+  const handle = k.handler(testRouter)
+
+  it('handles empty body with Content-Type: application/json', async () => {
+    const res = await handle(
+      new Request('http://localhost/health', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ status: 'ok' })
+  })
+
+  it('handles empty body with Content-Type: application/x-msgpack', async () => {
+    const res = await handle(
+      new Request('http://localhost/health', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-msgpack' },
+      }),
+    )
+    expect(res.status).toBe(200)
+  })
+
+  it('handles empty body with Content-Type: application/x-devalue+json', async () => {
+    const res = await handle(
+      new Request('http://localhost/health', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-devalue+json' },
+      }),
+    )
+    expect(res.status).toBe(200)
+  })
+
+  it('handles empty body with Accept: application/x-msgpack', async () => {
+    const res = await handle(
+      new Request('http://localhost/health', {
+        method: 'POST',
+        headers: { accept: 'application/x-msgpack' },
+      }),
+    )
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('application/x-msgpack')
+  })
+
+  it('handles empty body with Accept: application/x-devalue+json', async () => {
+    const res = await handle(
+      new Request('http://localhost/health', {
+        method: 'POST',
+        headers: { accept: 'application/x-devalue+json' },
+      }),
+    )
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('application/x-devalue+json')
+  })
+})

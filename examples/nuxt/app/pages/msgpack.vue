@@ -7,14 +7,17 @@ import type { AppRouter } from '../server/rpc/router'
 const link = createLink({ url: '', binary: true })
 const client = createClient<AppRouter>(link)
 
+
 const todos = ref<any[]>([])
 const newTitle = ref('')
 const loading = ref(true)
 const responseInfo = ref('')
 
+
 onMounted(async () => {
   await fetchTodos()
 })
+
 
 async function fetchTodos() {
   loading.value = true
@@ -26,6 +29,7 @@ async function fetchTodos() {
   loading.value = false
 }
 
+
 async function addTodo() {
   if (!newTitle.value.trim()) return
   await client.todos.create({ title: newTitle.value.trim() })
@@ -33,10 +37,12 @@ async function addTodo() {
   await fetchTodos()
 }
 
+
 async function toggleTodo(id: number) {
   await client.todos.toggle({ id })
   await fetchTodos()
 }
+
 
 async function removeTodo(id: number) {
   await client.todos.remove({ id })
@@ -60,7 +66,10 @@ async function removeTodo(id: number) {
         placeholder="What needs to be done?"
         class="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-gray-400"
       />
-      <button type="submit" class="cursor-pointer rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700">
+      <button
+        type="submit"
+        class="cursor-pointer rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700"
+      >
         Add
       </button>
     </form>
@@ -73,7 +82,10 @@ async function removeTodo(id: number) {
         <span class="flex-1 text-sm" :class="todo.completed ? 'text-gray-400 line-through' : 'text-gray-900'">
           {{ todo.title }}
         </span>
-        <button class="cursor-pointer border-none bg-transparent text-xs text-red-600 hover:text-red-800" @click="removeTodo(todo.id)">
+        <button
+          class="cursor-pointer border-none bg-transparent text-xs text-red-600 hover:text-red-800"
+          @click="removeTodo(todo.id)"
+        >
           Delete
         </button>
       </li>
