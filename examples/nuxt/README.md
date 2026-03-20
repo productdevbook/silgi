@@ -1,6 +1,6 @@
 # Silgi + Nuxt — Todo App
 
-A todo app built with Silgi RPC and Nuxt 5 via the `silgiNitro` adapter.
+A todo app built with Silgi RPC and Nuxt 5 via the `silgiH3` adapter.
 
 ## Quick Start
 

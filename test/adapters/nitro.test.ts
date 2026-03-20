@@ -14,10 +14,10 @@ const testRouter = k.router({
   }),
 })
 
-describe('silgiNitro() — real NitroEvent', () => {
+describe('silgiH3() — real NitroEvent', () => {
   it('handles FS routing with path param', async () => {
-    const { silgiNitro } = await import('#src/adapters/nitro.ts')
-    const handler = silgiNitro(testRouter)
+    const { silgiH3 } = await import('#src/adapters/h3.ts')
+    const handler = silgiH3(testRouter)
 
     const event = {
       method: 'POST',
@@ -38,8 +38,8 @@ describe('silgiNitro() — real NitroEvent', () => {
   })
 
   it('handles prefix mode with body', async () => {
-    const { silgiNitro } = await import('#src/adapters/nitro.ts')
-    const handler = silgiNitro(testRouter, { prefix: '/rpc' })
+    const { silgiH3 } = await import('#src/adapters/h3.ts')
+    const handler = silgiH3(testRouter, { prefix: '/rpc' })
 
     const event = {
       method: 'POST',
@@ -60,8 +60,8 @@ describe('silgiNitro() — real NitroEvent', () => {
   })
 
   it('returns NOT_FOUND for unknown procedures', async () => {
-    const { silgiNitro } = await import('#src/adapters/nitro.ts')
-    const handler = silgiNitro(testRouter)
+    const { silgiH3 } = await import('#src/adapters/h3.ts')
+    const handler = silgiH3(testRouter)
 
     const event = {
       method: 'POST',
@@ -82,11 +82,11 @@ describe('silgiNitro() — real NitroEvent', () => {
   })
 
   it('passes context from Nitro event', async () => {
-    const { silgiNitro } = await import('#src/adapters/nitro.ts')
+    const { silgiH3 } = await import('#src/adapters/h3.ts')
     const ctxRouter = k.router({
       whoami: k.$resolve(({ ctx }) => ({ user: (ctx as any).user })),
     })
-    const handler = silgiNitro(ctxRouter, {
+    const handler = silgiH3(ctxRouter, {
       context: (event: any) => ({ user: event.context.auth }),
     })
 
@@ -109,8 +109,8 @@ describe('silgiNitro() — real NitroEvent', () => {
   })
 
   it('handles validation errors', async () => {
-    const { silgiNitro } = await import('#src/adapters/nitro.ts')
-    const handler = silgiNitro(testRouter, { prefix: '/rpc' })
+    const { silgiH3 } = await import('#src/adapters/h3.ts')
+    const handler = silgiH3(testRouter, { prefix: '/rpc' })
 
     const event = {
       method: 'POST',
@@ -132,8 +132,8 @@ describe('silgiNitro() — real NitroEvent', () => {
   })
 
   it('handles GET with query params', async () => {
-    const { silgiNitro } = await import('#src/adapters/nitro.ts')
-    const handler = silgiNitro(testRouter, { prefix: '/rpc' })
+    const { silgiH3 } = await import('#src/adapters/h3.ts')
+    const handler = silgiH3(testRouter, { prefix: '/rpc' })
 
     const event = {
       method: 'GET',

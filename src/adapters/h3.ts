@@ -22,7 +22,11 @@ import type { RouterDef } from '../types.ts'
 export interface H3AdapterOptions<TCtx extends Record<string, unknown>> {
   /** Context factory — receives the H3 event */
   context?: (event: any) => TCtx | Promise<TCtx>
-  /** Route prefix to strip from the path. Default: "/rpc" */
+  /**
+   * Route prefix to strip from the path.
+   * When using Nitro FS routing ([...path].ts), leave undefined — path comes from params.
+   * When using H3 catch-all, set to strip prefix (e.g., "/rpc").
+   */
   prefix?: string
 }
 
@@ -39,9 +43,10 @@ export function silgiH3<TCtx extends Record<string, unknown>>(
   const flatRouter = compileRouter(router)
   const prefix = options.prefix ?? '/rpc'
   return async (event: any) => {
-    // H3 v2: event.url is a URL object, event.req is a Request-like
+    // Nitro FS routing: [...path].ts provides path via event.context.params.path
     const url = event.url ?? new URL(event.req?.url ?? '/', 'http://localhost')
-    const pathname = extractPath(typeof url === 'string' ? url : url.pathname, prefix)
+    const catchAllPath = event.context?.params?.path
+    const pathname = catchAllPath ? catchAllPath : extractPath(typeof url === 'string' ? url : url.pathname, prefix)
 
     const httpMethod = event.req?.method ?? event.method ?? 'POST'
     const match = flatRouter(httpMethod, '/' + pathname)

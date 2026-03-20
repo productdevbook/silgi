@@ -25,7 +25,6 @@ export default defineBuildConfig({
         './src/adapters/h3.ts',
         './src/adapters/hono.ts',
         './src/adapters/express.ts',
-        './src/adapters/nitro.ts',
         './src/adapters/aws-lambda.ts',
         './src/adapters/elysia.ts',
         './src/adapters/nextjs.ts',

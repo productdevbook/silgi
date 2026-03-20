@@ -39,7 +39,7 @@ const appRouter = router({ health, users: { list: listUsers } })
 export default { fetch: handler(appRouter) }
 ```
 
-No H3, no file-system routing, no `silgiNitro` adapter — Silgi IS the framework. Full content negotiation (JSON, MessagePack, devalue) works out of the box.
+No H3, no file-system routing, no `silgiH3` adapter — Silgi IS the framework. Full content negotiation (JSON, MessagePack, devalue) works out of the box.
 
 ```
 POST /health          → { status: "ok" }
@@ -53,15 +53,15 @@ POST /users/list      → [{ id: 1, name: "Alice" }, ...]
 
 ## H3 mode
 
-If you need Nitro's file-system routing or want to mix Silgi with H3 routes, use the `silgiNitro` adapter:
+If you need Nitro's file-system routing or want to mix Silgi with H3 routes, use the `silgiH3` adapter:
 
 ```ts twoslash
 // @noErrors
 // server/routes/rpc/[...path].ts
-import { silgiNitro } from 'silgi/nitro'
+import { silgiH3 } from 'silgi/h3'
 import { appRouter } from '~/server/rpc'
 
-export default silgiNitro(appRouter, {
+export default silgiH3(appRouter, {
   context: (event) => ({
     db: getDB(),
     user: event.context.auth,
@@ -91,7 +91,7 @@ export default defineMiddleware((event) => {
 ```ts twoslash
 // @noErrors
 // server/routes/rpc/[...path].ts
-export default silgiNitro(appRouter, {
+export default silgiH3(appRouter, {
   context: (event) => ({
     user: event.context.auth,
   }),
@@ -103,7 +103,7 @@ export default silgiNitro(appRouter, {
 | Scenario                                           | Mode                                |
 | -------------------------------------------------- | ----------------------------------- |
 | New project, Silgi is the only framework           | **Direct** (`{ fetch: handler() }`) |
-| Existing Nitro/Nuxt app, adding RPC                | **H3** (`silgiNitro()`)             |
+| Existing Nitro/Nuxt app, adding RPC                | **H3** (`silgiH3()`)                |
 | Need H3 middleware (auth, session, etc.)           | **H3**                              |
 | Want full protocol support (msgpack, devalue, SSE) | **Direct**                          |
 
