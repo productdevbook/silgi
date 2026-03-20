@@ -124,9 +124,7 @@ export class RegExpRouter<T = unknown> {
         routes.push({ data, paramNames, paramOffset })
       }
 
-      const regex = regexParts.length > 0
-        ? new RegExp(`^(?:${regexParts.join('|')})$`)
-        : /^$/
+      const regex = regexParts.length > 0 ? new RegExp(`^(?:${regexParts.join('|')})$`) : /^$/
 
       // Pre-compute marker index → route map for O(1) lookup
       const markerMap: Record<number, RegExpRoute<T>> = Object.create(null)

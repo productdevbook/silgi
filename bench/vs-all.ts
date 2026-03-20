@@ -30,13 +30,12 @@ async function startKatman(): Promise<Server> {
   const k = katman({ context: () => ({}) })
   const auth = k.guard(() => ({ userId: 1 }))
   const router = k.router({
-    health: k.query(() => ({ status: 'ok' })),
-    echo: k.query(EchoInput as any, ({ input }: any) => ({ echo: input.message })),
-    guarded: k.mutation({
-      use: [auth],
-      input: GuardedInput as any,
-      resolve: ({ input, ctx }: any) => ({ name: input.name, by: ctx.userId }),
-    }),
+    health: k.$resolve(() => ({ status: 'ok' })),
+    echo: k.$input(EchoInput as any).$resolve(({ input }: any) => ({ echo: input.message })),
+    guarded: k
+      .$use(auth)
+      .$input(GuardedInput as any)
+      .$resolve(({ input, ctx }: any) => ({ name: input.name, by: ctx.userId })),
   })
   const flat = compileRouter(router)
   const pool = new ContextPool()

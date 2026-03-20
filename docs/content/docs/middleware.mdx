@@ -78,7 +78,8 @@ const auth = guard({
 })
 
 // In the procedure, fail() knows about 'UNAUTHORIZED' from the guard
-const createPost = k.mutation()
+const createPost = k
+  .mutation()
   .$use(auth)
   .$errors({ CONFLICT: 409 })
   .$resolve(({ fail }) => {
@@ -153,7 +154,8 @@ When you stack middleware via `.$use()`, guards always run first (in order), the
 
 ```ts twoslash
 // @noErrors
-const proc = k.mutation()
+const proc = k
+  .mutation()
   .$use(auth, rateLimit, adminOnly, timing, withSentry)
   //    ────── guards ──────────   ────── wraps ──────
   .$resolve(({ ctx, input }) => {
@@ -237,7 +239,8 @@ const logging = lifecycleWrap({
   onFinish: ({ durationMs }) => metrics.record(durationMs),
 })
 
-const listUsers = k.query()
+const listUsers = k
+  .query()
   .$use(logging)
   .$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
@@ -265,7 +268,8 @@ const renameUserId = mapInput((input: { userId: string }) => ({
   id: input.userId,
 }))
 
-const getUser = k.query()
+const getUser = k
+  .query()
   .$use(renameUserId)
   .$resolve(({ input }) => db.users.find(input.id))
 ```

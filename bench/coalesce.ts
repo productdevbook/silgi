@@ -44,7 +44,7 @@ function simulateDB(items: number): unknown[] {
 
 const k = katman({ context: () => ({}) })
 const katmanRouter = k.router({
-  list: k.query(z.object({ limit: z.number() }) as any, async ({ input }: any) => simulateDB(input.limit)),
+  list: k.$input(z.object({ limit: z.number() }) as any).$resolve(async ({ input }: any) => simulateDB(input.limit)),
 })
 
 // ── Servers ─────────────────────────────────────────

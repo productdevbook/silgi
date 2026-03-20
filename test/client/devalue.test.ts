@@ -78,8 +78,8 @@ describe('devalue codec', () => {
 describe('devalue server integration', () => {
   const k = katman({ context: () => ({}) })
   const router = k.router({
-    time: k.query(() => ({ now: new Date(), status: 'ok' })),
-    echo: k.query(({ input }: any) => input),
+    time: k.$resolve(() => ({ now: new Date(), status: 'ok' })),
+    echo: k.$resolve(({ input }: any) => input),
   })
   const handle = k.handler(router)
 

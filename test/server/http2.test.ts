@@ -39,8 +39,8 @@ function generateSelfSignedCert() {
 const k = katman({ context: () => ({}) })
 
 const appRouter = k.router({
-  health: k.query(() => ({ status: 'ok' })),
-  echo: k.query(z.object({ msg: z.string() }), ({ input }) => ({ echo: input.msg })),
+  health: k.$resolve(() => ({ status: 'ok' })),
+  echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
 })
 
 // Build the compiled router and handler function manually (same as serve() does internally)

@@ -72,8 +72,10 @@ function startBareFullCycle(port: number): Promise<Server> {
 function startKatman(port: number): Promise<Server> {
   const k = katman({ context: () => ({}) })
   const router = k.router({
-    health: k.query(async () => ({ status: 'ok' })),
-    echo: k.query(z.object({ message: z.string() }) as any, async ({ input }: any) => ({ echo: input.message })),
+    health: k.$resolve(async () => ({ status: 'ok' })),
+    echo: k
+      .$input(z.object({ message: z.string() }) as any)
+      .$resolve(async ({ input }: any) => ({ echo: input.message })),
   })
   const flat = compileRouter(router)
   const pool = new ContextPool()

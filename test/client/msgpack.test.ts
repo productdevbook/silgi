@@ -69,12 +69,11 @@ describe('msgpack codec', () => {
 
 describe('binary transport (end-to-end)', () => {
   const k = katman({ context: () => ({ db: true }) })
-  const { query, mutation, router } = k
 
-  const appRouter = router({
-    health: query(() => ({ status: 'ok', ts: Date.now() })),
-    echo: query(z.object({ msg: z.string() }), ({ input }) => ({ echo: input.msg })),
-    add: mutation(z.object({ a: z.number(), b: z.number() }), ({ input }) => ({ sum: input.a + input.b })),
+  const appRouter = k.router({
+    health: k.$resolve(() => ({ status: 'ok', ts: Date.now() })),
+    echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
+    add: k.$input(z.object({ a: z.number(), b: z.number() })).$resolve(({ input }) => ({ sum: input.a + input.b })),
   })
 
   const handle = k.handler(appRouter)

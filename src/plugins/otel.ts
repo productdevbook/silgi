@@ -30,7 +30,7 @@ export interface Tracer {
  *
  * const tracing = otelWrap(trace.getTracer("my-service"))
  *
- * const proc = k.query()
+ * const proc = k
  *   .$use(tracing)
  *   .$resolve(({ ctx }) => ctx.db.find())
  * ```

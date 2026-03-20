@@ -8,7 +8,7 @@
  * ```ts
  * import { compressionWrap } from "katman/plugins"
  *
- * const listUsers = k.query()
+ * const listUsers = k
  *   .$use(compressionWrap())
  *   .$resolve(({ ctx }) => ctx.db.users.findMany())
  * ```

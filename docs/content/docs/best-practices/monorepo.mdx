@@ -92,7 +92,8 @@ const k = katman({
 
 const listUsers = k.query(ListInput, ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit ?? 10 }))
 
-const createUser = k.mutation()
+const createUser = k
+  .mutation()
   .$use(auth)
   .$input(UserInput)
   .$resolve(({ input, ctx }) => ctx.db.users.create(input))

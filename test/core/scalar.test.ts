@@ -71,7 +71,7 @@ describe('generateOpenAPI', () => {
 
   it('generates valid OpenAPI 3.1.0 doc', () => {
     const router = k.router({
-      health: k.query(() => ({ ok: true })),
+      health: k.$resolve(() => ({ ok: true })),
     })
     const spec = generateOpenAPI(router)
     expect(spec.openapi).toBe('3.1.0')
@@ -81,7 +81,7 @@ describe('generateOpenAPI', () => {
   it('includes error responses in spec', () => {
     const router = k.router({
       users: {
-        create: k.mutation()
+        create: k
           .$input(z.object({ name: z.string() }))
           .$errors({ CONFLICT: 409, VALIDATION: { status: 422, message: 'Invalid' } })
           .$resolve(({ input }) => ({ id: 1, name: input.name })),
@@ -101,7 +101,7 @@ describe('generateOpenAPI', () => {
 
     const router = k.router({
       users: {
-        create: k.mutation()
+        create: k
           .$use(auth)
           .$input(z.object({ name: z.string() }))
           .$errors({ CONFLICT: 409 })
@@ -122,12 +122,10 @@ describe('generateOpenAPI', () => {
     })
 
     const router = k.router({
-      secret: k.query()
-        .$use(auth)
-        .$resolve(() => ({ data: 'secret' })),
+      secret: k.$use(auth).$resolve(() => ({ data: 'secret' })),
     })
     const spec = generateOpenAPI(router)
-    const secretOp = (spec.paths as any)['/secret']?.get
+    const secretOp = (spec.paths as any)['/secret']?.post
     expect(secretOp.responses['401']).toBeDefined()
     expect(secretOp.responses['403']).toBeDefined()
   })

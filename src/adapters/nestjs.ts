@@ -50,14 +50,17 @@ export function katmanNestHandler<TCtx extends Record<string, unknown>>(
     let pathname = req.params?.[0] ?? req.path ?? req.url ?? ''
     if (pathname.startsWith('/')) pathname = pathname.slice(1)
 
-    const route = flatRouter('POST', '/' + pathname)?.data
-    if (!route) {
+    const match = flatRouter(req.method, '/' + pathname)
+    if (!match) {
       res.status(404).json({ code: 'NOT_FOUND', status: 404, message: 'Procedure not found' })
       return
     }
+    const route = match.data
 
     try {
       const ctx: Record<string, unknown> = Object.create(null)
+      // Surface URL params from radix router match
+      if (match.params) ctx.params = match.params
       if (options.context) {
         const baseCtx = await options.context(req)
         const keys = Object.keys(baseCtx)

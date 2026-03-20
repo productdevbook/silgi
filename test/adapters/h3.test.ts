@@ -10,10 +10,10 @@ import type { Server } from 'node:http'
 const k = katman({ context: () => ({ db: 'test' }) })
 
 const testRouter = k.router({
-  health: k.query(() => ({ status: 'ok' })),
-  echo: k.query(z.object({ msg: z.string() }), ({ input }) => ({ echo: input.msg })),
-  greet: k.mutation(z.object({ name: z.string() }), ({ input }) => ({ hello: input.name })),
-  fail: k.query(() => {
+  health: k.$resolve(() => ({ status: 'ok' })),
+  echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
+  greet: k.$input(z.object({ name: z.string() })).$resolve(({ input }) => ({ hello: input.name })),
+  fail: k.$resolve(() => {
     throw new KatmanError('NOT_FOUND', { message: 'nope' })
   }),
 })

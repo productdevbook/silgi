@@ -41,15 +41,18 @@ export function katmanExpress<TCtx extends Record<string, unknown>>(
     let pathname = req.path ?? req.url ?? ''
     if (pathname.startsWith('/')) pathname = pathname.slice(1)
 
-    const route = flatRouter('POST', '/' + pathname)?.data
-    if (!route) {
+    const match = flatRouter(req.method, '/' + pathname)
+    if (!match) {
       // Pass to next middleware if not found
       return next()
     }
+    const route = match.data
 
     const handle = async () => {
       try {
         const ctx: Record<string, unknown> = Object.create(null)
+        // Surface URL params from radix router match
+        if (match.params) ctx.params = match.params
         if (options.context) {
           const baseCtx = await options.context(req)
           const keys = Object.keys(baseCtx)

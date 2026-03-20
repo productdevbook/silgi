@@ -159,7 +159,7 @@ describe('Pino logging hooks', () => {
     const logger = mockLogger()
     const hooks = loggingHooks({ logger })
     const k = katman({ context: () => ({}), hooks: hooks as any })
-    const router = k.router({ health: k.query(() => ({ ok: true })) })
+    const router = k.router({ health: k.$resolve(() => ({ ok: true })) })
     const handle = k.handler(router)
 
     await handle(new Request('http://localhost/health', { method: 'POST' }))
@@ -173,7 +173,7 @@ describe('Pino logging hooks', () => {
     const hooks = loggingHooks({ logger })
     const k = katman({ context: () => ({}), hooks: hooks as any })
     const router = k.router({
-      fail: k.query(() => {
+      fail: k.$resolve(() => {
         throw new Error('boom')
       }),
     })

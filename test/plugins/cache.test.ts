@@ -1,9 +1,9 @@
+import { createMemoryStorage, setStorage } from 'ocache'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { z } from 'zod'
 
 import { katman } from '#src/katman.ts'
 import { cacheQuery, setCacheStorage, invalidateQueryCache, createUnstorageAdapter } from '#src/plugins/cache.ts'
-import { createMemoryStorage, setStorage } from 'ocache'
 
 const k = katman({ context: () => ({}) })
 
@@ -18,9 +18,7 @@ describe('cacheQuery', () => {
 
     const handler = k.handler(
       k.router({
-        counter: k.query()
-          .$use(cacheQuery({ maxAge: 10 }))
-          .$resolve(() => ++callCount),
+        counter: k.$use(cacheQuery({ maxAge: 10 })).$resolve(() => ++callCount),
       }),
     )
 
@@ -40,7 +38,7 @@ describe('cacheQuery', () => {
 
     const handler = k.handler(
       k.router({
-        echo: k.query()
+        echo: k
           .$use(cacheQuery({ maxAge: 60, swr: false, name: 'echo_test' }))
           .$input(z.object({ id: z.number() }))
           .$resolve(({ input }) => {
@@ -81,19 +79,21 @@ describe('invalidateQueryCache', () => {
 
     const handler = k.handler(
       k.router({
-        data: k.query()
-          .$use(cacheQuery({
-            maxAge: 60,
-            swr: false,
-            name: 'data_inv',
-            shouldInvalidateCache: () => {
-              if (shouldInvalidate) {
-                shouldInvalidate = false
-                return true
-              }
-              return false
-            },
-          }))
+        data: k
+          .$use(
+            cacheQuery({
+              maxAge: 60,
+              swr: false,
+              name: 'data_inv',
+              shouldInvalidateCache: () => {
+                if (shouldInvalidate) {
+                  shouldInvalidate = false
+                  return true
+                }
+                return false
+              },
+            }),
+          )
           .$resolve(() => ++callCount),
       }),
     )
@@ -120,12 +120,14 @@ describe('shouldBypassCache', () => {
 
     const handler = k.handler(
       k.router({
-        data: k.query()
-          .$use(cacheQuery({
-            maxAge: 60,
-            name: 'bypass_test',
-            shouldBypassCache: (input: any) => input?.noCache === true,
-          }))
+        data: k
+          .$use(
+            cacheQuery({
+              maxAge: 60,
+              name: 'bypass_test',
+              shouldBypassCache: (input: any) => input?.noCache === true,
+            }),
+          )
           .$input(z.object({ noCache: z.boolean().optional() }))
           .$resolve(() => ++callCount),
       }),
@@ -157,13 +159,15 @@ describe('shouldInvalidateCache', () => {
 
     const handler = k.handler(
       k.router({
-        data: k.query()
-          .$use(cacheQuery({
-            maxAge: 60,
-            swr: false,
-            name: 'invalidate_flag_test',
-            shouldInvalidateCache: (input: any) => input?.refresh === true,
-          }))
+        data: k
+          .$use(
+            cacheQuery({
+              maxAge: 60,
+              swr: false,
+              name: 'invalidate_flag_test',
+              shouldInvalidateCache: (input: any) => input?.refresh === true,
+            }),
+          )
           .$input(z.object({ refresh: z.boolean().optional() }))
           .$resolve(() => ++callCount),
       }),
@@ -195,13 +199,15 @@ describe('validate', () => {
 
     const handler = k.handler(
       k.router({
-        data: k.query()
-          .$use(cacheQuery({
-            maxAge: 60,
-            swr: false,
-            name: 'validate_test',
-            validate: (entry) => entry.value !== null && entry.value !== 0,
-          }))
+        data: k
+          .$use(
+            cacheQuery({
+              maxAge: 60,
+              swr: false,
+              name: 'validate_test',
+              validate: (entry) => entry.value !== null && entry.value !== 0,
+            }),
+          )
           .$resolve(() => callCount++), // returns 0 first time
       }),
     )
@@ -276,9 +282,7 @@ describe('createUnstorageAdapter', () => {
     let callCount = 0
     const handler = k.handler(
       k.router({
-        cached: k.query()
-          .$use(cacheQuery({ maxAge: 60, name: 'unstorage_test' }))
-          .$resolve(() => ++callCount),
+        cached: k.$use(cacheQuery({ maxAge: 60, name: 'unstorage_test' })).$resolve(() => ++callCount),
       }),
     )
 

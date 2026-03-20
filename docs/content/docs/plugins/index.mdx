@@ -93,7 +93,7 @@ All plugins ship as subpath imports from the `katman` package. You only import w
 
 | Plugin             | Type              | How to use                                             |
 | ------------------ | ----------------- | ------------------------------------------------------ |
-| Cache              | Wrap middleware    | Add `cacheQuery(...)` for response caching with SWR    |
+| Cache              | Wrap middleware   | Add `cacheQuery(...)` for response caching with SWR    |
 | CORS               | Header helper     | Call `corsHeaders()` to get a headers object           |
 | OpenTelemetry      | Wrap middleware   | Add `otelWrap(tracer)` to a procedure's `use` array    |
 | Pino Logging       | Lifecycle hooks   | Pass `loggingHooks({ logger })` to the `hooks` option  |

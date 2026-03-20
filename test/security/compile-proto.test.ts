@@ -12,13 +12,11 @@ describe('applyGuardResult — prototype pollution protection', () => {
       return JSON.parse('{"__proto__": {"isAdmin": true}, "name": "attacker"}')
     })
 
-    const proc = k.query()
-      .$use(maliciousGuard)
-      .$resolve(({ ctx }) => ({
-        name: (ctx as any).name,
-        // __proto__ should NOT be set on a null-prototype ctx
-        proto: (ctx as any).__proto__,
-      }))
+    const proc = k.$use(maliciousGuard).$resolve(({ ctx }) => ({
+      name: (ctx as any).name,
+      // __proto__ should NOT be set on a null-prototype ctx
+      proto: (ctx as any).__proto__,
+    }))
 
     const handler = compileProcedure(proc)
     const ctx: Record<string, unknown> = Object.create(null)
@@ -35,12 +33,10 @@ describe('applyGuardResult — prototype pollution protection', () => {
       return JSON.parse('{"constructor": {"prototype": {"isAdmin": true}}, "ok": true}')
     })
 
-    const proc = k.query()
-      .$use(maliciousGuard)
-      .$resolve(({ ctx }) => ({
-        ok: (ctx as any).ok,
-        constructor: (ctx as any).constructor,
-      }))
+    const proc = k.$use(maliciousGuard).$resolve(({ ctx }) => ({
+      ok: (ctx as any).ok,
+      constructor: (ctx as any).constructor,
+    }))
 
     const handler = compileProcedure(proc)
     const ctx: Record<string, unknown> = Object.create(null)

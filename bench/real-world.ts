@@ -37,11 +37,10 @@ const db = Array.from({ length: 100 }, (_, i) => ({
 
 const k = katman({ context: () => ({}) })
 const katmanRouter = k.router({
-  list: k.query(z.object({ limit: z.number() }) as any, async ({ input }: any) => db.slice(0, input.limit)),
-  get: k.query(
-    z.object({ id: z.number() }) as any,
-    async ({ input }: any) => db.find((u) => u.id === input.id) ?? null,
-  ),
+  list: k.$input(z.object({ limit: z.number() }) as any).$resolve(async ({ input }: any) => db.slice(0, input.limit)),
+  get: k
+    .$input(z.object({ id: z.number() }) as any)
+    .$resolve(async ({ input }: any) => db.find((u) => u.id === input.id) ?? null),
 })
 
 // ── oRPC ────────────────────────────────────────────

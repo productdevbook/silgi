@@ -230,11 +230,13 @@ const getUser = query(z.object({ id: z.number() }), async ({ input, ctx }) => {
 // --- Users: Create (builder: auth + timing + lifecycle + output + errors) ---
 const createUser = mutation()
   .$use(auth, timing, lifecycle)
-  .$input(z.object({
-    name: z.string().min(1).max(100),
-    email: z.string().email(),
-    role: z.enum(['user', 'admin']).optional(),
-  }))
+  .$input(
+    z.object({
+      name: z.string().min(1).max(100),
+      email: z.string().email(),
+      role: z.enum(['user', 'admin']).optional(),
+    }),
+  )
   .$output(UserSchema)
   .$errors({
     CONFLICT: 409,
@@ -272,10 +274,12 @@ const deleteUser = mutation()
 // --- Posts: List (builder: coercion guard) ---
 const listPosts = query()
   .$use(coerceGuard)
-  .$input(z.object({
-    authorId: z.number().optional(),
-    published: z.boolean().optional(),
-  }))
+  .$input(
+    z.object({
+      authorId: z.number().optional(),
+      published: z.boolean().optional(),
+    }),
+  )
   .$resolve(async ({ input, ctx }) => {
     let posts = ctx.db.posts
     if (input.authorId) posts = posts.filter((p) => p.authorId === input.authorId)
@@ -286,11 +290,13 @@ const listPosts = query()
 // --- Posts: Create (builder: auth + lifecycle + output) ---
 const createPost = mutation()
   .$use(auth, lifecycle)
-  .$input(z.object({
-    title: z.string().min(1).max(200),
-    body: z.string().min(1),
-    published: z.boolean().default(false),
-  }))
+  .$input(
+    z.object({
+      title: z.string().min(1).max(200),
+      body: z.string().min(1),
+      published: z.boolean().default(false),
+    }),
+  )
   .$output(PostSchema)
   .$resolve(async ({ input, ctx }) => {
     const post = {

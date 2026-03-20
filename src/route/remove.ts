@@ -13,11 +13,7 @@ import type { RouterContext, RouteNode } from './types.ts'
  * Supports the same patterns as addRoute: modifiers (:name?, :name+, :name*),
  * non-capturing groups ({s}?), wildcard patterns (*.png), etc.
  */
-export function removeRoute<T>(
-  ctx: RouterContext<T>,
-  method: string,
-  path: string,
-): void {
+export function removeRoute<T>(ctx: RouterContext<T>, method: string, path: string): void {
   // Handle non-capturing groups: expand and remove each variant
   const groupMatch = path.match(/\{([^}]+)\}\?/)
   if (groupMatch) {
@@ -66,11 +62,7 @@ export function removeRoute<T>(
   _removeNode(ctx, method, path)
 }
 
-function _removeNode<T>(
-  ctx: RouterContext<T>,
-  method: string,
-  path: string,
-): void {
+function _removeNode<T>(ctx: RouterContext<T>, method: string, path: string): void {
   const segments = splitPath(path)
   let node: RouteNode<T> | undefined = ctx.root
   let isStatic = true
@@ -103,7 +95,7 @@ function _removeNode<T>(
 
   if (isStatic && entries.length > 1) {
     // Static route shares node with wildcard zero-match — only remove static entries
-    node.methods[key] = entries.filter(e => e.paramMap?.length)
+    node.methods[key] = entries.filter((e) => e.paramMap?.length)
     if (node.methods[key]!.length === 0) delete node.methods[key]
   } else {
     delete node.methods[key]

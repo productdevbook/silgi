@@ -9,9 +9,11 @@ const k = katman({ context: () => ({ db: 'test' }) })
 describe('createServerClient()', () => {
   it('calls procedures in-process', async () => {
     const router = k.router({
-      health: k.query(() => ({ status: 'ok' })),
+      health: k.$resolve(() => ({ status: 'ok' })),
       users: {
-        list: k.query(z.object({ limit: z.number().optional() }), ({ input }) => ({ count: input.limit ?? 10 })),
+        list: k
+          .$input(z.object({ limit: z.number().optional() }))
+          .$resolve(({ input }) => ({ count: input.limit ?? 10 })),
       },
     })
 

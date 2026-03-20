@@ -9,7 +9,7 @@
  * ```ts
  * import { coerceGuard } from "katman/plugins"
  *
- * const getUser = k.query()
+ * const getUser = k
  *   .$use(coerceGuard)
  *   .$input(z.object({ id: z.number(), active: z.boolean().optional() }))
  *   .$resolve(({ input }) => db.users.find(input.id))

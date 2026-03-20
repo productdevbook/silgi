@@ -21,12 +21,7 @@ import { splitPath, isCatchAll } from './utils.ts'
 
 import type { RouterContext, RouteNode, MethodEntry, ParamMapEntry } from './types.ts'
 
-export function addRoute<T>(
-  ctx: RouterContext<T>,
-  method: string,
-  path: string,
-  data: T,
-): void {
+export function addRoute<T>(ctx: RouterContext<T>, method: string, path: string, data: T): void {
   // Handle escape sequences: \: → FFFD_A, \* → FFFD_B, \( → FFFD_C etc.
   // Only detect escapes for known sequences — \d, \w etc in regex are NOT escapes
   const hasEscapes = /\\[:\*\(\)\{\}]/.test(path)
@@ -101,7 +96,7 @@ export function addRoute<T>(
 
       if (segment !== '*') {
         // Segment wildcard pattern: *.png → /^([^/]+?)\.png$/
-        const escaped = segment.replace(/[.*+?^${}()|[\]\\]/g, (c) => c === '*' ? '([^/]+?)' : `\\${c}`)
+        const escaped = segment.replace(/[.*+?^${}()|[\]\\]/g, (c) => (c === '*' ? '([^/]+?)' : `\\${c}`))
         const regex = new RegExp(`^${escaped}$`)
         paramRegex[i] = regex
         hasRegex = true

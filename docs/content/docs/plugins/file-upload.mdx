@@ -13,11 +13,14 @@ Parse multipart file uploads with size and MIME type validation. Files are avail
 // @noErrors
 import { fileGuard } from 'katman/plugins'
 
-const uploadAvatar = k.mutation()
-  .$use(fileGuard({
-    maxFileSize: 5 * 1024 * 1024, // 5 MB
-    allowedTypes: ['image/*'],
-  }))
+const uploadAvatar = k
+  .mutation()
+  .$use(
+    fileGuard({
+      maxFileSize: 5 * 1024 * 1024, // 5 MB
+      allowedTypes: ['image/*'],
+    }),
+  )
   .$resolve(async ({ ctx }) => {
     const file = ctx.file
     const buffer = await file.arrayBuffer()
@@ -40,7 +43,8 @@ Set `maxFiles` to allow multiple uploads. Files are available as `ctx.files`:
 
 ```ts twoslash
 // @noErrors
-const uploadPhotos = k.mutation()
+const uploadPhotos = k
+  .mutation()
   .$use(fileGuard({ maxFiles: 10, allowedTypes: ['image/*'] }))
   .$resolve(async ({ ctx }) => {
     return ctx.files.map((f) => ({ name: f.name, size: f.size }))

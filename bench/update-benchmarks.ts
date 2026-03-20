@@ -35,13 +35,12 @@ const k = katman({ context: () => ({}) })
 const auth = k.guard(() => ({ userId: 1 }))
 
 const katmanRouter = k.router({
-  health: k.query(async () => ({ status: 'ok' })),
-  echo: k.query(EchoInput as any, async ({ input }: any) => ({ echo: input.message })),
-  guarded: k.mutation({
-    use: [auth],
-    input: GuardedInput as any,
-    resolve: async ({ input, ctx }: any) => ({ name: input.name, by: ctx.userId }),
-  }),
+  health: k.$resolve(async () => ({ status: 'ok' })),
+  echo: k.$input(EchoInput as any).$resolve(async ({ input }: any) => ({ echo: input.message })),
+  guarded: k
+    .$use(auth)
+    .$input(GuardedInput as any)
+    .$resolve(async ({ input, ctx }: any) => ({ name: input.name, by: ctx.userId })),
 })
 
 // ── oRPC Setup ──────────────────────────────────────

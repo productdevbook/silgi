@@ -17,7 +17,7 @@
  * import { cacheQuery, setCacheStorage } from 'katman/cache'
  *
  * // Basic: cache for 60 seconds with SWR
- * const listUsers = k.query()
+ * const listUsers = k
  *   .$use(cacheQuery({ maxAge: 60 }))
  *   .$resolve(({ ctx }) => ctx.db.users.findMany())
  *
@@ -34,8 +34,8 @@
 import { defineCachedFunction, setStorage, useStorage } from 'ocache'
 import { hash } from 'ohash'
 
-import type { CacheEntry, CacheOptions, StorageInterface } from 'ocache'
 import type { WrapDef } from '../types.ts'
+import type { CacheEntry, CacheOptions, StorageInterface } from 'ocache'
 
 /** Registry of cached function keys for invalidation */
 const cacheKeyRegistry = new Map<string, Set<string>>()
@@ -130,12 +130,12 @@ export interface CacheQueryOptions<T = unknown> {
  *
  * @example
  * ```ts
- * const listUsers = k.query()
+ * const listUsers = k
  *   .$use(cacheQuery({ maxAge: 60 }))
  *   .$resolve(({ ctx }) => ctx.db.users.findMany())
  *
  * // Advanced: bypass cache for admin, custom validation
- * const listPosts = k.query()
+ * const listPosts = k
  *   .$use(cacheQuery({
  *     maxAge: 300,
  *     swr: true,
@@ -177,32 +177,29 @@ export function cacheQuery<T = unknown>(options: CacheQueryOptions<T> = {}): Wra
           ? (input: unknown) => customGetKey(input)
           : (input: unknown) => (input !== undefined && input !== null ? hash(input) : '')
 
-        cachedFn = defineCachedFunction(
-          async (_input: unknown) => currentNext!(),
-          {
-            name: resolvedName,
-            group: 'katman',
-            maxAge,
-            swr,
-            staleMaxAge,
-            base: options.base,
-            integrity: options.integrity,
-            onError: options.onError,
-            validate: options.validate as ((entry: CacheEntry) => boolean) | undefined,
-            transform: options.transform as ((entry: CacheEntry) => unknown) | undefined,
-            shouldBypassCache: options.shouldBypassCache
-              ? (input: unknown) => options.shouldBypassCache!(input)
-              : undefined,
-            shouldInvalidateCache: options.shouldInvalidateCache
-              ? (input: unknown) => options.shouldInvalidateCache!(input)
-              : undefined,
-            getKey: (input: unknown) => {
-              const key = keyFn(input)
-              keySet.add(`/cache:katman:${resolvedName}:${key}.json`)
-              return key
-            },
+        cachedFn = defineCachedFunction(async (_input: unknown) => currentNext!(), {
+          name: resolvedName,
+          group: 'katman',
+          maxAge,
+          swr,
+          staleMaxAge,
+          base: options.base,
+          integrity: options.integrity,
+          onError: options.onError,
+          validate: options.validate as ((entry: CacheEntry) => boolean) | undefined,
+          transform: options.transform as ((entry: CacheEntry) => unknown) | undefined,
+          shouldBypassCache: options.shouldBypassCache
+            ? (input: unknown) => options.shouldBypassCache!(input)
+            : undefined,
+          shouldInvalidateCache: options.shouldInvalidateCache
+            ? (input: unknown) => options.shouldInvalidateCache!(input)
+            : undefined,
+          getKey: (input: unknown) => {
+            const key = keyFn(input)
+            keySet.add(`/cache:katman:${resolvedName}:${key}.json`)
+            return key
           },
-        )
+        })
       }
 
       // Set the current request's next() before calling cachedFn
@@ -222,7 +219,7 @@ export function cacheQuery<T = unknown>(options: CacheQueryOptions<T> = {}): Wra
  *
  * @example
  * ```ts
- * const createUser = k.mutation(async ({ input, ctx }) => {
+ * const createUser = k.$resolve(async ({ input, ctx }) => {
  *   const user = await ctx.db.users.create(input)
  *   await invalidateQueryCache('users_list')
  *   return user

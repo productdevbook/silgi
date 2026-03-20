@@ -14,10 +14,10 @@ import type { ClientLink } from '#src/client/types.ts'
 const k = katman({ context: () => ({}) })
 const appRouter = k.router({
   users: {
-    list: k.query(z.object({ limit: z.number().optional() }), ({ input }) => ({
+    list: k.$input(z.object({ limit: z.number().optional() })).$resolve(({ input }) => ({
       users: [{ id: 1, name: 'Alice' }].slice(0, input.limit ?? 10),
     })),
-    get: k.query(z.object({ id: z.number() }), ({ input }) => ({ id: input.id, name: 'Alice' })),
+    get: k.$input(z.object({ id: z.number() })).$resolve(({ input }) => ({ id: input.id, name: 'Alice' })),
   },
 })
 

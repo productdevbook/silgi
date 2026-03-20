@@ -26,13 +26,14 @@ const k = katman({
 const auth = k.guard((ctx) => ({ userId: 1 }))
 
 const katmanRouter = k.router({
-  health: k.query(async () => ({ status: 'ok' })),
-  echo: k.query(z.object({ message: z.string() }) as any, async ({ input }: any) => ({ echo: input.message })),
-  guarded: k.mutation({
-    use: [auth],
-    input: z.object({ name: z.string() }) as any,
-    resolve: async ({ input, ctx }: any) => ({ name: input.name, by: ctx.userId }),
-  }),
+  health: k.$resolve(async () => ({ status: 'ok' })),
+  echo: k
+    .$input(z.object({ message: z.string() }) as any)
+    .$resolve(async ({ input }: any) => ({ echo: input.message })),
+  guarded: k
+    .$use(auth)
+    .$input(z.object({ name: z.string() }) as any)
+    .$resolve(async ({ input, ctx }: any) => ({ name: input.name, by: ctx.userId })),
 })
 
 const katmanHandle = k.handler(katmanRouter)

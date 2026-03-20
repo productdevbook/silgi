@@ -19,9 +19,9 @@ import type { Server } from 'node:http'
 const k = katman({ context: () => ({}) })
 
 const appRouter = k.router({
-  health: k.query(() => ({ status: 'ok' })),
-  echo: k.query(z.object({ msg: z.string() }), ({ input }) => ({ echo: input.msg })),
-  add: k.mutation(z.object({ a: z.number(), b: z.number() }), ({ input }) => ({ sum: input.a + input.b })),
+  health: k.$resolve(() => ({ status: 'ok' })),
+  echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
+  add: k.$input(z.object({ a: z.number(), b: z.number() })).$resolve(({ input }) => ({ sum: input.a + input.b })),
 })
 
 let server: Server

@@ -29,20 +29,20 @@ const k = katman({
   }),
 })
 
-const { query, mutation, guard, router } = k
+const { guard, router } = k
 
-const listUsers = query(z.object({ limit: z.number().min(1).max(100).optional() }), ({ input, ctx }) => {
+const listUsers = k.$input(z.object({ limit: z.number().min(1).max(100).optional() })).$resolve(({ input, ctx }) => {
   const limit = input.limit ?? 10
   return { users: ctx.db.users.slice(0, limit), total: ctx.db.users.length }
 })
 
-const getUser = query(z.object({ id: z.number() }), ({ input, ctx }) => {
+const getUser = k.$input(z.object({ id: z.number() })).$resolve(({ input, ctx }) => {
   const user = ctx.db.users.find((u) => u.id === input.id)
   if (!user) throw new Error('Not found')
   return user
 })
 
-const createUser = mutation()
+const createUser = k
   .$input(z.object({ name: z.string().min(1), email: z.string().email() }))
   .$errors({ CONFLICT: 409 })
   .$resolve(({ input, ctx }) => {
@@ -50,7 +50,7 @@ const createUser = mutation()
     return user
   })
 
-const noInput = query(() => ({ status: 'ok' }))
+const noInput = k.$resolve(() => ({ status: 'ok' }))
 
 const appRouter = router({
   health: noInput,

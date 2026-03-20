@@ -32,8 +32,8 @@
  *
  * const router = implement(api, (k) => ({
  *   users: {
- *     list: k.query(({ input, ctx }) => ctx.db.users.find({ take: input.limit })),
- *     create: k.mutation(({ input, ctx, fail }) => {
+ *     list: k.$resolve(({ input, ctx }) => ctx.db.users.find({ take: input.limit })),
+ *     create: k.$resolve(({ input, ctx, fail }) => {
  *       if (exists(input.name)) fail("CONFLICT")
  *       return ctx.db.users.create(input)
  *     }),

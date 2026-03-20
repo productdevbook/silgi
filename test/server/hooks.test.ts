@@ -15,9 +15,9 @@ function createApp(hooks?: Parameters<typeof katman>[0]['hooks']) {
     hooks,
   })
   const router = k.router({
-    health: k.query(() => ({ status: 'ok' })),
-    echo: k.query(z.object({ msg: z.string() }), ({ input }) => ({ echo: input.msg })),
-    fail: k.query(() => {
+    health: k.$resolve(() => ({ status: 'ok' })),
+    echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
+    fail: k.$resolve(() => {
       throw new Error('boom')
     }),
   })

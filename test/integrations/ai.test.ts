@@ -11,13 +11,13 @@ import { katman } from '#src/katman.ts'
 const k = katman({ context: () => ({}) })
 
 const appRouter = k.router({
-  health: k.query(() => ({ status: 'ok' })),
-  echo: k.query(z.object({ msg: z.string() }), ({ input }) => ({ echo: input.msg })),
+  health: k.$resolve(() => ({ status: 'ok' })),
+  echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
   users: {
-    list: k.query(z.object({ limit: z.number().optional() }), ({ input }) => ({
+    list: k.$input(z.object({ limit: z.number().optional() })).$resolve(({ input }) => ({
       users: [{ id: 1, name: 'Alice' }].slice(0, input.limit ?? 10),
     })),
-    create: k.mutation(z.object({ name: z.string() }), ({ input }) => ({ id: 2, name: input.name })),
+    create: k.$input(z.object({ name: z.string() })).$resolve(({ input }) => ({ id: 2, name: input.name })),
   },
 })
 

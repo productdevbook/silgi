@@ -4,8 +4,8 @@ import { katman } from '#src/katman.ts'
 
 const k = katman({ context: () => ({}) })
 const echoRouter = k.router({
-  echo: k.mutation(({ input }) => input),
-  hello: k.query(() => 'world'),
+  echo: k.$resolve(({ input }) => input),
+  hello: k.$resolve(() => 'world'),
 })
 const handle = k.handler(echoRouter)
 
@@ -32,7 +32,7 @@ describe('handler() — body parsing safety', () => {
   it('handles UTF-8 multibyte response correctly', async () => {
     const k2 = katman({ context: () => ({}) })
     const r = k2.router({
-      emoji: k2.query(() => ({ text: 'Merhaba dünya 🌍 日本語' })),
+      emoji: k2.$resolve(() => ({ text: 'Merhaba dünya 🌍 日本語' })),
     })
     const h = k2.handler(r)
     const res = await h(new Request('http://localhost/emoji'))

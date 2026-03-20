@@ -15,11 +15,11 @@ import type { FastifyInstance } from 'fastify'
 const k = katman({ context: () => ({ db: true }) })
 
 const appRouter = k.router({
-  health: k.query(() => ({ status: 'ok' })),
-  echo: k.query(z.object({ msg: z.string() }), ({ input }) => ({ echo: input.msg })),
-  add: k.mutation(z.object({ a: z.number(), b: z.number() }), ({ input }) => ({ sum: input.a + input.b })),
+  health: k.$resolve(() => ({ status: 'ok' })),
+  echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
+  add: k.$input(z.object({ a: z.number(), b: z.number() })).$resolve(({ input }) => ({ sum: input.a + input.b })),
   users: {
-    list: k.query(() => [{ id: 1, name: 'Alice' }]),
+    list: k.$resolve(() => [{ id: 1, name: 'Alice' }]),
   },
 })
 
@@ -108,7 +108,7 @@ describe('katmanFastify (real Fastify)', () => {
   it('supports context factory', async () => {
     const withCtx = Fastify()
     withCtx.register(
-      katmanFastify(k.router({ whoami: k.query(({ ctx }: any) => ({ fromCtx: ctx.userId })) }), {
+      katmanFastify(k.router({ whoami: k.$resolve(({ ctx }: any) => ({ fromCtx: ctx.userId })) }), {
         context: () => ({ userId: 42 }),
       }),
     )

@@ -10,11 +10,7 @@ import type { RouterContext, RouteNode, MethodEntry, MatchedRoute, ParamMapEntry
 /**
  * Find a matching route for a given method and path.
  */
-export function findRoute<T>(
-  ctx: RouterContext<T>,
-  method: string = '',
-  path: string,
-): MatchedRoute<T> | undefined {
+export function findRoute<T>(ctx: RouterContext<T>, method: string = '', path: string): MatchedRoute<T> | undefined {
   // Normalize trailing slash
   const len = path.length
   if (len > 1 && path.charCodeAt(len - 1) === 47) {
@@ -60,12 +56,7 @@ export function findRoute<T>(
   return { data: match.data }
 }
 
-function _lookup<T>(
-  node: RouteNode<T>,
-  method: string,
-  segments: string[],
-  index: number,
-): MethodEntry<T> | undefined {
+function _lookup<T>(node: RouteNode<T>, method: string, segments: string[], index: number): MethodEntry<T> | undefined {
   if (index === segments.length) {
     // Check current node
     if (node.methods) {
@@ -77,7 +68,10 @@ function _lookup<T>(
           if (!entry.paramRegex?.some(Boolean)) continue
           let ok = true
           for (let r = 0; r < entry.paramRegex.length; r++) {
-            if (entry.paramRegex[r] && !entry.paramRegex[r]!.test(segments[r]!)) { ok = false; break }
+            if (entry.paramRegex[r] && !entry.paramRegex[r]!.test(segments[r]!)) {
+              ok = false
+              break
+            }
           }
           if (ok) return entry
         }

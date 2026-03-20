@@ -6,9 +6,9 @@ import { katman } from '#src/katman.ts'
 const k = katman({ context: () => ({ db: 'test' }) })
 
 const testRouter = k.router({
-  health: k.query(() => ({ status: 'ok' })),
-  echo: k.query(z.object({ msg: z.string() }), ({ input }) => ({ echo: input.msg })),
-  greet: k.mutation(z.object({ name: z.string() }), ({ input }) => ({ hello: input.name })),
+  health: k.$resolve(() => ({ status: 'ok' })),
+  echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
+  greet: k.$input(z.object({ name: z.string() })).$resolve(({ input }) => ({ hello: input.name })),
 })
 
 describe('MessagePort adapter', () => {

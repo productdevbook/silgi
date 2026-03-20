@@ -108,18 +108,21 @@ export function katmanNitro<TCtx extends Record<string, unknown>>(
       procedurePath = prefix ? stripPrefix(rawPath, prefix) : stripLeadingSlash(rawPath)
     }
 
-    const route = flatRouter('POST', '/' + procedurePath)?.data
-    if (!route) {
+    const match = flatRouter(event.req.method, '/' + procedurePath)
+    if (!match) {
       return {
         code: 'NOT_FOUND',
         status: 404,
         message: 'Procedure not found',
       }
     }
+    const route = match.data
 
     try {
       // Build context
       const ctx: Record<string, unknown> = Object.create(null)
+      // Surface URL params from radix router match
+      if (match.params) ctx.params = match.params
       if (options.context) {
         const baseCtx = await options.context(event)
         const keys = Object.keys(baseCtx)

@@ -48,6 +48,8 @@ export function katmanFastify(routerDef: RouterDef, options: KatmanFastifyOption
       const route = match.data
 
       const ctx: Record<string, unknown> = Object.create(null)
+      // Surface URL params from radix router match
+      if (match.params) ctx.params = match.params
       try {
         const baseCtx = await contextFactory(req)
         Object.assign(ctx, baseCtx)

@@ -29,29 +29,27 @@ const k = katman({
   }),
 })
 
-const { query, mutation, guard, router } = k
+const auth = k.guard(() => ({ userId: 1 }))
 
-const auth = guard(() => ({ userId: 1 }))
-
-const appRouter = router({
-  health: query(() => ({ status: 'ok', ts: Date.now() })),
+const appRouter = k.router({
+  health: k.$resolve(() => ({ status: 'ok', ts: Date.now() })),
   users: {
-    list: query(z.object({ limit: z.number().optional() }), ({ input, ctx }) => {
+    list: k.$input(z.object({ limit: z.number().optional() })).$resolve(({ input, ctx }) => {
       const limit = input.limit ?? 10
       return ctx.db.users.slice(0, limit)
     }),
-    get: query(z.object({ id: z.number() }), ({ input, ctx }) => {
+    get: k.$input(z.object({ id: z.number() })).$resolve(({ input, ctx }) => {
       const user = ctx.db.users.find((u) => u.id === input.id)
       if (!user) throw new Error('Not found')
       return user
     }),
-    create: mutation()
+    create: k
       .$use(auth)
       .$input(z.object({ name: z.string().min(1) }))
       .$errors({ CONFLICT: 409 })
       .$resolve(({ input }) => ({ id: 3, name: input.name })),
   },
-  echo: query(z.object({ message: z.string() }), ({ input }) => ({ echo: input.message })),
+  echo: k.$input(z.object({ message: z.string() })).$resolve(({ input }) => ({ echo: input.message })),
 })
 
 type AppRouter = typeof appRouter

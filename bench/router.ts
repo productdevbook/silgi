@@ -5,20 +5,30 @@
  */
 
 import { bench, run, summary, compact } from 'mitata'
-
-import { createRouter, addRoute, compileRouter } from '../src/route/index.ts'
 import { createRouter as rou3Create, addRoute as rou3Add } from 'rou3'
 import { compileRouter as rou3Compile } from 'rou3/compiler'
+
+import { createRouter, addRoute, compileRouter } from '../src/route/index.ts'
 
 // ── Routes ──────────────────────────────────────────
 
 const paths = [
-  '/users', '/users/list', '/posts', '/posts/list',
-  '/api/v1/health', '/api/v1/config',
-  '/admin/dashboard', '/admin/settings',
-  '/users/:id', '/users/:id/posts', '/users/:id/posts/:postId',
-  '/api/v1/:resource', '/api/v1/:resource/:id',
-  '/files/**', '/assets/**', '/cdn/**:path',
+  '/users',
+  '/users/list',
+  '/posts',
+  '/posts/list',
+  '/api/v1/health',
+  '/api/v1/config',
+  '/admin/dashboard',
+  '/admin/settings',
+  '/users/:id',
+  '/users/:id/posts',
+  '/users/:id/posts/:postId',
+  '/api/v1/:resource',
+  '/api/v1/:resource/:id',
+  '/files/**',
+  '/assets/**',
+  '/cdn/**:path',
 ]
 
 // Katman
@@ -32,7 +42,11 @@ for (const p of paths) rou3Add(rr, 'GET', p, { path: p })
 const rc = rou3Compile(rr)
 
 // Verify
-for (const [path, label] of [['/users/list', 'static'], ['/users/123', 'param'], ['/files/a/b', 'wildcard']] as const) {
+for (const [path, label] of [
+  ['/users/list', 'static'],
+  ['/users/123', 'param'],
+  ['/files/a/b', 'wildcard'],
+] as const) {
   const km = kc('GET', path)
   const rm = rc('GET', path)
   if (!km || !rm) console.error(`FAIL ${label}: katman=${!!km} rou3=${!!rm}`)

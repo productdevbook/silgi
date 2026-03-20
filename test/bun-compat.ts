@@ -11,9 +11,9 @@ import { katman } from '../src/katman.ts'
 const k = katman({ context: () => ({ db: true }) })
 
 const router = k.router({
-  health: k.query(() => ({ status: 'ok', runtime: typeof Bun !== 'undefined' ? 'bun' : 'node' })),
-  echo: k.query(z.object({ msg: z.string() }), ({ input }) => ({ echo: input.msg })),
-  add: k.mutation(z.object({ a: z.number(), b: z.number() }), ({ input }) => ({ sum: input.a + input.b })),
+  health: k.$resolve(() => ({ status: 'ok', runtime: typeof Bun !== 'undefined' ? 'bun' : 'node' })),
+  echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
+  add: k.$input(z.object({ a: z.number(), b: z.number() })).$resolve(({ input }) => ({ sum: input.a + input.b })),
 })
 
 const handle = k.handler(router)

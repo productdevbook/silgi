@@ -13,10 +13,7 @@ describe('RPCLink relative URL', () => {
 
     const link = new RPCLink({ url: '/rpc', fetch: mockFetch })
     await link.call(['users', 'list'], { limit: 10 }, {})
-    expect(mockFetch).toHaveBeenCalledWith(
-      '/rpc/users/list',
-      expect.objectContaining({ method: 'POST' }),
-    )
+    expect(mockFetch).toHaveBeenCalledWith('/rpc/users/list', expect.objectContaining({ method: 'POST' }))
   })
 
   it('supports relative URL with trailing slash', async () => {
@@ -31,10 +28,7 @@ describe('RPCLink relative URL', () => {
 
     const link = new RPCLink({ url: '/api/', fetch: mockFetch })
     await link.call(['health'], undefined, {})
-    expect(mockFetch).toHaveBeenCalledWith(
-      '/api/health',
-      expect.objectContaining({ method: 'POST' }),
-    )
+    expect(mockFetch).toHaveBeenCalledWith('/api/health', expect.objectContaining({ method: 'POST' }))
   })
 })
 
@@ -101,10 +95,7 @@ describe('OpenAPILink', () => {
 
     const link = new OpenAPILink({ url: '/api', fetch: mockFetch })
     await link.call(['users', 'list'], { limit: 5 }, {})
-    expect(mockFetch).toHaveBeenCalledWith(
-      '/api/users/list',
-      expect.objectContaining({ method: 'POST' }),
-    )
+    expect(mockFetch).toHaveBeenCalledWith('/api/users/list', expect.objectContaining({ method: 'POST' }))
   })
 
   it('supports relative URL with trailing slash', async () => {
@@ -119,10 +110,7 @@ describe('OpenAPILink', () => {
 
     const link = new OpenAPILink({ url: '/api/', fetch: mockFetch })
     await link.call(['health'], undefined, {})
-    expect(mockFetch).toHaveBeenCalledWith(
-      '/api/health',
-      expect.objectContaining({ method: 'POST' }),
-    )
+    expect(mockFetch).toHaveBeenCalledWith('/api/health', expect.objectContaining({ method: 'POST' }))
   })
 
   it('throws KatmanError on non-ok response', async () => {

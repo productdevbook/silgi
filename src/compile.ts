@@ -258,7 +258,14 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
     !analysis.usesContext &&
     !analysis.usesFail
   ) {
-    return (_ctx, rawInput, signal) => resolveFn({ input: rawInput, ctx: _ctx, fail: failFn, signal })
+    return (_ctx, rawInput, signal) =>
+      resolveFn({
+        input: rawInput,
+        ctx: _ctx,
+        fail: failFn,
+        signal,
+        params: (_ctx.params ?? {}) as Record<string, string>,
+      })
   }
 
   // ── SYNC FAST PATH: no wraps, no validation, all sync guards ──
@@ -266,9 +273,23 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
     return (ctx, rawInput, signal) => {
       const guardResult = runGuards(ctx)
       if (guardResult && isThenable(guardResult)) {
-        return (guardResult as Promise<void>).then(() => resolveFn({ input: rawInput, ctx, fail: failFn, signal }))
+        return (guardResult as Promise<void>).then(() =>
+          resolveFn({
+            input: rawInput,
+            ctx,
+            fail: failFn,
+            signal,
+            params: (ctx.params ?? {}) as Record<string, string>,
+          }),
+        )
       }
-      const output = resolveFn({ input: rawInput, ctx, fail: failFn, signal })
+      const output = resolveFn({
+        input: rawInput,
+        ctx,
+        fail: failFn,
+        signal,
+        params: (ctx.params ?? {}) as Record<string, string>,
+      })
       return output
     }
   }
@@ -279,7 +300,13 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
       const guardResult = runGuards(ctx)
       if (guardResult) await guardResult
       const input = inputSchema ? await validateSchema(inputSchema, rawInput ?? {}) : rawInput
-      const output = await resolveFn({ input, ctx, fail: failFn, signal })
+      const output = await resolveFn({
+        input,
+        ctx,
+        fail: failFn,
+        signal,
+        params: (ctx.params ?? {}) as Record<string, string>,
+      })
       return outputSchema ? await validateSchema(outputSchema, output) : output
     }
   }
@@ -295,7 +322,15 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
 
     let execute: () => Promise<unknown> = () => {
       const resolvedInput = ctx.__rawInput ?? input
-      return Promise.resolve(resolveFn({ input: resolvedInput, ctx, fail: failFn, signal }))
+      return Promise.resolve(
+        resolveFn({
+          input: resolvedInput,
+          ctx,
+          fail: failFn,
+          signal,
+          params: (ctx.params ?? {}) as Record<string, string>,
+        }),
+      )
     }
 
     for (let i = wraps.length - 1; i >= 0; i--) {
@@ -311,7 +346,11 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
 
 // ── COMPILED ROUTER ─────────────────────────────────
 
-import { createRouter as createRadixRouter, addRoute as addRadixRoute, compileRouter as compileRadixRouter } from './route/index.ts'
+import {
+  createRouter as createRadixRouter,
+  addRoute as addRadixRoute,
+  compileRouter as compileRadixRouter,
+} from './route/index.ts'
 
 import type { MatchedRoute } from './route/types.ts'
 
@@ -345,11 +384,11 @@ export function compileRouter(def: Record<string, unknown>): CompiledRouterFn {
       // Use custom route path or auto-generated from tree
       const routePath = route?.path || '/' + path.join('/')
 
-      // Determine HTTP method from procedure type
-      const method = route?.method?.toUpperCase() || (proc.type === 'query' ? 'GET' : 'POST')
+      // HTTP method from route config, default POST
+      const method = route?.method?.toUpperCase() || 'POST'
 
       let cacheControl: string | undefined
-      if (proc.type === 'query' && route?.cache != null) {
+      if (route?.cache != null) {
         cacheControl = typeof route.cache === 'number' ? `public, max-age=${route.cache}` : route.cache
       }
 

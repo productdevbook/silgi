@@ -6,10 +6,9 @@
  *
  * @example
  * ```ts
- * const getUsers = k.query(
- *   z.object({ limit: z.number() }),
- *   ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
- * )
+ * const getUsers = k
+ *   .$input(z.object({ limit: z.number() }))
+ *   .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))
  *
  * const fn = callable(getUsers, {
  *   context: () => ({ db: getDB() }),

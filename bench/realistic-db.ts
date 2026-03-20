@@ -40,7 +40,7 @@ async function queryDB(limit: number): Promise<unknown[]> {
 
 const k = katman({ context: () => ({}) })
 const katmanRouter = k.router({
-  list: k.query(z.object({ limit: z.number() }) as any, async ({ input }: any) => {
+  list: k.$input(z.object({ limit: z.number() }) as any).$resolve(async ({ input }: any) => {
     katmanHandlerCalls++
     return queryDB(input.limit)
   }),

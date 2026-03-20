@@ -45,11 +45,13 @@ const tracing = otelWrap(trace.getTracer('my-service'))
 
 ```ts twoslash
 // @noErrors
-const listUsers = k.query()
+const listUsers = k
+  .query()
   .$use(tracing)
   .$resolve(({ ctx }) => ctx.db.users.findMany())
 
-const createUser = k.mutation()
+const createUser = k
+  .mutation()
   .$use(auth, tracing)
   .$resolve(({ ctx, input }) => ctx.db.users.create(input))
 ```
@@ -94,7 +96,8 @@ const tracing = otelWrap(tracer, 'api.procedure')
 
 ```ts twoslash
 // @noErrors
-const createUser = k.mutation()
+const createUser = k
+  .mutation()
   .$use(auth, rateLimit, tracing)
   //    guards first, then wraps
   .$resolve(({ ctx, input }) => ctx.db.users.create(input))

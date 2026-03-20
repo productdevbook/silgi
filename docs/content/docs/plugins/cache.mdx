@@ -16,7 +16,8 @@ Wrap a query with `cacheQuery()` to cache its results:
 // @noErrors
 import { cacheQuery } from 'katman/cache'
 
-const listUsers = k.query()
+const listUsers = k
+  .query()
   .$use(cacheQuery({ maxAge: 60 }))
   .$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
@@ -28,34 +29,34 @@ The first call runs the resolver and caches the result. Subsequent calls with th
 ```ts twoslash
 // @noErrors
 cacheQuery({
-  maxAge: 60,           // TTL in seconds (default: 60)
-  swr: true,            // stale-while-revalidate (default: true)
-  staleMaxAge: 60,      // max stale age in seconds (default: maxAge)
-  name: 'users_list',   // cache key prefix (default: auto-generated)
+  maxAge: 60, // TTL in seconds (default: 60)
+  swr: true, // stale-while-revalidate (default: true)
+  staleMaxAge: 60, // max stale age in seconds (default: maxAge)
+  name: 'users_list', // cache key prefix (default: auto-generated)
   getKey: (input) => input.id, // custom cache key from input
 })
 ```
 
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `maxAge` | `number` | `60` | Cache TTL in seconds |
-| `swr` | `boolean` | `true` | Return stale data while revalidating in the background |
-| `staleMaxAge` | `number` | `maxAge` | Maximum seconds to serve stale data during SWR |
-| `name` | `string` | auto | Cache key prefix for invalidation |
-| `getKey` | `(input) => string` | hash | Custom cache key generator |
-| `shouldBypassCache` | `(input) => boolean` | - | Skip cache entirely (e.g. admin, debug) |
-| `shouldInvalidateCache` | `(input) => boolean` | - | Force re-resolve and update cache |
-| `validate` | `(entry) => boolean` | - | Return `false` to treat entry as miss |
-| `transform` | `(entry) => T` | - | Transform cached value before returning |
-| `base` | `string \| string[]` | `'/cache'` | Multi-tier storage prefixes |
-| `integrity` | `string` | auto | Custom integrity hash (auto-invalidates on redeploy) |
-| `onError` | `(error) => void` | console.error | Error handler for cache read/write failures |
+| Option                  | Type                 | Default       | Description                                            |
+| ----------------------- | -------------------- | ------------- | ------------------------------------------------------ |
+| `maxAge`                | `number`             | `60`          | Cache TTL in seconds                                   |
+| `swr`                   | `boolean`            | `true`        | Return stale data while revalidating in the background |
+| `staleMaxAge`           | `number`             | `maxAge`      | Maximum seconds to serve stale data during SWR         |
+| `name`                  | `string`             | auto          | Cache key prefix for invalidation                      |
+| `getKey`                | `(input) => string`  | hash          | Custom cache key generator                             |
+| `shouldBypassCache`     | `(input) => boolean` | -             | Skip cache entirely (e.g. admin, debug)                |
+| `shouldInvalidateCache` | `(input) => boolean` | -             | Force re-resolve and update cache                      |
+| `validate`              | `(entry) => boolean` | -             | Return `false` to treat entry as miss                  |
+| `transform`             | `(entry) => T`       | -             | Transform cached value before returning                |
+| `base`                  | `string \| string[]` | `'/cache'`    | Multi-tier storage prefixes                            |
+| `integrity`             | `string`             | auto          | Custom integrity hash (auto-invalidates on redeploy)   |
+| `onError`               | `(error) => void`    | console.error | Error handler for cache read/write failures            |
 
 ## Bypass and conditional invalidation
 
 Skip the cache entirely for specific requests, or force a refresh:
 
-```ts twoslash
+````ts twoslash
 // @noErrors
 import { cacheQuery } from 'katman/cache'
 
@@ -88,28 +89,16 @@ const createUser = k.mutation(async ({ input, ctx }) => {
   await invalidateQueryCache('users_list') // clear the cache
   return user
 })
-```
+````
 
 ## Storage backends
 
 By default, cache lives in memory. For production, plug in any storage backend via [unstorage](https://unstorage.unjs.io).
 
 <Tabs items={['pnpm', 'npm', 'bun']}>
-  <Tab value='pnpm'>
-  ```bash
-  pnpm add unstorage
-  ```
-  </Tab>
-  <Tab value='npm'>
-  ```bash
-  npm install unstorage
-  ```
-  </Tab>
-  <Tab value='bun'>
-  ```bash
-  bun add unstorage
-  ```
-  </Tab>
+  <Tab value='pnpm'>```bash pnpm add unstorage ```</Tab>
+  <Tab value='npm'>```bash npm install unstorage ```</Tab>
+  <Tab value='bun'>```bash bun add unstorage ```</Tab>
 </Tabs>
 
 ### Redis
@@ -167,7 +156,8 @@ setCacheStorage({
 7. Cache entries auto-expire after `maxAge` seconds
 
 <Callout type='info'>
-  The cache key is computed from the serialized input using [ohash](https://github.com/unjs/ohash). Two calls with the same input always produce the same key, regardless of property order.
+  The cache key is computed from the serialized input using [ohash](https://github.com/unjs/ohash). Two calls with the
+  same input always produce the same key, regardless of property order.
 </Callout>
 
 ## What's next?

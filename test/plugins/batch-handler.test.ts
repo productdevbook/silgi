@@ -9,8 +9,8 @@ const k = katman({ context: () => ({ db: 'test' }) })
 describe('createBatchHandler()', () => {
   it('processes multiple calls in one request', async () => {
     const router = k.router({
-      health: k.query(() => ({ status: 'ok' })),
-      echo: k.query(z.object({ msg: z.string() }), ({ input }) => ({ echo: input.msg })),
+      health: k.$resolve(() => ({ status: 'ok' })),
+      echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
     })
 
     const handler = createBatchHandler(router, { context: () => ({}) })
@@ -31,7 +31,7 @@ describe('createBatchHandler()', () => {
   })
 
   it('rejects oversized batches', async () => {
-    const router = k.router({ health: k.query(() => 'ok') })
+    const router = k.router({ health: k.$resolve(() => 'ok') })
     const handler = createBatchHandler(router, { context: () => ({}), maxBatchSize: 2 })
 
     const request = new Request('http://localhost/batch', {

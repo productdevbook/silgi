@@ -33,7 +33,8 @@ When you need middleware, error definitions, or output validation, use the build
 // @noErrors
 import { z } from 'zod'
 
-const createUser = k.mutation()
+const createUser = k
+  .mutation()
   .$use(auth) // middleware
   .$input(z.object({ name: z.string() })) // input validation
   .$output(z.object({ id: z.number() })) // output validation (optional)
@@ -48,15 +49,15 @@ const createUser = k.mutation()
 
 ### Available builder methods
 
-| Method            | Required | Description                                                                     |
-| ----------------- | -------- | ------------------------------------------------------------------------------- |
-| `.$resolve(fn)`   | Yes      | The function that does the work. Receives `{ input, ctx, fail, signal }`.       |
-| `.$input(schema)` | No       | A schema that validates the incoming data.                                      |
-| `.$output(schema)`| No       | A schema that validates the return value.                                       |
-| `.$use(...mw)`    | No       | Add guards and wraps to run before the procedure.                               |
-| `.$errors({...})` | No       | A map of error codes to HTTP status codes. Enables the typed `fail()` function. |
-| `.$route({...})`  | No       | HTTP route metadata (method, path, description). Used by OpenAPI.               |
-| `.$meta({...})`   | No       | Set custom metadata.                                                            |
+| Method             | Required | Description                                                                     |
+| ------------------ | -------- | ------------------------------------------------------------------------------- |
+| `.$resolve(fn)`    | Yes      | The function that does the work. Receives `{ input, ctx, fail, signal }`.       |
+| `.$input(schema)`  | No       | A schema that validates the incoming data.                                      |
+| `.$output(schema)` | No       | A schema that validates the return value.                                       |
+| `.$use(...mw)`     | No       | Add guards and wraps to run before the procedure.                               |
+| `.$errors({...})`  | No       | A map of error codes to HTTP status codes. Enables the typed `fail()` function. |
+| `.$route({...})`   | No       | HTTP route metadata (method, path, description). Used by OpenAPI.               |
+| `.$meta({...})`    | No       | Set custom metadata.                                                            |
 
 <Callout type='info'>
   `.$resolve()` must be called last — it finalizes the builder and returns a `ProcedureDef`.
@@ -68,13 +69,12 @@ Every procedure has a `resolve` function. It receives one object with four prope
 
 ```ts twoslash
 // @noErrors
-const myProcedure = k.query()
-  .$resolve(({ input, ctx, fail, signal }) => {
-    // input  — the validated input (or undefined if no schema)
-    // ctx    — the context object (from context factory + guards)
-    // fail   — throws a typed error (only if `errors` is defined)
-    // signal — AbortSignal for cancellation
-  })
+const myProcedure = k.query().$resolve(({ input, ctx, fail, signal }) => {
+  // input  — the validated input (or undefined if no schema)
+  // ctx    — the context object (from context factory + guards)
+  // fail   — throws a typed error (only if `errors` is defined)
+  // signal — AbortSignal for cancellation
+})
 ```
 
 ## Queries vs mutations
@@ -115,7 +115,8 @@ const PostSchema = z.object({
   body: z.string(),
 })
 
-const createPost = k.mutation()
+const createPost = k
+  .mutation()
   .$input(z.object({ title: z.string(), body: z.string() }))
   .$output(PostSchema)
   .$errors({ CONFLICT: 409 })
@@ -155,7 +156,8 @@ Attach custom key-value metadata to any procedure using `.$meta()`:
 
 ```ts twoslash
 // @noErrors
-const listUsers = k.query()
+const listUsers = k
+  .query()
   .$input(z.object({ limit: z.number().optional() }))
   .$meta({ cacheable: true, rateLimit: 100 })
   .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))

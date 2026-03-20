@@ -12,8 +12,8 @@ import { katman } from '../src/katman.ts'
 const k = katman({ context: () => ({ db: true }) })
 
 const router = k.router({
-  health: k.query(() => ({ status: 'ok', runtime: 'deno' })),
-  echo: k.query(z.object({ msg: z.string() }), ({ input }) => ({ echo: input.msg })),
+  health: k.$resolve(() => ({ status: 'ok', runtime: 'deno' })),
+  echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
 })
 
 const handle = k.handler(router)

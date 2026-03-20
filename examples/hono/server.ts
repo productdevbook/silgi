@@ -7,8 +7,8 @@ import { z } from 'zod'
 const k = katman({ context: () => ({ db: 'hono-db' }) })
 
 const appRouter = k.router({
-  health: k.query(() => ({ status: 'ok', framework: 'hono' })),
-  echo: k.query(z.object({ msg: z.string() }), ({ input }) => ({ echo: input.msg })),
+  health: k.$resolve(() => ({ status: 'ok', framework: 'hono' })),
+  echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
 })
 
 const app = new Hono()

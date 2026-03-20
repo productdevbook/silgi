@@ -8,7 +8,7 @@
  * ```ts
  * import { strictGetGuard } from "katman/plugins"
  *
- * const listUsers = k.query()
+ * const listUsers = k
  *   .$use(strictGetGuard)
  *   .$resolve(({ ctx }) => ctx.db.users.findMany())
  * ```

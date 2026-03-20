@@ -3,7 +3,7 @@
  *
  * @example
  * ```ts
- * const p = k.query()
+ * const p = k
  *   .$input(inputSchema)
  *   .$output(PostSchema)
  *   .$resolve(() => ({ id: 1, title: 'hi', body: 'x' }))
@@ -11,11 +11,7 @@
  * ```
  */
 
-import type {
-  AnySchema,
-  InferSchemaInput,
-  InferSchemaOutput,
-} from './core/schema.ts'
+import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
 import type {
   ProcedureDef,
   ProcedureType,
@@ -166,9 +162,8 @@ class ProcBuilder {
   }
 }
 
-export function createProcedureBuilder<
-  TType extends ProcedureType,
-  TBaseCtx extends Record<string, unknown>,
->(type: TType): ProcedureBuilder<TType, TBaseCtx> {
+export function createProcedureBuilder<TType extends ProcedureType, TBaseCtx extends Record<string, unknown>>(
+  type: TType,
+): ProcedureBuilder<TType, TBaseCtx> {
   return new ProcBuilder(type) as unknown as ProcedureBuilder<TType, TBaseCtx>
 }

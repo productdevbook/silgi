@@ -35,7 +35,7 @@ describe('toKatmanError — information disclosure', () => {
   it('handler should not expose internal errors in response body', async () => {
     const k = katman({ context: () => ({}) })
     const router = k.router({
-      broken: k.query(() => {
+      broken: k.$resolve(() => {
         throw new Error('SELECT * FROM secret_table WHERE password = ...')
       }),
     })

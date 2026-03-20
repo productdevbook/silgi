@@ -9,11 +9,11 @@ describe('createPeer() — bidirectional RPC', () => {
     const { createPeer } = await import('#src/adapters/peer.ts')
 
     const routerA = k.router({
-      ping: k.query(() => ({ from: 'A', msg: 'pong' })),
+      ping: k.$resolve(() => ({ from: 'A', msg: 'pong' })),
     })
 
     const routerB = k.router({
-      hello: k.query(() => ({ from: 'B', msg: 'world' })),
+      hello: k.$resolve(() => ({ from: 'B', msg: 'world' })),
     })
 
     const channel = new MessageChannel()

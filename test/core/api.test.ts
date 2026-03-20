@@ -27,7 +27,7 @@ describe('guard()', () => {
 
   it('sync guard merges context', async () => {
     const enrichIp = k.guard((ctx) => ({ ip: '1.2.3.4' }))
-    const proc = k.query().$use(enrichIp).$resolve(async ({ ctx }) => (ctx as any).ip)
+    const proc = k.$use(enrichIp).$resolve(async ({ ctx }) => (ctx as any).ip)
 
     const pipeline = compileProcedure(proc)
     const ctx: Record<string, unknown> = {}
@@ -38,7 +38,7 @@ describe('guard()', () => {
 
   it('async guard merges context', async () => {
     const auth = k.guard(async () => ({ user: 'admin' }))
-    const proc = k.query().$use(auth).$resolve(async ({ ctx }) => (ctx as any).user)
+    const proc = k.$use(auth).$resolve(async ({ ctx }) => (ctx as any).user)
 
     const pipeline = compileProcedure(proc)
     const ctx: Record<string, unknown> = {}
@@ -50,7 +50,7 @@ describe('guard()', () => {
     const enrichIp = k.guard((ctx: any) => {
       ctx.ip = '1.2.3.4' // direct mutation, no return
     })
-    const proc = k.query().$use(enrichIp).$resolve(async ({ ctx }) => (ctx as any).ip)
+    const proc = k.$use(enrichIp).$resolve(async ({ ctx }) => (ctx as any).ip)
 
     const pipeline = compileProcedure(proc)
     const ctx: Record<string, unknown> = {}
@@ -60,7 +60,7 @@ describe('guard()', () => {
 
   it('only merges plain objects, not class instances', async () => {
     const badGuard = k.guard(() => new Date() as any)
-    const proc = k.query().$use(badGuard).$resolve(async ({ ctx }) => Object.keys(ctx))
+    const proc = k.$use(badGuard).$resolve(async ({ ctx }) => Object.keys(ctx))
 
     const pipeline = compileProcedure(proc)
     const ctx: Record<string, unknown> = {}
@@ -74,11 +74,11 @@ describe('guard()', () => {
     const addB = k.guard(() => ({ b: 2 }))
     const addC = k.guard(async () => ({ c: 3 }))
 
-    const proc = k.query().$use(addA, addB, addC).$resolve(async ({ ctx }) => ({
-        a: (ctx as any).a,
-        b: (ctx as any).b,
-        c: (ctx as any).c,
-      }))
+    const proc = k.$use(addA, addB, addC).$resolve(async ({ ctx }) => ({
+      a: (ctx as any).a,
+      b: (ctx as any).b,
+      c: (ctx as any).c,
+    }))
 
     const pipeline = compileProcedure(proc)
     const ctx: Record<string, unknown> = {}
@@ -105,10 +105,10 @@ describe('wrap()', () => {
       return result
     })
 
-    const proc = k.query().$use(mw).$resolve(async () => {
-        order.push('handler')
-        return 'ok'
-      })
+    const proc = k.$use(mw).$resolve(async () => {
+      order.push('handler')
+      return 'ok'
+    })
 
     const pipeline = compileProcedure(proc)
     await pipeline({}, undefined, AbortSignal.timeout(5000))
@@ -126,10 +126,10 @@ describe('wrap()', () => {
       return next()
     })
 
-    const proc = k.query().$use(g, w).$resolve(async () => {
-        order.push('handler')
-        return 'ok'
-      })
+    const proc = k.$use(g, w).$resolve(async () => {
+      order.push('handler')
+      return 'ok'
+    })
 
     const pipeline = compileProcedure(proc)
     await pipeline({}, undefined, AbortSignal.timeout(5000))
@@ -141,28 +141,30 @@ describe('wrap()', () => {
 
 describe('query() / mutation() / subscription()', () => {
   it('short form: query(resolve)', () => {
-    const proc = k.query(async () => 'hello')
+    const proc = k.$resolve(async () => 'hello')
     expect(proc.type).toBe('query')
     expect(proc.input).toBeNull()
     expect(proc.resolve).toBeDefined()
   })
 
   it('short form: query(input, resolve)', () => {
-    const proc = k.query(z.object({ name: z.string() }) as any, async ({ input }: any) => `hello ${input.name}`)
+    const proc = k
+      .$input(z.object({ name: z.string() }) as any)
+      .$resolve(async ({ input }: any) => `hello ${input.name}`)
     expect(proc.type).toBe('query')
     expect(proc.input).toBeDefined()
   })
 
-  it('builder form: mutation().$use(...).$input(...).$errors(...).$resolve(...)', () => {
+  it('builder form: $use(...).$input(...).$errors(...).$resolve(...)', () => {
     const auth = k.guard(async () => ({ user: 'admin' }))
-    const proc = k.mutation()
+    const proc = k
       .$use(auth)
       .$input(z.object({ name: z.string() }) as any)
       .$errors({ CONFLICT: 409 })
       .$resolve(async ({ input, fail }: any) => {
         return { id: 1, name: input.name }
       })
-    expect(proc.type).toBe('mutation')
+    expect(proc.type).toBe('query')
     expect(proc.errors).toEqual({ CONFLICT: 409 })
     expect(proc.use).toHaveLength(1)
   })
@@ -175,8 +177,8 @@ describe('query() / mutation() / subscription()', () => {
   })
 
   it('all procedures have same 8-property shape', () => {
-    const q = k.query(async () => 'q')
-    const m = k.mutation(async () => 'm')
+    const q = k.$resolve(async () => 'q')
+    const m = k.$resolve(async () => 'm')
     const s = k.subscription(async function* () {
       yield 1
     })
@@ -192,11 +194,9 @@ describe('query() / mutation() / subscription()', () => {
 
 describe('fail()', () => {
   it('throws KatmanError with defined=true', async () => {
-    const proc = k.mutation()
-      .$errors({ CONFLICT: 409 })
-      .$resolve(async ({ fail }: any) => {
-        fail('CONFLICT')
-      })
+    const proc = k.$errors({ CONFLICT: 409 }).$resolve(async ({ fail }: any) => {
+      fail('CONFLICT')
+    })
 
     const pipeline = compileProcedure(proc)
     await expect(pipeline({}, undefined, AbortSignal.timeout(5000))).rejects.toMatchObject({
@@ -207,7 +207,7 @@ describe('fail()', () => {
   })
 
   it('fail with data', async () => {
-    const proc = k.mutation()
+    const proc = k
       .$errors({ INVALID: { status: 422, message: 'Validation failed' } })
       .$resolve(async ({ fail }: any) => {
         fail('INVALID', { field: 'email' })
@@ -222,7 +222,7 @@ describe('fail()', () => {
   })
 
   it('fail on procedure without errors still throws (defined=false)', async () => {
-    const proc = k.query(async ({ fail }: any) => {
+    const proc = k.$resolve(async ({ fail }: any) => {
       fail('RANDOM')
     })
 
@@ -238,7 +238,7 @@ describe('fail()', () => {
 
 describe('input/output validation', () => {
   it('validates input schema', async () => {
-    const proc = k.query(z.object({ name: z.string() }) as any, async ({ input }: any) => input.name)
+    const proc = k.$input(z.object({ name: z.string() }) as any).$resolve(async ({ input }: any) => input.name)
 
     const pipeline = compileProcedure(proc)
 
@@ -250,9 +250,7 @@ describe('input/output validation', () => {
   })
 
   it('validates output schema', async () => {
-    const proc = k.query()
-      .$output(z.object({ id: z.number() }) as any)
-      .$resolve(async () => ({ id: 'not-a-number' }))
+    const proc = k.$output(z.object({ id: z.number() }) as any).$resolve(async () => ({ id: 'not-a-number' }))
 
     const pipeline = compileProcedure(proc)
     await expect(pipeline({}, undefined, AbortSignal.timeout(5000))).rejects.toThrow()
@@ -264,10 +262,10 @@ describe('input/output validation', () => {
 describe('router()', () => {
   it('auto-assigns paths', () => {
     const router = k.router({
-      health: k.query(async () => 'ok'),
+      health: k.$resolve(async () => 'ok'),
       users: {
-        list: k.query(async () => []),
-        create: k.mutation(async () => ({})),
+        list: k.$resolve(async () => []),
+        create: k.$resolve(async () => ({})),
       },
     })
 
@@ -281,15 +279,13 @@ describe('router()', () => {
 
 describe('handler()', () => {
   const router = k.router({
-    health: k.query(async () => ({ status: 'ok' })),
-    greet: k.query(z.object({ name: z.string() }) as any, async ({ input }: any) => ({
+    health: k.$resolve(async () => ({ status: 'ok' })),
+    greet: k.$input(z.object({ name: z.string() }) as any).$resolve(async ({ input }: any) => ({
       message: `Hello, ${input.name}!`,
     })),
-    fail: k.mutation()
-      .$errors({ FORBIDDEN: 403 })
-      .$resolve(async ({ fail }: any) => {
-        fail('FORBIDDEN')
-      }),
+    fail: k.$errors({ FORBIDDEN: 403 }).$resolve(async ({ fail }: any) => {
+      fail('FORBIDDEN')
+    }),
   })
 
   const handle = k.handler(router)
@@ -363,10 +359,10 @@ describe('E2E: Full CRUD', () => {
 
   const router = k2.router({
     users: {
-      list: k2.query(z.object({ limit: z.number().optional() }) as any, async ({ input }: any) =>
-        db.slice(0, input?.limit ?? 10),
-      ),
-      create: k2.mutation()
+      list: k2
+        .$input(z.object({ limit: z.number().optional() }) as any)
+        .$resolve(async ({ input }: any) => db.slice(0, input?.limit ?? 10)),
+      create: k2
         .$use(auth)
         .$input(z.object({ name: z.string(), email: z.string() }) as any)
         .$errors({ CONFLICT: 409 })
@@ -428,5 +424,90 @@ describe('E2E: Full CRUD', () => {
     const body = await res.json()
     expect(body.code).toBe('CONFLICT')
     expect(body.defined).toBe(true)
+  })
+})
+
+// ── URL Params Tests ────────────────────────────────
+
+describe('URL params from route patterns', () => {
+  const k3 = katman({
+    context: () => ({}),
+  })
+
+  it('surfaces :id param from route pattern to resolve context', async () => {
+    const router = k3.router({
+      users: {
+        byId: k3
+          .$route({ path: '/users/:id', method: 'GET' })
+          .$resolve(async ({ params }: any) => {
+            return { userId: params.id }
+          }),
+      },
+    })
+    const handle = k3.handler(router)
+
+    const res = await handle(new Request('http://localhost/users/123', { method: 'GET' }))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.userId).toBe('123')
+  })
+
+  it('surfaces multiple params from route pattern', async () => {
+    const router = k3.router({
+      posts: {
+        byUserAndPost: k3
+          .$route({ path: '/users/:userId/posts/:postId', method: 'GET' })
+          .$resolve(async ({ params }: any) => {
+            return { userId: params.userId, postId: params.postId }
+          }),
+      },
+    })
+    const handle = k3.handler(router)
+
+    const res = await handle(new Request('http://localhost/users/42/posts/99', { method: 'GET' }))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.userId).toBe('42')
+    expect(body.postId).toBe('99')
+  })
+
+  it('provides empty params object for static routes', async () => {
+    const router = k3.router({
+      health: k3.$resolve(async ({ params }: any) => {
+        return { hasParams: Object.keys(params).length > 0 }
+      }),
+    })
+    const handle = k3.handler(router)
+
+    const res = await handle(new Request('http://localhost/health', { method: 'POST' }))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.hasParams).toBe(false)
+  })
+
+  it('params work with POST method and input', async () => {
+    const router = k3.router({
+      users: {
+        update: k3
+          .$route({ path: '/users/:id', method: 'POST' })
+          .$input(z.object({ name: z.string() }) as any)
+          .$resolve(async ({ params, input }: any) => {
+            return { id: params.id, name: input.name }
+          }),
+      },
+    })
+    const handle = k3.handler(router)
+
+    const res = await handle(
+      new Request('http://localhost/users/456', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'Updated' }),
+      }),
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.id).toBe('456')
+    expect(body.name).toBe('Updated')
   })
 })

@@ -69,8 +69,8 @@ export function katmanMessagePort<TCtx extends Record<string, unknown>>(
     const msg = event.data as RPCMessage
     if (!msg || typeof msg !== 'object' || !msg.__katman || msg.__type !== 'request') return
 
-    const route = flatRouter('POST', '/' + msg.path)?.data
-    if (!route) {
+    const match = flatRouter('POST', '/' + msg.path)
+    if (!match) {
       port.postMessage({
         __katman: true,
         __type: 'response',
@@ -79,9 +79,12 @@ export function katmanMessagePort<TCtx extends Record<string, unknown>>(
       } satisfies RPCResponse)
       return
     }
+    const route = match.data
 
     try {
       const ctx: Record<string, unknown> = Object.create(null)
+      // Surface URL params from radix router match
+      if (match.params) ctx.params = match.params
       if (options.context) {
         const baseCtx = await options.context()
         const keys = Object.keys(baseCtx)

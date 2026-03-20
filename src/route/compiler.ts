@@ -16,9 +16,7 @@ import { findRoute } from './find.ts'
 
 import type { RouterContext, RouteNode, MethodEntry, MatchedRoute, ParamMapEntry } from './types.ts'
 
-export function compileRouter<T>(
-  ctx: RouterContext<T>,
-): (method: string, path: string) => MatchedRoute<T> | undefined {
+export function compileRouter<T>(ctx: RouterContext<T>): (method: string, path: string) => MatchedRoute<T> | undefined {
   const refs: unknown[] = []
   const pre: string[] = ['var _rs={data:null,params:null}']
   const uid = { n: 0 }
@@ -43,11 +41,14 @@ export function compileRouter<T>(
 
     for (const [ch, entries] of byChar) {
       // Check if ALL entries in this group are simple leaves (indexOf fast path)
-      const allSimple = entries.every(([, child]) =>
-        !child.static
-        && !(child.param && child.wildcard)
-        && !child.param?.static && !child.param?.param && !child.param?.wildcard
-        && !_hasMultiParam(child.param),
+      const allSimple = entries.every(
+        ([, child]) =>
+          !child.static &&
+          !(child.param && child.wildcard) &&
+          !child.param?.static &&
+          !child.param?.param &&
+          !child.param?.wildcard &&
+          !_hasMultiParam(child.param),
       )
 
       let body: string
@@ -79,7 +80,10 @@ export function compileRouter<T>(
           if (child.methods && !inSwitch) {
             let hasParams = false
             for (const m in child.methods) {
-              if (child.methods[m]?.some((e: MethodEntry<any>) => e.paramMap?.length)) { hasParams = true; break }
+              if (child.methods[m]?.some((e: MethodEntry<any>) => e.paramMap?.length)) {
+                hasParams = true
+                break
+              }
             }
             if (!hasParams) {
               inner += emitTerminal(child.methods, refs, `p.length===${prefixEnd}`)
@@ -116,7 +120,8 @@ export function compileRouter<T>(
                       rx += `&&$${ri}.test(p.substring(${childPrefix}))`
                     }
                   }
-                  inner += `{var _j=p.indexOf("/",${childPrefix});if(${g}p.length>${childPrefix}&&_j===-1${rx}){` +
+                  inner +=
+                    `{var _j=p.indexOf("/",${childPrefix});if(${g}p.length>${childPrefix}&&_j===-1${rx}){` +
                     emitAssign(po, entry.paramMap[0]!, `p.substring(${childPrefix})`, entry.paramRegex, refs, uid) +
                     `${ro}.data=$${d};return ${ro}}}`
                 }
@@ -227,7 +232,10 @@ function emitNode(
   if (node.methods) {
     let hasParams = false
     for (const m in node.methods) {
-      if (node.methods[m]?.some((e: MethodEntry<any>) => e.paramMap?.length)) { hasParams = true; break }
+      if (node.methods[m]?.some((e: MethodEntry<any>) => e.paramMap?.length)) {
+        hasParams = true
+        break
+      }
     }
     if (hasParams) {
       code += emitParamTerminal(node.methods, refs, pre, uid, depth)
@@ -300,9 +308,7 @@ function emitParamNode(
         const lastIdx = entry.paramMap[pc - 1]![0]
         const expLen = lastIdx + 2
 
-        const lenCk = lastOpt
-          ? `(l===${expLen}||l===${expLen - 1})`
-          : `l===${expLen}`
+        const lenCk = lastOpt ? `(l===${expLen}||l===${expLen - 1})` : `l===${expLen}`
 
         // Regex constraints (only .test for non-group regexes)
         let rx = ''
@@ -312,7 +318,7 @@ function emitParamNode(
             if (pmI !== -1) {
               const src = entry.paramRegex[i]!.source
               // Skip .test for regexes with capture groups — handled by emitAssign
-              if (!src.includes('(?<') && !(src.match(/\((?!\?)/g)?.length)) {
+              if (!src.includes('(?<') && !src.match(/\((?!\?)/g)?.length) {
                 rx += `&&${entry.paramRegex[i]!.toString()}.test(s[${entry.paramMap[pmI]![0] + 1}])`
               } else {
                 rx += `&&${entry.paramRegex[i]!.toString()}.test(s[${entry.paramMap[pmI]![0] + 1}])`
@@ -335,7 +341,12 @@ function emitParamNode(
   // Recurse into children — create a virtual node WITHOUT methods
   // to avoid re-emitting terminal handlers that were already handled above
   if (node.static || node.param || node.wildcard) {
-    const childNode = { key: node.key, static: node.static, param: node.param, wildcard: node.wildcard } as RouteNode<any>
+    const childNode = {
+      key: node.key,
+      static: node.static,
+      param: node.param,
+      wildcard: node.wildcard,
+    } as RouteNode<any>
     code += emitNode(childNode, refs, pre, uid, depth + 1)
   }
 
@@ -346,7 +357,9 @@ function emitParamNode(
 
 function emitParamTerminal(
   methods: Record<string, MethodEntry<any>[] | undefined>,
-  refs: unknown[], pre: string[], uid: { n: number },
+  refs: unknown[],
+  pre: string[],
+  uid: { n: number },
   depth: number,
 ): string {
   let c = ''
@@ -389,11 +402,7 @@ function emitParamTerminal(
 
 // ── Terminal ────────────────────────────────────────
 
-function emitTerminal(
-  methods: Record<string, MethodEntry<any>[] | undefined>,
-  refs: unknown[],
-  ck: string,
-): string {
+function emitTerminal(methods: Record<string, MethodEntry<any>[] | undefined>, refs: unknown[], ck: string): string {
   let c = ''
   for (const m in methods) {
     const e = methods[m]?.[0]
@@ -409,7 +418,9 @@ function emitTerminal(
 
 function emitWildcardSplit(
   methods: Record<string, MethodEntry<any>[] | undefined>,
-  refs: unknown[], pre: string[], uid: { n: number },
+  refs: unknown[],
+  pre: string[],
+  uid: { n: number },
   depth: number,
 ): string {
   let code = ''
@@ -448,7 +459,9 @@ function emitWildcardSplit(
 
 function emitWildcardSlice(
   methods: Record<string, MethodEntry<any>[] | undefined>,
-  refs: unknown[], pre: string[], uid: { n: number },
+  refs: unknown[],
+  pre: string[],
+  uid: { n: number },
   offset: number,
 ): string {
   let code = ''
@@ -528,8 +541,8 @@ function allocP(
   const idx = uid.n++
   const po = `_p${idx}`
   const ro = `_r${idx}`
-  const fieldNames = entry ? collectNames(entry) : pm.map(([, n]) => typeof n === 'string' ? n : String(n))
-  const fields = fieldNames.map(n => `${JSON.stringify(n)}:""`).join(',')
+  const fieldNames = entry ? collectNames(entry) : pm.map(([, n]) => (typeof n === 'string' ? n : String(n)))
+  const fields = fieldNames.map((n) => `${JSON.stringify(n)}:""`).join(',')
   pre.push(`var ${po}={${fields}}`)
   pre.push(`var ${ro}={data:null,params:${po}}`)
   return { po, ro }
@@ -554,7 +567,7 @@ function emitAssign(
   const mv = `_m${uid.n++}`
 
   if (src.includes('(?<')) {
-    const groupNames = [...src.matchAll(/\(\?<(\w+)>/g)].map(m => m[1]!)
+    const groupNames = [...src.matchAll(/\(\?<(\w+)>/g)].map((m) => m[1]!)
     let code = `var ${mv}=$${ri}.exec(${segExpr});`
     for (const gn of groupNames) code += `${po}${safe(gn)}=${mv}?${mv}.groups.${gn}:"";`
     return code
@@ -574,11 +587,10 @@ function emitAssign(
   return `${po}${safe(pn)}=${segExpr};`
 }
 
-
 function _hasMultiParam(node: RouteNode<any> | undefined): boolean {
   if (!node?.methods) return false
   for (const m in node.methods) {
-    if (node.methods[m]?.some(e => e.paramMap && e.paramMap.length > 1)) return true
+    if (node.methods[m]?.some((e) => e.paramMap && e.paramMap.length > 1)) return true
   }
   return false
 }
@@ -593,6 +605,9 @@ function safe(k: string): string {
 
 function addRef(refs: unknown[], v: unknown): number {
   let i = refs.indexOf(v)
-  if (i === -1) { refs.push(v); i = refs.length - 1 }
+  if (i === -1) {
+    refs.push(v)
+    i = refs.length - 1
+  }
   return i
 }

@@ -45,13 +45,16 @@ export function katmanHono<TCtx extends Record<string, unknown>>(
     }
     if (pathname.startsWith('/')) pathname = pathname.slice(1)
 
-    const route = flatRouter('POST', '/' + pathname)?.data
-    if (!route) {
+    const match = flatRouter(c.req.method, '/' + pathname)
+    if (!match) {
       return c.json({ code: 'NOT_FOUND', status: 404, message: 'Procedure not found' }, 404)
     }
+    const route = match.data
 
     try {
       const ctx: Record<string, unknown> = Object.create(null)
+      // Surface URL params from radix router match
+      if (match.params) ctx.params = match.params
       if (options.context) {
         const baseCtx = await options.context(c)
         const keys = Object.keys(baseCtx)

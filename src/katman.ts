@@ -14,6 +14,7 @@ import { defu } from 'defu'
 import { getPort } from 'get-port-please'
 import { createHooks } from 'hookable'
 
+import { createProcedureBuilder } from './builder.ts'
 import {
   encode as devalueEncode,
   decode as devalueDecode,
@@ -29,18 +30,17 @@ import {
   MSGPACK_CONTENT_TYPE,
 } from './codec/msgpack.ts'
 import { compileProcedure, compileRouter, ContextPool } from './compile.ts'
-import type { CompiledRouterFn } from './compile.ts'
 import { KatmanError, toKatmanError, isErrorStatus } from './core/error.ts'
 import { ValidationError, validateSchema } from './core/schema.ts'
 import { iteratorToEventStream } from './core/sse.ts'
 import { stringifyJSON, parseEmptyableJSON, once } from './core/utils.ts'
-import { createProcedureBuilder } from './builder.ts'
 import { generateOpenAPI, scalarHTML, resolveScalarLocal } from './scalar.ts'
 
+import type { ProcedureBuilder } from './builder.ts'
+import type { CompiledRouterFn } from './compile.ts'
 import type { CompiledHandler } from './compile.ts'
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
 import type { ScalarOptions } from './scalar.ts'
-import type { ProcedureBuilder } from './builder.ts'
 import type {
   ProcedureDef,
   ProcedureType,
@@ -88,11 +88,26 @@ export interface KatmanInstance<TBaseCtx extends Record<string, unknown>> {
   /** Create a wrap middleware (onion, before+after) */
   wrap: (fn: WrapFn<TBaseCtx>) => WrapDef<TBaseCtx>
 
-  /** Define a query (GET, cacheable, idempotent) */
-  query: QueryFactory<TBaseCtx>
+  /** Start a builder — resolve only */
+  $resolve: ProcedureBuilder<'query', TBaseCtx>['$resolve']
 
-  /** Define a mutation (POST, side effects) */
-  mutation: MutationFactory<TBaseCtx>
+  /** Start a builder — set input schema */
+  $input: ProcedureBuilder<'query', TBaseCtx>['$input']
+
+  /** Start a builder — add middleware */
+  $use: ProcedureBuilder<'query', TBaseCtx>['$use']
+
+  /** Start a builder — set output schema */
+  $output: ProcedureBuilder<'query', TBaseCtx>['$output']
+
+  /** Start a builder — set errors */
+  $errors: ProcedureBuilder<'query', TBaseCtx>['$errors']
+
+  /** Start a builder — set route metadata */
+  $route: ProcedureBuilder<'query', TBaseCtx>['$route']
+
+  /** Start a builder — set custom metadata */
+  $meta: ProcedureBuilder<'query', TBaseCtx>['$meta']
 
   /** Define a subscription (SSE stream) */
   subscription: SubscriptionFactory<TBaseCtx>
@@ -138,31 +153,18 @@ interface GuardFactory<TBaseCtx> {
 
 // ── Procedure Factories ──────────────────────────────
 
-interface QueryFactory<TBaseCtx extends Record<string, unknown>> {
-  /** Builder: `query()` — returns chainable builder */
-  (): ProcedureBuilder<'query', TBaseCtx>
-  /** Short: `query(resolve)` */
-  <TOutput>(resolve: (opts: ResolveContext<TBaseCtx, undefined, {}>) => Promise<TOutput> | TOutput): ProcedureDef<'query', undefined, TOutput, {}>
-  /** Short: `query(input, resolve)` */
-  <TSchema extends AnySchema, TOutput>(input: TSchema, resolve: (opts: ResolveContext<TBaseCtx, InferSchemaOutput<TSchema>, {}>) => Promise<TOutput> | TOutput): ProcedureDef<'query', InferSchemaInput<TSchema>, TOutput, {}>
-}
-
-interface MutationFactory<TBaseCtx extends Record<string, unknown>> {
-  /** Builder: `mutation()` — returns chainable builder */
-  (): ProcedureBuilder<'mutation', TBaseCtx>
-  /** Short: `mutation(resolve)` */
-  <TOutput>(resolve: (opts: ResolveContext<TBaseCtx, undefined, {}>) => Promise<TOutput> | TOutput): ProcedureDef<'mutation', undefined, TOutput, {}>
-  /** Short: `mutation(input, resolve)` */
-  <TSchema extends AnySchema, TOutput>(input: TSchema, resolve: (opts: ResolveContext<TBaseCtx, InferSchemaOutput<TSchema>, {}>) => Promise<TOutput> | TOutput): ProcedureDef<'mutation', InferSchemaInput<TSchema>, TOutput, {}>
-}
-
 interface SubscriptionFactory<TBaseCtx extends Record<string, unknown>> {
   /** Builder: `subscription()` — returns chainable builder */
   (): ProcedureBuilder<'subscription', TBaseCtx>
   /** Short: `subscription(resolve)` */
-  <TOutput>(resolve: (opts: ResolveContext<TBaseCtx, undefined, {}>) => AsyncIterableIterator<TOutput>): ProcedureDef<'subscription', undefined, TOutput, {}>
+  <TOutput>(
+    resolve: (opts: ResolveContext<TBaseCtx, undefined, {}>) => AsyncIterableIterator<TOutput>,
+  ): ProcedureDef<'subscription', undefined, TOutput, {}>
   /** Short: `subscription(input, resolve)` */
-  <TSchema extends AnySchema, TOutput>(input: TSchema, resolve: (opts: ResolveContext<TBaseCtx, InferSchemaOutput<TSchema>, {}>) => AsyncIterableIterator<TOutput>): ProcedureDef<'subscription', InferSchemaInput<TSchema>, TOutput, {}>
+  <TSchema extends AnySchema, TOutput>(
+    input: TSchema,
+    resolve: (opts: ResolveContext<TBaseCtx, InferSchemaOutput<TSchema>, {}>) => AsyncIterableIterator<TOutput>,
+  ): ProcedureDef<'subscription', InferSchemaInput<TSchema>, TOutput, {}>
 }
 
 // ── Implementation ──────────────────────────────────
@@ -247,8 +249,14 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
     },
     wrap: (fn) => ({ kind: 'wrap' as const, fn }),
 
-    query: ((...args: unknown[]) => createProcedure('query', ...args)) as QueryFactory<TBaseCtx>,
-    mutation: ((...args: unknown[]) => createProcedure('mutation', ...args)) as MutationFactory<TBaseCtx>,
+    $resolve: ((fn: any) => createProcedure('query', fn)) as any,
+    $input: ((schema: any) => createProcedureBuilder('query').$input(schema)) as any,
+    $use: ((...middleware: any[]) => createProcedureBuilder('query').$use(...middleware)) as any,
+    $output: ((schema: any) => createProcedureBuilder('query').$output(schema)) as any,
+    $errors: ((errors: any) => createProcedureBuilder('query').$errors(errors)) as any,
+    $route: ((route: any) => createProcedureBuilder('query').$route(route)) as any,
+    $meta: ((meta: any) => createProcedureBuilder('query').$meta(meta)) as any,
+
     subscription: ((...args: unknown[]) => createProcedure('subscription', ...args)) as SubscriptionFactory<TBaseCtx>,
 
     router: (def) => {
@@ -370,6 +378,8 @@ export function katman<TBaseCtx extends Record<string, unknown>>(
           // FIX #3: No per-request closures — inline respond/error logic
           // FIX #2b: Don't use pool (delete causes V8 dictionary mode)
           const ctx: Record<string, unknown> = Object.create(null)
+          // Surface URL params from radix router match
+          if (match.params) ctx.params = match.params
           const ac = new AbortController()
           req.on('close', () => ac.abort())
 
@@ -650,6 +660,9 @@ function createFetchHandler(
       const baseCtx = await contextFactory(request)
       const keys = Object.keys(baseCtx)
       for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = baseCtx[keys[i]!]
+
+      // Surface URL params from radix router match
+      if (match.params) ctx.params = match.params
 
       // Parse input — use .json() directly when possible
       let rawInput: unknown

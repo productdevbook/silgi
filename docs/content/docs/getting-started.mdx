@@ -94,10 +94,12 @@ const listUsers = query(z.object({ limit: z.number().min(1).max(100).optional() 
 // A mutation that requires authentication
 const createUser = mutation()
   .$use(auth)
-  .$input(z.object({
-    name: z.string().min(1),
-    email: z.string().email(),
-  }))
+  .$input(
+    z.object({
+      name: z.string().min(1),
+      email: z.string().email(),
+    }),
+  )
   .$resolve(({ input, ctx }) => {
     return ctx.db.users.create({ ...input, createdBy: ctx.userId })
   })

@@ -120,10 +120,11 @@ export interface ResolveContext<TCtx, TInput, TErrors extends ErrorDef> {
   input: TInput
   fail: FailFn<TErrors>
   signal: AbortSignal
+  /** URL params extracted from the route pattern (e.g. `/users/:id` → `{ id: '123' }`) */
+  params: Record<string, string>
 }
 
 // ── Config Forms ──────────────────────────────────
-
 
 // ── Router Types ──────────────────────────────────
 

@@ -77,7 +77,7 @@ export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}):
   collectProcedures(router, [], (path, proc) => {
     const route = proc.route as Route | null
     const httpPath = route?.path ?? '/' + path.join('/')
-    const method = route?.method?.toLowerCase() ?? (proc.type === 'query' ? 'get' : 'post')
+    const method = route?.method?.toLowerCase() ?? 'post'
     const operationId = path.join('_')
 
     // Collect tags from first path segment

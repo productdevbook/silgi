@@ -23,22 +23,18 @@ const k = katman({
 const auth = k.guard(() => ({ userId: 1 }))
 
 const appRouter = k.router({
-  health: k.query()
-    .$route({ cache: 60 })
-    .$resolve(() => ({ status: 'ok' as const, uptime: 123 })),
-  cached: k.query()
-    .$route({ cache: 'public, max-age=300, stale-while-revalidate=60' })
-    .$resolve(() => ({ data: 'cached' })),
+  health: k.$route({ cache: 60 }).$resolve(() => ({ status: 'ok' as const, uptime: 123 })),
+  cached: k.$route({ cache: 'public, max-age=300, stale-while-revalidate=60' }).$resolve(() => ({ data: 'cached' })),
   users: {
-    list: k.query(z.object({ limit: z.number().optional() }), ({ input, ctx }) =>
-      ctx.db.users.slice(0, input.limit ?? 10),
-    ),
-    get: k.query(z.object({ id: z.number() }), ({ input, ctx }) => {
+    list: k
+      .$input(z.object({ limit: z.number().optional() }))
+      .$resolve(({ input, ctx }) => ctx.db.users.slice(0, input.limit ?? 10)),
+    get: k.$input(z.object({ id: z.number() })).$resolve(({ input, ctx }) => {
       const user = ctx.db.users.find((u) => u.id === input.id)
       if (!user) throw new Error('Not found')
       return user
     }),
-    create: k.mutation()
+    create: k
       .$use(auth)
       .$input(z.object({ name: z.string(), email: z.string().email() }))
       .$errors({ CONFLICT: 409 })
@@ -180,10 +176,13 @@ describe('E2E type roundtrip', () => {
   it('handler passes through raw Response from resolver', async () => {
     const k2 = katman({ context: () => ({}) })
     const router = k2.router({
-      download: k2.query(() => new Response('file-content', {
-        status: 200,
-        headers: { 'content-type': 'application/pdf', 'x-custom': 'test' },
-      })),
+      download: k2.$resolve(
+        () =>
+          new Response('file-content', {
+            status: 200,
+            headers: { 'content-type': 'application/pdf', 'x-custom': 'test' },
+          }),
+      ),
     })
     const handle = k2.handler(router)
     const res = await handle(new Request('http://localhost/download', { method: 'POST' }))
@@ -196,7 +195,7 @@ describe('E2E type roundtrip', () => {
   it('handler passes through ReadableStream as octet-stream', async () => {
     const k2 = katman({ context: () => ({}) })
     const router = k2.router({
-      stream: k2.query(() => {
+      stream: k2.$resolve(() => {
         const encoder = new TextEncoder()
         return new ReadableStream({
           start(controller) {

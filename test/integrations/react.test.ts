@@ -11,10 +11,10 @@ import { katman } from '#src/katman.ts'
 const k = katman({ context: () => ({}) })
 
 const appRouter = k.router({
-  health: k.query(() => ({ status: 'ok' })),
-  echo: k.query(z.object({ msg: z.string() }), ({ input }) => ({ echo: input.msg })),
+  health: k.$resolve(() => ({ status: 'ok' })),
+  echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
   users: {
-    create: k.mutation(z.object({ name: z.string().min(1) }), ({ input }) => ({ id: 1, name: input.name })),
+    create: k.$input(z.object({ name: z.string().min(1) })).$resolve(({ input }) => ({ id: 1, name: input.name })),
   },
 })
 

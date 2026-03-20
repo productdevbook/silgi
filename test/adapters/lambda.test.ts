@@ -9,8 +9,8 @@ const k = katman({ context: () => ({ db: 'test' }) })
 describe('katmanLambda()', () => {
   it('handles Lambda events', async () => {
     const router = k.router({
-      health: k.query(() => ({ status: 'ok' })),
-      echo: k.query(z.object({ msg: z.string() }), ({ input }) => ({ echo: input.msg })),
+      health: k.$resolve(() => ({ status: 'ok' })),
+      echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
     })
 
     const handler = katmanLambda(router, { context: () => ({}) })
@@ -28,7 +28,7 @@ describe('katmanLambda()', () => {
   })
 
   it('returns 404 for unknown procedures', async () => {
-    const router = k.router({ health: k.query(() => 'ok') })
+    const router = k.router({ health: k.$resolve(() => 'ok') })
     const handler = katmanLambda(router, { context: () => ({}) })
 
     const result = await handler({
@@ -43,7 +43,7 @@ describe('katmanLambda()', () => {
   })
 
   it('strips prefix', async () => {
-    const router = k.router({ health: k.query(() => ({ ok: true })) })
+    const router = k.router({ health: k.$resolve(() => ({ ok: true })) })
     const handler = katmanLambda(router, { prefix: '/rpc', context: () => ({}) })
 
     const result = await handler({

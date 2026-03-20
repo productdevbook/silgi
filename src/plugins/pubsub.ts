@@ -11,7 +11,7 @@
  * const pubsub = createPublisher(new MemoryPubSub())
  *
  * // Publish from a mutation
- * const createUser = k.mutation(async ({ input, ctx }) => {
+ * const createUser = k.$resolve(async ({ input, ctx }) => {
  *   const user = await ctx.db.users.create(input)
  *   await pubsub.publish("user:created", user)
  *   return user

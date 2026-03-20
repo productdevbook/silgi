@@ -58,17 +58,20 @@ export function katmanLambda<TCtx extends Record<string, unknown>>(
     }
     if (pathname.startsWith('/')) pathname = pathname.slice(1)
 
-    const route = flatRouter('POST', '/' + pathname)?.data
-    if (!route) {
+    const match = flatRouter(event.httpMethod, '/' + pathname)
+    if (!match) {
       return {
         statusCode: 404,
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ code: 'NOT_FOUND', status: 404, message: 'Procedure not found' }),
       }
     }
+    const route = match.data
 
     try {
       const ctx: Record<string, unknown> = Object.create(null)
+      // Surface URL params from radix router match
+      if (match.params) ctx.params = match.params
       if (options.context) {
         const baseCtx = await options.context(event)
         const keys = Object.keys(baseCtx)
