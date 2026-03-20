@@ -704,11 +704,13 @@ function createFetchHandler(
         const ct = request.headers.get('content-type')
         if (isMsgpack(ct) && request.body) {
           const buf = new Uint8Array(await request.arrayBuffer())
-          rawInput = msgpackDecode(buf)
+          rawInput = buf.length > 0 ? msgpackDecode(buf) : undefined
         } else if (isDevalue(ct) && request.body) {
-          rawInput = devalueDecode(await request.text())
+          const text = await request.text()
+          rawInput = text ? devalueDecode(text) : undefined
         } else if (ct?.includes('json') && request.body) {
-          rawInput = await request.json()
+          const text = await request.text()
+          rawInput = text ? JSON.parse(text) : undefined
         } else if (request.body) {
           const text = await request.text()
           rawInput = text ? parseEmptyableJSON(text) : undefined
