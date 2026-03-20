@@ -53,7 +53,6 @@ async function removeTodo(id: number) {
     <h1 class="mb-1 text-2xl font-bold">Silgi + Nuxt — Todo</h1>
     <p class="mb-6 text-sm text-gray-400">Type-safe RPC with Silgi</p>
 
-    <!-- Add todo -->
     <form class="mb-6 flex gap-2" @submit.prevent="addTodo">
       <input
         v-model="newTitle"
@@ -68,10 +67,8 @@ async function removeTodo(id: number) {
       </button>
     </form>
 
-    <!-- Loading -->
     <p v-if="loading" class="text-sm text-gray-400">Loading...</p>
 
-    <!-- Todo list -->
     <ul v-else class="m-0 list-none p-0">
       <li
         v-for="todo in todos"
