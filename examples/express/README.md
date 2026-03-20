@@ -1,11 +1,11 @@
-# Katman + Express
+# Silgi + Express
 
-Katman RPC mounted as Express middleware with `katmanExpress`.
+Silgi RPC mounted as Express middleware with `silgiExpress`.
 
 ## Quick Start
 
 ```bash
-npx giget@latest gh:productdevbook/katman/examples/express my-express-app
+npx giget@latest gh:productdevbook/silgi/examples/express my-express-app
 cd my-express-app
 pnpm install
 pnpm dev

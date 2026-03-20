@@ -1,5 +1,5 @@
 {
-  "name": "katman-example-sveltekit",
+  "name": "silgi-example-sveltekit",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "katman": "latest",
+    "silgi": "latest",
     "zod": "^4.3.6"
   },
   "devDependencies": {

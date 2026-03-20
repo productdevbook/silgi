@@ -1,5 +1,5 @@
 {
-  "name": "katman-example-hono",
+  "name": "silgi-example-hono",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,7 +9,7 @@
   "dependencies": {
     "@hono/node-server": "^1.19.11",
     "hono": "^4.12.8",
-    "katman": "latest",
+    "silgi": "latest",
     "zod": "^4.3.6"
   }
 }

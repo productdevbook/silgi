@@ -1,12 +1,12 @@
-# Katman — Standalone Example
+# Silgi — Standalone Example
 
-Standalone Katman server with `k.serve()`. No framework needed.
+Standalone Silgi server with `k.serve()`. No framework needed.
 
 ## Quick Start
 
 ```bash
-npx giget@latest gh:productdevbook/katman/examples/standalone my-katman-app
-cd my-katman-app
+npx giget@latest gh:productdevbook/silgi/examples/standalone my-silgi-app
+cd my-silgi-app
 pnpm install
 pnpm dev
 ```

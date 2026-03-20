@@ -1,11 +1,11 @@
-# Katman + Hono
+# Silgi + Hono
 
-Katman RPC mounted on a Hono server.
+Silgi RPC mounted on a Hono server.
 
 ## Quick Start
 
 ```bash
-npx giget@latest gh:productdevbook/katman/examples/hono my-hono-app
+npx giget@latest gh:productdevbook/silgi/examples/hono my-hono-app
 cd my-hono-app
 pnpm install
 pnpm dev

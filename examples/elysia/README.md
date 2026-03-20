@@ -1,11 +1,11 @@
-# Katman + Elysia
+# Silgi + Elysia
 
-Katman RPC mounted as an Elysia plugin with `katmanElysia`. Runs on Bun.
+Silgi RPC mounted as an Elysia plugin with `silgiElysia`. Runs on Bun.
 
 ## Quick Start
 
 ```bash
-npx giget@latest gh:productdevbook/katman/examples/elysia my-elysia-app
+npx giget@latest gh:productdevbook/silgi/examples/elysia my-elysia-app
 cd my-elysia-app
 pnpm install
 pnpm dev

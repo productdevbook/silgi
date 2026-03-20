@@ -1,5 +1,5 @@
 {
-  "name": "katman-example-nextjs",
+  "name": "silgi-example-nextjs",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -8,7 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
-    "katman": "latest",
+    "silgi": "latest",
     "next": "^16.2.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

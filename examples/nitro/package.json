@@ -1,5 +1,5 @@
 {
-  "name": "katman-example-nitro",
+  "name": "silgi-example-nitro",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,7 +9,7 @@
     "start": "node .output/server/index.mjs"
   },
   "dependencies": {
-    "katman": "latest",
+    "silgi": "latest",
     "zod": "^4.3.6"
   },
   "devDependencies": {

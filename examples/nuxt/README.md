@@ -1,13 +1,13 @@
-# Katman + Nuxt
+# Silgi + Nuxt
 
-Katman RPC integrated with Nuxt 5 via the `katmanNitro` adapter on a catch-all server route.
+Silgi RPC integrated with Nuxt 5 via the `silgiNitro` adapter on a catch-all server route.
 
 Demonstrates a Nitro catch-all route at `server/routes/rpc/[...path].ts` and a Vue page that calls the endpoints.
 
 ## Quick Start
 
 ```bash
-npx giget@latest gh:productdevbook/katman/examples/nuxt my-nuxt-app
+npx giget@latest gh:productdevbook/silgi/examples/nuxt my-nuxt-app
 cd my-nuxt-app
 pnpm install
 pnpm dev

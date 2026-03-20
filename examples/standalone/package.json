@@ -1,5 +1,5 @@
 {
-  "name": "katman-example-standalone",
+  "name": "silgi-example-standalone",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -7,7 +7,7 @@
     "dev": "node --experimental-strip-types server.ts"
   },
   "dependencies": {
-    "katman": "latest",
+    "silgi": "latest",
     "zod": "^4.3.6"
   }
 }

@@ -1,5 +1,5 @@
 {
-  "name": "katman-example-nuxt",
+  "name": "silgi-example-nuxt",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,7 +9,7 @@
     "start": "node .output/server/index.mjs"
   },
   "dependencies": {
-    "katman": "latest",
+    "silgi": "latest",
     "nuxt": "npm:nuxt-nightly@5x",
     "zod": "^4.3.6"
   }
