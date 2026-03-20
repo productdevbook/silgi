@@ -117,9 +117,6 @@ export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}):
           required: true,
           content: {
             'application/json': { schema },
-            'application/x-msgpack': {
-              schema: { type: 'string', format: 'binary', description: 'MessagePack encoded' },
-            },
           },
         }
       }
@@ -134,10 +131,6 @@ export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}):
         description: successDesc,
         content: {
           'application/json': { schema },
-          'application/x-msgpack': { schema: { type: 'string', format: 'binary' } },
-          'application/x-devalue+json': {
-            schema: { type: 'string', description: 'devalue-encoded (Date, Map, Set, BigInt)' },
-          },
         },
       }
     } else {
