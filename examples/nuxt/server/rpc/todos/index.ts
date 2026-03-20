@@ -1,4 +1,5 @@
 import { s } from '../instance'
+
 import { CreateTodoSchema, TodoIdSchema, TodoListSchema, TodoSchema, OkSchema, getNextId } from './schema'
 
 import type { Todo } from './schema'
@@ -18,7 +19,7 @@ export const create = s
       completed: false,
       createdAt: new Date().toISOString(),
     }
-    ;(ctx.todos).push(todo)
+    ctx.todos.push(todo)
     return todo
   })
 
@@ -27,7 +28,7 @@ export const toggle = s
   .$output(TodoSchema)
   .$errors({ NOT_FOUND: 404 })
   .$resolve(({ input, ctx, fail }) => {
-    const todo = (ctx.todos).find(t => t.id === input.id)
+    const todo = ctx.todos.find((t) => t.id === input.id)
     if (!todo) return fail('NOT_FOUND')
     todo.completed = !todo.completed
     return todo
@@ -39,7 +40,7 @@ export const remove = s
   .$errors({ NOT_FOUND: 404 })
   .$resolve(({ input, ctx, fail }) => {
     const list = ctx.todos
-    const idx = list.findIndex(t => t.id === input.id)
+    const idx = list.findIndex((t) => t.id === input.id)
     if (idx === -1) return fail('NOT_FOUND')
     list.splice(idx, 1)
     return { ok: true }

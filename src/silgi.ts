@@ -114,7 +114,13 @@ export interface SilgiInstance<TBaseCtx extends Record<string, unknown>> {
   router: <T extends RouterDef>(def: T) => T
 
   /** Create a Fetch API handler: (Request) => Response */
-  handler: (router: RouterDef) => (request: Request) => Promise<Response>
+  handler: (
+    router: RouterDef,
+    options?: {
+      /** Enable Scalar API Reference UI at /reference and /openapi.json */
+      scalar?: boolean | ScalarOptions
+    },
+  ) => (request: Request) => Promise<Response>
 
   /** Create & start a Node.js HTTP server */
   serve: (
@@ -264,7 +270,7 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
       return def
     },
 
-    handler: (routerDef) => createFetchHandler(routerDef, contextFactory, hooks),
+    handler: (routerDef, options) => createFetchHandler(routerDef, contextFactory, hooks, options),
 
     serve: (routerDef, options) => {
       // Compile router ONCE
@@ -618,6 +624,7 @@ function createFetchHandler(
   routerDef: RouterDef,
   contextFactory: (req: Request) => Record<string, unknown> | Promise<Record<string, unknown>>,
   hooks?: Hookable<SilgiHooks>,
+  handlerOptions?: { scalar?: boolean | ScalarOptions },
 ): (request: Request) => Promise<Response> {
   // Compile router tree into JIT-compiled radix router
   let compiledRouter = routerCache.get(routerDef)
@@ -634,12 +641,32 @@ function createFetchHandler(
   const sseHeaders = { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' }
   const notFoundBody = JSON.stringify({ code: 'NOT_FOUND', status: 404, message: 'Procedure not found' })
 
+  // Scalar API docs (lazy init)
+  const scalarEnabled = !!handlerOptions?.scalar
+  let specJson: string | undefined
+  let specHtml: string | undefined
+  if (scalarEnabled) {
+    const scalarOpts = typeof handlerOptions!.scalar === 'object' ? handlerOptions!.scalar : {}
+    specJson = JSON.stringify(generateOpenAPI(routerDef, scalarOpts))
+    specHtml = scalarHTML('/openapi.json', scalarOpts)
+  }
+
   return async (request: Request): Promise<Response> => {
     // FAST pathname extraction — 40x faster than new URL()
     const url = request.url
     const pathStart = url.indexOf('/', url.indexOf('//') + 2)
     const qMark = url.indexOf('?', pathStart)
     const pathname = qMark === -1 ? url.slice(pathStart + 1) : url.slice(pathStart + 1, qMark)
+
+    // Scalar: /openapi.json and /reference
+    if (scalarEnabled) {
+      if (pathname === 'openapi.json') {
+        return new Response(specJson, { headers: { 'content-type': 'application/json' } })
+      }
+      if (pathname === 'reference') {
+        return new Response(specHtml, { headers: { 'content-type': 'text/html' } })
+      }
+    }
 
     // Compiled radix router lookup
     const match = compiledRouter!('POST', '/' + pathname)

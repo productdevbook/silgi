@@ -6,13 +6,16 @@ interface Todo {
   createdAt: string
 }
 
+
 const todos = ref<Todo[]>([])
 const newTitle = ref('')
 const loading = ref(true)
 
+
 onMounted(async () => {
   await fetchTodos()
 })
+
 
 async function fetchTodos() {
   loading.value = true
@@ -20,6 +23,7 @@ async function fetchTodos() {
   todos.value = data as Todo[]
   loading.value = false
 }
+
 
 async function addTodo() {
   if (!newTitle.value.trim()) return
@@ -31,6 +35,7 @@ async function addTodo() {
   await fetchTodos()
 }
 
+
 async function toggleTodo(id: number) {
   await $fetch('/todos/toggle', {
     method: 'POST',
@@ -38,6 +43,7 @@ async function toggleTodo(id: number) {
   })
   await fetchTodos()
 }
+
 
 async function removeTodo(id: number) {
   await $fetch('/todos/remove', {
@@ -70,21 +76,9 @@ async function removeTodo(id: number) {
     <p v-if="loading" class="text-sm text-gray-400">Loading...</p>
 
     <ul v-else class="m-0 list-none p-0">
-      <li
-        v-for="todo in todos"
-        :key="todo.id"
-        class="flex items-center gap-3 border-b border-gray-100 py-2.5"
-      >
-        <input
-          type="checkbox"
-          :checked="todo.completed"
-          class="cursor-pointer"
-          @change="toggleTodo(todo.id)"
-        />
-        <span
-          class="flex-1 text-sm"
-          :class="todo.completed ? 'text-gray-400 line-through' : 'text-gray-900'"
-        >
+      <li v-for="todo in todos" :key="todo.id" class="flex items-center gap-3 border-b border-gray-100 py-2.5">
+        <input type="checkbox" :checked="todo.completed" class="cursor-pointer" @change="toggleTodo(todo.id)" />
+        <span class="flex-1 text-sm" :class="todo.completed ? 'text-gray-400 line-through' : 'text-gray-900'">
           {{ todo.title }}
         </span>
         <button
@@ -95,9 +89,7 @@ async function removeTodo(id: number) {
         </button>
       </li>
 
-      <li v-if="todos.length === 0" class="py-4 text-center text-sm text-gray-400">
-        No todos yet. Add one above.
-      </li>
+      <li v-if="todos.length === 0" class="py-4 text-center text-sm text-gray-400">No todos yet. Add one above.</li>
     </ul>
 
     <p v-if="todos.length > 0" class="mt-4 text-xs text-gray-400">
