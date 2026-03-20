@@ -31,8 +31,8 @@ The contract-first pattern lets your frontend import types from a shared package
 
 Three packages, each with a single responsibility:
 
-| Package        | Responsibility           | Dependencies                    |
-| -------------- | ------------------------ | ------------------------------- |
+| Package        | Responsibility           | Dependencies                   |
+| -------------- | ------------------------ | ------------------------------ |
 | `api-contract` | Shared types and schemas | `silgi`, `zod`                 |
 | `api-server`   | Implements the contract  | `api-contract`, `silgi`, `zod` |
 | `frontend`     | Consumes the API         | `api-contract`, `silgi`        |

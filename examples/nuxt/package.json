@@ -9,8 +9,8 @@
     "start": "node .output/server/index.mjs"
   },
   "dependencies": {
-    "silgi": "latest",
     "nuxt": "npm:nuxt-nightly@5x",
+    "silgi": "latest",
     "zod": "^4.3.6"
   }
 }

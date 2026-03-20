@@ -54,13 +54,13 @@ s.serve(appRouter, {
 })
 ```
 
-| Option     | Type                       | Default       | Description                                                                                   |
-| ---------- | -------------------------- | ------------- | --------------------------------------------------------------------------------------------- |
+| Option     | Type                       | Default       | Description                                                                                  |
+| ---------- | -------------------------- | ------------- | -------------------------------------------------------------------------------------------- |
 | `port`     | `number`                   | `3000`        | Port to listen on. If it's taken, Silgi automatically picks the next free port in 3000-3100. |
-| `hostname` | `string`                   | `"127.0.0.1"` | Network interface. Use `"0.0.0.0"` to accept connections from other machines.                 |
-| `scalar`   | `boolean \| ScalarOptions` | `false`       | Enable auto-generated API docs at `/reference`.                                               |
-| `ws`       | `boolean`                  | `false`       | Enable WebSocket RPC on the same port.                                                        |
-| `http2`    | `{ cert, key }`            | `undefined`   | Enable HTTP/2 with TLS certificates. Falls back to HTTP/1.1 for older clients.                |
+| `hostname` | `string`                   | `"127.0.0.1"` | Network interface. Use `"0.0.0.0"` to accept connections from other machines.                |
+| `scalar`   | `boolean \| ScalarOptions` | `false`       | Enable auto-generated API docs at `/reference`.                                              |
+| `ws`       | `boolean`                  | `false`       | Enable WebSocket RPC on the same port.                                                       |
+| `http2`    | `{ cert, key }`            | `undefined`   | Enable HTTP/2 with TLS certificates. Falls back to HTTP/1.1 for older clients.               |
 
 ### Automatic port selection
 

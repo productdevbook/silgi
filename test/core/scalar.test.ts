@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
 
-import { silgi } from '#src/silgi.ts'
 import { scalarHTML, generateOpenAPI, resolveScalarLocal } from '#src/scalar.ts'
+import { silgi } from '#src/silgi.ts'
 
 describe('scalarHTML', () => {
   it('uses jsdelivr CDN by default', () => {

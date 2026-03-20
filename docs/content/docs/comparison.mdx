@@ -7,7 +7,7 @@ import { Callout } from 'fumadocs-ui/components/callout'
 
 ## Feature matrix
 
-| Feature                                 | Silgi            | oRPC                 | tRPC               | ts-rest     |
+| Feature                                 | Silgi             | oRPC                 | tRPC               | ts-rest     |
 | --------------------------------------- | ----------------- | -------------------- | ------------------ | ----------- |
 | End-to-end type-safe I/O                | Yes               | Yes                  | Yes                | Yes         |
 | End-to-end type-safe errors             | Yes               | Yes                  | Partial            | Yes         |
@@ -101,7 +101,7 @@ All benchmarks run on the same machine (Apple M3 Max, Node v24.11.0). Sequential
 
 Measures raw middleware pipeline overhead — how fast the framework processes a call after TCP/HTTP is stripped away.
 
-| Scenario             | Silgi     | oRPC     | H3 v2    | vs oRPC         | vs H3            |
+| Scenario             | Silgi      | oRPC     | H3 v2    | vs oRPC         | vs H3            |
 | -------------------- | ---------- | -------- | -------- | --------------- | ---------------- |
 | No middleware        | **111 ns** | 685 ns   | 2,025 ns | **6.2x faster** | **18.2x faster** |
 | Zod input validation | **241 ns** | 804 ns   | 4,214 ns | **3.3x faster** | **17.5x faster** |
@@ -114,14 +114,14 @@ Silgi's compiled pipeline (unrolled guards, context pool) is **3-6x faster than 
 
 Real HTTP servers, real TCP connections, 3000 sequential requests per scenario.
 
-| Scenario               | Silgi              | oRPC            | H3 v2           | Hono            |
+| Scenario               | Silgi               | oRPC            | H3 v2           | Hono            |
 | ---------------------- | ------------------- | --------------- | --------------- | --------------- |
 | Simple (no middleware) | **79µs** (12,592/s) | 83µs (12,048/s) | 78µs (12,753/s) | 74µs (13,516/s) |
 | Zod validation         | **86µs** (11,627/s) | 120µs (8,315/s) | 93µs (10,707/s) | 97µs (10,280/s) |
 | Guard + Zod            | **79µs** (12,706/s) | 116µs (8,625/s) | 96µs (10,359/s) | 102µs (9,799/s) |
 
-| Comparison     | Simple | Zod             | Guard + Zod     |
-| -------------- | ------ | --------------- | --------------- |
+| Comparison    | Simple | Zod             | Guard + Zod     |
+| ------------- | ------ | --------------- | --------------- |
 | Silgi vs oRPC | ~tied  | **1.4x faster** | **1.5x faster** |
 | Silgi vs H3   | ~tied  | **1.1x faster** | **1.2x faster** |
 | Silgi vs Hono | 0.9x   | **1.1x faster** | **1.3x faster** |
@@ -132,7 +132,7 @@ For simple routes, all four are within 10% — TCP overhead dominates. As middle
 
 JIT-compiled radix tree router vs rou3's compiled router.
 
-| Scenario                | Silgi      | rou3    |                  |
+| Scenario                | Silgi       | rou3    |                  |
 | ----------------------- | ----------- | ------- | ---------------- |
 | Static `/users/list`    | **3.1 ns**  | 3.9 ns  | **1.23x faster** |
 | Param `/users/123`      | **22.0 ns** | 25.6 ns | **1.16x faster** |
@@ -146,7 +146,7 @@ Silgi's router uses indexOf fast path for simple branches (avoids `split()`), sw
 
 | Scenario (Guard + Zod) | avg      | p50      | p99       |
 | ---------------------- | -------- | -------- | --------- |
-| **Silgi**             | **79µs** | **70µs** | **148µs** |
+| **Silgi**              | **79µs** | **70µs** | **148µs** |
 | oRPC                   | 116µs    | 103µs    | 223µs     |
 | H3 v2                  | 96µs     | 82µs     | 236µs     |
 | Hono                   | 102µs    | 87µs     | 194µs     |
@@ -157,16 +157,16 @@ Silgi's p99 is **34% lower** than oRPC and **37% lower** than H3 — compiled pi
 
 > 50K calls, 3 guards + Zod validation, measured with `--expose-gc`
 
-| Framework  | Bytes per call | Ratio     |
-| ---------- | -------------- | --------- |
+| Framework | Bytes per call | Ratio     |
+| --------- | -------------- | --------- |
 | **Silgi** | ~40 bytes      | **1x**    |
-| oRPC       | ~56 bytes      | 1.4x more |
+| oRPC      | ~56 bytes      | 1.4x more |
 
 ### WebSocket performance
 
 > 2000 sequential messages over persistent connection
 
-| Scenario     | Silgi   | oRPC | H3 v2 |
+| Scenario     | Silgi    | oRPC | H3 v2 |
 | ------------ | -------- | ---- | ----- |
 | Simple query | **39µs** | 42µs | 34µs  |
 

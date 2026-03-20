@@ -6,11 +6,11 @@ import { describe, it, expect, vi } from 'vitest'
 import { z } from 'zod'
 
 import { compileProcedure } from '#src/compile.ts'
-import { silgi } from '#src/silgi.ts'
 import { corsHeaders } from '#src/plugins/cors.ts'
 import { otelWrap } from '#src/plugins/otel.ts'
 import { loggingHooks } from '#src/plugins/pino.ts'
 import { rateLimitGuard, MemoryRateLimiter } from '#src/plugins/ratelimit.ts'
+import { silgi } from '#src/silgi.ts'
 
 import type { Tracer, Span } from '#src/plugins/otel.ts'
 import type { Logger } from '#src/plugins/pino.ts'

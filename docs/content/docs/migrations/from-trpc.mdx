@@ -217,16 +217,16 @@ const users = await client.users.list({ limit: 10 })
 
 ## Concept mapping
 
-| tRPC                        | Silgi                                   | Notes                                               |
+| tRPC                        | Silgi                                    | Notes                                               |
 | --------------------------- | ---------------------------------------- | --------------------------------------------------- |
-| `t.procedure`               | `s.$resolve()` / `s.$input().$resolve()` | Silgi uses builder methods                         |
+| `t.procedure`               | `s.$resolve()` / `s.$input().$resolve()` | Silgi uses builder methods                          |
 | `t.router()`                | `s.router()`                             | Same nesting                                        |
 | `t.middleware()`            | `s.guard()` or `s.wrap()`                | Guards for auth, wraps for before+after             |
-| `TRPCError`                 | `SilgiError`                            | Same code names                                     |
+| `TRPCError`                 | `SilgiError`                             | Same code names                                     |
 | `createTRPCProxyClient()`   | `createClient()`                         | Same proxy pattern                                  |
 | `httpBatchLink`             | `createLink()`                           | Batching via separate plugin                        |
-| `@trpc/react-query`         | `silgi/tanstack-query`                  | `createQueryUtils()` instead of `createTRPCReact()` |
-| `ctx` via `createContext()` | `context:` in `silgi()`                 | Factory runs per request                            |
+| `@trpc/react-query`         | `silgi/tanstack-query`                   | `createQueryUtils()` instead of `createTRPCReact()` |
+| `ctx` via `createContext()` | `context:` in `silgi()`                  | Factory runs per request                            |
 
 ## What you gain
 

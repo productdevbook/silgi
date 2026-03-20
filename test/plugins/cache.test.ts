@@ -2,8 +2,8 @@ import { createMemoryStorage, setStorage } from 'ocache'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { z } from 'zod'
 
-import { silgi } from '#src/silgi.ts'
 import { cacheQuery, setCacheStorage, invalidateQueryCache, createUnstorageAdapter } from '#src/plugins/cache.ts'
+import { silgi } from '#src/silgi.ts'
 
 const k = silgi({ context: () => ({}) })
 

@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
 
-import { silgi } from '#src/silgi.ts'
 import { createBatchHandler } from '#src/plugins/batch-server.ts'
+import { silgi } from '#src/silgi.ts'
 
 const k = silgi({ context: () => ({ db: 'test' }) })
 
