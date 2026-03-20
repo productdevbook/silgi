@@ -1,6 +1,6 @@
 # Benchmarks
 
-> Last updated: **2026-03-19** | Apple M3 Max | Node v24.11.0
+> Last updated: **2026-03-20** | Apple M3 Max | Node v24.11.0
 
 ## Pipeline Performance (pure execution, no HTTP)
 
@@ -38,15 +38,15 @@
 | H3 v2 | 96µs | 82µs | 236µs |
 | Hono | 102µs | 87µs | 194µs |
 
-## Katman vs Nitro v3 (real server)
+## Router Performance (Katman compiled vs rou3)
 
-2000 sequential requests.
-
-| Scenario | Katman serve() | Nitro v3 (real) | |
+| Scenario | Katman | rou3 | |
 |---|---|---|---|
-| Health | **102µs** / 9,781/s | 238µs / 4,208/s | **2.3x faster** |
-| List + Zod | **108µs** / 9,250/s | 231µs / 4,322/s | **2.1x faster** |
-| Guard + Zod | **108µs** / 9,268/s | 223µs / 4,484/s | **2.1x faster** |
+| Static `/users/list` | **3.1 ns** | 3.9 ns | **1.23x faster** |
+| Param `/users/123` | **22.0 ns** | 25.6 ns | **1.16x faster** |
+| Deep `/users/1/posts/2` | **23.7 ns** | 26.6 ns | **1.12x faster** |
+| Wildcard `/files/a/b/c` | **19.2 ns** | 91.3 ns | **4.75x faster** |
+| Miss `/missing/deep` | **4.5 ns** | 22.3 ns | **4.96x faster** |
 
 ## Memory Usage
 
@@ -60,8 +60,5 @@
 ## How to run
 
 ```sh
-node --experimental-strip-types bench/vs-all.ts     # Katman vs oRPC vs H3 vs Hono
-node --experimental-strip-types bench/vs-nitro.ts   # vs real Nitro server
-node --experimental-strip-types bench/pipeline.ts   # pipeline only
-node --experimental-strip-types bench/http.ts       # HTTP detailed (Katman vs oRPC)
+node --experimental-strip-types bench/router.ts     # Router: Katman vs rou3
 ```
