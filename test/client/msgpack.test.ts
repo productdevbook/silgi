@@ -100,8 +100,8 @@ describe('binary transport (end-to-end)', () => {
 
       const fetchRes = await handle(fetchReq)
       const resHeaders: Record<string, string> = {}
-      fetchRes.headers.forEach((v, k) => {
-        resHeaders[k] = v
+      fetchRes.headers.forEach((v, hk) => {
+        resHeaders[hk] = v
       })
       const resBuf = Buffer.from(await fetchRes.arrayBuffer())
       res.writeHead(fetchRes.status, resHeaders)

@@ -8,7 +8,7 @@
 
 import { stringifyJSON } from '../../core/utils.ts'
 
-import type { ClientLink, ClientContext, ClientOptions } from '../types.ts'
+import type { ClientLink, ClientContext } from '../types.ts'
 
 export interface DedupeOptions {
   /** Custom key function. Default: JSON.stringify(path + input) */

@@ -36,7 +36,7 @@ function hr(title: string) {
   console.log(`${'─'.repeat(56)}\n`)
 }
 
-function json(data: unknown) {
+function _json(data: unknown) {
   console.log(JSON.stringify(data, null, 2))
 }
 

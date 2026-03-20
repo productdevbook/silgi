@@ -13,7 +13,7 @@ export interface ClientOptions<TContext extends ClientContext = ClientContext> {
 }
 
 /** A single procedure client — callable function */
-export type Client<TClientContext extends ClientContext, TInput, TOutput, TError = SilgiError> = (
+export type Client<TClientContext extends ClientContext, TInput, TOutput, _TError = SilgiError> = (
   ...args: ClientRest<TClientContext, TInput>
 ) => Promise<TOutput>
 

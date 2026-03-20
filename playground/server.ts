@@ -26,7 +26,7 @@
  *  20. mapInput middleware
  */
 
-import { silgi, SilgiError, callable, lifecycleWrap, mapInput, lazy } from 'silgi'
+import { silgi, SilgiError, callable, lifecycleWrap, mapInput } from 'silgi'
 import { contract, implement } from 'silgi/contract'
 import {
   cors,
@@ -132,7 +132,7 @@ const { query, mutation, subscription, guard, wrap, router } = s
 
 // ── CORS (hook-based) ────────────────────────────────
 
-const corsHooks = cors({
+const _corsHooks = cors({
   origin: 'http://localhost:3456',
   credentials: true,
   methods: ['GET', 'POST', 'OPTIONS'],
@@ -150,13 +150,13 @@ const auth = guard(async (ctx) => {
 })
 
 // 2. Rate limiting guard
-const rateLimit = rateLimitGuard({
+const _rateLimit = rateLimitGuard({
   limiter: new MemoryRateLimiter({ limit: 100, windowMs: 60_000 }),
   keyFn: (ctx: any) => ctx.headers['x-forwarded-for'] ?? 'anonymous',
 })
 
 // 3. Body limit guard (1MB)
-const bodyLimit = bodyLimitGuard({ maxBytes: 1_048_576 })
+const _bodyLimit = bodyLimitGuard({ maxBytes: 1_048_576 })
 
 // ── Wraps ────────────────────────────────────────────
 
@@ -483,7 +483,7 @@ export type AppRouter = typeof appRouter
 
 // ── Batch Handler ────────────────────────────────────
 
-const batchHandler = createBatchHandler(appRouter, {
+const _batchHandler = createBatchHandler(appRouter, {
   context: (req: Request) => ({
     headers: Object.fromEntries(req.headers) as Record<string, string>,
     db,

@@ -5,8 +5,6 @@
  * Handles preflight OPTIONS requests automatically.
  */
 
-import type { SilgiHooks } from '../silgi.ts'
-
 export interface CORSOptions {
   origin?: string | string[] | ((origin: string) => boolean)
   methods?: string[]

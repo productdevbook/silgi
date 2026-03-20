@@ -38,7 +38,7 @@ const appRouter = k.router({
       .$use(auth)
       .$input(z.object({ name: z.string(), email: z.string().email() }))
       .$errors({ CONFLICT: 409 })
-      .$resolve(({ input, ctx }) => ({ id: 2, ...input })),
+      .$resolve(({ input }) => ({ id: 2, ...input })),
   },
   stream: {
     ticks: k.subscription(async function* () {
@@ -160,15 +160,15 @@ describe('E2E type roundtrip', () => {
   })
 
   it('route.cache: number — sets Cache-Control header', async () => {
-    const handle = k.handler(appRouter)
-    const res = await handle(new Request(`http://localhost/health`, { method: 'POST' }))
+    const handleReq = k.handler(appRouter)
+    const res = await handleReq(new Request(`http://localhost/health`, { method: 'POST' }))
     expect(res.status).toBe(200)
     expect(res.headers.get('cache-control')).toBe('public, max-age=60')
   })
 
   it('route.cache: string — sets custom Cache-Control header', async () => {
-    const handle = k.handler(appRouter)
-    const res = await handle(new Request(`http://localhost/cached`, { method: 'POST' }))
+    const handleReq = k.handler(appRouter)
+    const res = await handleReq(new Request(`http://localhost/cached`, { method: 'POST' }))
     expect(res.status).toBe(200)
     expect(res.headers.get('cache-control')).toBe('public, max-age=300, stale-while-revalidate=60')
   })
@@ -184,8 +184,8 @@ describe('E2E type roundtrip', () => {
           }),
       ),
     })
-    const handle = k2.handler(router)
-    const res = await handle(new Request('http://localhost/download', { method: 'POST' }))
+    const handleReq = k2.handler(router)
+    const res = await handleReq(new Request('http://localhost/download', { method: 'POST' }))
     expect(res.status).toBe(200)
     expect(res.headers.get('content-type')).toBe('application/pdf')
     expect(res.headers.get('x-custom')).toBe('test')
@@ -206,15 +206,15 @@ describe('E2E type roundtrip', () => {
         })
       }),
     })
-    const handle = k2.handler(router)
-    const res = await handle(new Request('http://localhost/stream', { method: 'POST' }))
+    const handleReq = k2.handler(router)
+    const res = await handleReq(new Request('http://localhost/stream', { method: 'POST' }))
     expect(res.headers.get('content-type')).toBe('application/octet-stream')
     expect(await res.text()).toBe('chunk1chunk2')
   })
 
   it('mutation has no Cache-Control header', async () => {
-    const handle = k.handler(appRouter)
-    const res = await handle(
+    const handleReq = k.handler(appRouter)
+    const res = await handleReq(
       new Request(`http://localhost/users/create`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },

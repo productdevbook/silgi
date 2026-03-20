@@ -21,7 +21,6 @@
 
 import { compileProcedure } from './compile.ts'
 
-import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
 import type { ProcedureDef, ErrorDef } from './types.ts'
 
 export interface CallableOptions<TCtx extends Record<string, unknown>> {

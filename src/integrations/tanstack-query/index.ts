@@ -11,7 +11,7 @@
  *   // use with useQuery(options) or queryClient.fetchQuery(options)
  */
 
-import type { ClientContext, NestedClient, Client } from '../../client/types.ts'
+import type { NestedClient, Client } from '../../client/types.ts'
 
 // === Key Generation ===
 
@@ -30,7 +30,7 @@ export function generateKey(
 
 // === Procedure Utils ===
 
-export interface QueryOptionsIn<TInput, TOutput, TError> {
+export interface QueryOptionsIn<TInput, TOutput, _TError> {
   input: TInput
   queryKey?: unknown[]
   enabled?: boolean
@@ -41,7 +41,7 @@ export interface QueryOptionsIn<TInput, TOutput, TError> {
   select?: (data: TOutput) => unknown
 }
 
-export interface MutationOptionsIn<TInput, TOutput, TError> {
+export interface MutationOptionsIn<TInput, TOutput, _TError> {
   onSuccess?: (data: TOutput, input: TInput) => void
   onError?: (error: TError, input: TInput) => void
   onSettled?: (data: TOutput | undefined, error: TError | null, input: TInput) => void
@@ -52,7 +52,7 @@ export interface MutationOptionsIn<TInput, TOutput, TError> {
 export const skipToken: unique symbol = Symbol.for('silgi.skipToken')
 export type SkipToken = typeof skipToken
 
-export interface InfiniteQueryOptionsIn<TInput, TOutput, TError, TPageParam> {
+export interface InfiniteQueryOptionsIn<TInput, TOutput, _TError, TPageParam> {
   input: (pageParam: TPageParam) => TInput
   initialPageParam: TPageParam
   getNextPageParam: (lastPage: TOutput, allPages: TOutput[], lastPageParam: TPageParam) => TPageParam | undefined

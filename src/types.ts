@@ -5,7 +5,7 @@
  * → V8 assigns ONE hidden class → monomorphic inline caches.
  */
 
-import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
+import type { AnySchema, InferSchemaInput } from './core/schema.ts'
 
 /** HTTP route metadata */
 export interface Route {
@@ -37,8 +37,8 @@ export type ProcedureType = 'query' | 'mutation' | 'subscription'
 /** Internal procedure representation — fixed shape for V8 optimization */
 export interface ProcedureDef<
   TType extends ProcedureType = ProcedureType,
-  TInput = unknown,
-  TOutput = unknown,
+  _TInput = unknown,
+  _TOutput = unknown,
   TErrors extends ErrorDef = ErrorDef,
 > {
   readonly type: TType
@@ -56,9 +56,6 @@ export interface ProcedureDef<
 /** Error definition: number shorthand or full config */
 export type ErrorDefItem = number | { status: number; message?: string; data?: AnySchema }
 export type ErrorDef = Record<string, ErrorDefItem>
-
-/** Extract status from error def item */
-type ErrorStatus<T extends ErrorDefItem> = T extends number ? T : T extends { status: infer S } ? S : 500
 
 /** Extract data schema from error def item */
 type ErrorData<T extends ErrorDefItem> = T extends { data: infer S extends AnySchema } ? InferSchemaInput<S> : undefined

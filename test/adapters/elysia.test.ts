@@ -56,8 +56,8 @@ describe('silgiElysia() — real Elysia', () => {
     // Elysia has .fetch() — wrap in Node HTTP server
     const server = createServer(async (req, res) => {
       const headers = new Headers()
-      for (const [k, v] of Object.entries(req.headers)) {
-        if (v) headers.set(k, Array.isArray(v) ? v[0]! : v)
+      for (const [hk, v] of Object.entries(req.headers)) {
+        if (v) headers.set(hk, Array.isArray(v) ? v[0]! : v)
       }
       const body = await new Promise<string>((r) => {
         let b = ''
@@ -73,7 +73,7 @@ describe('silgiElysia() — real Elysia', () => {
       })
       const response = await app.fetch(request)
       res.statusCode = response.status
-      response.headers.forEach((v, k) => res.setHeader(k, v))
+      response.headers.forEach((v, hk) => res.setHeader(hk, v))
       res.end(await response.text())
     })
 

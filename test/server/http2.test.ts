@@ -4,9 +4,7 @@
  * Tests HTTP/2 with TLS using self-signed certificates.
  */
 
-import * as crypto from 'node:crypto'
 import * as http2 from 'node:http2'
-import * as tls from 'node:tls'
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { z } from 'zod'
@@ -17,22 +15,6 @@ import { stringifyJSON } from '#src/core/utils.ts'
 import { silgi } from '#src/silgi.ts'
 
 // ── Generate self-signed cert ───────────────────────
-
-function generateSelfSignedCert() {
-  // Use node:crypto to generate a self-signed cert in memory
-  const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
-    modulusLength: 2048,
-    publicKeyEncoding: { type: 'spki', format: 'pem' },
-    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-  })
-
-  // Create a self-signed certificate using X509Certificate
-  const cert = new crypto.X509Certificate(
-    crypto.createSign('SHA256').update('').end().toString(), // dummy — we'll use createSecureServer with key/cert directly
-  )
-
-  return { key: privateKey, cert: publicKey } // simplified for test
-}
 
 // ── Setup ──────────────────────────────────────────
 
@@ -172,18 +154,12 @@ function h2Get(path: string): Promise<{ status: number; data: any }> {
       data += chunk
     })
     req.on('end', () => {
-      const status = (req as any).sentHeaders?.[':status'] ?? 200
       client.close()
       try {
         resolve({ status: 200, data: JSON.parse(data) })
       } catch {
         resolve({ status: 200, data })
       }
-    })
-
-    let responseStatus = 200
-    req.on('response', (headers) => {
-      responseStatus = headers[':status'] as number
     })
 
     req.on('error', reject)

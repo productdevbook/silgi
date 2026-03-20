@@ -102,7 +102,7 @@ describe('getOptimizationHints', () => {
   })
 
   it('full handler uses everything', () => {
-    const a = analyzeHandler(async ({ ctx, input, fail, signal }: any) => {
+    const a = analyzeHandler(async ({ ctx, input, fail, signal: _signal }: any) => {
       if (!ctx.auth) fail('UNAUTHORIZED')
       return ctx.db.get(input.id)
     })

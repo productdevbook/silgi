@@ -8,7 +8,6 @@
 import { compileProcedure } from '../../compile.ts'
 import { SilgiError, toSilgiError } from '../../core/error.ts'
 
-import type { CompiledHandler } from '../../compile.ts'
 import type { ProcedureDef, RouterDef } from '../../types.ts'
 
 export type ActionResult<TOutput> =

@@ -17,8 +17,7 @@ import { SilgiError } from './core/error.ts'
 import { validateSchema } from './core/schema.ts'
 import { compileStringify } from './fast-stringify.ts'
 
-import type { AnySchema } from './core/schema.ts'
-import type { ProcedureDef, GuardDef, WrapDef, MiddlewareDef, ErrorDef } from './types.ts'
+import type { ProcedureDef, GuardDef, WrapDef, ErrorDef } from './types.ts'
 
 /**
  * Compiled pipeline — called per request.
@@ -34,12 +33,6 @@ export type CompiledHandler = (
 
 function isThenable(value: unknown): value is PromiseLike<unknown> {
   return value !== null && typeof value === 'object' && typeof (value as any).then === 'function'
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== 'object') return false
-  const proto = Object.getPrototypeOf(value)
-  return proto === Object.prototype || proto === null
 }
 
 function createFail(errors: ErrorDef): (code: string, data?: unknown) => never {
@@ -454,7 +447,7 @@ export class ContextPool {
     return Object.create(null)
   }
 
-  release(ctx: Record<string, unknown>): void {
+  release(_ctx: Record<string, unknown>): void {
     // Replace with fresh null-prototype object instead of deleting properties
     // (delete causes V8 dictionary mode transition, defeating the pool's purpose)
     if (this.#index > 0) {

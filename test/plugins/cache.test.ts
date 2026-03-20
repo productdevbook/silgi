@@ -1,11 +1,18 @@
 import { createMemoryStorage, setStorage } from 'ocache'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { z } from 'zod'
 
-import { cacheQuery, setCacheStorage, invalidateQueryCache, createUnstorageAdapter } from '#src/plugins/cache.ts'
+import { cacheQuery, setCacheStorage, createUnstorageAdapter } from '#src/plugins/cache.ts'
 import { silgi } from '#src/silgi.ts'
 
 const k = silgi({ context: () => ({}) })
+
+function makePostReq(path: string, body?: unknown) {
+  return new Request(`http://localhost/${path}`, {
+    method: 'POST',
+    ...(body !== undefined ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {}),
+  })
+}
 
 beforeEach(() => {
   // Reset to fresh memory storage before each test
@@ -48,25 +55,18 @@ describe('cacheQuery', () => {
       }),
     )
 
-    const makeReq = (id: number) =>
-      new Request('http://localhost/echo', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ id }),
-      })
-
-    const res1 = await handler(makeReq(1))
+    const res1 = await handler(makePostReq('echo', { id: 1 }))
     const val1 = await res1.json()
     expect(val1.id).toBe(1)
     expect(val1.call).toBe(1)
 
-    const res2 = await handler(makeReq(2))
+    const res2 = await handler(makePostReq('echo', { id: 2 }))
     const val2 = await res2.json()
     expect(val2.id).toBe(2)
     expect(val2.call).toBe(2) // different input, different cache
 
     // Same input as first call — should be cached
-    const res3 = await handler(makeReq(1))
+    const res3 = await handler(makePostReq('echo', { id: 1 }))
     const val3 = await res3.json()
     expect(val3.call).toBe(1) // cached from first call
   })
@@ -98,18 +98,16 @@ describe('invalidateQueryCache', () => {
       }),
     )
 
-    const req = () => new Request('http://localhost/data', { method: 'POST' })
-
-    const r1 = await handler(req())
+    const r1 = await handler(makePostReq('data'))
     expect(await r1.json()).toBe(1)
 
     // Cached
-    const r2 = await handler(req())
+    const r2 = await handler(makePostReq('data'))
     expect(await r2.json()).toBe(1)
 
     // Trigger invalidation on next call
     shouldInvalidate = true
-    const r3 = await handler(req())
+    const r3 = await handler(makePostReq('data'))
     expect(await r3.json()).toBe(2) // re-resolved
   })
 })
@@ -133,22 +131,15 @@ describe('shouldBypassCache', () => {
       }),
     )
 
-    const makeReq = (noCache?: boolean) =>
-      new Request('http://localhost/data', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ noCache }),
-      })
-
-    const r1 = await handler(makeReq(false))
+    const r1 = await handler(makePostReq('data', { noCache: false }))
     expect(await r1.json()).toBe(1)
 
     // Cached
-    const r2 = await handler(makeReq(false))
+    const r2 = await handler(makePostReq('data', { noCache: false }))
     expect(await r2.json()).toBe(1)
 
     // Bypass — resolver runs again
-    const r3 = await handler(makeReq(true))
+    const r3 = await handler(makePostReq('data', { noCache: true }))
     expect(await r3.json()).toBe(2)
   })
 })
@@ -173,22 +164,15 @@ describe('shouldInvalidateCache', () => {
       }),
     )
 
-    const makeReq = (refresh?: boolean) =>
-      new Request('http://localhost/data', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ refresh }),
-      })
-
-    const r1 = await handler(makeReq(false))
+    const r1 = await handler(makePostReq('data', { refresh: false }))
     expect(await r1.json()).toBe(1)
 
     // Cached
-    const r2 = await handler(makeReq(false))
+    const r2 = await handler(makePostReq('data', { refresh: false }))
     expect(await r2.json()).toBe(1)
 
     // Refresh flag — re-resolve
-    const r3 = await handler(makeReq(true))
+    const r3 = await handler(makePostReq('data', { refresh: true }))
     expect(await r3.json()).toBe(2)
   })
 })
@@ -212,18 +196,16 @@ describe('validate', () => {
       }),
     )
 
-    const req = () => new Request('http://localhost/data', { method: 'POST' })
-
     // First call returns 0 — validate rejects it
-    const r1 = await handler(req())
+    const r1 = await handler(makePostReq('data'))
     expect(await r1.json()).toBe(0)
 
     // Not cached because validate returned false for 0, resolver runs again
-    const r2 = await handler(req())
+    const r2 = await handler(makePostReq('data'))
     expect(await r2.json()).toBe(1)
 
     // Now value is 1, validate accepts — should be cached
-    const r3 = await handler(req())
+    const r3 = await handler(makePostReq('data'))
     expect(await r3.json()).toBe(1)
   })
 })

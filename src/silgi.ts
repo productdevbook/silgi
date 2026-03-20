@@ -29,16 +29,15 @@ import {
   isMsgpack,
   MSGPACK_CONTENT_TYPE,
 } from './codec/msgpack.ts'
-import { compileProcedure, compileRouter, ContextPool } from './compile.ts'
+import { compileRouter, ContextPool } from './compile.ts'
 import { SilgiError, toSilgiError, isErrorStatus } from './core/error.ts'
 import { ValidationError, validateSchema } from './core/schema.ts'
 import { iteratorToEventStream } from './core/sse.ts'
-import { stringifyJSON, parseEmptyableJSON, once } from './core/utils.ts'
+import { stringifyJSON, parseEmptyableJSON } from './core/utils.ts'
 import { generateOpenAPI, scalarHTML, resolveScalarLocal } from './scalar.ts'
 
 import type { ProcedureBuilder } from './builder.ts'
 import type { CompiledRouterFn } from './compile.ts'
-import type { CompiledHandler } from './compile.ts'
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
 import type { ScalarOptions } from './scalar.ts'
 import type {
@@ -49,11 +48,10 @@ import type {
   WrapDef,
   GuardFn,
   WrapFn,
-  MiddlewareDef,
   ResolveContext,
   RouterDef,
 } from './types.ts'
-import type { Hookable, HookCallback } from 'hookable'
+import type { Hookable } from 'hookable'
 
 // ── Lifecycle Hooks ─────────────────────────────────
 
@@ -358,14 +356,14 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
           const iterableHeaders: any = {}
           const hkeys = Object.keys(hdrs)
           for (let i = 0; i < hkeys.length; i++) {
-            const k = hkeys[i]!
-            const v = hdrs[k]
-            iterableHeaders[k] = Array.isArray(v) ? v[0] : v
+            const hk = hkeys[i]!
+            const v = hdrs[hk]
+            iterableHeaders[hk] = Array.isArray(v) ? v[0] : v
           }
           iterableHeaders[Symbol.iterator] = function* () {
-            for (const k of hkeys) {
-              const v = hdrs[k]
-              if (v !== undefined) yield [k, Array.isArray(v) ? v[0] : v]
+            for (const hk of hkeys) {
+              const v = hdrs[hk]
+              if (v !== undefined) yield [hk, Array.isArray(v) ? v[0] : v]
             }
           }
 
@@ -633,8 +631,6 @@ function createFetchHandler(
 
   // Pre-allocate response headers (reused across requests)
   const jsonHeaders = { 'content-type': 'application/json' }
-  const msgpackHeaders = { 'content-type': MSGPACK_CONTENT_TYPE }
-  const devalueHeaders = { 'content-type': DEVALUE_CONTENT_TYPE }
   const sseHeaders = { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' }
   const notFoundBody = JSON.stringify({ code: 'NOT_FOUND', status: 404, message: 'Procedure not found' })
 

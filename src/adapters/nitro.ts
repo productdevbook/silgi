@@ -44,7 +44,6 @@ import { compileRouter } from '../compile.ts'
 import { SilgiError, toSilgiError } from '../core/error.ts'
 import { ValidationError } from '../core/schema.ts'
 
-import type { FlatRouter } from '../compile.ts'
 import type { RouterDef } from '../types.ts'
 
 export interface NitroAdapterOptions<TCtx extends Record<string, unknown>> {

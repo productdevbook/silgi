@@ -8,7 +8,6 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { WebSocket } from 'ws'
 import { z } from 'zod'
 
-import { compileRouter } from '#src/compile.ts'
 import { silgi } from '#src/silgi.ts'
 import { attachWebSocket } from '#src/ws.ts'
 

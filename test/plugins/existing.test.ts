@@ -2,8 +2,7 @@
  * v2 plugins — CORS, OTel, Pino, Rate Limiting.
  */
 
-import { describe, it, expect, vi } from 'vitest'
-import { z } from 'zod'
+import { describe, it, expect } from 'vitest'
 
 import { compileProcedure } from '#src/compile.ts'
 import { corsHeaders } from '#src/plugins/cors.ts'
@@ -12,7 +11,7 @@ import { loggingHooks } from '#src/plugins/pino.ts'
 import { rateLimitGuard, MemoryRateLimiter } from '#src/plugins/ratelimit.ts'
 import { silgi } from '#src/silgi.ts'
 
-import type { Tracer, Span } from '#src/plugins/otel.ts'
+import type { Tracer } from '#src/plugins/otel.ts'
 import type { Logger } from '#src/plugins/pino.ts'
 
 // ── CORS ────────────────────────────────────────────
@@ -55,37 +54,37 @@ describe('CORS', () => {
 
 // ── OTel ────────────────────────────────────────────
 
-describe('OTel wrap', () => {
-  function mockTracer(): Tracer & { spans: any[] } {
-    const spans: any[] = []
-    return {
-      spans,
-      startSpan(name, options) {
-        const span = {
-          name,
-          attributes: { ...options?.attributes },
-          status: null as any,
-          events: [] as any[],
-          ended: false,
-          setAttribute(k: string, v: any) {
-            span.attributes[k] = v
-          },
-          setStatus(s: any) {
-            span.status = s
-          },
-          addEvent(n: string, a?: any) {
-            span.events.push({ name: n, attributes: a })
-          },
-          end() {
-            span.ended = true
-          },
-        }
-        spans.push(span)
-        return span
-      },
-    }
+function mockTracer(): Tracer & { spans: any[] } {
+  const spans: any[] = []
+  return {
+    spans,
+    startSpan(name, options) {
+      const span = {
+        name,
+        attributes: { ...options?.attributes },
+        status: null as any,
+        events: [] as any[],
+        ended: false,
+        setAttribute(k: string, v: any) {
+          span.attributes[k] = v
+        },
+        setStatus(s: any) {
+          span.status = s
+        },
+        addEvent(n: string, a?: any) {
+          span.events.push({ name: n, attributes: a })
+        },
+        end() {
+          span.ended = true
+        },
+      }
+      spans.push(span)
+      return span
+    },
   }
+}
 
+describe('OTel wrap', () => {
   it('wraps a procedure call in a span', async () => {
     const tracer = mockTracer()
     const tracing = otelWrap(tracer)
@@ -131,30 +130,30 @@ describe('OTel wrap', () => {
 
 // ── Pino ────────────────────────────────────────────
 
-describe('Pino logging hooks', () => {
-  function mockLogger(): Logger & { logs: any[] } {
-    const logs: any[] = []
-    const logger: any = {
-      logs,
-      info(obj: any, msg?: string) {
-        logs.push({ level: 'info', ...obj, msg })
-      },
-      error(obj: any, msg?: string) {
-        logs.push({ level: 'error', ...obj, msg })
-      },
-      warn(obj: any, msg?: string) {
-        logs.push({ level: 'warn', ...obj, msg })
-      },
-      debug(obj: any, msg?: string) {
-        logs.push({ level: 'debug', ...obj, msg })
-      },
-      child() {
-        return logger
-      },
-    }
-    return logger
+function mockLogger(): Logger & { logs: any[] } {
+  const logs: any[] = []
+  const logger: any = {
+    logs,
+    info(obj: any, msg?: string) {
+      logs.push({ level: 'info', ...obj, msg })
+    },
+    error(obj: any, msg?: string) {
+      logs.push({ level: 'error', ...obj, msg })
+    },
+    warn(obj: any, msg?: string) {
+      logs.push({ level: 'warn', ...obj, msg })
+    },
+    debug(obj: any, msg?: string) {
+      logs.push({ level: 'debug', ...obj, msg })
+    },
+    child() {
+      return logger
+    },
   }
+  return logger
+}
 
+describe('Pino logging hooks', () => {
   it('logs requests and responses', async () => {
     const logger = mockLogger()
     const hooks = loggingHooks({ logger })

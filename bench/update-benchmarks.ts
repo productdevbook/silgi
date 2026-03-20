@@ -25,7 +25,7 @@ const GuardedInput = z.object({ name: z.string() })
 
 // ── Silgi Setup ────────────────────────────────────
 
-import { compileProcedure, compileRouter, ContextPool } from '../src/compile.ts'
+import { compileProcedure, compileRouter } from '../src/compile.ts'
 import { silgi } from '../src/silgi.ts'
 import { attachWebSocket } from '../src/ws.ts'
 
@@ -109,11 +109,6 @@ function generateCert() {
 
 // ── Pipeline Benchmark (Silgi vs oRPC vs H3) ──────
 
-import { compilePipeline } from '../src/core/pipeline.ts'
-import { validateSchema } from '../src/core/schema.ts'
-
-import type { Middleware } from '../src/core/pipeline.ts'
-
 interface PipelineResult {
   name: string
   silgi_ns: number
@@ -121,6 +116,14 @@ interface PipelineResult {
   h3_ns: number
   vs_orpc: string
   vs_h3: string
+}
+
+function h3Req(path: string, body?: unknown): Request {
+  return new Request(`http://localhost${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  })
 }
 
 async function runPipelineBenchmarks(): Promise<PipelineResult[]> {
@@ -145,14 +148,6 @@ async function runPipelineBenchmarks(): Promise<PipelineResult[]> {
     const b = await readBody(ev)
     return InputSchema.parse(b)
   })
-
-  function h3Req(path: string, body?: unknown): Request {
-    return new Request(`http://localhost${path}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: body ? JSON.stringify(body) : undefined,
-    })
-  }
 
   // 1. No middleware
   const orpc1 = orpcOs.handler(async ({ input }) => ({ result: input }))
@@ -393,15 +388,15 @@ async function runHTTPBenchmarks(): Promise<HTTPResult[]> {
     const s = createServer(async (req, res) => {
       const url = `http://127.0.0.1:${HP}${req.url}`
       const h = new Headers()
-      for (const [k, v] of Object.entries(req.headers)) {
-        if (v) h.set(k, Array.isArray(v) ? v[0]! : v)
+      for (const [hk, v] of Object.entries(req.headers)) {
+        if (v) h.set(hk, Array.isArray(v) ? v[0]! : v)
       }
-      const body = await new Promise<string>((r) => {
+      const body = await new Promise<string>((resolve) => {
         let b = ''
         req.on('data', (d: Buffer) => {
           b += d
         })
-        req.on('end', () => r(b))
+        req.on('end', () => resolve(b))
       })
       const rq = new Request(url, {
         method: req.method,
@@ -410,7 +405,7 @@ async function runHTTPBenchmarks(): Promise<HTTPResult[]> {
       })
       const rs = await h3App.fetch(rq)
       res.statusCode = rs.status
-      rs.headers.forEach((v, k) => res.setHeader(k, v))
+      rs.headers.forEach((v, hk) => res.setHeader(hk, v))
       res.end(await rs.text())
     })
     s.listen(HP, '127.0.0.1', () => r(s))
@@ -621,8 +616,6 @@ async function wsBench(
 
 async function runWSBenchmarks(): Promise<WSResult[]> {
   const N = 2000
-  const flat = compileRouter(silgiRouter)
-  const sig = new AbortController().signal
 
   // ── Silgi WS Server (crossws) ──
   const silgiSrv: Server = await new Promise((r) => {

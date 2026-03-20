@@ -17,7 +17,6 @@ import { compileRouter } from './compile.ts'
 import { SilgiError, toSilgiError } from './core/error.ts'
 import { stringifyJSON } from './core/utils.ts'
 
-import type { FlatRouter } from './compile.ts'
 import type { RouterDef } from './types.ts'
 import type { Peer, Message } from 'crossws'
 import type { Server as HttpServer } from 'node:http'
@@ -48,7 +47,7 @@ interface RPCRequest {
  */
 export function attachWebSocket(server: HttpServer, routerDef: RouterDef, options: WSAdapterOptions = {}): void {
   // Compile router once
-  const flat: FlatRouter = compileRouter(routerDef)
+  const flat = compileRouter(routerDef)
   const binary = options.binary ?? false
 
   function send(peer: Peer, data: unknown): void {
@@ -68,7 +67,7 @@ export function attachWebSocket(server: HttpServer, routerDef: RouterDef, option
 
   const ws = nodeAdapter({
     hooks: {
-      open(peer) {
+      open(_peer) {
         // Connection opened — no action needed
       },
 

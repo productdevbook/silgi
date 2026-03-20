@@ -66,7 +66,7 @@ console.log(`✓ validation error: status=${r5.status}`)
 
 // Test 6: Performance
 const N = 10000
-const req = new Request('http://localhost/health', { method: 'POST' })
+const _req = new Request('http://localhost/health', { method: 'POST' })
 const t0 = performance.now()
 for (let i = 0; i < N; i++) {
   const r = await handle(new Request('http://localhost/health', { method: 'POST' }))

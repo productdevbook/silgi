@@ -206,7 +206,7 @@ describe('builder pattern', () => {
       .$input(z.object({ email: z.string() }))
       .$output(outputSchema)
       .$errors({ CONFLICT: 409 as const })
-      .$resolve(({ input, fail }) => {
+      .$resolve(({ input, fail: _fail }) => {
         expectTypeOf(input).toEqualTypeOf<{ email: string }>()
         return { id: 1, name: input.email }
       })

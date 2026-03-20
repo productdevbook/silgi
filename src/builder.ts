@@ -12,19 +12,7 @@
  */
 
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
-import type {
-  ProcedureDef,
-  ProcedureType,
-  ErrorDef,
-  MiddlewareDef,
-  GuardDef,
-  WrapDef,
-  ResolveContext,
-  Route,
-  Meta,
-  InferContextFromUse,
-  InferErrorsFromUse,
-} from './types.ts'
+import type { ProcedureDef, ProcedureType, ErrorDef, MiddlewareDef, ResolveContext, Route, Meta } from './types.ts'
 
 // ── Builder Interfaces ──────────────────────────────
 
@@ -37,7 +25,7 @@ export interface ProcedureBuilder<
   TErrors extends ErrorDef = {},
 > {
   /** Add middleware (guards and wraps) */
-  $use<TReturn extends Record<string, unknown> | void>(
+  $use<_TReturn extends Record<string, unknown> | void>(
     ...middleware: readonly MiddlewareDef[]
   ): ProcedureBuilder<TType, TBaseCtx, TCtx, TInput, TErrors>
 

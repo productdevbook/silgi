@@ -37,12 +37,6 @@ function getZodDef(schema: any): any {
   return schema?._zod?.def ?? schema?._def
 }
 
-function getShape(schema: any): Record<string, any> | undefined {
-  const def = getZodDef(schema)
-  if (!def) return undefined
-  return def.shape ?? (typeof schema.shape === 'function' ? schema.shape() : schema.shape)
-}
-
 // ── Compiler ────────────────────────────────────────
 
 function compileType(def: any): FastStringify | undefined {
@@ -174,24 +168,6 @@ function buildUnrolledObjectFn(
       s += p.jsonKey + p.stringify(obj[p.key])
     }
     return s + '}'
-  }
-}
-
-function compileArray(def: any): FastStringify | undefined {
-  const elementSchema = def.element ?? def.type
-  if (!elementSchema) return undefined
-  const elemDef = getZodDef(elementSchema)
-  if (!elemDef) return undefined
-  const elemFn = compileType(elemDef)
-  if (!elemFn) return undefined
-
-  return (arr: any) => {
-    if (!Array.isArray(arr) || arr.length === 0) return '[]'
-    let s = '[' + elemFn(arr[0])
-    for (let i = 1; i < arr.length; i++) {
-      s += ',' + elemFn(arr[i])
-    }
-    return s + ']'
   }
 }
 

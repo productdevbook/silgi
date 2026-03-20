@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
 
 import { compileProcedure } from '#src/compile.ts'
@@ -18,7 +18,7 @@ const k = silgi({
 
 describe('guard()', () => {
   it('creates a guard middleware def', () => {
-    const auth = k.guard(async (ctx) => {
+    const auth = k.guard(async (_ctx) => {
       return { user: { id: 1, name: 'admin' } }
     })
     expect(auth.kind).toBe('guard')
@@ -26,7 +26,7 @@ describe('guard()', () => {
   })
 
   it('sync guard merges context', async () => {
-    const enrichIp = k.guard((ctx) => ({ ip: '1.2.3.4' }))
+    const enrichIp = k.guard((_ctx) => ({ ip: '1.2.3.4' }))
     const proc = k.$use(enrichIp).$resolve(async ({ ctx }) => (ctx as any).ip)
 
     const pipeline = compileProcedure(proc)
@@ -161,7 +161,7 @@ describe('query() / mutation() / subscription()', () => {
       .$use(auth)
       .$input(z.object({ name: z.string() }) as any)
       .$errors({ CONFLICT: 409 })
-      .$resolve(async ({ input, fail }: any) => {
+      .$resolve(async ({ input, fail: _fail }: any) => {
         return { id: 1, name: input.name }
       })
     expect(proc.type).toBe('query')
@@ -366,7 +366,7 @@ describe('E2E: Full CRUD', () => {
         .$use(auth)
         .$input(z.object({ name: z.string(), email: z.string() }) as any)
         .$errors({ CONFLICT: 409 })
-        .$resolve(async ({ input, ctx, fail }: any) => {
+        .$resolve(async ({ input, fail }: any) => {
           if (db.some((u) => u.email === input.email)) fail('CONFLICT')
           const user = { id: db.length + 1, ...input }
           db.push(user)

@@ -17,10 +17,10 @@
  * ```
  */
 
-import { compileProcedure, compileRouter } from '../compile.ts'
+import { compileRouter } from '../compile.ts'
 
-import type { FlatRouter, CompiledHandler } from '../compile.ts'
-import type { RouterDef, ProcedureDef, InferClient } from '../types.ts'
+import type { CompiledRouterFn } from '../compile.ts'
+import type { RouterDef, InferClient } from '../types.ts'
 
 export interface ServerClientOptions<TCtx extends Record<string, unknown>> {
   /** Context factory — called for every procedure call */
@@ -42,7 +42,7 @@ export function createServerClient<TRouter extends RouterDef, TCtx extends Recor
 }
 
 function createServerProxy(
-  flatRouter: FlatRouter,
+  flatRouter: CompiledRouterFn,
   contextFactory: () => Record<string, unknown> | Promise<Record<string, unknown>>,
   path: string[],
 ): unknown {

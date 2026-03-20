@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 import { createClient, safe } from '#src/client/client.ts'
 
-import type { ClientLink, ClientContext, ClientOptions } from '#src/client/types.ts'
+import type { ClientLink } from '#src/client/types.ts'
 
 describe('createClient proxy', () => {
   const mockedLink: ClientLink = {

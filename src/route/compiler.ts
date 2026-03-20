@@ -12,8 +12,6 @@
  * static segments, params, wildcards, regex, mixed depth.
  */
 
-import { findRoute } from './find.ts'
-
 import type { RouterContext, RouteNode, MethodEntry, MatchedRoute, ParamMapEntry } from './types.ts'
 
 export function compileRouter<T>(ctx: RouterContext<T>): (method: string, path: string) => MatchedRoute<T> | undefined {
@@ -557,7 +555,7 @@ function emitAssign(
   refs: unknown[],
   uid: { n: number },
 ): string {
-  const [si, nm] = pm
+  const [si] = pm
   const pn = pmName(pm)
   const rx = paramRegex?.[si]
   if (!rx) return `${po}${safe(pn)}=${segExpr};`

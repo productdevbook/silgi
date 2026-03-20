@@ -180,7 +180,6 @@ export function iteratorToEventStream(
 ): ReadableStream<Uint8Array> {
   const serialize = options.serialize ?? JSON.stringify
   const keepAliveMs = options.keepAliveMs ?? 30_000
-  const encoder = new TextEncoder()
 
   let keepAliveTimer: ReturnType<typeof setInterval> | undefined
   let cancelled = false

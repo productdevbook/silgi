@@ -4,14 +4,10 @@
  * Tests the Node.js HTTP server created by silgi().serve().
  */
 
-import { createServer } from 'node:http'
-
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
 
 import { silgi } from '#src/silgi.ts'
-
-import type { Server } from 'node:http'
 
 // ── Setup ──────────────────────────────────────────
 
@@ -29,7 +25,7 @@ const k = silgi({
   }),
 })
 
-const { guard, router } = k
+const { router } = k
 
 const listUsers = k.$input(z.object({ limit: z.number().min(1).max(100).optional() })).$resolve(({ input, ctx }) => {
   const limit = input.limit ?? 10
@@ -129,7 +125,7 @@ describe('v2 serve — HTTP handler', () => {
   })
 
   it('returns validation error for invalid input', async () => {
-    const { status, body } = await post('users/create', {
+    const { status } = await post('users/create', {
       name: '', // min(1) fails
       email: 'bad', // email() fails
     })

@@ -21,7 +21,6 @@ import { compileRouter } from '../compile.ts'
 import { SilgiError, toSilgiError } from '../core/error.ts'
 import { ValidationError } from '../core/schema.ts'
 
-import type { FlatRouter } from '../compile.ts'
 import type { RouterDef } from '../types.ts'
 
 export interface BatchHandlerOptions<TCtx extends Record<string, unknown>> {
