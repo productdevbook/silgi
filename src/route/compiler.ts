@@ -317,9 +317,19 @@ function emitWildcardSplit(
     const d = addRef(refs, entry.data)
     const g = m ? `if(m===${JSON.stringify(m)})` : ''
     if (entry.paramMap?.length) {
-      const nm = pmName(entry.paramMap[entry.paramMap.length - 1]!)
-      const { po, ro } = allocP(pre, uid, [[0, nm, false]])
-      code += `${g}{${po}${safe(nm)}=s.slice(${depth}).join("/");${ro}.data=$${d};return ${ro}}`
+      const { po, ro } = allocP(pre, uid, entry.paramMap)
+      let asgn = ''
+      for (let i = 0; i < entry.paramMap.length; i++) {
+        const [si, nm] = entry.paramMap[i]!
+        const pn = typeof nm === 'string' ? nm : String(i)
+        if (i === entry.paramMap.length - 1 && entry.catchAll) {
+          // Last param is catch-all — join remaining segments
+          asgn += `${po}${safe(pn)}=s.slice(${depth}).join("/");`
+        } else {
+          asgn += `${po}${safe(pn)}=s[${si + 1}];`
+        }
+      }
+      code += `${g}{${asgn}${ro}.data=$${d};return ${ro}}`
     } else {
       code += `${g}{_rs.data=$${d};return _rs}`
     }
@@ -341,9 +351,26 @@ function emitWildcardSlice(
     const d = addRef(refs, entry.data)
     const g = m ? `if(m===${JSON.stringify(m)})` : ''
     if (entry.paramMap?.length) {
-      const nm = pmName(entry.paramMap[entry.paramMap.length - 1]!)
-      const { po, ro } = allocP(pre, uid, [[0, nm, false]])
-      code += `${g}{${po}${safe(nm)}=p.length>=${offset}?p.slice(${offset}):"";${ro}.data=$${d};return ${ro}}`
+      const { po, ro } = allocP(pre, uid, entry.paramMap)
+      const lastPn = pmName(entry.paramMap[entry.paramMap.length - 1]!)
+      // For slice-based wildcard, only the last (catch-all) param uses p.slice
+      // Earlier params need split — fall back to split if multiple params
+      if (entry.paramMap.length === 1) {
+        code += `${g}{${po}${safe(lastPn)}=p.length>=${offset}?p.slice(${offset}):"";${ro}.data=$${d};return ${ro}}`
+      } else {
+        // Multiple params — need split for non-wildcard params
+        let asgn = ''
+        for (let i = 0; i < entry.paramMap.length; i++) {
+          const [si, nm] = entry.paramMap[i]!
+          const pn = typeof nm === 'string' ? nm : String(i)
+          if (i === entry.paramMap.length - 1) {
+            asgn += `${po}${safe(pn)}=p.length>=${offset}?p.slice(${offset}):"";`
+          } else {
+            asgn += `${po}${safe(pn)}=s[${si + 1}];`
+          }
+        }
+        code += `${g}{var s=p.split("/");${asgn}${ro}.data=$${d};return ${ro}}`
+      }
     } else {
       code += `${g}{_rs.data=$${d};return _rs}`
     }
