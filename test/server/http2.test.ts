@@ -43,21 +43,23 @@ const appRouter = k.router({
   echo: k.query(z.object({ msg: z.string() }), ({ input }) => ({ echo: input.msg })),
 })
 
-// Build the flat router and handler function manually (same as serve() does internally)
-const flat = compileRouter(appRouter)
+// Build the compiled router and handler function manually (same as serve() does internally)
+const compiledRouter = compileRouter(appRouter)
 const notFound = '{"code":"NOT_FOUND","status":404,"message":"Not found"}'
 
 function requestHandler(req: any, res: any) {
   const rawUrl = req.url ?? '/'
   const qIdx = rawUrl.indexOf('?')
-  const pathname = qIdx === -1 ? rawUrl.slice(1) : rawUrl.slice(1, qIdx)
+  const pathname = qIdx === -1 ? rawUrl : rawUrl.slice(0, qIdx)
 
-  const route = flat.get(pathname)
-  if (!route) {
+  const method = req.method ?? 'POST'
+  const match = compiledRouter(method, pathname)
+  if (!match) {
     res.writeHead(404, { 'content-type': 'application/json' })
     res.end(notFound)
     return
   }
+  const route = match.data
 
   const ctx: Record<string, unknown> = Object.create(null)
 

@@ -34,11 +34,9 @@ beforeAll(async () => {
 afterAll(() => app?.close())
 
 describe('katmanFastify (real Fastify)', () => {
-  it('registers routes for each procedure', () => {
+  it('registers catch-all route for router dispatch', () => {
     const routes = app.printRoutes()
-    expect(routes).toContain('health')
-    expect(routes).toContain('echo')
-    expect(routes).toContain('add')
+    expect(routes).toContain('*')
   })
 
   it('handles no-input query', async () => {
