@@ -53,7 +53,7 @@
   <g transform="translate(72, 72)">
     <rect width="48" height="48" rx="11" fill="#edc462"/>
     <circle cx="24" cy="24" r="7" fill="#0a0908"/>
-    <text x="62" y="36" fill="#ede6db" font-family="Georgia, 'Times New Roman', serif" font-size="34" font-style="italic" letter-spacing="-0.5">Katman</text>
+    <text x="62" y="36" fill="#ede6db" font-family="Georgia, 'Times New Roman', serif" font-size="34" font-style="italic" letter-spacing="-0.5">Silgi</text>
   </g>
 
   <!-- Title -->
@@ -67,12 +67,12 @@
   <g transform="translate(72, 460)">
     <rect x="0" y="0" width="380" height="52" rx="10" fill="#0e0d0a" stroke="white" stroke-opacity="0.06"/>
     <text x="20" y="34" fill="#5e5549" font-family="'Menlo', 'Consolas', monospace" font-size="19">$</text>
-    <text x="42" y="34" fill="#ede6db" font-family="'Menlo', 'Consolas', monospace" font-size="19">pnpm add katman</text>
+    <text x="42" y="34" fill="#ede6db" font-family="'Menlo', 'Consolas', monospace" font-size="19">pnpm add silgi</text>
   </g>
 
   <!-- Bottom tagline -->
   <text x="76" y="572" fill="#4a4238" font-family="sans-serif" font-size="16" font-weight="400" letter-spacing="0.3">Compiled pipelines · Single package · Every runtime</text>
-  <text x="1128" y="572" fill="#3d3830" font-family="sans-serif" font-size="14" text-anchor="end">katman.silgi.dev</text>
+  <text x="1128" y="572" fill="#3d3830" font-family="sans-serif" font-size="14" text-anchor="end">silgi.silgi.dev</text>
 
   <!-- Border -->
   <rect x="0" y="0" width="1200" height="630" fill="none" stroke="white" stroke-opacity="0.03"/>

@@ -21,7 +21,7 @@ async function greet() {
 
 <template>
   <main style="padding: 2rem; font-family: system-ui">
-    <h1>Katman + Nuxt</h1>
+    <h1>Silgi + Nuxt</h1>
     <p>Health: {{ health ? `${health.status} (${health.framework})` : 'loading...' }}</p>
     <div style="margin-top: 1rem">
       <input v-model="name" placeholder="Enter your name" />
