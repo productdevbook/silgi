@@ -259,11 +259,10 @@ function emitParamTerminal(
         continue
       }
 
+      // Use depth for length check — depth is the split length at this node
       const pc = entry.paramMap.length
-      const lastIdx = entry.paramMap[pc - 1]![0]
-      const expLen = lastIdx + 2
       const lastOpt = entry.paramMap[pc - 1]![2]
-      const lenCk = lastOpt ? `(l===${expLen}||l===${expLen - 1})` : `l===${expLen}`
+      const lenCk = lastOpt ? `(l===${depth}||l===${depth - 1})` : `l===${depth}`
 
       const { po, ro } = allocP(pre, uid, entry.paramMap)
       let asgn = ''
