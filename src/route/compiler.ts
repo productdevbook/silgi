@@ -14,7 +14,7 @@
 
 import { findRoute } from './find.ts'
 
-import type { RouterContext, RouteNode, MethodEntry, MatchedRoute } from './types.ts'
+import type { RouterContext, RouteNode, MethodEntry, MatchedRoute, ParamMapEntry } from './types.ts'
 
 export function compileRouter<T>(
   ctx: RouterContext<T>,
@@ -187,10 +187,9 @@ function emitParamNode(
         if (!entry.paramMap?.length) continue
         const d = addRef(refs, entry.data)
         const g = method ? `m===${JSON.stringify(method)}&&` : ''
-        const { po, ro } = allocP(pre, uid, entry.paramMap)
+        const { po, ro } = allocP(pre, uid, entry.paramMap, entry)
 
         if (entry.catchAll) {
-          // Catch-all: join remaining segments
           const pn = pmName(entry.paramMap[0]!)
           code += `if(${g}l>=${depth + 1}){${po}${safe(pn)}=s.slice(${depth}).join("/");${ro}.data=$${d};return ${ro}}`
           continue
@@ -201,27 +200,31 @@ function emitParamNode(
         const lastIdx = entry.paramMap[pc - 1]![0]
         const expLen = lastIdx + 2
 
-        // Length check
         const lenCk = lastOpt
           ? `(l===${expLen}||l===${expLen - 1})`
           : `l===${expLen}`
 
-        // Regex constraints
+        // Regex constraints (only .test for non-group regexes)
         let rx = ''
         for (let i = 0; i < (entry.paramRegex?.length || 0); i++) {
           if (entry.paramRegex[i]) {
             const pmI = entry.paramMap.findIndex(([idx]) => idx === i)
             if (pmI !== -1) {
-              rx += `&&${entry.paramRegex[i]!.toString()}.test(s[${entry.paramMap[pmI]![0] + 1}])`
+              const src = entry.paramRegex[i]!.source
+              // Skip .test for regexes with capture groups — handled by emitAssign
+              if (!src.includes('(?<') && !(src.match(/\((?!\?)/g)?.length)) {
+                rx += `&&${entry.paramRegex[i]!.toString()}.test(s[${entry.paramMap[pmI]![0] + 1}])`
+              } else {
+                rx += `&&${entry.paramRegex[i]!.toString()}.test(s[${entry.paramMap[pmI]![0] + 1}])`
+              }
             }
           }
         }
 
-        // Assign params from split segments
+        // Assign params — use regex extraction when needed
         let asgn = ''
         for (let i = 0; i < pc; i++) {
-          const [si, nm] = entry.paramMap[i]!
-          asgn += `${po}${safe(pmName(entry.paramMap[i]!))}=s[${si + 1}];`
+          asgn += emitAssign(po, entry.paramMap[i]!, `s[${entry.paramMap[i]![0] + 1}]`, entry.paramRegex, refs, uid)
         }
 
         code += `if(${g}${lenCk}${rx}){${asgn}${ro}.data=$${d};return ${ro}}`
@@ -264,11 +267,10 @@ function emitParamTerminal(
       const lastOpt = entry.paramMap[pc - 1]![2]
       const lenCk = lastOpt ? `(l===${depth}||l===${depth - 1})` : `l===${depth}`
 
-      const { po, ro } = allocP(pre, uid, entry.paramMap)
+      const { po, ro } = allocP(pre, uid, entry.paramMap, entry)
       let asgn = ''
       for (let i = 0; i < pc; i++) {
-        const [si] = entry.paramMap[i]!
-        asgn += `${po}${safe(pmName(entry.paramMap[i]!))}=s[${si + 1}];`
+        asgn += emitAssign(po, entry.paramMap[i]!, `s[${entry.paramMap[i]![0] + 1}]`, entry.paramRegex, refs, uid)
       }
 
       let rx = ''
@@ -318,18 +320,23 @@ function emitWildcardSplit(
     const g = m ? `if(m===${JSON.stringify(m)})` : ''
     if (entry.paramMap?.length) {
       const { po, ro } = allocP(pre, uid, entry.paramMap)
+      const lastPm = entry.paramMap[entry.paramMap.length - 1]!
+      const zeroOk = lastPm[2] || lastPm[1] === '_'
       let asgn = ''
       for (let i = 0; i < entry.paramMap.length; i++) {
         const [si, nm] = entry.paramMap[i]!
         const pn = typeof nm === 'string' ? nm : String(i)
         if (i === entry.paramMap.length - 1 && entry.catchAll) {
-          // Last param is catch-all — join remaining segments
           asgn += `${po}${safe(pn)}=s.slice(${depth}).join("/");`
         } else {
           asgn += `${po}${safe(pn)}=s[${si + 1}];`
         }
       }
-      code += `${g}{${asgn}${ro}.data=$${d};return ${ro}}`
+      if (zeroOk) {
+        code += `${g}{${asgn}${ro}.data=$${d};return ${ro}}`
+      } else {
+        code += `${g}if(l>${depth}){${asgn}${ro}.data=$${d};return ${ro}}`
+      }
     } else {
       code += `${g}{_rs.data=$${d};return _rs}`
     }
@@ -355,8 +362,14 @@ function emitWildcardSlice(
       const lastPn = pmName(entry.paramMap[entry.paramMap.length - 1]!)
       // For slice-based wildcard, only the last (catch-all) param uses p.slice
       // Earlier params need split — fall back to split if multiple params
+      const lastEntry = entry.paramMap[entry.paramMap.length - 1]!
+      const zeroOk = lastEntry[2] || lastEntry[1] === '_'
       if (entry.paramMap.length === 1) {
-        code += `${g}{${po}${safe(lastPn)}=p.length>=${offset}?p.slice(${offset}):"";${ro}.data=$${d};return ${ro}}`
+        if (zeroOk) {
+          code += `${g}{${po}${safe(lastPn)}=p.length>=${offset}?p.slice(${offset}):"";${ro}.data=$${d};return ${ro}}`
+        } else {
+          code += `${g}if(p.length>${offset}){${po}${safe(lastPn)}=p.slice(${offset});${ro}.data=$${d};return ${ro}}`
+        }
       } else {
         // Multiple params — need split for non-wildcard params
         let asgn = ''
@@ -380,21 +393,85 @@ function emitWildcardSlice(
 
 // ── Helpers ─────────────────────────────────────────
 
+/** Collect all param names an entry will produce — accounts for regex groups */
+function collectNames(entry: MethodEntry<any>): string[] {
+  const pm = entry.paramMap
+  if (!pm?.length) return []
+  const names: string[] = []
+  for (let i = 0; i < pm.length; i++) {
+    const [si, nm] = pm[i]!
+    const rx = entry.paramRegex?.[si]
+    if (rx) {
+      const src = rx.source
+      if (src.includes('(?<')) {
+        for (const m of src.matchAll(/\(\?<(\w+)>/g)) names.push(m[1]!)
+        continue
+      }
+      const numGroups = (src.match(/\((?!\?)/g) || []).length
+      if (numGroups > 1) {
+        const base = parseInt(typeof nm === 'string' ? nm : String(nm))
+        for (let g = 0; g < numGroups; g++) names.push(isNaN(base) ? String(g) : String(base + g))
+        continue
+      }
+    }
+    names.push(typeof nm === 'string' ? nm : String(nm))
+  }
+  return names
+}
+
 function allocP(
   pre: string[],
   uid: { n: number },
   pm: Array<[number, string | RegExp, boolean]> | Array<[number, string, boolean]>,
+  entry?: MethodEntry<any>,
 ): { po: string; ro: string } {
   const idx = uid.n++
   const po = `_p${idx}`
   const ro = `_r${idx}`
-  const fields = pm.map(([, n]) => {
-    const name = typeof n === 'string' ? n : String(n)
-    return `${JSON.stringify(name)}:""`
-  }).join(',')
+  const fieldNames = entry ? collectNames(entry) : pm.map(([, n]) => typeof n === 'string' ? n : String(n))
+  const fields = fieldNames.map(n => `${JSON.stringify(n)}:""`).join(',')
   pre.push(`var ${po}={${fields}}`)
   pre.push(`var ${ro}={data:null,params:${po}}`)
   return { po, ro }
+}
+
+/** Emit param assignment — handles regex group extraction */
+function emitAssign(
+  po: string,
+  pm: ParamMapEntry,
+  segExpr: string,
+  paramRegex: RegExp[] | undefined,
+  refs: unknown[],
+  uid: { n: number },
+): string {
+  const [si, nm] = pm
+  const pn = pmName(pm)
+  const rx = paramRegex?.[si]
+  if (!rx) return `${po}${safe(pn)}=${segExpr};`
+
+  const src = rx.source
+  const ri = addRef(refs, rx)
+  const mv = `_m${uid.n++}`
+
+  if (src.includes('(?<')) {
+    const groupNames = [...src.matchAll(/\(\?<(\w+)>/g)].map(m => m[1]!)
+    let code = `var ${mv}=$${ri}.exec(${segExpr});`
+    for (const gn of groupNames) code += `${po}${safe(gn)}=${mv}?${mv}.groups.${gn}:"";`
+    return code
+  }
+
+  const numGroups = (src.match(/\((?!\?)/g) || []).length
+  if (numGroups > 0) {
+    const base = parseInt(pn)
+    let code = `var ${mv}=$${ri}.exec(${segExpr});`
+    for (let g = 0; g < numGroups; g++) {
+      const gn = isNaN(base) ? pn : String(base + g)
+      code += `${po}${safe(gn)}=${mv}?${mv}[${g + 1}]:"";`
+    }
+    return code
+  }
+
+  return `${po}${safe(pn)}=${segExpr};`
 }
 
 function emitTree(root: RouteNode<any>, refs: unknown[], pre: string[], uid: { n: number }, depth: number): string {

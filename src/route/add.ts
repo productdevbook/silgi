@@ -312,11 +312,16 @@ function _setMethod<T>(
   if (hasRegex) node.hasRegex = true
   const key = method || ''
   if (!node.methods![key]) node.methods![key] = []
-  node.methods![key]!.push(entry)
+  // Regex-constrained entries first — more specific routes take priority
+  if (hasRegex) {
+    node.methods![key]!.unshift(entry)
+  } else {
+    node.methods![key]!.push(entry)
+  }
 }
 
 function _lastIsCatchAll(segments: string[]): boolean {
   if (segments.length === 0) return false
   const last = segments[segments.length - 1]!
-  return last === '**' || last.startsWith('**:') || last.endsWith('+') || last.endsWith('*')
+  return last === '**' || last.startsWith('**:')
 }

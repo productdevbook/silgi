@@ -70,18 +70,37 @@ function _lookup<T>(
     // Check current node
     if (node.methods) {
       const entries = node.methods[method] || node.methods['']
-      if (entries) return entries[0]
+      if (entries) {
+        if (entries.length === 1) return entries[0]
+        // Multiple entries — prefer regex-constrained that match all segments
+        for (const entry of entries) {
+          if (!entry.paramRegex?.some(Boolean)) continue
+          let ok = true
+          for (let r = 0; r < entry.paramRegex.length; r++) {
+            if (entry.paramRegex[r] && !entry.paramRegex[r]!.test(segments[r]!)) { ok = false; break }
+          }
+          if (ok) return entry
+        }
+        // Fallback: first unconstrained entry
+        for (const entry of entries) {
+          if (!entry.paramRegex?.some(Boolean)) return entry
+        }
+        return entries[0]
+      }
     }
     // Optional param fallback
     if (node.param?.methods) {
       const entries = node.param.methods[method] || node.param.methods['']
       if (entries?.[0]?.paramMap?.[entries[0].paramMap.length - 1]?.[2]) return entries[0]
     }
-    // Wildcard fallback — only if the route is optional (**, :path*, not :path+)
+    // Wildcard fallback — unnamed ** matches zero segments, :path+ does NOT
     if (node.wildcard?.methods) {
       const entries = node.wildcard.methods[method] || node.wildcard.methods['']
-      if (entries?.[0]?.paramMap?.[entries[0].paramMap.length - 1]?.[2] /* optional */ || entries?.[0]?.catchAll) {
-        return entries[0]
+      if (entries) {
+        const e = entries[0]!
+        const lastPm = e.paramMap?.[e.paramMap.length - 1]
+        // Allow zero-match: no paramMap, optional param, or unnamed catch-all ('_')
+        if (!lastPm || lastPm[2] || lastPm[1] === '_') return e
       }
     }
     return undefined
@@ -137,8 +156,13 @@ function _extractParams(
 ): Record<string, string> {
   const params: Record<string, string> = Object.create(null)
   for (let i = 0; i < paramMap.length; i++) {
-    const [idx, name] = paramMap[i]!
-    if (idx >= segments.length) continue
+    const [idx, name, optional] = paramMap[i]!
+    if (idx >= segments.length) {
+      if (optional) {
+        params[typeof name === 'string' ? name : String(i)] = undefined as never
+      }
+      continue
+    }
 
     // Catch-all: join remaining segments
     if (catchAll && i === paramMap.length - 1) {
@@ -161,13 +185,22 @@ function _extractParams(
     // Check if this param has a regex with capture groups
     if (paramRegex?.[idx]) {
       const rxMatch = paramRegex[idx]!.exec(segments[idx]!)
-      if (rxMatch && rxMatch.length > 1) {
-        // Multiple capture groups (e.g., file-*-*.png → 2 groups)
-        for (let g = 1; g < rxMatch.length; g++) {
-          const groupName = String(parseInt(name as string) + g - 1)
-          params[groupName] = rxMatch[g]!
+      if (rxMatch) {
+        // Named groups (from mixed segments like @:param)
+        if (rxMatch.groups) {
+          for (const [k, v] of Object.entries(rxMatch.groups)) {
+            if (v !== undefined) params[k] = v
+          }
+          continue
         }
-        continue
+        // Numeric capture groups (e.g., file-*-*.png → 2 groups)
+        if (rxMatch.length > 1) {
+          for (let g = 1; g < rxMatch.length; g++) {
+            const groupName = String(parseInt(name as string) + g - 1)
+            params[groupName] = rxMatch[g]!
+          }
+          continue
+        }
       }
     }
     params[name] = segments[idx]!
