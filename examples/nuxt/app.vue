@@ -6,16 +6,13 @@ interface Todo {
   createdAt: string
 }
 
-
 const todos = ref<Todo[]>([])
 const newTitle = ref('')
 const loading = ref(true)
 
-
 onMounted(async () => {
   await fetchTodos()
 })
-
 
 async function fetchTodos() {
   loading.value = true
@@ -23,7 +20,6 @@ async function fetchTodos() {
   todos.value = data as Todo[]
   loading.value = false
 }
-
 
 async function addTodo() {
   if (!newTitle.value.trim()) return
@@ -35,7 +31,6 @@ async function addTodo() {
   await fetchTodos()
 }
 
-
 async function toggleTodo(id: number) {
   await $fetch('/todos/toggle', {
     method: 'POST',
@@ -43,7 +38,6 @@ async function toggleTodo(id: number) {
   })
   await fetchTodos()
 }
-
 
 async function removeTodo(id: number) {
   await $fetch('/todos/remove', {
@@ -55,64 +49,61 @@ async function removeTodo(id: number) {
 </script>
 
 <template>
-  <main style="max-width: 480px; margin: 3rem auto; font-family: system-ui; padding: 0 1rem">
-    <h1 style="font-size: 1.5rem; margin-bottom: 0.25rem">Silgi + Nuxt — Todo</h1>
-    <p style="color: #888; margin-bottom: 1.5rem; font-size: 0.875rem">Type-safe RPC with Silgi</p>
+  <main class="mx-auto max-w-lg px-4 py-12 font-sans">
+    <h1 class="mb-1 text-2xl font-bold">Silgi + Nuxt — Todo</h1>
+    <p class="mb-6 text-sm text-gray-400">Type-safe RPC with Silgi</p>
 
     <!-- Add todo -->
-    <form style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem" @submit.prevent="addTodo">
+    <form class="mb-6 flex gap-2" @submit.prevent="addTodo">
       <input
         v-model="newTitle"
         placeholder="What needs to be done?"
-        style="flex: 1; padding: 0.5rem 0.75rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.875rem"
+        class="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-gray-400"
       />
       <button
         type="submit"
-        style="
-          padding: 0.5rem 1rem;
-          background: #111;
-          color: #fff;
-          border: none;
-          border-radius: 6px;
-          cursor: pointer;
-          font-size: 0.875rem;
-        "
+        class="cursor-pointer rounded-lg bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-800"
       >
         Add
       </button>
     </form>
 
     <!-- Loading -->
-    <p v-if="loading" style="color: #888">Loading...</p>
+    <p v-if="loading" class="text-sm text-gray-400">Loading...</p>
 
     <!-- Todo list -->
-    <ul v-else style="list-style: none; padding: 0; margin: 0">
+    <ul v-else class="m-0 list-none p-0">
       <li
         v-for="todo in todos"
         :key="todo.id"
-        style="display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0; border-bottom: 1px solid #eee"
+        class="flex items-center gap-3 border-b border-gray-100 py-2.5"
       >
-        <input type="checkbox" :checked="todo.completed" style="cursor: pointer" @change="toggleTodo(todo.id)" />
+        <input
+          type="checkbox"
+          :checked="todo.completed"
+          class="cursor-pointer"
+          @change="toggleTodo(todo.id)"
+        />
         <span
-          style="flex: 1; font-size: 0.875rem"
-          :style="{ textDecoration: todo.completed ? 'line-through' : 'none', color: todo.completed ? '#aaa' : '#111' }"
+          class="flex-1 text-sm"
+          :class="todo.completed ? 'text-gray-400 line-through' : 'text-gray-900'"
         >
           {{ todo.title }}
         </span>
         <button
-          style="background: none; border: none; color: #c00; cursor: pointer; font-size: 0.75rem"
+          class="cursor-pointer border-none bg-transparent text-xs text-red-600 hover:text-red-800"
           @click="removeTodo(todo.id)"
         >
           Delete
         </button>
       </li>
 
-      <li v-if="todos.length === 0" style="padding: 1rem 0; color: #888; text-align: center">
+      <li v-if="todos.length === 0" class="py-4 text-center text-sm text-gray-400">
         No todos yet. Add one above.
       </li>
     </ul>
 
-    <p v-if="todos.length > 0" style="margin-top: 1rem; font-size: 0.75rem; color: #888">
+    <p v-if="todos.length > 0" class="mt-4 text-xs text-gray-400">
       {{ todos.filter((t) => t.completed).length }} / {{ todos.length }} completed
     </p>
   </main>

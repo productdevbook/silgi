@@ -9,8 +9,10 @@
     "start": "node .output/server/index.mjs"
   },
   "dependencies": {
+    "@nuxtjs/tailwindcss": "7.0.0-beta.1",
     "nuxt": "npm:nuxt-nightly@5x",
     "silgi": "latest",
+    "tailwindcss": "^4.2.2",
     "zod": "^4.3.6"
   }
 }
