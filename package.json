@@ -190,6 +190,22 @@
     "./peer": {
       "import": "./dist/adapters/peer.mjs",
       "types": "./dist/adapters/peer.d.mts"
+    },
+    "./unstorage": {
+      "import": "./lib/unstorage.mjs",
+      "types": "./lib/unstorage.d.mts"
+    },
+    "./ocache": {
+      "import": "./lib/ocache.mjs",
+      "types": "./lib/ocache.d.mts"
+    },
+    "./ofetch": {
+      "import": "./lib/ofetch.mjs",
+      "types": "./lib/ofetch.d.mts"
+    },
+    "./srvx": {
+      "import": "./lib/srvx.mjs",
+      "types": "./lib/srvx.d.mts"
     }
   },
   "scripts": {
