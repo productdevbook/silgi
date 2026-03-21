@@ -1,17 +1,3 @@
-import {
-  encode as devalueEncode,
-  decode as devalueDecode,
-  acceptsDevalue,
-  isDevalue,
-  DEVALUE_CONTENT_TYPE,
-} from '../codec/devalue.ts'
-import {
-  encode as msgpackEncode,
-  decode as msgpackDecode,
-  acceptsMsgpack,
-  isMsgpack,
-  MSGPACK_CONTENT_TYPE,
-} from '../codec/msgpack.ts'
 import { ContextPool } from '../compile.ts'
 import { compileRouter } from '../compile.ts'
 import { generateOpenAPI, scalarHTML } from '../scalar.ts'
@@ -26,28 +12,36 @@ import type { ScalarOptions } from '../scalar.ts'
 import type { SilgiHooks } from '../silgi.ts'
 import type { Hookable } from 'hookable'
 
+// Lazy-loaded codecs — resolved on first non-JSON request
+let _msgpack: typeof import('../codec/msgpack.ts') | undefined
+let _devalue: typeof import('../codec/devalue.ts') | undefined
+
 // ── Response Encoding Helper ────────────────────────
 
 export type ResponseFormat = 'json' | 'msgpack' | 'devalue'
 
-export function encodeResponse(
+export async function encodeResponse(
   data: unknown,
   status: number,
   format: ResponseFormat,
   jsonStringify?: (v: unknown) => string,
   extraHeaders?: Record<string, string>,
-): Response {
+): Promise<Response> {
   switch (format) {
-    case 'msgpack':
-      return new Response(msgpackEncode(data), {
+    case 'msgpack': {
+      _msgpack ??= await import('../codec/msgpack.ts')
+      return new Response(_msgpack.encode(data), {
         status,
-        headers: { 'content-type': MSGPACK_CONTENT_TYPE, ...extraHeaders },
+        headers: { 'content-type': _msgpack.MSGPACK_CONTENT_TYPE, ...extraHeaders },
       })
-    case 'devalue':
-      return new Response(devalueEncode(data), {
+    }
+    case 'devalue': {
+      _devalue ??= await import('../codec/devalue.ts')
+      return new Response(_devalue.encode(data), {
         status,
-        headers: { 'content-type': DEVALUE_CONTENT_TYPE, ...extraHeaders },
+        headers: { 'content-type': _devalue.DEVALUE_CONTENT_TYPE, ...extraHeaders },
       })
+    }
     default:
       return new Response(jsonStringify ? jsonStringify(data) : stringifyJSON(data), {
         status,
@@ -140,12 +134,14 @@ export function createFetchHandler(
         }
       } else {
         const ct = request.headers.get('content-type')
-        if (isMsgpack(ct) && request.body) {
+        if (ct?.includes('msgpack') && request.body) {
+          _msgpack ??= await import('../codec/msgpack.ts')
           const buf = new Uint8Array(await request.arrayBuffer())
-          rawInput = buf.length > 0 ? msgpackDecode(buf) : undefined
-        } else if (isDevalue(ct) && request.body) {
+          rawInput = buf.length > 0 ? _msgpack.decode(buf) : undefined
+        } else if (ct?.includes('x-devalue') && request.body) {
+          _devalue ??= await import('../codec/devalue.ts')
           const text = await request.text()
-          rawInput = text ? devalueDecode(text) : undefined
+          rawInput = text ? _devalue.decode(text) : undefined
         } else if (ct?.includes('json') && request.body) {
           const text = await request.text()
           rawInput = text ? JSON.parse(text) : undefined
@@ -183,13 +179,21 @@ export function createFetchHandler(
       // Content negotiation: msgpack > devalue > json
       hooks?.callHook('response', { path: pathname, output, durationMs: performance.now() - t0 })
       const accept = request.headers.get('accept')
-      const fmt = acceptsMsgpack(accept) ? 'msgpack' : acceptsDevalue(accept) ? 'devalue' : 'json'
+      const fmt: ResponseFormat = accept?.includes('msgpack')
+        ? 'msgpack'
+        : accept?.includes('x-devalue')
+          ? 'devalue'
+          : 'json'
       const cacheHeaders = route.cacheControl ? { 'cache-control': route.cacheControl } : undefined
       return encodeResponse(output, 200, fmt, route.stringify, cacheHeaders)
     } catch (error) {
       hooks?.callHook('error', { path: pathname, error })
       const accept = request.headers.get('accept')
-      const fmt = acceptsMsgpack(accept) ? 'msgpack' : acceptsDevalue(accept) ? 'devalue' : 'json'
+      const fmt: ResponseFormat = accept?.includes('msgpack')
+        ? 'msgpack'
+        : accept?.includes('x-devalue')
+          ? 'devalue'
+          : 'json'
       if (error instanceof ValidationError) {
         const errBody = { code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } }
         return encodeResponse(errBody, 400, fmt)

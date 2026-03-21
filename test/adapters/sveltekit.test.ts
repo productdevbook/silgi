@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
 
-import { silgi, SilgiError } from '#src/silgi.ts'
+import { SilgiError } from '#src/core/error.ts'
+import { silgi } from '#src/silgi.ts'
 
 const k = silgi({ context: () => ({ db: 'test' }) })
 

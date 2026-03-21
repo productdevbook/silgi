@@ -12,14 +12,16 @@
  * ```
  */
 
-import { encode as devalueEncode, acceptsDevalue, DEVALUE_CONTENT_TYPE } from '../codec/devalue.ts'
-import { encode as msgpackEncode, acceptsMsgpack, MSGPACK_CONTENT_TYPE } from '../codec/msgpack.ts'
 import { compileRouter } from '../compile.ts'
 import { SilgiError, toSilgiError } from '../core/error.ts'
 import { ValidationError } from '../core/schema.ts'
 
 import type { CompiledRouterFn } from '../compile.ts'
 import type { RouterDef } from '../types.ts'
+
+// Lazy-loaded codecs — only resolved when client sends Accept: msgpack/devalue
+let _msgpack: typeof import('../codec/msgpack.ts') | undefined
+let _devalue: typeof import('../codec/devalue.ts') | undefined
 
 export interface SilgiFastifyOptions {
   /** Context factory — receives Fastify request */
@@ -71,15 +73,17 @@ export function silgiFastify(routerDef: RouterDef, options: SilgiFastifyOptions 
           reply.header('cache-control', route.cacheControl)
         }
 
-        // Content negotiation
-        const accept = req.headers.accept
-        if (acceptsMsgpack(accept)) {
+        // Content negotiation — codecs lazy-loaded on first non-JSON request
+        const accept: string | undefined = req.headers.accept
+        if (accept?.includes('msgpack')) {
+          _msgpack ??= await import('../codec/msgpack.ts')
           return reply
-            .header('content-type', MSGPACK_CONTENT_TYPE)
-            .send(Buffer.from(msgpackEncode(output) as ArrayBuffer))
+            .header('content-type', _msgpack.MSGPACK_CONTENT_TYPE)
+            .send(Buffer.from(_msgpack.encode(output) as ArrayBuffer))
         }
-        if (acceptsDevalue(accept)) {
-          return reply.header('content-type', DEVALUE_CONTENT_TYPE).send(devalueEncode(output))
+        if (accept?.includes('x-devalue')) {
+          _devalue ??= await import('../codec/devalue.ts')
+          return reply.header('content-type', _devalue.DEVALUE_CONTENT_TYPE).send(_devalue.encode(output))
         }
         return reply.header('content-type', 'application/json').send(route.stringify(output))
       } catch (error) {

@@ -43,6 +43,7 @@
     "lib"
   ],
   "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": {
       "import": "./dist/index.mjs",
@@ -192,6 +193,18 @@
       "import": "./dist/adapters/peer.mjs",
       "types": "./dist/adapters/peer.d.mts"
     },
+    "./broker": {
+      "import": "./dist/broker/index.mjs",
+      "types": "./dist/broker/index.d.mts"
+    },
+    "./broker/nats": {
+      "import": "./dist/broker/nats.mjs",
+      "types": "./dist/broker/nats.d.mts"
+    },
+    "./broker/redis": {
+      "import": "./dist/broker/redis.mjs",
+      "types": "./dist/broker/redis.d.mts"
+    },
     "./unstorage": {
       "import": "./lib/unstorage.mjs",
       "types": "./lib/unstorage.d.mts"
@@ -210,7 +223,7 @@
     }
   },
   "scripts": {
-    "build": "obuild",
+    "build": "tsdown",
     "dev": "vitest",
     "bench": "node --experimental-strip-types bench/update-benchmarks.ts",
     "bench:memory": "node --expose-gc --experimental-strip-types bench/memory.ts",
@@ -255,13 +268,16 @@
     "fastify": "^5.8.2",
     "h3": "2.0.1-rc.16",
     "hono": "^4.12.8",
+    "ioredis": "^5.10.1",
     "mitata": "^1.0.34",
+    "nats": "^2.29.3",
     "nitro": "3.0.260311-beta",
     "nuxt-nightly": "5.0.0-29563820.579db312",
     "obuild": "^0.4.32",
     "oxfmt": "^0.41.0",
     "oxlint": "^1.56.0",
     "rou3": "^0.8.1",
+    "tsdown": "^0.21.4",
     "typescript": "^5.9.3",
     "vitest": "^4.1.0",
     "ws": "^8.19.0",

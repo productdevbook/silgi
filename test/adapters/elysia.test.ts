@@ -3,7 +3,8 @@ import { createServer } from 'node:http'
 import { describe, it, expect, afterAll } from 'vitest'
 import { z } from 'zod'
 
-import { silgi, SilgiError } from '#src/silgi.ts'
+import { SilgiError } from '#src/core/error.ts'
+import { silgi } from '#src/silgi.ts'
 
 import type { Server } from 'node:http'
 

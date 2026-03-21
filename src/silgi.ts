@@ -14,14 +14,12 @@ import { createHooks } from 'hookable'
 
 import { createProcedureBuilder } from './builder.ts'
 import { compileRouter } from './compile.ts'
-import { createFetchHandler } from './core/handler.ts'
 import { assignPaths, routerCache } from './core/router-utils.ts'
-import { createServeHandler } from './core/serve.ts'
-import { initStorage, useStorage } from './core/storage.ts'
 
 import type { ProcedureBuilder } from './builder.ts'
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
 import type { StorageConfig } from './core/storage.ts'
+import type { useStorage } from './core/storage.ts'
 import type { ScalarOptions } from './scalar.ts'
 import type {
   ProcedureDef,
@@ -234,12 +232,7 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
 ): SilgiInstance<TBaseCtx> {
   const contextFactory = config.context
 
-  // Initialize storage (if configured) — once at startup, zero per-request cost
-  if (config.storage) {
-    initStorage(config.storage)
-  }
-
-  // Lifecycle hooks (sync fast-path when no hooks registered)
+  // Hooks — synchronous init (hookable is tiny ~2KB, must be sync for API compat)
   const hooks = createHooks<SilgiHooks>()
   if (config.hooks) {
     for (const [name, fn] of Object.entries(config.hooks)) {
@@ -251,10 +244,17 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
     }
   }
 
+  // Initialize storage lazily (only if configured)
+  if (config.storage) {
+    import('./core/storage.ts').then((m) => m.initStorage(config.storage))
+  }
+
   const instance: SilgiInstance<TBaseCtx> = {
     hook: hooks.hook,
     removeHook: hooks.removeHook.bind(hooks),
-    useStorage,
+    useStorage: (...args: Parameters<typeof import('./core/storage.ts').useStorage>) => {
+      return import('./core/storage.ts').then((m) => m.useStorage(...args)) as any
+    },
 
     guard: (fnOrConfig: any) => {
       if (typeof fnOrConfig === 'function') {
@@ -281,17 +281,22 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
       return def
     },
 
-    handler: (routerDef, options) => createFetchHandler(routerDef, contextFactory, hooks, options),
+    handler: (routerDef, options) => {
+      let fetchHandler: ((req: Request) => Promise<Response>) | undefined
+      return async (request: Request) => {
+        if (!fetchHandler) {
+          const { createFetchHandler } = await import('./core/handler.ts')
+          fetchHandler = createFetchHandler(routerDef, contextFactory, hooks, options)
+        }
+        return fetchHandler(request)
+      }
+    },
 
-    serve: (routerDef, options) => createServeHandler(routerDef, contextFactory, hooks, options),
+    serve: async (routerDef, options) => {
+      const { createServeHandler } = await import('./core/serve.ts')
+      return createServeHandler(routerDef, contextFactory, hooks, options)
+    },
   }
 
   return instance
 }
-
-// ── Re-exports ──────────────────────────────────────
-
-export { SilgiError, toSilgiError, isErrorStatus } from './core/error.ts'
-export { type, validateSchema, ValidationError } from './core/schema.ts'
-export { useStorage, initStorage, resetStorage } from './core/storage.ts'
-export type { StorageConfig, Storage, StorageValue, Driver } from './core/storage.ts'

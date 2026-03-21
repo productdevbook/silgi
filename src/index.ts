@@ -89,12 +89,13 @@ export { mapInput } from './map-input.ts'
 export { compileProcedure, compileRouter, ContextPool } from './compile.ts'
 export { AsyncIteratorClass, mapAsyncIterator } from './core/iterator.ts'
 
-// ── Client (re-export for convenience) ──────────────
-export { createClient, safe } from './client/client.ts'
-
 // ── Lazy Loading ────────────────────────────────────
 export { lazy, isLazy, resolveLazy } from './lazy.ts'
 export type { LazyRouter } from './lazy.ts'
+
+// ── Storage ────────────────────────────────────────
+export { useStorage, initStorage, resetStorage } from './core/storage.ts'
+export type { StorageConfig, Storage, StorageValue, Driver } from './core/storage.ts'
 
 // ── OpenAPI / Scalar ────────────────────────────────
 export { generateOpenAPI, scalarHTML } from './scalar.ts'
