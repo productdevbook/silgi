@@ -3,11 +3,11 @@
  * Run: bun bench/elysia-profile.ts
  */
 
+import { Elysia } from 'elysia'
 import { z } from 'zod'
 
 import { silgiBun } from '../src/adapters/bun.ts'
 import { compileRouter } from '../src/compile.ts'
-import { Elysia } from 'elysia'
 import { silgi } from '../src/silgi.ts'
 
 const NameInput = z.object({ name: z.string() })
@@ -16,7 +16,10 @@ const NameInput = z.object({ name: z.string() })
 const k = silgi({ context: () => ({}) })
 const auth = k.guard(() => ({ userId: 1 }))
 const router = k.router({
-  greet: k.$use(auth).$input(NameInput).$resolve(({ input, ctx }) => ({ hello: input.name, by: ctx.userId })),
+  greet: k
+    .$use(auth)
+    .$input(NameInput)
+    .$resolve(({ input, ctx }) => ({ hello: input.name, by: ctx.userId })),
 })
 const bunConfig = silgiBun(router, { context: () => ({ db: 'postgres' }), port: 4400 })
 

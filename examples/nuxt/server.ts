@@ -4,6 +4,8 @@ import { appRouter } from './server/rpc/router'
 export default {
   fetch: s.handler(appRouter, {
     scalar: true,
-    analytics: true,
+    analytics: {
+      auth: 'test',
+    },
   }),
 }
