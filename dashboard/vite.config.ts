@@ -14,8 +14,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/analytics/api': 'http://localhost:3000',
-      '/analytics/errors': 'http://localhost:3000',
+      '/analytics/_api': 'http://localhost:3000',
     },
   },
 })

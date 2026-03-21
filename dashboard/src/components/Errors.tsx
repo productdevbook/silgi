@@ -1,294 +1,138 @@
-import { useMemo, useState, useCallback } from 'react'
-import { Copy, Check, Maximize2 } from 'lucide-react'
+import { useCallback, useMemo, useState } from 'react'
+import { HugeiconsIcon } from '@hugeicons/react'
+import { Search01Icon } from '@hugeicons/core-free-icons'
 
-import { DataTableInfinite } from '@/components/data-table/data-table-infinite'
-import type { DataTableFilterField } from '@/components/data-table/types'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
+import { Card } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { fmtMs, fmtTime } from '@/lib/format'
 
-import { errorToMarkdown, fmtMs, fmtTime, useCopy } from '../hooks'
+import type { ErrorEntry } from '@/lib/types'
 
-import type { ErrorEntry } from '../hooks'
-import type { ColumnDef } from '@tanstack/react-table'
+type SortKey = 'time' | 'procedure' | 'code' | 'status' | 'duration'
 
-// ── Column definitions ──────────────────────────────
+const COLUMNS: readonly { key: SortKey; label: string; align: 'left' | 'right' }[] = [
+  { key: 'time', label: 'Time', align: 'left' },
+  { key: 'procedure', label: 'Procedure', align: 'left' },
+  { key: 'code', label: 'Code', align: 'left' },
+  { key: 'status', label: 'Status', align: 'right' },
+  { key: 'duration', label: 'Duration', align: 'right' },
+] as const
 
-const columns: ColumnDef<ErrorEntry>[] = [
-  {
-    accessorKey: 'code',
-    header: 'Code',
-    cell: ({ row }) => (
-      <Badge variant='destructive' className='text-[10px]'>
-        {row.original.code}
-      </Badge>
-    ),
-    filterFn: 'arrSome',
-    size: 120,
-  },
-  {
-    accessorKey: 'procedure',
-    header: 'Procedure',
-    cell: ({ row }) => (
-      <span className='font-medium text-primary'>{row.original.procedure}</span>
-    ),
-    size: 200,
-  },
-  {
-    accessorKey: 'error',
-    header: 'Message',
-    cell: ({ row }) => (
-      <span className='max-w-[300px] truncate block text-muted-foreground text-xs'>
-        {row.original.error}
-      </span>
-    ),
-    size: 300,
-  },
-  {
-    accessorKey: 'status',
-    header: 'Status',
-    cell: ({ row }) => <span className='tabular-nums'>{row.original.status}</span>,
-    size: 80,
-  },
-  {
-    accessorKey: 'durationMs',
-    header: 'Duration',
-    cell: ({ row }) => (
-      <span className='tabular-nums text-xs'>{fmtMs(row.original.durationMs)}</span>
-    ),
-    size: 100,
-  },
-  {
-    accessorKey: 'timestamp',
-    header: 'Time',
-    cell: ({ row }) => (
-      <span className='text-muted-foreground text-xs'>{fmtTime(row.original.timestamp)}</span>
-    ),
-    size: 140,
-  },
-  {
-    accessorKey: 'spans',
-    header: 'Spans',
-    cell: ({ row }) => {
-      const count = row.original.spans.length
-      if (!count) return <span className='text-muted-foreground'>-</span>
-      const hasError = row.original.spans.some((s) => s.error)
-      return (
-        <Badge variant={hasError ? 'destructive' : 'secondary'} className='text-[10px]'>
-          {count} span{count > 1 ? 's' : ''}
-        </Badge>
-      )
-    },
-    size: 100,
-    enableSorting: false,
-    enableColumnFilter: false,
-  },
-]
-
-// ── Filter fields ───────────────────────────────────
-
-function getFilterFields(errors: ErrorEntry[]): DataTableFilterField<ErrorEntry>[] {
-  const codes = [...new Set(errors.map((e) => e.code))]
-  const procedures = [...new Set(errors.map((e) => e.procedure))]
-
-  return [
-    {
-      type: 'checkbox',
-      label: 'Error Code',
-      value: 'code' as keyof ErrorEntry,
-      options: codes.map((c) => ({ label: c, value: c })),
-    },
-    {
-      type: 'checkbox',
-      label: 'Procedure',
-      value: 'procedure' as keyof ErrorEntry,
-      options: procedures.map((p) => ({ label: p, value: p })),
-    },
-  ]
+function getSortValue(entry: ErrorEntry, key: SortKey): string | number {
+  switch (key) {
+    case 'time': return entry.timestamp
+    case 'procedure': return entry.procedure
+    case 'code': return entry.code
+    case 'status': return entry.status
+    case 'duration': return entry.durationMs
+  }
 }
 
-// ── Main component ──────────────────────────────────
+interface ErrorsProps {
+  errors: ErrorEntry[]
+  navigate: (page: string, id?: string) => void
+}
 
-export default function Errors({ errors }: { errors: ErrorEntry[] }) {
-  const [dialogError, setDialogError] = useState<ErrorEntry | null>(null)
-  const { copiedId, copy } = useCopy()
+export function Errors({ errors, navigate }: ErrorsProps) {
+  const [filter, setFilter] = useState('')
+  const [sortKey, setSortKey] = useState<SortKey>('time')
+  const [sortAsc, setSortAsc] = useState(false)
 
-  const reversed = useMemo(() => [...errors].reverse(), [errors])
-  const filterFields = useMemo(() => getFilterFields(errors), [errors])
+  const handleSort = useCallback((key: SortKey) => {
+    setSortKey((prev) => {
+      if (prev === key) setSortAsc((a) => !a)
+      else setSortAsc(key === 'procedure' || key === 'code')
+      return key
+    })
+  }, [])
 
-  const noop = useCallback(async () => {}, [])
-  const noopRefetch = useCallback(() => {}, [])
+  const filtered = useMemo(() => {
+    let result = [...errors].reverse()
+    if (filter) {
+      const q = filter.toLowerCase()
+      result = result.filter(
+        (e) =>
+          e.procedure.toLowerCase().includes(q) ||
+          e.code.toLowerCase().includes(q) ||
+          e.error.toLowerCase().includes(q),
+      )
+    }
+    const dir = sortAsc ? 1 : -1
+    result.sort((a, b) => {
+      const va = getSortValue(a, sortKey)
+      const vb = getSortValue(b, sortKey)
+      if (typeof va === 'number' && typeof vb === 'number') return dir * (va - vb)
+      return dir * String(va).localeCompare(String(vb))
+    })
+    return result
+  }, [errors, filter, sortKey, sortAsc])
 
-  if (!errors.length) {
-    return <div className='flex h-[60vh] items-center justify-center text-sm text-muted-foreground'>No errors yet</div>
+  if (errors.length === 0) {
+    return <Empty>No errors recorded</Empty>
   }
 
   return (
-    <div className='p-4'>
-      <DataTableInfinite
-        columns={columns}
-        data={reversed}
-        filterFields={filterFields}
-        totalRows={errors.length}
-        filterRows={reversed.length}
-        totalRowsFetched={reversed.length}
-        fetchNextPage={noop}
-        refetch={noopRefetch}
-        hasNextPage={false}
-        isFetching={false}
-        isLoading={false}
-        getRowId={(row) => String(row.id)}
-        getRowClassName={(row) => {
-          return 'cursor-pointer'
-        }}
-        tableId='analytics-errors'
-        toolbarActions={
-          <span className='text-xs text-muted-foreground'>{errors.length} error{errors.length !== 1 ? 's' : ''}</span>
-        }
-      />
+    <div className="space-y-4 p-6">
+      <FilterInput value={filter} onChange={setFilter} placeholder="Filter errors..." />
 
-      {/* Error detail dialog */}
-      <Dialog open={!!dialogError} onOpenChange={(open) => !open && setDialogError(null)}>
-        <DialogContent showCloseButton className='max-w-3xl max-h-[90vh] overflow-hidden'>
-          {dialogError && (
-            <>
-              <DialogHeader>
-                <div className='flex items-center gap-2'>
-                  <Badge variant='destructive'>{dialogError.code}</Badge>
-                  <DialogTitle className='text-primary'>{dialogError.procedure}</DialogTitle>
-                </div>
-                <DialogDescription>
-                  {new Date(dialogError.timestamp).toISOString()} · {fmtMs(dialogError.durationMs)}
-                </DialogDescription>
-              </DialogHeader>
-              <div className='flex gap-2 mt-2'>
-                <CopyBtn id={`dlg-md-${dialogError.id}`} copiedId={copiedId} onClick={() => copy(`dlg-md-${dialogError.id}`, errorToMarkdown(dialogError))}>
-                  Copy for AI
-                </CopyBtn>
-                <CopyBtn
-                  id={`dlg-json-${dialogError.id}`}
-                  copiedId={copiedId}
-                  onClick={() => {
-                    const clean = { ...dialogError, headers: { ...dialogError.headers } }
-                    if (clean.headers.authorization) clean.headers.authorization = '[REDACTED]'
-                    copy(`dlg-json-${dialogError.id}`, JSON.stringify(clean, null, 2))
-                  }}
-                >
-                  Copy JSON
-                </CopyBtn>
-              </div>
-              <Separator />
-              <ScrollArea className='max-h-[60vh]'>
-                <ErrorDetailContent entry={dialogError} />
-                <ScrollBar orientation='vertical' />
-              </ScrollArea>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
-  )
-}
-
-// ── Error detail content ────────────────────────────
-
-function ErrorDetailContent({ entry: e }: { entry: ErrorEntry }) {
-  return (
-    <div className='space-y-4 text-sm'>
-      <Section title='Details'>
-        <dl className='grid grid-cols-[100px_1fr] gap-x-3 gap-y-1 text-xs'>
-          <dt className='text-muted-foreground'>Status</dt><dd>{e.status}</dd>
-          <dt className='text-muted-foreground'>Duration</dt><dd>{fmtMs(e.durationMs)}</dd>
-          <dt className='text-muted-foreground'>Time</dt><dd>{new Date(e.timestamp).toISOString()}</dd>
-        </dl>
-      </Section>
-
-      {e.input !== undefined && e.input !== null && (
-        <Section title='Input'>
-          <pre className='overflow-x-auto rounded-md border bg-muted/50 p-3 text-xs'>{JSON.stringify(e.input, null, 2)}</pre>
-        </Section>
-      )}
-
-      {e.spans.length > 0 && (
-        <Section title='Traced Operations'>
+      {filtered.length === 0 ? (
+        <Empty>No errors match &ldquo;{filter}&rdquo;</Empty>
+      ) : (
+        <Card>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead className='text-right'>Duration</TableHead>
-                <TableHead>Status</TableHead>
+                {COLUMNS.map((col) => (
+                  <SortHead key={col.key} col={col} sortKey={sortKey} sortAsc={sortAsc} onSort={handleSort} />
+                ))}
+                <TableHead className="text-xs">Message</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {e.spans.map((s, i) => (
-                <TableRow key={i}>
-                  <TableCell className='text-xs font-mono'>{s.name}</TableCell>
-                  <TableCell className='text-right text-xs tabular-nums'>{fmtMs(s.durationMs)}</TableCell>
-                  <TableCell>
-                    {s.error ? (
-                      <Badge variant='destructive' className='text-[10px]'>Error: {s.error}</Badge>
-                    ) : (
-                      <span className='text-xs text-muted-foreground'>OK</span>
-                    )}
-                  </TableCell>
+              {filtered.map((entry) => (
+                <TableRow key={entry.id} onClick={() => navigate('errors', String(entry.id))} className="cursor-pointer">
+                  <TableCell className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">{fmtTime(entry.timestamp)}</TableCell>
+                  <TableCell className="text-xs font-medium">{entry.procedure}</TableCell>
+                  <TableCell><Badge variant="destructive" className="text-[10px]">{entry.code}</Badge></TableCell>
+                  <TableCell className="text-right text-xs tabular-nums text-muted-foreground">{entry.status}</TableCell>
+                  <TableCell className="text-right text-xs tabular-nums text-muted-foreground">{fmtMs(entry.durationMs)}</TableCell>
+                  <TableCell className="max-w-[280px] truncate text-xs text-muted-foreground">{entry.error}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        </Section>
+        </Card>
       )}
-
-      {Object.keys(e.headers || {}).length > 0 && (
-        <Section title='Headers'>
-          <dl className='grid grid-cols-[140px_1fr] gap-x-3 gap-y-1 text-xs font-mono'>
-            {Object.entries(e.headers).map(([k, v]) => (
-              <span key={k} className='contents'>
-                <dt className='text-muted-foreground'>{k}</dt>
-                <dd className='break-all'>{k === 'authorization' ? '[REDACTED]' : v}</dd>
-              </span>
-            ))}
-          </dl>
-        </Section>
-      )}
-
-      {e.stack && (
-        <Section title='Stack Trace'>
-          <pre className='overflow-x-auto rounded-md border bg-muted/50 p-3 text-xs leading-relaxed'>{e.stack}</pre>
-        </Section>
-      )}
-
-      <Section title='Error Message'>
-        <pre className='overflow-x-auto rounded-md border bg-muted/50 p-3 text-xs'>{e.error}</pre>
-      </Section>
     </div>
   )
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function FilterInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
   return (
-    <div>
-      <h3 className='mb-1.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase'>{title}</h3>
-      {children}
+    <div className="relative">
+      <HugeiconsIcon icon={Search01Icon} size={14} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground" />
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="h-8 w-full rounded-md border bg-transparent pl-8 pr-3 text-xs outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring"
+      />
     </div>
   )
 }
 
-function CopyBtn({ id, copiedId, onClick, children }: { id: string; copiedId: string | null; onClick: () => void; children: React.ReactNode }) {
-  const isCopied = copiedId === id
+function SortHead({ col, sortKey, sortAsc, onSort }: { col: { key: SortKey; label: string; align: string }; sortKey: string; sortAsc: boolean; onSort: (k: SortKey) => void }) {
   return (
-    <Button variant={isCopied ? 'default' : 'outline'} size='xs' onClick={onClick}>
-      {isCopied ? <Check className='size-3' /> : <Copy className='size-3' />}
-      {isCopied ? 'Copied!' : children}
-    </Button>
+    <TableHead
+      onClick={() => onSort(col.key)}
+      className={`cursor-pointer select-none text-xs ${col.align === 'right' ? 'text-right' : ''} ${sortKey === col.key ? 'text-primary' : ''}`}
+    >
+      {col.label}{sortKey === col.key && (sortAsc ? ' ↑' : ' ↓')}
+    </TableHead>
   )
+}
+
+function Empty({ children }: { children: React.ReactNode }) {
+  return <div className="flex h-[60vh] items-center justify-center text-xs text-muted-foreground">{children}</div>
 }

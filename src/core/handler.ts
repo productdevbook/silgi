@@ -140,26 +140,26 @@ export function createFetchHandler(
       }
     }
 
-    // Analytics: /analytics and /analytics/api
-    if (analyticsEnabled && collector) {
-      if (pathname === 'analytics') {
-        return new Response(analyticsDashboardHtml, { headers: { 'content-type': 'text/html' } })
-      }
-      if (pathname === 'analytics/api') {
+    // Analytics: /analytics/* — dashboard SPA + JSON API
+    if (analyticsEnabled && collector && pathname.startsWith('analytics')) {
+      // JSON API endpoints under /_api/ to avoid collision with SPA routes
+      if (pathname === 'analytics/_api/stats') {
         return new Response(JSON.stringify(collector.toJSON()), {
           headers: { 'content-type': 'application/json', 'cache-control': 'no-cache' },
         })
       }
-      if (pathname === 'analytics/errors') {
+      if (pathname === 'analytics/_api/errors') {
         return new Response(JSON.stringify(collector.getErrors()), {
           headers: { 'content-type': 'application/json', 'cache-control': 'no-cache' },
         })
       }
-      if (pathname === 'analytics/requests') {
+      if (pathname === 'analytics/_api/requests') {
         return new Response(JSON.stringify(collector.getRequests()), {
           headers: { 'content-type': 'application/json', 'cache-control': 'no-cache' },
         })
       }
+      // SPA fallback — serve dashboard HTML for all other /analytics/* routes
+      return new Response(analyticsDashboardHtml, { headers: { 'content-type': 'text/html' } })
     }
 
     // Compiled radix router lookup — fullPath already has leading '/'
@@ -176,6 +176,7 @@ export function createFetchHandler(
       // Ultra-fast: skip pool when context is empty, no params, no analytics
       const usePool = !ctxFactoryIsEmpty || match.params || collector
       const ctx = usePool ? ctxPool.borrow() : (emptyCtx as Record<string, unknown>)
+      let t0 = 0
       try {
         // Skip context factory + keys iteration when factory returns empty object
         if (!ctxFactoryIsEmpty) {
@@ -208,7 +209,7 @@ export function createFetchHandler(
 
         if (hasHooks) hooks!.callHook('request', { path: pathname, input: rawInput })
 
-        const t0 = collector ? performance.now() : 0
+        t0 = collector ? performance.now() : 0
         const pipelineResult = route.handler(ctx, rawInput, request.signal)
 
         // Sync pipeline result — fully synchronous response
@@ -287,11 +288,11 @@ export function createFetchHandler(
               headers: cacheHeaders ? { ...jsonHeaders, ...cacheHeaders } : jsonHeaders,
             })
           })
-          .catch((error) => handleError(error, pathname, request, rawInput, reqTrace))
+          .catch((error) => handleError(error, pathname, request, rawInput, reqTrace, t0))
           .finally(() => { if (usePool) ctxPool.release(ctx) })
       } catch (error) {
         if (usePool) ctxPool.release(ctx)
-        return handleError(error, pathname, request, undefined, undefined)
+        return handleError(error, pathname, request, undefined, undefined, t0)
       }
     }
 
@@ -406,7 +407,7 @@ export function createFetchHandler(
         headers: cacheHeaders ? { ...jsonHeaders, ...cacheHeaders } : jsonHeaders,
       })
     } catch (error) {
-      return handleError(error, pathname, request, rawInput, reqTrace) as Response
+      return handleError(error, pathname, request, rawInput, reqTrace, t0) as Response
     } finally {
       ctxPool.release(ctx)
     }
@@ -418,10 +419,12 @@ export function createFetchHandler(
     request: Request,
     rawInput: unknown,
     reqTrace: RequestTrace | undefined,
+    t0: number,
   ): Response | Promise<Response> {
     if (hasHooks) hooks!.callHook('error', { path: pathname, error })
     if (collector) {
-      collector.recordError(pathname, 0, error instanceof Error ? error.message : String(error))
+      const durationMs = t0 ? round(performance.now() - t0) : 0
+      collector.recordError(pathname, durationMs, error instanceof Error ? error.message : String(error))
       const isValidation = error instanceof ValidationError
       const silgiErr = isValidation ? null : error instanceof SilgiError ? error : toSilgiError(error)
       collector.recordDetailedError({
@@ -433,7 +436,7 @@ export function createFetchHandler(
         stack: error instanceof Error ? (error.stack ?? '') : '',
         input: rawInput,
         headers: Object.fromEntries(request.headers),
-        durationMs: 0,
+        durationMs,
         spans: reqTrace?.spans ?? [],
       })
     }

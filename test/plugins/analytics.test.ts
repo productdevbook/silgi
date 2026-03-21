@@ -153,6 +153,99 @@ describe('AnalyticsCollector', () => {
     expect(errors[0]!.procedure).toBe('proc2') // first 2 evicted
     expect(errors[2]!.procedure).toBe('proc4')
   })
+
+  it('stores detailed requests via recordDetailedRequest', () => {
+    const collector = new AnalyticsCollector()
+
+    collector.recordDetailedRequest({
+      timestamp: 1711018800000,
+      procedure: 'users/list',
+      durationMs: 4.56,
+      status: 200,
+      input: { page: 1 },
+      spans: [
+        { name: 'db.users.findMany', durationMs: 3.2 },
+        { name: 'cache.set', durationMs: 0.8 },
+      ],
+    })
+
+    const requests = collector.getRequests()
+    expect(requests).toHaveLength(1)
+    expect(requests[0]!.id).toBe(1)
+    expect(requests[0]!.procedure).toBe('users/list')
+    expect(requests[0]!.durationMs).toBe(4.56)
+    expect(requests[0]!.status).toBe(200)
+    expect(requests[0]!.input).toEqual({ page: 1 })
+    expect(requests[0]!.spans).toHaveLength(2)
+    expect(requests[0]!.spans[0]!.name).toBe('db.users.findMany')
+    expect(requests[0]!.spans[1]!.name).toBe('cache.set')
+  })
+
+  it('getRequests returns all stored entries', () => {
+    const collector = new AnalyticsCollector()
+
+    for (let i = 0; i < 3; i++) {
+      collector.recordDetailedRequest({
+        timestamp: Date.now(),
+        procedure: `proc${i}`,
+        durationMs: i + 1,
+        status: 200,
+        input: null,
+        spans: [],
+      })
+    }
+
+    const requests = collector.getRequests()
+    expect(requests).toHaveLength(3)
+    expect(requests.map((r) => r.procedure)).toEqual(['proc0', 'proc1', 'proc2'])
+    // IDs are auto-incrementing
+    expect(requests.map((r) => r.id)).toEqual([1, 2, 3])
+  })
+
+  it('limits request log to maxRequests (oldest dropped)', () => {
+    const collector = new AnalyticsCollector({ maxRequests: 3 })
+
+    for (let i = 0; i < 5; i++) {
+      collector.recordDetailedRequest({
+        timestamp: Date.now(),
+        procedure: `req${i}`,
+        durationMs: 1,
+        status: 200,
+        input: null,
+        spans: [],
+      })
+    }
+
+    const requests = collector.getRequests()
+    expect(requests).toHaveLength(3)
+    expect(requests[0]!.procedure).toBe('req2') // first 2 evicted
+    expect(requests[1]!.procedure).toBe('req3')
+    expect(requests[2]!.procedure).toBe('req4')
+  })
+
+  it('RequestEntry has correct shape with all fields', () => {
+    const collector = new AnalyticsCollector()
+
+    collector.recordDetailedRequest({
+      timestamp: 1711018800000,
+      procedure: 'echo',
+      durationMs: 2.5,
+      status: 200,
+      input: { msg: 'hello' },
+      spans: [{ name: 'db.query', durationMs: 1.0, error: 'timeout' }],
+    })
+
+    const entry = collector.getRequests()[0]!
+    expect(entry).toEqual({
+      id: 1,
+      timestamp: 1711018800000,
+      procedure: 'echo',
+      durationMs: 2.5,
+      status: 200,
+      input: { msg: 'hello' },
+      spans: [{ name: 'db.query', durationMs: 1.0, error: 'timeout' }],
+    })
+  })
 })
 
 describe('RequestTrace', () => {

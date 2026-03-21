@@ -9,6 +9,8 @@ Built-in analytics for Silgi. No Prometheus, no Grafana, no external infrastruct
 
 ## Quick start
 
+Pass `analytics: true` to `serve()` or `handler()`:
+
 ```ts twoslash
 // @noErrors
 s.serve(appRouter, {
@@ -32,27 +34,58 @@ Open `http://localhost:3000/analytics` in your browser.
 
 All data lives in memory. No disk I/O, no network calls, no serialization until the dashboard is opened.
 
+## Dashboard
+
+The dashboard is a self-contained HTML page with vanilla JS — no external dependencies. It auto-refreshes every 2 seconds and is served at `/analytics`.
+
+**Overview tab:**
+
+- Total requests, req/s, error rate, and average latency stat cards
+- Request rate sparkline chart with error markers
+- Per-procedure table with sortable columns (count, errors, error rate, latency percentiles)
+
+**Errors tab:**
+
+- Chronological error log with expandable details
+- Full input, headers, stack trace, and traced spans for each error
+- **Copy for AI (Markdown)** — one click to copy a structured markdown document, paste into any AI assistant
+- **Copy JSON** — raw error data for programmatic use
+
 ## Tracing DB queries and API calls
 
-Use the `trace()` helper to measure any async operation inside your procedures:
+When analytics is enabled, every request context gets a `trace()` method. Use it to measure any async operation inside your procedures:
+
+```ts twoslash
+// @noErrors
+const listUsers = s
+  .query()
+  .$resolve(async ({ ctx }) => {
+    const users = await ctx.trace('db.users.findMany', () => db.users.findMany())
+    const count = await ctx.trace('db.users.count', () => db.users.count())
+    return { users, count }
+  })
+```
+
+Each traced operation records its name, duration, and error status. Spans appear in the error detail panel when a request fails, and in the JSON API responses.
+
+### Standalone `trace()` helper
+
+If you prefer an explicit import over the context method, use the standalone `trace()` function. It works whether analytics is enabled or not — when disabled, it calls the function directly with zero overhead:
 
 ```ts twoslash
 // @noErrors
 import { trace } from 'silgi/analytics'
 
-const listUsers = s.$resolve(async ({ ctx }) => {
-  const users = await trace(ctx, 'db.users.findMany', () => db.users.findMany())
-  const count = await trace(ctx, 'db.users.count', () => db.users.count())
-  return { users, count }
-})
+const listUsers = s
+  .query()
+  .$resolve(async ({ ctx }) => {
+    const users = await trace(ctx, 'db.users.findMany', () => db.users.findMany())
+    const weather = await trace(ctx, 'api.weather', () => fetch(weatherUrl))
+    return { users, weather }
+  })
 ```
 
-When analytics is disabled, `trace()` calls the function directly with zero overhead. When enabled, each span is recorded with its name, duration, and error status.
-
-Spans appear in:
-
-- The error detail panel (when a request fails)
-- The `/analytics/errors` JSON API
+This is useful when you want tracing code that compiles cleanly regardless of whether the handler has analytics turned on.
 
 ## Error log — Copy for AI
 
@@ -69,16 +102,28 @@ The dashboard has a **"Copy for AI"** button that generates a structured markdow
 
 ## Configuration
 
+Pass an options object instead of `true` to customize buffer sizes and history:
+
 ```ts twoslash
 // @noErrors
 s.serve(appRouter, {
   analytics: {
-    bufferSize: 2048, // latency samples per procedure (default: 1024)
-    historySeconds: 300, // sparkline history in seconds (default: 120)
-    maxErrors: 200, // error log entries to keep (default: 100)
+    bufferSize: 2048,
+    historySeconds: 300,
+    maxErrors: 200,
+    maxRequests: 500,
   },
 })
 ```
+
+| Option           | Type     | Default | Description                                      |
+| ---------------- | -------- | ------- | ------------------------------------------------ |
+| `bufferSize`     | `number` | `1024`  | Latency samples to keep per procedure (ring buffer) |
+| `historySeconds` | `number` | `120`   | Time-series sparkline history in seconds          |
+| `maxErrors`      | `number` | `100`   | Maximum error log entries to keep                 |
+| `maxRequests`    | `number` | `200`   | Maximum recent request entries to keep            |
+
+All buffers are fixed-size ring buffers — memory usage stays constant regardless of traffic volume.
 
 ## With `handler()`
 
@@ -92,33 +137,46 @@ Bun.serve({ port: 3000, fetch: handle })
 // Dashboard at /analytics
 ```
 
-## Dashboard
-
-Self-contained HTML page with vanilla JS — no external dependencies. Auto-refreshes every 2 seconds.
-
-**Overview tab:**
-
-- Total requests, req/s, error rate, average latency cards
-- Request rate sparkline with error markers
-- Per-procedure table with sortable columns
-
-**Errors tab:**
-
-- Chronological error log with expandable details
-- Full input, headers, stack trace, traced spans
-- **Copy for AI (Markdown)** — one click, paste into any AI
-- **Copy JSON** — raw error data
-
 ## JSON API
 
-| Endpoint            | Description                                      |
-| ------------------- | ------------------------------------------------ |
-| `/analytics/api`    | Procedure metrics, percentiles, time-series      |
-| `/analytics/errors` | Full error log with input, headers, stack, spans |
+The dashboard reads from three JSON endpoints. You can also query them directly for custom integrations, alerting, or external dashboards:
+
+| Endpoint                   | Description                                             |
+| -------------------------- | ------------------------------------------------------- |
+| `/analytics/_api/stats`    | Procedure metrics, latency percentiles, time-series     |
+| `/analytics/_api/errors`   | Full error log with input, headers, stack trace, spans  |
+| `/analytics/_api/requests` | Recent requests with trace spans                        |
+
+All endpoints return JSON with `cache-control: no-cache`.
+
+### Stats response shape
+
+The `/analytics/_api/stats` endpoint returns:
+
+```ts twoslash
+// @noErrors
+interface AnalyticsSnapshot {
+  uptime: number             // seconds since start
+  totalRequests: number
+  totalErrors: number
+  errorRate: number          // percentage (0-100)
+  requestsPerSecond: number
+  avgLatency: number         // milliseconds
+  procedures: Record<string, {
+    count: number
+    errors: number
+    errorRate: number
+    latency: { avg: number; p50: number; p95: number; p99: number }
+    lastError: string | null
+    lastErrorTime: number | null
+  }>
+  timeSeries: Array<{ time: number; count: number; errors: number }>
+}
+```
 
 ## Server-side markdown export
 
-You can also generate the markdown programmatically:
+You can also generate the markdown programmatically for Slack notifications, log files, or custom alerting:
 
 ```ts twoslash
 // @noErrors

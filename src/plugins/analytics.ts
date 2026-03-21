@@ -94,6 +94,16 @@ export interface ErrorEntry {
   spans: TraceSpan[]
 }
 
+export interface RequestEntry {
+  id: number
+  timestamp: number
+  procedure: string
+  durationMs: number
+  status: number
+  input: unknown
+  spans: TraceSpan[]
+}
+
 export interface AnalyticsOptions {
   /** Latency samples to keep per procedure (default: 1024) */
   bufferSize?: number
@@ -101,6 +111,8 @@ export interface AnalyticsOptions {
   historySeconds?: number
   /** Max error entries to keep (default: 100) */
   maxErrors?: number
+  /** Max recent request entries to keep (default: 200) */
+  maxRequests?: number
 }
 
 export interface ProcedureSnapshot {
@@ -184,6 +196,7 @@ export class AnalyticsCollector {
   #bufferSize: number
   #historySeconds: number
   #maxErrors: number
+  #maxRequests: number
 
   // 1-second time windows for sparklines
   #timeSeries: TimeWindow[] = []
@@ -193,10 +206,15 @@ export class AnalyticsCollector {
   #errors: ErrorEntry[] = []
   #nextErrorId = 1
 
+  // Recent requests log (all requests with spans)
+  #requests: RequestEntry[] = []
+  #nextRequestId = 1
+
   constructor(options: AnalyticsOptions = {}) {
     this.#bufferSize = options.bufferSize ?? 1024
     this.#historySeconds = options.historySeconds ?? 120
     this.#maxErrors = options.maxErrors ?? 100
+    this.#maxRequests = options.maxRequests ?? 200
     this.#currentWindow = { time: Math.floor(Date.now() / 1000), count: 0, errors: 0 }
   }
 
@@ -225,6 +243,14 @@ export class AnalyticsCollector {
     this.#errors.push({ ...entry, id: this.#nextErrorId++ })
     if (this.#errors.length > this.#maxErrors) {
       this.#errors.shift()
+    }
+  }
+
+  /** Record a detailed request (successful or not) with trace spans. */
+  recordDetailedRequest(entry: Omit<RequestEntry, 'id'>): void {
+    this.#requests.push({ ...entry, id: this.#nextRequestId++ })
+    if (this.#requests.length > this.#maxRequests) {
+      this.#requests.shift()
     }
   }
 
@@ -260,6 +286,10 @@ export class AnalyticsCollector {
 
   getErrors(): ErrorEntry[] {
     return this.#errors
+  }
+
+  getRequests(): RequestEntry[] {
+    return this.#requests
   }
 
   toJSON(): AnalyticsSnapshot {
