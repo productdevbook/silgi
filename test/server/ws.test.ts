@@ -22,8 +22,11 @@ import type { Server } from 'node:http'
 const k = silgi({ context: () => ({}) })
 
 const appRouter = k.router({
-  health: k.$resolve(() => ({ status: 'ok' })),
-  echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
+  health: k.$route({ ws: true }).$resolve(() => ({ status: 'ok' })),
+  echo: k
+    .$route({ ws: true })
+    .$input(z.object({ msg: z.string() }))
+    .$resolve(({ input }) => ({ echo: input.msg })),
 })
 
 const handle = k.handler(appRouter)
@@ -57,8 +60,8 @@ beforeAll(async () => {
     res.end(await fetchRes.text())
   })
 
-  // Attach WebSocket (same as serve() does with ws: true)
-  attachWebSocket(server, appRouter)
+  // Attach WebSocket
+  await attachWebSocket(server, appRouter)
 
   await new Promise<void>((resolve) => {
     server.listen(0, '127.0.0.1', () => {

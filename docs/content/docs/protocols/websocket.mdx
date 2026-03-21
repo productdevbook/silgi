@@ -19,50 +19,121 @@ Silgi's default transport is HTTP — every procedure call is a separate request
 
 For most APIs, HTTP is the right choice. WebSocket adds value when you need persistent connections or when you're making many calls per second and want to skip the per-request overhead.
 
-## Enable with serve()
+## Enabling WebSocket on procedures
 
-If you're using `serve()`, add `ws: true`:
+Mark individual procedures with `$route({ ws: true })` to make them accessible over WebSocket. Procedures without this flag are HTTP-only.
 
 ```ts twoslash
 // @noErrors
 import { silgi } from 'silgi'
 
-const s = silgi({ context: (req) => ({}) })
-const { subscription, router } = s
+const s = silgi({ context: () => ({}) })
 
-const appRouter = router({
-  health: s.$resolve(() => ({ status: 'ok' })),
-  countdown: subscription(async function* () {
+// HTTP-only — not accessible over WebSocket
+const listUsers = s.$resolve(({ ctx }) => ctx.db.users.findMany())
+
+// WebSocket-enabled — accessible over both HTTP and WebSocket
+const clock = s
+  .subscription()
+  .$route({ ws: true })
+  .$resolve(async function* () {
     for (let i = 5; i > 0; i--) {
       yield { count: i }
       await new Promise((r) => setTimeout(r, 1000))
     }
-  }),
-})
+  })
 
+// Any procedure type can be WebSocket-enabled
+const echo = s
+  .$route({ ws: true })
+  .$input(z.object({ msg: z.string() }))
+  .$resolve(({ input }) => ({ echo: input.msg }))
+```
+
+<Callout type='info'>
+  WebSocket-enabled procedures also work over HTTP. The `ws: true` flag adds WebSocket access, it doesn't remove HTTP access.
+</Callout>
+
+## Server setup
+
+### With serve()
+
+If you're using `serve()`, add `ws: true`:
+
+```ts twoslash
+// @noErrors
 s.serve(appRouter, {
   port: 3000,
   ws: true,
 })
 ```
 
-HTTP and WebSocket share the same port. The server detects WebSocket upgrade requests and routes them to the WebSocket handler. Powered by [crossws](https://github.com/unjs/crossws).
+HTTP and WebSocket share the same port. Powered by [crossws](https://github.com/unjs/crossws).
 
-## Standalone setup
+### With attachWebSocket (Express, Node HTTP)
 
-If you have your own HTTP server (or an existing Fastify/Express app), attach WebSocket separately:
+If you have your own HTTP server, attach WebSocket separately:
 
 ```ts twoslash
 // @noErrors
-import { createServer } from 'node:http'
 import { attachWebSocket } from 'silgi/ws'
 
-const server = createServer(yourHttpHandler)
-attachWebSocket(server, appRouter)
+// Express
+const server = app.listen(3000)
+await attachWebSocket(server, appRouter)
+
+// Raw Node HTTP
+import { createServer } from 'node:http'
+const server = createServer(httpHandler)
+await attachWebSocket(server, appRouter)
 server.listen(3000)
 ```
 
-`attachWebSocket` listens for the `upgrade` event on the HTTP server and handles WebSocket connections.
+### With createWSHooks (Nitro, Nuxt, Deno, Bun)
+
+For frameworks that use crossws natively, use `createWSHooks` to get crossws-compatible hooks:
+
+```ts twoslash
+// @noErrors
+import { createWSHooks } from 'silgi/ws'
+
+// Returns crossws hooks — works with any crossws integration
+const hooks = createWSHooks(appRouter)
+```
+
+<Tabs items={['Nuxt / Nitro', 'Deno', 'Bun']}>
+  <Tab value='Nuxt / Nitro'>
+  ```ts title="server/routes/_ws.ts"
+  import { createWSHooks } from 'silgi/ws'
+  import { appRouter } from '../rpc/router'
+
+  // @ts-expect-error — Nitro auto-import
+  export default defineWebSocketHandler(createWSHooks(appRouter))
+  ```
+
+  Enable in `nuxt.config.ts`:
+
+  ```ts
+  export default defineNuxtConfig({
+    nitro: { features: { websocket: true } },
+  })
+  ```
+  </Tab>
+  <Tab value='Deno'>
+  ```ts
+  import { createWSHooks } from 'silgi/ws'
+
+  Deno.serve({ handler: fetchHandler, websocket: createWSHooks(appRouter) })
+  ```
+  </Tab>
+  <Tab value='Bun'>
+  ```ts
+  import { createWSHooks } from 'silgi/ws'
+
+  Bun.serve({ fetch: fetchHandler, websocket: createWSHooks(appRouter) })
+  ```
+  </Tab>
+</Tabs>
 
 ## Message protocol
 
@@ -84,7 +155,7 @@ The server responds with the result:
 
 ### Errors
 
-If the procedure fails, the server sends an error:
+If the procedure fails or is not WebSocket-enabled, the server sends an error:
 
 ```json
 { "id": "2", "error": { "code": "NOT_FOUND", "status": 404, "message": "Procedure not found" } }
@@ -92,7 +163,7 @@ If the procedure fails, the server sends an error:
 
 ### Streaming (subscriptions)
 
-For procedures defined with `s.subscription()`, the server sends multiple `data` messages followed by a `done` signal:
+For subscription procedures, the server sends multiple `data` messages followed by a `done` signal:
 
 ```json
 { "id": "3", "data": { "count": 5 } }
@@ -164,13 +235,13 @@ ws.onmessage = ({ data }) => {
 
 ## Binary WebSocket
 
-Combine WebSocket with [MessagePack](/docs/protocols/msgpack) for smaller messages. Pass `binary: true` when attaching:
+Combine WebSocket with [MessagePack](/docs/protocols/msgpack) for smaller messages. Pass `binary: true` when setting up:
 
 ```ts twoslash
 // @noErrors
 import { attachWebSocket } from 'silgi/ws'
 
-attachWebSocket(server, appRouter, { binary: true })
+await attachWebSocket(server, appRouter, { binary: true })
 ```
 
 With binary mode, messages are sent as MessagePack-encoded binary frames instead of JSON text. On the client side, you'd use `msgpack` to encode/decode instead of `JSON.parse`/`JSON.stringify`.
@@ -178,6 +249,14 @@ With binary mode, messages are sent as MessagePack-encoded binary frames instead
 <Callout type='info'>
   Binary WebSocket is especially useful for high-throughput scenarios where many small messages are sent per second. The
   combination of persistent connection + compact encoding gives you the lowest possible overhead.
+</Callout>
+
+## OpenAPI
+
+WebSocket-enabled procedures are documented in the OpenAPI spec with an automatic note in the description field. Scalar and other OpenAPI viewers will display this alongside the regular HTTP documentation.
+
+<Callout type='warn'>
+  OpenAPI 3.x does not have a native WebSocket specification. When Scalar adds AsyncAPI support, Silgi will generate AsyncAPI specs for WebSocket procedures.
 </Callout>
 
 ## What's next?

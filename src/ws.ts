@@ -10,15 +10,13 @@
  *   Server → Client (stream): { id: string, data: unknown, done?: boolean }
  */
 
-import nodeAdapter from 'crossws/adapters/node'
-
 import { encode as msgpackEncode, decode as msgpackDecode } from './codec/msgpack.ts'
 import { compileRouter } from './compile.ts'
 import { SilgiError, toSilgiError } from './core/error.ts'
 import { stringifyJSON } from './core/utils.ts'
 
 import type { RouterDef } from './types.ts'
-import type { Peer, Message } from 'crossws'
+import type { Peer, Message, Hooks as WSHooks } from 'crossws'
 import type { Server as HttpServer } from 'node:http'
 
 export interface WSAdapterOptions {
@@ -33,20 +31,22 @@ interface RPCRequest {
 }
 
 /**
- * Attach WebSocket RPC handler to an existing Node.js HTTP server.
+ * Create crossws-compatible hooks for Silgi RPC over WebSocket.
+ *
+ * Works with any crossws integration — Nitro, Deno, Bun, Cloudflare, etc.
  *
  * @example
  * ```ts
- * import { createServer } from "node:http";
- * import { attachWebSocket } from "silgi/ws";
+ * // Nitro / Nuxt
+ * import { createWSHooks } from "silgi/ws";
+ * export default defineWebSocketHandler(createWSHooks(appRouter));
  *
- * const server = createServer(httpHandler);
- * attachWebSocket(server, appRouter);
- * server.listen(3000);
+ * // Deno
+ * import { createWSHooks } from "silgi/ws";
+ * Deno.serve({ handler, websocket: createWSHooks(appRouter) });
  * ```
  */
-export function attachWebSocket(server: HttpServer, routerDef: RouterDef, options: WSAdapterOptions = {}): void {
-  // Compile router once
+export function createWSHooks(routerDef: RouterDef, options: WSAdapterOptions = {}): Partial<WSHooks> {
   const flat = compileRouter(routerDef)
   const binary = options.binary ?? false
 
@@ -65,71 +65,86 @@ export function attachWebSocket(server: HttpServer, routerDef: RouterDef, option
     return message.json<RPCRequest>()
   }
 
-  const ws = nodeAdapter({
-    hooks: {
-      open(_peer) {
-        // Connection opened — no action needed
-      },
-
-      async message(peer, message) {
-        let req: RPCRequest
-        try {
-          req = parseMessage(message)
-        } catch {
-          send(peer, { id: '0', error: { code: 'BAD_REQUEST', status: 400, message: 'Invalid message format' } })
-          return
-        }
-
-        const { id, path, input } = req
-
-        // Route lookup
-        const route = flat('POST', '/' + path)?.data
-        if (!route) {
-          send(peer, { id, error: { code: 'NOT_FOUND', status: 404, message: `Procedure "${path}" not found` } })
-          return
-        }
-
-        // Execute pipeline
-        const ctx: Record<string, unknown> = Object.create(null)
-        const ac = new AbortController()
-        try {
-          const result = route.handler(ctx, input ?? {}, ac.signal)
-          const output = result instanceof Promise ? await result : result
-
-          // Streaming (subscription)
-          if (output && typeof output === 'object' && Symbol.asyncIterator in (output as object)) {
-            const iter = output as AsyncIterableIterator<unknown>
-            try {
-              for await (const data of iter) {
-                send(peer, { id, data })
-              }
-              send(peer, { id, data: null, done: true })
-            } catch (err) {
-              const e = err instanceof SilgiError ? err : toSilgiError(err)
-              send(peer, { id, error: e.toJSON() })
-            }
-            return
-          }
-
-          // Single response
-          send(peer, { id, result: output })
-        } catch (err) {
-          const e = err instanceof SilgiError ? err : toSilgiError(err)
-          send(peer, { id, error: e.toJSON() })
-        }
-      },
-
-      close(_peer, _details) {
-        // Connection closed — cleanup if needed
-      },
-
-      error(_peer, error) {
-        console.error('[silgi:ws] error:', error)
-      },
+  return {
+    open(_peer) {
+      // Connection opened — no action needed
     },
-  })
 
-  // Attach to existing HTTP server
+    async message(peer, message) {
+      let req: RPCRequest
+      try {
+        req = parseMessage(message)
+      } catch {
+        send(peer, { id: '0', error: { code: 'BAD_REQUEST', status: 400, message: 'Invalid message format' } })
+        return
+      }
+
+      const { id, path, input } = req
+
+      // Route lookup — only procedures with ws: true are accessible
+      const route = flat('POST', '/' + path)?.data
+      if (!route || !route.ws) {
+        send(peer, { id, error: { code: 'NOT_FOUND', status: 404, message: `Procedure "${path}" not found` } })
+        return
+      }
+
+      // Execute pipeline
+      const ctx: Record<string, unknown> = Object.create(null)
+      const ac = new AbortController()
+      try {
+        const result = route.handler(ctx, input ?? {}, ac.signal)
+        const output = result instanceof Promise ? await result : result
+
+        // Streaming (subscription)
+        if (output && typeof output === 'object' && Symbol.asyncIterator in (output as object)) {
+          const iter = output as AsyncIterableIterator<unknown>
+          try {
+            for await (const data of iter) {
+              send(peer, { id, data })
+            }
+            send(peer, { id, data: null, done: true })
+          } catch (err) {
+            const e = err instanceof SilgiError ? err : toSilgiError(err)
+            send(peer, { id, error: e.toJSON() })
+          }
+          return
+        }
+
+        // Single response
+        send(peer, { id, result: output })
+      } catch (err) {
+        const e = err instanceof SilgiError ? err : toSilgiError(err)
+        send(peer, { id, error: e.toJSON() })
+      }
+    },
+
+    close(_peer, _details) {
+      // Connection closed — cleanup if needed
+    },
+
+    error(_peer, error) {
+      console.error('[silgi:ws] error:', error)
+    },
+  }
+}
+
+/**
+ * Attach WebSocket RPC handler to an existing Node.js HTTP server.
+ *
+ * @example
+ * ```ts
+ * import { createServer } from "node:http";
+ * import { attachWebSocket } from "silgi/ws";
+ *
+ * const server = createServer(httpHandler);
+ * attachWebSocket(server, appRouter);
+ * server.listen(3000);
+ * ```
+ */
+export async function attachWebSocket(server: HttpServer, routerDef: RouterDef, options: WSAdapterOptions = {}): Promise<void> {
+  const nodeAdapter = (await import('crossws/adapters/node')).default
+  const ws = nodeAdapter({ hooks: createWSHooks(routerDef, options) })
+
   server.on('upgrade', (req, socket, head) => {
     ws.handleUpgrade(req, socket, head)
   })

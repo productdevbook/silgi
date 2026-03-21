@@ -96,16 +96,28 @@ The method distinction helps with:
 
 ## Subscriptions
 
-A subscription is a procedure that returns an async generator. The server sends each yielded value as a Server-Sent Event:
+A subscription is a procedure that returns an async generator. Over HTTP, the server sends each yielded value as a Server-Sent Event. Over [WebSocket](/docs/protocols/websocket), each value is a separate message.
 
 ```ts twoslash
 // @noErrors
+// SSE only (HTTP)
 const countdown = s.subscription(async function* () {
   for (let i = 5; i > 0; i--) {
     yield { count: i }
     await new Promise((r) => setTimeout(r, 1000))
   }
 })
+
+// SSE + WebSocket — add $route({ ws: true }) to also stream over WebSocket
+const liveFeed = s
+  .subscription()
+  .$route({ ws: true })
+  .$resolve(async function* () {
+    for (let i = 5; i > 0; i--) {
+      yield { count: i }
+      await new Promise((r) => setTimeout(r, 1000))
+    }
+  })
 ```
 
 The client receives a stream of `{ count: 5 }`, `{ count: 4 }`, ... `{ count: 1 }`.

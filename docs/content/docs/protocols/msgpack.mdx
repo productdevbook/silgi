@@ -99,7 +99,7 @@ You can also use MessagePack over WebSocket for even lower overhead:
 // @noErrors
 import { attachWebSocket } from 'silgi/ws'
 
-attachWebSocket(server, appRouter, { binary: true })
+await attachWebSocket(server, appRouter, { binary: true })
 ```
 
 Messages are sent as binary WebSocket frames instead of text.

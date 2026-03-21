@@ -18,9 +18,16 @@ import type { Server } from 'node:http'
 const k = silgi({ context: () => ({}) })
 
 const appRouter = k.router({
-  health: k.$resolve(() => ({ status: 'ok' })),
-  echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
-  add: k.$input(z.object({ a: z.number(), b: z.number() })).$resolve(({ input }) => ({ sum: input.a + input.b })),
+  health: k.$route({ ws: true }).$resolve(() => ({ status: 'ok' })),
+  echo: k
+    .$route({ ws: true })
+    .$input(z.object({ msg: z.string() }))
+    .$resolve(({ input }) => ({ echo: input.msg })),
+  add: k
+    .$route({ ws: true })
+    .$input(z.object({ a: z.number(), b: z.number() }))
+    .$resolve(({ input }) => ({ sum: input.a + input.b })),
+  httpOnly: k.$resolve(() => ({ secret: true })),
 })
 
 let server: Server
@@ -31,7 +38,7 @@ beforeAll(async () => {
     res.writeHead(200)
     res.end('ok')
   })
-  attachWebSocket(server, appRouter)
+  await attachWebSocket(server, appRouter)
 
   await new Promise<void>((resolve) => {
     server.listen(0, '127.0.0.1', () => {
@@ -92,6 +99,12 @@ describe('WebSocket RPC (crossws)', () => {
 
   it('returns error for unknown route', async () => {
     await expect(rpc('nonexistent')).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    })
+  })
+
+  it('rejects procedures without ws: true', async () => {
+    await expect(rpc('httpOnly')).rejects.toMatchObject({
       code: 'NOT_FOUND',
     })
   })

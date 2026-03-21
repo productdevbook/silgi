@@ -2,7 +2,7 @@ import { createMemoryStorage, setStorage } from 'ocache'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { z } from 'zod'
 
-import { cacheQuery, setCacheStorage, createUnstorageAdapter } from '#src/plugins/cache.ts'
+import { cacheQuery, invalidateQueryCache, setCacheStorage, createUnstorageAdapter } from '#src/plugins/cache.ts'
 import { silgi } from '#src/silgi.ts'
 
 const k = silgi({ context: () => ({}) })
@@ -109,6 +109,32 @@ describe('invalidateQueryCache', () => {
     shouldInvalidate = true
     const r3 = await handler(makePostReq('data'))
     expect(await r3.json()).toBe(2) // re-resolved
+  })
+
+  it('invalidateQueryCache() clears cache so next call re-resolves', async () => {
+    let callCount = 0
+
+    const handler = k.handler(
+      k.router({
+        data: k
+          .$use(cacheQuery({ maxAge: 60, swr: false, name: 'direct_inv' }))
+          .$resolve(() => ++callCount),
+      }),
+    )
+
+    const r1 = await handler(makePostReq('data'))
+    expect(await r1.json()).toBe(1)
+
+    // Cached
+    const r2 = await handler(makePostReq('data'))
+    expect(await r2.json()).toBe(1)
+
+    // Directly invalidate via invalidateQueryCache()
+    await invalidateQueryCache('direct_inv')
+
+    // Should re-resolve
+    const r3 = await handler(makePostReq('data'))
+    expect(await r3.json()).toBe(2)
   })
 })
 

@@ -352,6 +352,8 @@ export interface CompiledRoute {
   stringify: (value: unknown) => string
   /** Pre-computed Cache-Control header value, or undefined if no caching */
   cacheControl?: string
+  /** Procedure is accessible over WebSocket */
+  ws?: boolean
 }
 
 /** Compiled router function — returns matched route + params */
@@ -385,18 +387,17 @@ export function compileRouter(def: Record<string, unknown>): CompiledRouterFn {
         cacheControl = typeof route.cache === 'number' ? `public, max-age=${route.cache}` : route.cache
       }
 
-      addRadixRoute(radix, method, routePath, {
+      const compiled: CompiledRoute = {
         handler: compileProcedure(proc),
         stringify: compileStringify(proc.output),
         cacheControl,
-      })
+        ws: route?.ws ?? undefined,
+      }
+
+      addRadixRoute(radix, method, routePath, compiled)
 
       // Also add empty method for fallback (any method)
-      addRadixRoute(radix, '', routePath, {
-        handler: compileProcedure(proc),
-        stringify: compileStringify(proc.output),
-        cacheControl,
-      })
+      addRadixRoute(radix, '', routePath, compiled)
 
       return
     }

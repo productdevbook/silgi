@@ -291,7 +291,9 @@ Silgi server running at http://127.0.0.1:3000
   WebSocket RPC at ws://127.0.0.1:3000
 ```
 
-HTTP and WebSocket share the same port. The server detects WebSocket upgrade requests and routes them accordingly. See the [WebSocket protocol](/docs/protocols/websocket) page for the message format and how to connect from the client.
+HTTP and WebSocket share the same port. Only procedures marked with `$route({ ws: true })` are accessible over WebSocket — other procedures remain HTTP-only.
+
+See the [WebSocket protocol](/docs/protocols/websocket) page for per-procedure setup, framework integration, and the message format.
 
 ## Lifecycle hooks
 

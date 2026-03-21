@@ -39,6 +39,12 @@
           <span class="ml-2 text-sm text-gray-400">Server-sent events real-time clock</span>
         </NuxtLink>
       </li>
+      <li>
+        <NuxtLink to="/ws" class="block rounded-lg border border-gray-200 px-4 py-3 hover:border-gray-400">
+          <span class="font-medium">WebSocket</span>
+          <span class="ml-2 text-sm text-gray-400">Bidirectional RPC, streaming, errors</span>
+        </NuxtLink>
+      </li>
     </ul>
 
     <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Protocols</h2>

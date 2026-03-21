@@ -88,11 +88,18 @@ export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}):
       }
     }
 
+    // Append WebSocket note to description for ws-enabled procedures
+    let description = route?.description
+    if (route?.ws) {
+      const wsNote = 'Also available over WebSocket (`ws://`). Send `{ id, path: "' + path.join('/') + '", input }` as JSON.'
+      description = description ? `${description}\n\n${wsNote}` : wsNote
+    }
+
     const operation: Record<string, unknown> = {
       operationId,
       tags: path.length > 1 ? [path[0]] : undefined,
       summary: route?.summary,
-      description: route?.description,
+      description,
       deprecated: route?.deprecated || undefined,
       responses: {},
     }

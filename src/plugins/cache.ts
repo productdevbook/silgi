@@ -206,13 +206,15 @@ export function cacheQuery<T = unknown>(options: CacheQueryOptions<T> = {}): Wra
           ? (input: unknown) => customGetKey(input)
           : (input: unknown) => (input !== undefined && input !== null ? hash(input) : '')
 
+        const resolvedBase = options.base ?? '/cache'
+
         cachedFn = defineCachedFunction(async (_input: unknown) => currentNext!(), {
           name: resolvedName,
           group: 'silgi',
           maxAge,
           swr,
           staleMaxAge,
-          base: options.base,
+          base: resolvedBase,
           integrity: options.integrity,
           onError: options.onError,
           validate: options.validate as ((entry: CacheEntry) => boolean) | undefined,
@@ -225,7 +227,7 @@ export function cacheQuery<T = unknown>(options: CacheQueryOptions<T> = {}): Wra
             : undefined,
           getKey: (input: unknown) => {
             const key = keyFn(input)
-            keySet.add(`/cache:silgi:${resolvedName}:${key}.json`)
+            keySet.add(`${resolvedBase}:silgi:${resolvedName}:${key}.json`)
             return key
           },
         })

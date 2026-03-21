@@ -25,6 +25,8 @@ export interface Route {
    * - Only applies to query procedures (mutations and subscriptions are never cached)
    */
   cache?: number | string
+  /** Enable WebSocket RPC for this procedure */
+  ws?: boolean
 }
 
 /** Procedure metadata */
