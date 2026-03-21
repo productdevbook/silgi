@@ -1,0 +1,11 @@
+node_modules
+dist
+*.tsbuildinfo
+.turbo
+coverage
+
+# Deploy (k8s credentials, secrets)
+deploy/
+deploy.sh
+!.claude
+!CLAUDE.md
