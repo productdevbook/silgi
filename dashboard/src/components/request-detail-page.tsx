@@ -1,8 +1,5 @@
-import { HugeiconsIcon } from '@hugeicons/react'
-import { ArrowLeft01Icon } from '@hugeicons/core-free-icons'
-
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
+import { BackButton, CodePanel, InsightPill, PageHero, PageShell, SectionCard } from '@/components/dashboard-shell'
 import { SpanWaterfall } from '@/components/span-waterfall'
 import { fmtMs } from '@/lib/format'
 
@@ -18,62 +15,56 @@ export function RequestDetailPage({ requests, id, navigate }: RequestDetailPageP
   const entry = requests.find((r) => r.id === Number(id))
 
   if (!entry) {
-    return <div className="flex h-[60vh] items-center justify-center text-xs text-muted-foreground">Request not found</div>
+    return (
+      <PageShell>
+        <div className="flex min-h-64 items-center justify-center text-sm text-muted-foreground">Request not found</div>
+      </PageShell>
+    )
   }
 
   const hasInput = entry.input !== undefined && entry.input !== null
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <button
-          onClick={() => navigate('requests')}
-          className="mb-4 flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <HugeiconsIcon icon={ArrowLeft01Icon} size={14} />
+    <PageShell>
+      <div className="flex flex-col gap-3">
+        <BackButton onClick={() => navigate('requests')}>
           Back to requests
-        </button>
-
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary">200</Badge>
-            <span className="text-xs tabular-nums text-muted-foreground">{fmtMs(entry.durationMs)}</span>
-            <span className="text-xs text-muted-foreground">&middot;</span>
-            <span className="text-xs text-muted-foreground">{entry.spans.length} spans</span>
+        </BackButton>
+        <PageHero
+          eyebrow="Request detail"
+          title={entry.procedure}
+          description="Inspect the recorded request path, its traced spans, and the input payload that produced this response."
+          badges={
+            <>
+              <Badge variant={entry.status >= 400 ? 'destructive' : 'secondary'}>Status {entry.status}</Badge>
+              <Badge variant="secondary">{fmtMs(entry.durationMs)}</Badge>
+              <Badge variant="secondary">{entry.spans.length} spans</Badge>
+            </>
+          }
+        >
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <InsightPill label="Status" value={String(entry.status)} meta="HTTP response status" />
+            <InsightPill label="Duration" value={fmtMs(entry.durationMs)} meta="End-to-end duration" />
+            <InsightPill label="Spans" value={String(entry.spans.length)} meta="Recorded internal operations" />
+            <InsightPill label="Captured" value={new Date(entry.timestamp).toLocaleTimeString()} meta={new Date(entry.timestamp).toLocaleDateString()} />
           </div>
-          <h1 className="text-lg font-semibold tracking-tight">{entry.procedure}</h1>
-          <p className="text-xs text-muted-foreground">{new Date(entry.timestamp).toISOString()}</p>
-        </div>
+        </PageHero>
       </div>
-
-      <Separator className="mb-6" />
-
-      <div className="space-y-8">
+      <div className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
         {entry.spans.length > 0 && (
-          <Section title="Trace" subtitle={`${entry.spans.length} operations · ${fmtMs(entry.durationMs)} total`}>
+          <SectionCard
+            title="Trace"
+            subtitle={`${entry.spans.length} operations spanning ${fmtMs(entry.durationMs)} total`}
+          >
             <SpanWaterfall spans={entry.spans} totalMs={entry.durationMs} />
-          </Section>
+          </SectionCard>
         )}
         {hasInput && (
-          <Section title="Input">
-            <pre className="overflow-x-auto rounded-md bg-muted/40 p-3 font-mono text-[11px] leading-relaxed">
-              {JSON.stringify(entry.input, null, 2)}
-            </pre>
-          </Section>
+          <SectionCard title="Input" subtitle="Payload captured for this request">
+            <CodePanel>{JSON.stringify(entry.input, null, 2)}</CodePanel>
+          </SectionCard>
         )}
       </div>
-    </div>
-  )
-}
-
-function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="mb-2 flex items-baseline gap-2">
-        <h3 className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{title}</h3>
-        {subtitle && <span className="text-[11px] text-muted-foreground/60">{subtitle}</span>}
-      </div>
-      {children}
-    </div>
+    </PageShell>
   )
 }

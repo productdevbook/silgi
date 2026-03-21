@@ -46,7 +46,7 @@ export function RequestChart({ timeSeries }: RequestChartProps) {
   }
 
   return (
-    <ChartContainer config={chartConfig} className="h-48 w-full">
+    <ChartContainer config={chartConfig} className="h-64 w-full">
       <ComposedChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
         <defs>
           <linearGradient id="fillCount" x1="0" y1="0" x2="0" y2="1">
@@ -54,6 +54,7 @@ export function RequestChart({ timeSeries }: RequestChartProps) {
             <stop offset="100%" stopColor="var(--color-count)" stopOpacity={0} />
           </linearGradient>
         </defs>
+        <CartesianGrid vertical={false} stroke="var(--color-border)" strokeOpacity={0.4} />
         <XAxis
           dataKey="time"
           tick={{ fontSize: 10 }}
@@ -62,7 +63,13 @@ export function RequestChart({ timeSeries }: RequestChartProps) {
           interval="preserveStartEnd"
           tickMargin={8}
         />
-        <YAxis hide />
+        <YAxis
+          tick={{ fontSize: 10 }}
+          tickLine={false}
+          axisLine={false}
+          width={28}
+          tickFormatter={(value: number) => fmt(value)}
+        />
         <ChartTooltip content={<ChartTooltipContent />} />
         <Area
           type="natural"

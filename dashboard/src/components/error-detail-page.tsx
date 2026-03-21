@@ -1,9 +1,9 @@
 import { HugeiconsIcon } from '@hugeicons/react'
-import { ArrowLeft01Icon, Copy01Icon, Tick01Icon } from '@hugeicons/core-free-icons'
+import { Copy01Icon, Tick01Icon } from '@hugeicons/core-free-icons'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
+import { BackButton, InsightPill, PageHero, PageShell } from '@/components/dashboard-shell'
 import { ErrorDetail } from '@/components/error-detail'
 import { useCopy } from '@/hooks'
 import { fmtMs } from '@/lib/format'
@@ -22,47 +22,58 @@ export function ErrorDetailPage({ errors, id, navigate }: ErrorDetailPageProps) 
   const entry = errors.find((e) => e.id === Number(id))
 
   if (!entry) {
-    return <div className="flex h-[60vh] items-center justify-center text-xs text-muted-foreground">Error not found</div>
+    return (
+      <PageShell>
+        <div className="flex min-h-64 items-center justify-center text-sm text-muted-foreground">Error not found</div>
+      </PageShell>
+    )
   }
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <button
-          onClick={() => navigate('errors')}
-          className="mb-4 flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <HugeiconsIcon icon={ArrowLeft01Icon} size={14} />
+    <PageShell>
+      <div className="flex flex-col gap-3">
+        <BackButton onClick={() => navigate('errors')}>
           Back to errors
-        </button>
-
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 space-y-1">
-            <div className="flex items-center gap-2">
+        </BackButton>
+        <PageHero
+          eyebrow="Error detail"
+          title={entry.procedure}
+          description="Inspect the exact failure context, including stack trace, payload, request headers, and traced spans."
+          badges={
+            <>
               <Badge variant="destructive">{entry.code}</Badge>
-              <span className="text-xs tabular-nums text-muted-foreground">Status {entry.status}</span>
-            </div>
-            <h1 className="text-lg font-semibold tracking-tight">{entry.procedure}</h1>
-            <p className="text-xs text-muted-foreground">
-              {new Date(entry.timestamp).toISOString()} &middot; {fmtMs(entry.durationMs)}
-            </p>
+              <Badge variant="secondary">Status {entry.status}</Badge>
+              <Badge variant="secondary">{fmtMs(entry.durationMs)}</Badge>
+            </>
+          }
+          actions={
+            <>
+              <CopyBtn copied={copiedId === `md-${entry.id}`} onClick={() => copy(`md-${entry.id}`, errorToMarkdown(entry))}>
+                AI
+              </CopyBtn>
+              <CopyBtn copied={copiedId === `json-${entry.id}`} onClick={() => copy(`json-${entry.id}`, errorToRedactedJson(entry))}>
+                JSON
+              </CopyBtn>
+            </>
+          }
+        >
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <InsightPill label="Code" value={entry.code} meta="Silgi error code" />
+            <InsightPill label="Status" value={String(entry.status)} meta="HTTP response status" />
+            <InsightPill label="Duration" value={fmtMs(entry.durationMs)} meta="End-to-end duration" />
+            <InsightPill label="Captured" value={new Date(entry.timestamp).toLocaleTimeString()} meta={new Date(entry.timestamp).toLocaleDateString()} />
           </div>
-          <div className="flex shrink-0 gap-1.5">
-            <CopyBtn copied={copiedId === `md-${entry.id}`} onClick={() => copy(`md-${entry.id}`, errorToMarkdown(entry))}>AI</CopyBtn>
-            <CopyBtn copied={copiedId === `json-${entry.id}`} onClick={() => copy(`json-${entry.id}`, errorToRedactedJson(entry))}>JSON</CopyBtn>
-          </div>
-        </div>
+        </PageHero>
       </div>
-      <Separator className="mb-6" />
       <ErrorDetail entry={entry} />
-    </div>
+    </PageShell>
   )
 }
 
 function CopyBtn({ copied, onClick, children }: { copied: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <Button variant={copied ? 'default' : 'outline'} size="xs" onClick={onClick}>
-      <HugeiconsIcon icon={copied ? Tick01Icon : Copy01Icon} size={11} />
+      <HugeiconsIcon icon={copied ? Tick01Icon : Copy01Icon} data-icon="inline-start" />
       {copied ? 'Copied' : children}
     </Button>
   )

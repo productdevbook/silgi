@@ -36,18 +36,23 @@ All data lives in memory. No disk I/O, no network calls, no serialization until 
 
 ## Dashboard
 
-The dashboard is a self-contained HTML page with vanilla JS — no external dependencies. It auto-refreshes every 2 seconds and is served at `/analytics`.
+The dashboard is a self-contained single-file app served at `/analytics`. It auto-refreshes every 2 seconds and groups the most important signals into overview, request, and error workflows.
 
 **Overview tab:**
 
+- Health summary banner with busiest, noisiest, and slowest procedure callouts
 - Total requests, req/s, error rate, and average latency stat cards
-- Request rate sparkline chart with error markers
-- Per-procedure table with sortable columns (count, errors, error rate, latency percentiles)
+- Traffic console with peak windows, focus-mode panels for traffic, latency, and failures, plus a sortable per-procedure breakdown
+
+**Requests tab:**
+
+- Recent traced requests with procedure, status, and latency filters plus sortable columns
+- Per-request detail pages with span waterfall timing and captured input payloads
 
 **Errors tab:**
 
-- Chronological error log with expandable details
-- Full input, headers, stack trace, and traced spans for each error
+- Filterable error log with procedure, severity, and trace-presence controls
+- Detail pages with full input, headers, stack trace, and traced spans for each error
 - **Copy for AI (Markdown)** — one click to copy a structured markdown document, paste into any AI assistant
 - **Copy JSON** — raw error data for programmatic use
 

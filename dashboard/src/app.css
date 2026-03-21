@@ -122,13 +122,25 @@
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground antialiased;
-    margin: 0;
-  }
   html {
     @apply font-sans;
+    min-height: 100%;
   }
+  body {
+    @apply bg-background text-foreground antialiased;
+    min-height: 100vh;
+    margin: 0;
+    background: linear-gradient(180deg, oklch(0.985 0 0), oklch(0.978 0.002 85));
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  .dark body {
+    background: linear-gradient(180deg, oklch(0.115 0 0), oklch(0.132 0.006 265));
+  }
+
   ::selection {
     background-color: oklch(0.795 0.135 80 / 25%);
   }

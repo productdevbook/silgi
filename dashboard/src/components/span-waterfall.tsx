@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 
+import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { fmtMs } from '@/lib/format'
@@ -18,14 +19,14 @@ export function SpanWaterfall({ spans, totalMs }: SpanWaterfallProps) {
   )
 
   return (
-    <div className="space-y-1">
+    <div className="flex flex-col gap-2">
       {spans.map((span, i) => {
         const pct = maxMs > 0 ? (span.durationMs / maxMs) * 100 : 0
         const isError = !!span.error
         const isSlow = span.durationMs > totalMs * 0.5
 
         return (
-          <div key={i} className="group flex items-center gap-3">
+          <div key={i} className="group flex items-center gap-3 rounded-lg border bg-muted/20 px-3 py-2">
             {/* Name */}
             <div className="flex w-32 shrink-0 items-center gap-1.5 lg:w-44">
               <SpanIcon type={guessSpanType(span.name)} />
@@ -42,13 +43,14 @@ export function SpanWaterfall({ spans, totalMs }: SpanWaterfallProps) {
                   style={{ width: `${Math.max(pct, 2)}%` }}
                 >
                   <div
-                    className={`h-full w-full rounded ${
+                    className={cn(
+                      'h-full w-full rounded',
                       isError
                         ? 'bg-destructive/60'
                         : isSlow
-                          ? 'bg-amber-500/50 dark:bg-amber-400/40'
-                          : 'bg-primary/30'
-                    }`}
+                          ? 'bg-chart-1/45'
+                          : 'bg-primary/30',
+                    )}
                   />
                 </TooltipTrigger>
                 <TooltipContent side="top" className="text-xs">
@@ -63,7 +65,12 @@ export function SpanWaterfall({ spans, totalMs }: SpanWaterfallProps) {
 
             {/* Duration + status */}
             <div className="flex w-20 shrink-0 items-center justify-end gap-2">
-              <span className={`font-mono text-[11px] tabular-nums ${isError ? 'text-destructive' : isSlow ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}>
+              <span
+                className={cn(
+                  'font-mono text-[11px] tabular-nums',
+                  isError ? 'text-destructive' : isSlow ? 'text-chart-1' : 'text-muted-foreground',
+                )}
+              >
                 {fmtMs(span.durationMs)}
               </span>
               {isError && (
@@ -91,10 +98,10 @@ function guessSpanType(name: string): SpanType {
 }
 
 const SPAN_COLORS: Record<SpanType, string> = {
-  db: 'bg-blue-500',
-  http: 'bg-emerald-500',
-  cache: 'bg-amber-500',
-  queue: 'bg-purple-500',
+  db: 'bg-chart-4',
+  http: 'bg-chart-3',
+  cache: 'bg-chart-1',
+  queue: 'bg-chart-5',
   default: 'bg-muted-foreground',
 }
 

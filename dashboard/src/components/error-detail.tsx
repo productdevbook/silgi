@@ -1,3 +1,4 @@
+import { CodePanel, SectionCard } from '@/components/dashboard-shell'
 import { SpanWaterfall } from '@/components/span-waterfall'
 import { fmtMs } from '@/lib/format'
 
@@ -16,73 +17,51 @@ export function ErrorDetail({ entry }: ErrorDetailProps) {
   const hasHeaders = headerEntries.length > 0
 
   return (
-    <div className="space-y-8">
-      <Section title="Error">
-        <CodeBlock>{entry.error}</CodeBlock>
-      </Section>
+    <div className="flex flex-col gap-4">
+      <div className="grid gap-4 xl:grid-cols-[1fr_1.1fr]">
+        <SectionCard title="Error" subtitle="The thrown message captured by analytics">
+          <CodePanel>{entry.error}</CodePanel>
+        </SectionCard>
 
-      {hasSpans && (
-        <Section title="Trace" subtitle={`${entry.spans.length} operations · ${fmtMs(entry.durationMs)} total`}>
-          <SpanWaterfall spans={entry.spans} totalMs={entry.durationMs} />
-        </Section>
-      )}
+        {hasSpans && (
+          <SectionCard title="Trace" subtitle={`${entry.spans.length} operations across ${fmtMs(entry.durationMs)} total`}>
+            <SpanWaterfall spans={entry.spans} totalMs={entry.durationMs} />
+          </SectionCard>
+        )}
+      </div>
 
-      {hasInput && (
-        <Section title="Input">
-          <CodeBlock>{JSON.stringify(entry.input, null, 2)}</CodeBlock>
-        </Section>
+      {(hasInput || hasHeaders) && (
+        <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+          {hasInput && (
+            <SectionCard title="Input" subtitle="The request payload that led to the failure">
+              <CodePanel>{JSON.stringify(entry.input, null, 2)}</CodePanel>
+            </SectionCard>
+          )}
+
+          {hasHeaders && (
+            <SectionCard title="Headers" subtitle="Sensitive headers are redacted before display">
+              <div className="flex flex-col gap-0">
+                {headerEntries.map(([key, value]) => (
+                  <div key={key} className="flex gap-3 border-b border-dashed py-1.5 last:border-0">
+                    <span className="w-36 shrink-0 truncate font-mono text-[11px] text-muted-foreground">{key}</span>
+                    <span className="min-w-0 break-all font-mono text-[11px]">
+                      {SENSITIVE_HEADERS.has(key.toLowerCase()) ? (
+                        <span className="text-muted-foreground/50">[redacted]</span>
+                      ) : value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+          )}
+        </div>
       )}
 
       {entry.stack && (
-        <Section title="Stack Trace">
-          <CodeBlock>{entry.stack}</CodeBlock>
-        </Section>
-      )}
-
-      {hasHeaders && (
-        <Section title="Headers">
-          <div className="space-y-0">
-            {headerEntries.map(([key, value]) => (
-              <div key={key} className="flex gap-3 border-b border-dashed py-1.5 last:border-0">
-                <span className="w-36 shrink-0 truncate font-mono text-[11px] text-muted-foreground">{key}</span>
-                <span className="min-w-0 break-all font-mono text-[11px]">
-                  {SENSITIVE_HEADERS.has(key.toLowerCase()) ? (
-                    <span className="text-muted-foreground/50">[redacted]</span>
-                  ) : value}
-                </span>
-              </div>
-            ))}
-          </div>
-        </Section>
+        <SectionCard title="Stack trace" subtitle="Useful for mapping the failure back to its source">
+          <CodePanel>{entry.stack}</CodePanel>
+        </SectionCard>
       )}
     </div>
-  )
-}
-
-function Section({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string
-  subtitle?: string
-  children: React.ReactNode
-}) {
-  return (
-    <div>
-      <div className="mb-2 flex items-baseline gap-2">
-        <h3 className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{title}</h3>
-        {subtitle && <span className="text-[11px] text-muted-foreground/60">{subtitle}</span>}
-      </div>
-      {children}
-    </div>
-  )
-}
-
-function CodeBlock({ children }: { children: string }) {
-  return (
-    <pre className="overflow-x-auto rounded-md bg-muted/40 p-3 font-mono text-[11px] leading-relaxed">
-      {children}
-    </pre>
   )
 }
