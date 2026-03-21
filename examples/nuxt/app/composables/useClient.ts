@@ -1,7 +1,10 @@
 import { createClient } from 'silgi/client'
 import { createLink } from 'silgi/client/ofetch'
 
+import type { InferClient } from 'silgi'
 import type { AppRouter } from '../../server/rpc/router'
+
+type Client = InferClient<AppRouter>
 
 export function useClient(options?: { binary?: boolean; devalue?: boolean }) {
   const link = createLink({
@@ -9,5 +12,5 @@ export function useClient(options?: { binary?: boolean; devalue?: boolean }) {
     binary: options?.binary,
     devalue: options?.devalue,
   })
-  return createClient<AppRouter>(link)
+  return createClient<Client>(link)
 }
