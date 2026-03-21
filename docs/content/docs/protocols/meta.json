@@ -1,4 +1,10 @@
 {
   "title": "Protocols",
-  "pages": ["index", "msgpack", "devalue", "websocket"]
+  "pages": [
+    "index",
+    "msgpack",
+    "devalue",
+    "websocket"
+  ],
+  "defaultOpen": false
 }

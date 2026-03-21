@@ -1,4 +1,7 @@
 {
   "title": "Migrations",
-  "pages": ["from-trpc"]
+  "pages": [
+    "from-trpc"
+  ],
+  "defaultOpen": false
 }

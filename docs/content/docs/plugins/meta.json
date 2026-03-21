@@ -1,20 +1,23 @@
 {
   "title": "Plugins",
+  "defaultOpen": false,
   "pages": [
     "index",
+    "batch-server",
+    "body-limit",
+    "cache",
+    "coerce",
+    "compression",
+    "cookies",
     "cors",
+    "custom-serializer",
+    "file-upload",
     "otel",
     "pino",
-    "ratelimit",
-    "body-limit",
-    "strict-get",
-    "cookies",
-    "compression",
-    "signing",
-    "coerce",
-    "batch-server",
     "pubsub",
-    "custom-serializer",
-    "file-upload"
+    "ratelimit",
+    "signing",
+    "storage",
+    "strict-get"
   ]
 }

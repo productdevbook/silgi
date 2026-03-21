@@ -1,4 +1,10 @@
 {
   "title": "Best Practices",
-  "pages": ["index", "testing", "monorepo", "ssr"]
+  "pages": [
+    "index",
+    "testing",
+    "monorepo",
+    "ssr"
+  ],
+  "defaultOpen": false
 }
