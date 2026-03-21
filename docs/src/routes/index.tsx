@@ -108,7 +108,7 @@ const CODE = [
   '<span class="kw">import</span> { silgi } <span class="kw">from</span> <span class="st">\'silgi\'</span>',
   '<span class="kw">import</span> { z } <span class="kw">from</span> <span class="st">\'zod\'</span>',
   '',
-  '<span class="kw">const</span> k = <span class="fn">silgi</span>({',
+  '<span class="kw">const</span> s = <span class="fn">silgi</span>({',
   '  context: (req) =&gt; ({ db: <span class="fn">getDB</span>() }),',
   '})',
   '',
