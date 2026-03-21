@@ -45,13 +45,13 @@ s.serve(appRouter, { port: 3000, scalar: true })
 | | Import |
 |---|---|
 | Standalone | `s.serve()` / `s.handler()` |
-| Nitro v3 | `silgi/nitro` |
+| Nitro v3 | `serverEntry` + `s.handler()` |
 | Hono | `silgi/hono` |
 | Express | `silgi/express` |
 | Fastify | `silgi/fastify` |
 | Elysia | `silgi/elysia` |
 | Next.js | `silgi/nextjs` |
-| Nuxt | via `silgi/nitro` |
+| Nuxt | via Nitro `serverEntry` |
 | SvelteKit | `silgi/sveltekit` |
 | Remix | `silgi/remix` |
 | Astro | `silgi/astro` |
@@ -59,6 +59,17 @@ s.serve(appRouter, { port: 3000, scalar: true })
 | NestJS | `silgi/nestjs` |
 | AWS Lambda | `silgi/aws-lambda` |
 | MessagePort | `silgi/message-port` |
+
+## Ecosystem
+
+Built-in re-exports — no extra dependencies needed:
+
+| Import | Package | Use case |
+|---|---|---|
+| `silgi/unstorage` | unstorage | Key-value storage (Redis, KV, S3) |
+| `silgi/ocache` | ocache | Cached functions with TTL + SWR |
+| `silgi/ofetch` | ofetch | Universal fetch with auto-retry |
+| `silgi/srvx` | srvx | Universal server (Node, Deno, Bun) |
 
 ## Integrations
 

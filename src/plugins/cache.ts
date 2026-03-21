@@ -23,7 +23,7 @@
  *
  * // With unstorage backend (Redis)
  * import { createUnstorageAdapter } from 'silgi/cache'
- * import { createStorage } from 'unstorage'
+ * import { createStorage } from 'silgi/unstorage'
  * import redisDriver from 'unstorage/drivers/redis'
  *
  * const storage = createStorage({ driver: redisDriver({ url: 'redis://localhost' }) })
@@ -246,7 +246,7 @@ export async function invalidateQueryCache(name: string): Promise<void> {
  * @example
  * ```ts
  * import { setCacheStorage, createUnstorageAdapter } from 'silgi/cache'
- * import { createStorage } from 'unstorage'
+ * import { createStorage } from 'silgi/unstorage'
  * import redisDriver from 'unstorage/drivers/redis'
  *
  * setCacheStorage(createUnstorageAdapter(
@@ -275,7 +275,7 @@ export interface UnstorageCompatible {
  *
  * @example
  * ```ts
- * import { createStorage } from 'unstorage'
+ * import { createStorage } from 'silgi/unstorage'
  * import redisDriver from 'unstorage/drivers/redis'
  *
  * const storage = createStorage({ driver: redisDriver({ url: 'redis://localhost' }) })

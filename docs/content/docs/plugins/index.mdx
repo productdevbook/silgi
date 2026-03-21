@@ -108,6 +108,24 @@ All plugins ship as subpath imports from the `silgi` package. You only import wh
 | Publisher/PubSub   | Event system      | Use `createPublisher()` + `MemoryPubSub` or Redis      |
 | Custom Serializers | Helper            | Use `createSerializer()` for custom JSON types         |
 
+## Ecosystem packages
+
+Silgi re-exports key UnJS packages. No extra `pnpm add` needed — import directly from `silgi/*`:
+
+| Import from       | Package                                  | Use case                                |
+| ----------------- | ---------------------------------------- | --------------------------------------- |
+| `silgi/unstorage` | [unstorage](https://unstorage.unjs.io)   | Key-value storage (Redis, KV, S3, etc.) |
+| `silgi/ocache`    | [ocache](https://github.com/unjs/ocache) | Cached functions with TTL + SWR         |
+| `silgi/ofetch`    | [ofetch](https://github.com/unjs/ofetch) | Universal fetch with auto-retry         |
+| `silgi/srvx`      | [srvx](https://srvx.h3.dev)              | Universal server (Node, Deno, Bun)      |
+
+```ts twoslash
+// @noErrors
+import { createStorage } from 'silgi/unstorage'
+import { ofetch } from 'silgi/ofetch'
+import { serve } from 'silgi/srvx'
+```
+
 ## What's next?
 
 - [Middleware](/docs/middleware) — understand guards and wraps, which power most plugins

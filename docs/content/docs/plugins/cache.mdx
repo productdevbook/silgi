@@ -15,11 +15,7 @@ Wrap a procedure with `cacheQuery()` to cache its results:
 // @noErrors
 import { cacheQuery } from 'silgi/cache'
 
-const listUsers = s
-  .$use(cacheQuery({ maxAge: 60 }))
-  .$resolve(({ ctx }) =>
-    ctx.db.users.findMany(),
-  )
+const listUsers = s.$use(cacheQuery({ maxAge: 60 })).$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
 
 The first call runs the resolver and caches the result. Subsequent calls with the same input return the cached value for 60 seconds.
@@ -72,9 +68,7 @@ const listUsers = s
       validate: (entry) => Array.isArray(entry.value) && entry.value.length > 0,
     }),
   )
-  .$resolve(({ ctx }) =>
-    ctx.db.users.findMany(),
-  )
+  .$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
 
 ## Invalidation
@@ -85,11 +79,7 @@ Invalidate cached queries by name — typically after a mutation:
 // @noErrors
 import { cacheQuery, invalidateQueryCache } from 'silgi/cache'
 
-const listUsers = s
-  .$use(cacheQuery({ maxAge: 300, name: 'users_list' }))
-  .$resolve(({ ctx }) =>
-    ctx.db.users.findMany(),
-  )
+const listUsers = s.$use(cacheQuery({ maxAge: 300, name: 'users_list' })).$resolve(({ ctx }) => ctx.db.users.findMany())
 
 const createUser = s.$resolve(async ({ input, ctx }) => {
   const user = await ctx.db.users.create(input)
@@ -109,7 +99,7 @@ Configure it once at server startup — typically in your `server.ts`:
 ```ts twoslash title="server.ts"
 // @noErrors
 import { setCacheStorage, createUnstorageAdapter } from 'silgi/cache'
-import { createStorage } from 'unstorage'
+import { createStorage } from 'silgi/unstorage'
 import redisDriver from 'unstorage/drivers/redis'
 
 // Set up Redis cache before creating the handler
@@ -129,7 +119,7 @@ export default { fetch: s.handler(appRouter) }
 ```ts twoslash title="server.ts"
 // @noErrors
 import { setCacheStorage, createUnstorageAdapter } from 'silgi/cache'
-import { createStorage } from 'unstorage'
+import { createStorage } from 'silgi/unstorage'
 import cfKvDriver from 'unstorage/drivers/cloudflare-kv-binding'
 
 const storage = createStorage({
@@ -172,9 +162,7 @@ Use both together for maximum performance:
 const listUsers = s
   .$route({ cache: 60 })
   .$use(cacheQuery({ maxAge: 300, name: 'users' }))
-  .$resolve(({ ctx }) =>
-    ctx.db.users.findMany(),
-  )
+  .$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
 
 ## How it works

@@ -1,1 +1,1 @@
-export * from "ocache";
+export * from 'ocache'

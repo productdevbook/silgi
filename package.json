@@ -39,7 +39,8 @@
     "url": "https://github.com/productdevbook/silgi.git"
   },
   "files": [
-    "dist"
+    "dist",
+    "lib"
   ],
   "type": "module",
   "exports": {
