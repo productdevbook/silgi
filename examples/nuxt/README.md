@@ -8,6 +8,7 @@ Full-featured demo with Silgi RPC and Nuxt 5.
 - `/todos` — CRUD todo list with typed Silgi client
 - `/auth` — Login/logout with auth guard
 - `/errors` — Error handling demo (NOT_FOUND, validation, unauthorized)
+- `/broker` — RPC to a remote worker service via NATS
 - `/json` — JSON protocol
 - `/msgpack` — MessagePack binary protocol
 - `/devalue` — devalue rich type protocol
@@ -27,6 +28,10 @@ server/rpc/
   todos/
     index.ts                      — list, create, toggle, remove
     schema.ts                     — Zod schemas + store
+  broker/
+    index.ts                      — Worker router definition
+    worker.ts                     — Standalone worker process (NATS)
+    client.ts                     — NATS client used by Nuxt server
 app/
   app.vue                         — NuxtPage
   composables/useClient.ts        — Silgi typed client
@@ -39,3 +44,20 @@ app/
 pnpm install
 pnpm dev
 ```
+
+## Broker Demo (NATS)
+
+The `/broker` page calls a separate worker service via NATS. To run it:
+
+```bash
+# 1. Start NATS
+docker compose up -d
+
+# 2. Start the worker (separate terminal)
+node --experimental-strip-types server/rpc/broker/worker.ts
+
+# 3. Start Nuxt
+pnpm dev
+```
+
+Open http://localhost:3000/broker and try Ping, Uppercase, Fibonacci.

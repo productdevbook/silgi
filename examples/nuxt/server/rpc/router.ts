@@ -1,4 +1,7 @@
+import { z } from 'zod'
+
 import * as auth from './auth'
+import { getWorkerClient } from './broker/client'
 import * as demo from './demo'
 import { s } from './instance'
 import * as todos from './todos'
@@ -22,6 +25,20 @@ export const appRouter = s.router({
     invalidateCache: demo.invalidateCache,
     clock: demo.clock,
     compute: demo.compute,
+  },
+  broker: {
+    ping: s.$resolve(async () => {
+      const worker = await getWorkerClient()
+      return worker.ping()
+    }),
+    uppercase: s.$input(z.object({ text: z.string() })).$resolve(async ({ input }) => {
+      const worker = await getWorkerClient()
+      return worker.uppercase({ text: input.text })
+    }),
+    fib: s.$input(z.object({ n: z.number().int().min(0).max(40) })).$resolve(async ({ input }) => {
+      const worker = await getWorkerClient()
+      return worker.fib({ n: input.n })
+    }),
   },
 })
 

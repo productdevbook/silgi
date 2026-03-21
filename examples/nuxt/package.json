@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@nuxtjs/tailwindcss": "7.0.0-beta.1",
+    "nats": "^2.29.3",
     "nuxt": "npm:nuxt-nightly@5x",
     "silgi": "latest",
     "tailwindcss": "^4.2.2",

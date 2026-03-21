@@ -47,6 +47,16 @@
       </li>
     </ul>
 
+    <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Broker</h2>
+    <ul class="mb-6 space-y-2">
+      <li>
+        <NuxtLink to="/broker" class="block rounded-lg border border-gray-200 px-4 py-3 hover:border-gray-400">
+          <span class="font-medium">NATS Broker</span>
+          <span class="ml-2 text-sm text-gray-400">RPC to a remote worker via NATS</span>
+        </NuxtLink>
+      </li>
+    </ul>
+
     <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Protocols</h2>
     <ul class="mb-6 space-y-2">
       <li>
