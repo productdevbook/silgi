@@ -32,6 +32,9 @@ export interface SilgiLinkOptions<TClientContext extends ClientContext = ClientC
   /** Use MessagePack binary protocol (2-4x faster, ~50% smaller payloads) */
   binary?: boolean
 
+  /** Use devalue protocol (preserves Date, Map, Set, BigInt, circular refs) */
+  devalue?: boolean
+
   /** ofetch interceptors */
   onRequest?: FetchOptions['onRequest']
   onResponse?: FetchOptions['onResponse']
@@ -60,6 +63,7 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
   const defaultRetry = options.retry
   const defaultRetryDelay = options.retryDelay ?? 0
   const binary = options.binary ?? false
+  const useDevalue = options.devalue ?? false
 
   return {
     async call(path, input, callOptions) {
@@ -71,12 +75,17 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
         ...(typeof options.headers === 'function' ? options.headers(callOptions) : options.headers),
       }
 
-      // Binary mode: msgpack encode/decode
+      // Protocol selection: binary (msgpack) > devalue > json (default)
       let body: any
       if (binary) {
         headers['content-type'] = MSGPACK_CONTENT_TYPE
         headers['accept'] = MSGPACK_CONTENT_TYPE
         body = input !== undefined && input !== null ? msgpackEncode(input) : undefined
+      } else if (useDevalue) {
+        const { encode: devalueEncode, DEVALUE_CONTENT_TYPE } = await import('../../../codec/devalue.ts')
+        headers['content-type'] = DEVALUE_CONTENT_TYPE
+        headers['accept'] = DEVALUE_CONTENT_TYPE
+        body = input !== undefined && input !== null ? devalueEncode(input) : undefined
       } else {
         body = input !== undefined && input !== null ? input : undefined
       }
@@ -95,25 +104,33 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
           onResponse: options.onResponse,
           onRequestError: options.onRequestError,
           onResponseError: options.onResponseError,
-          // Binary: get raw arrayBuffer, then decode. JSON: parse as usual.
+          // Response handling per protocol
           ...(binary
-            ? {
-                responseType: 'arrayBuffer' as const,
-              }
-            : {
-                parseResponse(text: string) {
-                  if (!text) return undefined
-                  try {
-                    return JSON.parse(text)
-                  } catch {
-                    return text
-                  }
-                },
-              }),
+            ? { responseType: 'arrayBuffer' as const }
+            : useDevalue
+              ? { responseType: 'text' as const }
+              : {
+                  parseResponse(text: string) {
+                    if (!text) return undefined
+                    try {
+                      return JSON.parse(text)
+                    } catch {
+                      return text
+                    }
+                  },
+                }),
         })
 
         // Decode response
-        const decoded = binary ? msgpackDecode(new Uint8Array(data as ArrayBuffer)) : data
+        let decoded: unknown
+        if (binary) {
+          decoded = msgpackDecode(new Uint8Array(data as ArrayBuffer))
+        } else if (useDevalue) {
+          const { decode: devalueDecode } = await import('../../../codec/devalue.ts')
+          decoded = data ? devalueDecode(data as string) : undefined
+        } else {
+          decoded = data
+        }
 
         if (isSilgiErrorJSON(decoded)) {
           throw fromSilgiErrorJSON(decoded as any)

@@ -7,13 +7,26 @@
  * - preventNativeAwait is built into the proxy handler
  */
 
-import type { ClientLink, ClientContext, ClientOptions, NestedClient } from './types.ts'
+import type { InferClient } from '../types.ts'
+import type { ClientLink, ClientContext, ClientOptions } from './types.ts'
 
+/**
+ * Create a type-safe client from a link.
+ *
+ * Accepts either a router type (auto-inferred) or a pre-inferred client type:
+ * ```ts
+ * // Recommended — pass AppRouter directly
+ * const client = createClient<AppRouter>(link)
+ *
+ * // Also works — explicit InferClient
+ * const client = createClient<InferClient<AppRouter>>(link)
+ * ```
+ */
 export function createClient<
-  T extends NestedClient<TClientContext>,
+  T,
   TClientContext extends ClientContext = Record<never, never>,
->(link: ClientLink<TClientContext>): T {
-  return createClientProxy<T, TClientContext>(link, [])
+>(link: ClientLink<TClientContext>): InferClient<T> extends never ? T : InferClient<T> {
+  return createClientProxy(link, []) as any
 }
 
 function createClientProxy<T, TClientContext extends ClientContext>(
