@@ -227,6 +227,7 @@
     "dev": "vitest",
     "bench": "node --experimental-strip-types bench/update-benchmarks.ts",
     "bench:memory": "node --expose-gc --experimental-strip-types bench/memory.ts",
+    "bench:elysia": "bun bench/elysia.ts",
     "bench:bun": "bun test/bun-compat.ts",
     "play": "pnpm build && pnpm --filter silgi-playground dev",
     "lint": "oxlint . && oxfmt --check .",

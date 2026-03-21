@@ -14,6 +14,7 @@ import { createHooks } from 'hookable'
 
 import { createProcedureBuilder } from './builder.ts'
 import { compileRouter } from './compile.ts'
+import { createFetchHandler } from './core/handler.ts'
 import { assignPaths, routerCache } from './core/router-utils.ts'
 
 import type { ProcedureBuilder } from './builder.ts'
@@ -287,12 +288,9 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
     },
 
     handler: (routerDef, options) => {
-      let fetchHandler: ((req: Request) => Promise<Response>) | undefined
-      return async (request: Request) => {
-        if (!fetchHandler) {
-          const { createFetchHandler } = await import('./core/handler.ts')
-          fetchHandler = createFetchHandler(routerDef, contextFactory, hooks, options)
-        }
+      let fetchHandler: ((req: Request) => Response | Promise<Response>) | undefined
+      return (request: Request): Response | Promise<Response> => {
+        fetchHandler ??= createFetchHandler(routerDef, contextFactory, hooks, options)
         return fetchHandler(request)
       }
     },
