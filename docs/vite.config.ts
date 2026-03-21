@@ -1,16 +1,16 @@
-import tailwindcss from '@tailwindcss/vite'
-import { tanstackStart } from '@tanstack/react-start/plugin/vite'
-import react from '@vitejs/plugin-react'
-import mdx from 'fumadocs-mdx/vite'
-import { nitro } from 'nitro/vite'
-import { defineConfig } from 'vite'
+import tailwindcss from "@tailwindcss/vite";
+import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import react from "@vitejs/plugin-react";
+import mdx from "fumadocs-mdx/vite";
+import { nitro } from "nitro/vite";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   server: {
     port: 3000,
   },
   plugins: [
-    mdx(await import('./source.config')),
+    mdx(await import("./source.config")),
     tailwindcss(),
     tanstackStart({
       // prerender disabled due to fumadocs#3104 (tslib resolve bug)
@@ -19,14 +19,14 @@ export default defineConfig({
     react(),
     // please see https://tanstack.com/start/latest/docs/framework/react/guide/hosting#nitro for guides on hosting
     nitro({
-      serverDir: 'server',
-      traceDeps: ['@takumi-rs/core', '@takumi-rs/image-response'],
+      serverDir: "server",
+      traceDeps: ["@takumi-rs/core", "@takumi-rs/image-response"],
     }),
   ],
   resolve: {
     tsconfigPaths: true,
   },
   ssr: {
-    external: ['@takumi-rs/image-response', 'typescript', 'twoslash', 'shiki'],
+    external: ["@takumi-rs/image-response", "typescript", "twoslash", "shiki"],
   },
-})
+});

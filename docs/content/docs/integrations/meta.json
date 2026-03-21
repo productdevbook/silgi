@@ -4,6 +4,7 @@
   "pages": [
     "index",
     "ai-sdk",
+    "broker",
     "astro",
     "aws-lambda",
     "elysia",

@@ -1,0 +1,204 @@
+---
+title: Message Broker
+description: Call procedures across services via NATS, Redis, or any message broker.
+---
+
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs'
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Steps, Step } from 'fumadocs-ui/components/steps'
+
+Normally Silgi talks over HTTP. But sometimes your services need to talk to each other through a message broker like NATS or Redis. The broker adapter lets you do exactly that — same router, same client, just a different transport underneath.
+
+## How it works
+
+You pick a **driver** for your broker. The driver handles the messaging — Silgi handles everything else (routing, validation, errors, types).
+
+<Mermaid chart="sequenceDiagram\n    participant A as Service A (client)\n    participant B as NATS / Redis\n    participant C as Service B (server)\n    A->>B: client.users.list()\n    B->>C: deliver request\n    C->>B: { users: [...] }\n    B->>A: deliver response" />
+
+Every driver has two sides:
+
+- **Server** listens for requests and sends back results
+- **Client** sends requests and waits for results
+
+The API is the same regardless of which broker you use.
+
+## NATS
+
+NATS is the easiest option — it has built-in request-reply, so everything just works.
+
+<Tabs items={['pnpm', 'npm', 'bun']}>
+  <Tab value='pnpm'>```bash pnpm add silgi nats ```</Tab>
+  <Tab value='npm'>```bash npm install silgi nats ```</Tab>
+  <Tab value='bun'>```bash bun add silgi nats ```</Tab>
+</Tabs>
+
+<Steps>
+<Step>
+### Connect to NATS and create a driver
+
+```ts twoslash
+// @noErrors
+import { connect } from 'nats'
+import { natsBroker } from 'silgi/broker/nats'
+
+const nc = await connect({ servers: 'localhost:4222' })
+const driver = natsBroker(nc)
+```
+
+</Step>
+
+<Step>
+### Start the server
+
+Pass your router and the driver. This is identical to how you'd use `handler()` — just over NATS instead of HTTP.
+
+```ts twoslash
+// @noErrors
+import { silgiBroker } from 'silgi/broker'
+import { appRouter } from './router'
+
+await silgiBroker(appRouter, driver, {
+  context: () => ({ db: getDB() }),
+})
+```
+
+</Step>
+
+<Step>
+### Call from the client
+
+The client works exactly like the HTTP client. Same types, same autocomplete.
+
+```ts twoslash
+// @noErrors
+import { BrokerLink } from 'silgi/broker'
+import { createClient } from 'silgi/client'
+import type { AppRouter } from './router'
+
+const client = createClient<AppRouter>(new BrokerLink(driver))
+
+const users = await client.users.list({ limit: 10 })
+```
+
+</Step>
+</Steps>
+
+### Scaling with queue groups
+
+If you run multiple server instances, pass `queue` so each request goes to only one of them:
+
+```ts twoslash
+// @noErrors
+import { natsBroker } from 'silgi/broker/nats'
+
+// all instances use the same group name — NATS load-balances automatically
+const driver = natsBroker(nc, { queue: 'api-workers' })
+```
+
+## Redis
+
+Redis works too, but it doesn't have built-in request-reply like NATS. The driver simulates it using temporary channels — you don't need to worry about the details.
+
+<Tabs items={['pnpm', 'npm', 'bun']}>
+  <Tab value='pnpm'>```bash pnpm add silgi ioredis ```</Tab>
+  <Tab value='npm'>```bash npm install silgi ioredis ```</Tab>
+  <Tab value='bun'>```bash bun add silgi ioredis ```</Tab>
+</Tabs>
+
+<Callout type='info'>
+  Redis needs two connections — one for publishing, one for subscribing. This is a Redis limitation, not a Silgi one.
+</Callout>
+
+<Steps>
+<Step>
+### Create the driver
+
+```ts twoslash
+// @noErrors
+import Redis from 'ioredis'
+import { redisBroker, ioredisTransport } from 'silgi/broker/redis'
+
+const redis = new Redis()
+const driver = redisBroker(ioredisTransport(redis, redis.duplicate()))
+```
+
+</Step>
+
+<Step>
+### Start the server
+
+```ts twoslash
+// @noErrors
+import { silgiBroker } from 'silgi/broker'
+import { appRouter } from './router'
+
+await silgiBroker(appRouter, driver, {
+  context: () => ({ db: getDB() }),
+})
+```
+
+</Step>
+
+<Step>
+### Call from the client
+
+```ts twoslash
+// @noErrors
+import { BrokerLink } from 'silgi/broker'
+import { createClient } from 'silgi/client'
+import type { AppRouter } from './router'
+
+const client = createClient<AppRouter>(new BrokerLink(driver))
+
+const users = await client.users.list({ limit: 10 })
+```
+
+</Step>
+</Steps>
+
+## Using a different broker
+
+If you use RabbitMQ, MQTT, or something else, you can write your own driver. It's just two functions:
+
+```ts twoslash
+// @noErrors
+import type { BrokerDriver } from 'silgi/broker'
+
+function myBroker(client: MyBrokerClient): BrokerDriver {
+  return {
+    // Server side: listen for requests, call reply() with the result
+    subscribe(subject, handler) {
+      const sub = client.subscribe(subject, (msg) => {
+        handler(msg.payload, (response) => client.send(msg.replyTo, response))
+      })
+      return () => sub.unsubscribe()
+    },
+    // Client side: send a request, wait for the response
+    async request(subject, payload, opts) {
+      return client.request(subject, payload, { timeout: opts?.timeout })
+    },
+  }
+}
+```
+
+## Testing
+
+Use `memoryBroker()` in your tests — it works the same way but runs in-memory, no Docker needed:
+
+```ts twoslash
+// @noErrors
+import { silgiBroker, BrokerLink, memoryBroker } from 'silgi/broker'
+import { createClient } from 'silgi/client'
+
+const driver = memoryBroker()
+await silgiBroker(appRouter, driver)
+const client = createClient<AppRouter>(new BrokerLink(driver))
+
+// now test as usual
+const result = await client.health()
+```
+
+## What's next?
+
+- [Client](/docs/client) — client configuration
+- [Message Port](/docs/integrations/message-port) — RPC over MessagePort (Electron, Web Workers)
