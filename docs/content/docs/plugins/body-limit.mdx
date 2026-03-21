@@ -13,7 +13,7 @@ The body limit guard checks the `Content-Length` header before the procedure run
 // @noErrors
 import { bodyLimitGuard } from 'silgi/plugins'
 
-const upload = k
+const upload = s
   .$use(bodyLimitGuard({ maxBytes: 5 * 1024 * 1024 })) // 5 MB
   .$input(z.object({ file: z.string() }))
   .$resolve(({ input, ctx }) => ctx.storage.upload(input))

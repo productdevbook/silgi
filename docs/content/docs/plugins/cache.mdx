@@ -57,7 +57,7 @@ Skip the cache entirely for specific requests, or force a refresh:
 // @noErrors
 import { cacheQuery } from 'silgi/cache'
 
-const listUsers = k
+const listUsers = s
   .$use(cacheQuery({
     maxAge: 300,
     // Admin users bypass cache
@@ -77,7 +77,7 @@ Invalidate cached queries by name — typically after a mutation:
 // @noErrors
 import { cacheQuery, invalidateQueryCache } from 'silgi/cache'
 
-const listUsers = k
+const listUsers = s
   .$use(cacheQuery({ maxAge: 300, name: 'users_list' }))
   .$resolve(({ ctx }) => ctx.db.users.findMany())
 
@@ -90,13 +90,7 @@ const createUser = s.$resolve(async ({ input, ctx }) => {
 
 ## Storage backends
 
-By default, cache lives in memory. For production, plug in any storage backend via [unstorage](https://unstorage.unjs.io).
-
-<Tabs items={['pnpm', 'npm', 'bun']}>
-  <Tab value='pnpm'>```bash pnpm add unstorage ```</Tab>
-  <Tab value='npm'>```bash npm install unstorage ```</Tab>
-  <Tab value='bun'>```bash bun add unstorage ```</Tab>
-</Tabs>
+By default, cache lives in memory. For production, plug in any storage backend via [unstorage](https://unstorage.unjs.io) (included as a dependency).
 
 ### Redis
 

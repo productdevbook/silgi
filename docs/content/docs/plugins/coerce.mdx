@@ -13,7 +13,7 @@ When procedures receive GET requests, all values arrive as strings from the quer
 // @noErrors
 import { coerceGuard } from 'silgi/plugins'
 
-const getUser = k
+const getUser = s
   .$use(coerceGuard)
   .$input(z.object({ id: z.number(), active: z.boolean().optional() }))
   .$resolve(({ input }) => db.users.find(input.id))

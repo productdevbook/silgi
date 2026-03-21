@@ -90,7 +90,7 @@ const tracing = otelWrap(tracer, 'api.procedure')
 
 ```ts twoslash
 // @noErrors
-const createUser = k
+const createUser = s
   .$use(auth, rateLimit, tracing)
   //   guards first, then wraps
   .$resolve(({ ctx, input }) => ctx.db.users.create(input))
