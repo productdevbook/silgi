@@ -1,11 +1,10 @@
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
+import { fmtMs } from '@/lib/format'
 import { useMemo } from 'react'
 import { Bar, BarChart, XAxis, YAxis } from 'recharts'
 
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { fmtMs } from '@/lib/format'
-
-import type { ProcedureSnapshot } from '@/lib/types'
 import type { ChartConfig } from '@/components/ui/chart'
+import type { ProcedureSnapshot } from '@/lib/types'
 
 const chartConfig = {
   p50: { label: 'p50', color: 'var(--chart-3)' },
@@ -34,18 +33,11 @@ export function LatencyChart({ procedures }: LatencyChartProps) {
   if (data.length === 0) return null
 
   return (
-    <ChartContainer config={chartConfig} className="h-48 w-full">
-      <BarChart data={data} layout="vertical" margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-        <YAxis
-          dataKey="name"
-          type="category"
-          tick={{ fontSize: 10 }}
-          tickLine={false}
-          axisLine={false}
-          width={72}
-        />
+    <ChartContainer config={chartConfig} className='h-48 w-full'>
+      <BarChart data={data} layout='vertical' margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+        <YAxis dataKey='name' type='category' tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={72} />
         <XAxis
-          type="number"
+          type='number'
           tick={{ fontSize: 10 }}
           tickLine={false}
           axisLine={false}
@@ -62,9 +54,9 @@ export function LatencyChart({ procedures }: LatencyChartProps) {
             />
           }
         />
-        <Bar dataKey="p50" fill="var(--color-p50)" radius={[0, 2, 2, 0]} barSize={5} />
-        <Bar dataKey="p95" fill="var(--color-p95)" radius={[0, 2, 2, 0]} barSize={5} />
-        <Bar dataKey="p99" fill="var(--color-p99)" fillOpacity={0.4} radius={[0, 2, 2, 0]} barSize={5} />
+        <Bar dataKey='p50' fill='var(--color-p50)' radius={[0, 2, 2, 0]} barSize={5} />
+        <Bar dataKey='p95' fill='var(--color-p95)' radius={[0, 2, 2, 0]} barSize={5} />
+        <Bar dataKey='p99' fill='var(--color-p99)' fillOpacity={0.4} radius={[0, 2, 2, 0]} barSize={5} />
       </BarChart>
     </ChartContainer>
   )

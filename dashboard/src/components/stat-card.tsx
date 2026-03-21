@@ -10,16 +10,14 @@ interface StatCardProps {
 
 export function StatCard({ title, value, subtitle, danger }: StatCardProps) {
   return (
-    <Card className="shadow-sm">
-      <CardHeader className="gap-3">
-        <CardDescription className="text-[11px] font-medium tracking-[0.24em] uppercase">{title}</CardDescription>
-        <div className={cn('text-3xl font-semibold tabular-nums tracking-tight', danger && 'text-destructive')}>
+    <Card size='sm' className='bg-muted/15 shadow-none'>
+      <CardHeader className='gap-1.5'>
+        <CardDescription className='text-[10px] font-medium tracking-[0.24em] uppercase'>{title}</CardDescription>
+        <div className={cn('text-2xl font-semibold tabular-nums tracking-tight', danger && 'text-destructive')}>
           {value}
         </div>
       </CardHeader>
-      {subtitle && (
-        <CardContent className="pt-0 text-xs text-muted-foreground">{subtitle}</CardContent>
-      )}
+      {subtitle && <CardContent className='pt-0 text-[11px] text-muted-foreground'>{subtitle}</CardContent>}
     </Card>
   )
 }

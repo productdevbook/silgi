@@ -1,7 +1,10 @@
 import { Badge } from '@/components/ui/badge'
-import { BackButton, CodePanel, InsightPill, PageHero, PageShell, SectionCard } from '@/components/dashboard-shell'
+import { Button } from '@/components/ui/button'
 import { SpanWaterfall } from '@/components/span-waterfall'
-import { fmtMs } from '@/lib/format'
+import { fmtMs, fmtTime } from '@/lib/format'
+import { cn } from '@/lib/utils'
+import { ArrowLeft01Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/react'
 
 import type { RequestEntry } from '@/lib/types'
 
@@ -16,55 +19,78 @@ export function RequestDetailPage({ requests, id, navigate }: RequestDetailPageP
 
   if (!entry) {
     return (
-      <PageShell>
-        <div className="flex min-h-64 items-center justify-center text-sm text-muted-foreground">Request not found</div>
-      </PageShell>
+      <div className='flex min-h-40 items-center justify-center text-sm text-muted-foreground'>Request not found</div>
     )
   }
 
   const hasInput = entry.input !== undefined && entry.input !== null
 
   return (
-    <PageShell>
-      <div className="flex flex-col gap-3">
-        <BackButton onClick={() => navigate('requests')}>
-          Back to requests
-        </BackButton>
-        <PageHero
-          eyebrow="Request detail"
-          title={entry.procedure}
-          description="Inspect the recorded request path, its traced spans, and the input payload that produced this response."
-          badges={
-            <>
-              <Badge variant={entry.status >= 400 ? 'destructive' : 'secondary'}>Status {entry.status}</Badge>
-              <Badge variant="secondary">{fmtMs(entry.durationMs)}</Badge>
-              <Badge variant="secondary">{entry.spans.length} spans</Badge>
-            </>
-          }
-        >
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <InsightPill label="Status" value={String(entry.status)} meta="HTTP response status" />
-            <InsightPill label="Duration" value={fmtMs(entry.durationMs)} meta="End-to-end duration" />
-            <InsightPill label="Spans" value={String(entry.spans.length)} meta="Recorded internal operations" />
-            <InsightPill label="Captured" value={new Date(entry.timestamp).toLocaleTimeString()} meta={new Date(entry.timestamp).toLocaleDateString()} />
-          </div>
-        </PageHero>
+    <div>
+      {/* Header bar */}
+      <div className='flex flex-wrap items-center gap-2 border-b px-5 py-3'>
+        <Button variant='ghost' size='xs' onClick={() => navigate('requests')}>
+          <HugeiconsIcon icon={ArrowLeft01Icon} data-icon='inline-start' />
+          Requests
+        </Button>
+        <span className='text-muted-foreground'>/</span>
+        <span className='font-mono text-sm font-medium'>{entry.procedure}</span>
+        <Badge variant={entry.status >= 400 ? 'destructive' : 'secondary'}>{entry.status}</Badge>
+        <Badge variant='secondary'>{fmtMs(entry.durationMs)}</Badge>
+        {entry.spans.length > 0 && <Badge variant='secondary'>{entry.spans.length} spans</Badge>}
+        <span className='text-[11px] text-muted-foreground'>{fmtTime(entry.timestamp)}</span>
       </div>
-      <div className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
-        {entry.spans.length > 0 && (
-          <SectionCard
-            title="Trace"
-            subtitle={`${entry.spans.length} operations spanning ${fmtMs(entry.durationMs)} total`}
-          >
-            <SpanWaterfall spans={entry.spans} totalMs={entry.durationMs} />
-          </SectionCard>
-        )}
-        {hasInput && (
-          <SectionCard title="Input" subtitle="Payload captured for this request">
-            <CodePanel>{JSON.stringify(entry.input, null, 2)}</CodePanel>
-          </SectionCard>
-        )}
+
+      {/* Detail content */}
+      <div className='grid xl:grid-cols-[1.65fr_0.9fr]'>
+        <div className='xl:border-r'>
+          <Section label={`Span timeline — ${entry.spans.length} ops, ${fmtMs(entry.durationMs)} total`}>
+            {entry.spans.length > 0 ? (
+              <SpanWaterfall spans={entry.spans} totalMs={entry.durationMs} />
+            ) : (
+              <p className='text-sm text-muted-foreground'>No internal spans were recorded for this trace.</p>
+            )}
+          </Section>
+        </div>
+
+        <div>
+          <Section label='Metadata'>
+            <div className='flex flex-col'>
+              <KV label='id' value={String(entry.id)} />
+              <KV label='status' value={String(entry.status)} danger={entry.status >= 400} />
+              <KV label='spans' value={String(entry.spans.length)} />
+              <KV label='duration' value={fmtMs(entry.durationMs)} />
+              <KV label='input' value={hasInput ? 'captured' : 'empty'} />
+            </div>
+          </Section>
+
+          {hasInput && (
+            <Section label='Input payload'>
+              <pre className='overflow-x-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed'>
+                {JSON.stringify(entry.input, null, 2)}
+              </pre>
+            </Section>
+          )}
+        </div>
       </div>
-    </PageShell>
+    </div>
+  )
+}
+
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className='border-b px-5 py-4 last:border-b-0'>
+      <h4 className='mb-3 text-[11px] font-medium text-muted-foreground'>{label}</h4>
+      {children}
+    </div>
+  )
+}
+
+function KV({ label, value, danger }: { label: string; value: string; danger?: boolean }) {
+  return (
+    <div className='flex items-center justify-between border-b border-dashed py-1.5 last:border-0'>
+      <span className='text-[11px] text-muted-foreground'>{label}</span>
+      <span className={cn('font-mono text-[11px]', danger && 'text-destructive')}>{value}</span>
+    </div>
   )
 }

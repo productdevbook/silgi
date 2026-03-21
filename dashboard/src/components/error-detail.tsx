@@ -1,6 +1,6 @@
-import { CodePanel, SectionCard } from '@/components/dashboard-shell'
 import { SpanWaterfall } from '@/components/span-waterfall'
 import { fmtMs } from '@/lib/format'
+import { cn } from '@/lib/utils'
 
 import type { ErrorEntry } from '@/lib/types'
 
@@ -17,51 +17,86 @@ export function ErrorDetail({ entry }: ErrorDetailProps) {
   const hasHeaders = headerEntries.length > 0
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="grid gap-4 xl:grid-cols-[1fr_1.1fr]">
-        <SectionCard title="Error" subtitle="The thrown message captured by analytics">
-          <CodePanel>{entry.error}</CodePanel>
-        </SectionCard>
+    <div className='grid xl:grid-cols-[1.6fr_1fr]'>
+      {/* Left column */}
+      <div className='xl:border-r'>
+        <Section label='Error message'>
+          <pre className='overflow-x-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-destructive/90'>
+            {entry.error}
+          </pre>
+        </Section>
 
         {hasSpans && (
-          <SectionCard title="Trace" subtitle={`${entry.spans.length} operations across ${fmtMs(entry.durationMs)} total`}>
+          <Section label={`Trace timeline — ${entry.spans.length} ops, ${fmtMs(entry.durationMs)} total`}>
             <SpanWaterfall spans={entry.spans} totalMs={entry.durationMs} />
-          </SectionCard>
+          </Section>
+        )}
+
+        {entry.stack && (
+          <Section label='Stack trace'>
+            <pre className='overflow-x-auto whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-muted-foreground'>
+              {entry.stack}
+            </pre>
+          </Section>
         )}
       </div>
 
-      {(hasInput || hasHeaders) && (
-        <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-          {hasInput && (
-            <SectionCard title="Input" subtitle="The request payload that led to the failure">
-              <CodePanel>{JSON.stringify(entry.input, null, 2)}</CodePanel>
-            </SectionCard>
-          )}
+      {/* Right column */}
+      <div>
+        <Section label='Metadata'>
+          <div className='flex flex-col'>
+            <KV label='id' value={String(entry.id)} />
+            <KV label='status' value={String(entry.status)} danger={entry.status >= 500} />
+            <KV label='code' value={entry.code} danger />
+            <KV label='duration' value={fmtMs(entry.durationMs)} />
+            <KV label='spans' value={String(entry.spans.length)} />
+            <KV label='headers' value={String(headerEntries.length)} />
+          </div>
+        </Section>
 
-          {hasHeaders && (
-            <SectionCard title="Headers" subtitle="Sensitive headers are redacted before display">
-              <div className="flex flex-col gap-0">
-                {headerEntries.map(([key, value]) => (
-                  <div key={key} className="flex gap-3 border-b border-dashed py-1.5 last:border-0">
-                    <span className="w-36 shrink-0 truncate font-mono text-[11px] text-muted-foreground">{key}</span>
-                    <span className="min-w-0 break-all font-mono text-[11px]">
-                      {SENSITIVE_HEADERS.has(key.toLowerCase()) ? (
-                        <span className="text-muted-foreground/50">[redacted]</span>
-                      ) : value}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
-          )}
-        </div>
-      )}
+        {hasInput && (
+          <Section label='Input payload'>
+            <pre className='overflow-x-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed'>
+              {JSON.stringify(entry.input, null, 2)}
+            </pre>
+          </Section>
+        )}
 
-      {entry.stack && (
-        <SectionCard title="Stack trace" subtitle="Useful for mapping the failure back to its source">
-          <CodePanel>{entry.stack}</CodePanel>
-        </SectionCard>
-      )}
+        {hasHeaders && (
+          <Section label='Headers'>
+            <div className='flex flex-col'>
+              {headerEntries.map(([key, value]) => (
+                <div key={key} className='flex gap-3 border-b border-dashed py-1.5 last:border-0'>
+                  <span className='w-28 shrink-0 truncate font-mono text-[11px] text-muted-foreground'>{key}</span>
+                  <span className='min-w-0 break-all font-mono text-[11px]'>
+                    {SENSITIVE_HEADERS.has(key.toLowerCase()) ? (
+                      <span className='text-muted-foreground/40'>[redacted]</span>
+                    ) : value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className='border-b px-5 py-4 last:border-b-0'>
+      <h4 className='mb-3 text-[11px] font-medium text-muted-foreground'>{label}</h4>
+      {children}
+    </div>
+  )
+}
+
+function KV({ label, value, danger }: { label: string; value: string; danger?: boolean }) {
+  return (
+    <div className='flex items-center justify-between border-b border-dashed py-1.5 last:border-0'>
+      <span className='text-[11px] text-muted-foreground'>{label}</span>
+      <span className={cn('font-mono text-[11px]', danger && 'text-destructive')}>{value}</span>
     </div>
   )
 }

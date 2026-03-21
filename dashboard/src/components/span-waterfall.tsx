@@ -1,9 +1,8 @@
 import { useMemo } from 'react'
 
-import { cn } from '@/lib/utils'
-import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { fmtMs } from '@/lib/format'
+import { cn } from '@/lib/utils'
 
 import type { TraceSpan } from '@/lib/types'
 
@@ -13,70 +12,66 @@ interface SpanWaterfallProps {
 }
 
 export function SpanWaterfall({ spans, totalMs }: SpanWaterfallProps) {
-  const maxMs = useMemo(
-    () => Math.max(totalMs, ...spans.map((s) => s.durationMs)),
-    [spans, totalMs],
-  )
+  const maxMs = useMemo(() => Math.max(totalMs, ...spans.map((span) => span.durationMs)), [spans, totalMs])
 
   return (
-    <div className="flex flex-col gap-2">
-      {spans.map((span, i) => {
+    <div className='flex flex-col'>
+      {/* Header */}
+      <div className='grid grid-cols-[2rem_minmax(0,12rem)_1fr_4.5rem_3rem] items-center gap-2 border-b py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground'>
+        <span>#</span>
+        <span>span</span>
+        <span>timeline</span>
+        <span className='text-right'>dur</span>
+        <span className='text-right'>%</span>
+      </div>
+
+      {spans.map((span, index) => {
         const pct = maxMs > 0 ? (span.durationMs / maxMs) * 100 : 0
+        const totalPct = totalMs > 0 ? (span.durationMs / totalMs) * 100 : 0
         const isError = !!span.error
         const isSlow = span.durationMs > totalMs * 0.5
 
         return (
-          <div key={i} className="group flex items-center gap-3 rounded-lg border bg-muted/20 px-3 py-2">
-            {/* Name */}
-            <div className="flex w-32 shrink-0 items-center gap-1.5 lg:w-44">
-              <SpanIcon type={guessSpanType(span.name)} />
-              <span className="truncate font-mono text-[11px]" title={span.name}>
+          <div
+            key={`${span.name}-${index}`}
+            className='grid grid-cols-[2rem_minmax(0,12rem)_1fr_4.5rem_3rem] items-center gap-2 border-b border-dashed py-2 last:border-0'
+          >
+            <span className='font-mono text-[10px] text-muted-foreground/60'>{index + 1}</span>
+
+            <div className='flex min-w-0 items-center gap-1.5'>
+              <SpanDot type={guessSpanType(span.name)} />
+              <span className='truncate font-mono text-[11px]' title={span.name}>
                 {span.name}
               </span>
             </div>
 
-            {/* Bar */}
-            <div className="relative h-5 flex-1 overflow-hidden rounded bg-muted/50">
-              <Tooltip>
-                <TooltipTrigger
-                  className="absolute inset-y-0 left-0 flex items-center rounded transition-all"
-                  style={{ width: `${Math.max(pct, 2)}%` }}
-                >
-                  <div
-                    className={cn(
-                      'h-full w-full rounded',
-                      isError
-                        ? 'bg-destructive/60'
-                        : isSlow
-                          ? 'bg-chart-1/45'
-                          : 'bg-primary/30',
-                    )}
-                  />
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs">
-                  <span className="font-medium">{span.name}</span>
-                  <span className="ml-2 tabular-nums">{fmtMs(span.durationMs)}</span>
-                  {span.error && (
-                    <span className="ml-2 text-destructive">{span.error}</span>
+            <Tooltip>
+              <TooltipTrigger className='relative h-4 overflow-hidden rounded-sm bg-muted/30'>
+                <div
+                  className={cn(
+                    'absolute inset-y-0 left-0 rounded-sm',
+                    isError ? 'bg-destructive/60' : isSlow ? 'bg-chart-1/50' : 'bg-primary/30',
                   )}
-                </TooltipContent>
-              </Tooltip>
-            </div>
+                  style={{ width: `${Math.max(pct, 2)}%` }}
+                />
+              </TooltipTrigger>
+              <TooltipContent side='top' className='text-xs'>
+                <span className='font-medium'>{span.name}</span>
+                <span className='ml-2 tabular-nums'>{fmtMs(span.durationMs)}</span>
+                {span.error && <span className='ml-2 text-destructive'>{span.error}</span>}
+              </TooltipContent>
+            </Tooltip>
 
-            {/* Duration + status */}
-            <div className="flex w-20 shrink-0 items-center justify-end gap-2">
-              <span
-                className={cn(
-                  'font-mono text-[11px] tabular-nums',
-                  isError ? 'text-destructive' : isSlow ? 'text-chart-1' : 'text-muted-foreground',
-                )}
-              >
-                {fmtMs(span.durationMs)}
-              </span>
-              {isError && (
-                <Badge variant="destructive" className="h-4 px-1 text-[9px]">err</Badge>
+            <span
+              className={cn(
+                'text-right font-mono text-[11px] tabular-nums',
+                isError ? 'text-destructive' : isSlow ? 'text-chart-1' : 'text-muted-foreground',
               )}
-            </div>
+            >
+              {fmtMs(span.durationMs)}
+            </span>
+
+            <span className='text-right font-mono text-[10px] text-muted-foreground/60'>{totalPct.toFixed(0)}%</span>
           </div>
         )
       })}
@@ -84,16 +79,25 @@ export function SpanWaterfall({ spans, totalMs }: SpanWaterfallProps) {
   )
 }
 
-// ── Span type detection ──────────────────────────────
-
 type SpanType = 'db' | 'http' | 'cache' | 'queue' | 'default'
 
 function guessSpanType(name: string): SpanType {
-  const n = name.toLowerCase()
-  if (n.includes('db') || n.includes('sql') || n.includes('query') || n.includes('prisma') || n.includes('drizzle') || n.includes('mongo')) return 'db'
-  if (n.includes('http') || n.includes('fetch') || n.includes('api') || n.includes('request')) return 'http'
-  if (n.includes('cache') || n.includes('redis') || n.includes('memcache')) return 'cache'
-  if (n.includes('queue') || n.includes('publish') || n.includes('nats') || n.includes('kafka')) return 'queue'
+  const lower = name.toLowerCase()
+  if (
+    lower.includes('db')
+    || lower.includes('sql')
+    || lower.includes('query')
+    || lower.includes('prisma')
+    || lower.includes('drizzle')
+    || lower.includes('mongo')
+  )
+    return 'db'
+  if (lower.includes('http') || lower.includes('fetch') || lower.includes('api') || lower.includes('request'))
+    return 'http'
+  if (lower.includes('cache') || lower.includes('redis') || lower.includes('memcache'))
+    return 'cache'
+  if (lower.includes('queue') || lower.includes('publish') || lower.includes('nats') || lower.includes('kafka'))
+    return 'queue'
   return 'default'
 }
 
@@ -105,6 +109,6 @@ const SPAN_COLORS: Record<SpanType, string> = {
   default: 'bg-muted-foreground',
 }
 
-function SpanIcon({ type }: { type: SpanType }) {
+function SpanDot({ type }: { type: SpanType }) {
   return <span className={`inline-block size-1.5 shrink-0 rounded-full ${SPAN_COLORS[type]}`} />
 }
