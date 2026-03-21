@@ -128,7 +128,7 @@ const s = silgi({
   },
 })
 
-const { query, mutation, subscription, guard, wrap, router } = s
+// Methods used directly on `s`: s.$resolve, s.$input, s.$use, s.guard, s.wrap, s.router, s.subscription
 
 // ── CORS (hook-based) ────────────────────────────────
 
@@ -141,7 +141,7 @@ const _corsHooks = cors({
 // ── Guards ───────────────────────────────────────────
 
 // 1. Auth guard
-const auth = guard(async (ctx) => {
+const auth = s.guard(async (ctx) => {
   const token = ctx.headers.authorization?.replace('Bearer ', '')
   if (token !== 'secret-token') {
     throw new SilgiError('UNAUTHORIZED', { status: 401, message: 'Invalid or missing token' })
@@ -161,7 +161,7 @@ const _bodyLimit = bodyLimitGuard({ maxBytes: 1_048_576 })
 // ── Wraps ────────────────────────────────────────────
 
 // 1. Simple timing wrap
-const timing = wrap(async (ctx, next) => {
+const timing = s.wrap(async (ctx, next) => {
   const t0 = performance.now()
   const result = await next()
   const ms = (performance.now() - t0).toFixed(1)
@@ -188,7 +188,7 @@ const lifecycle = lifecycleWrap({
 // ── Procedures ───────────────────────────────────────
 
 // --- Health (zero-config short form) ---
-const health = query(async () => ({
+const health = s.$resolve(async () => ({
   status: 'ok' as const,
   uptime: process.uptime(),
   timestamp: new Date().toISOString(),
@@ -215,20 +215,22 @@ const health = query(async () => ({
 }))
 
 // --- Users: List (short form with input) ---
-const listUsers = query(z.object({ limit: z.number().min(1).max(100).optional() }), async ({ input, ctx }) => {
-  const limit = input.limit ?? 10
-  return { users: ctx.db.users.slice(0, limit), total: ctx.db.users.length }
-})
+const listUsers = s
+  .$input(z.object({ limit: z.number().min(1).max(100).optional() }))
+  .$resolve(async ({ input, ctx }) => {
+    const limit = input.limit ?? 10
+    return { users: ctx.db.users.slice(0, limit), total: ctx.db.users.length }
+  })
 
 // --- Users: Get (with NOT_FOUND error) ---
-const getUser = query(z.object({ id: z.number() }), async ({ input, ctx }) => {
+const getUser = s.$input(z.object({ id: z.number() })).$resolve(async ({ input, ctx }) => {
   const user = ctx.db.users.find((u) => u.id === input.id)
   if (!user) throw new SilgiError('NOT_FOUND', { status: 404, message: `User #${input.id} not found` })
   return user
 })
 
 // --- Users: Create (builder: auth + timing + lifecycle + output + errors) ---
-const createUser = mutation()
+const createUser = s
   .$use(auth, timing, lifecycle)
   .$input(
     z.object({
@@ -259,7 +261,7 @@ const createUser = mutation()
   })
 
 // --- Users: Delete (builder: auth + typed error) ---
-const deleteUser = mutation()
+const deleteUser = s
   .$use(auth)
   .$input(z.object({ id: z.number() }))
   .$errors({ NOT_FOUND: 404 })
@@ -272,7 +274,7 @@ const deleteUser = mutation()
   })
 
 // --- Posts: List (builder: coercion guard) ---
-const listPosts = query()
+const listPosts = s
   .$use(coerceGuard)
   .$input(
     z.object({
@@ -288,7 +290,7 @@ const listPosts = query()
   })
 
 // --- Posts: Create (builder: auth + lifecycle + output) ---
-const createPost = mutation()
+const createPost = s
   .$use(auth, lifecycle)
   .$input(
     z.object({
@@ -312,7 +314,7 @@ const createPost = mutation()
   })
 
 // --- Cookies: Demo ---
-const cookieDemo = query(async ({ ctx }) => {
+const cookieDemo = s.$resolve(async ({ ctx }) => {
   const existing = getCookie(ctx.headers.cookie ?? '', 'session')
   const newCookie = setCookie('session', 'silgi-session-123', {
     httpOnly: true,
@@ -327,7 +329,7 @@ const cookieDemo = query(async ({ ctx }) => {
 })
 
 // --- Signing & Encryption: Demo ---
-const signingDemo = query(async () => {
+const signingDemo = s.$resolve(async () => {
   const secret = 'silgi-secret-key-2026'
   const message = 'hello from silgi'
 
@@ -351,7 +353,7 @@ const signingDemo = query(async () => {
 })
 
 // --- Custom Serializer: Demo ---
-const serializerDemo = query(async () => {
+const serializerDemo = s.$resolve(async () => {
   const data = {
     date: new Date('2026-01-01T00:00:00Z'),
     set: new Set([1, 2, 3]),
@@ -375,7 +377,7 @@ const serializerDemo = query(async () => {
 })
 
 // --- Subscription: Tick stream ---
-const tickStream = subscription(async function* () {
+const tickStream = s.subscription(async function* () {
   for (let i = 0; i < 5; i++) {
     await new Promise((r) => setTimeout(r, 300))
     yield {
@@ -388,24 +390,23 @@ const tickStream = subscription(async function* () {
 })
 
 // --- Subscription: PubSub-based user events ---
-const userEvents = subscription(async function* ({ ctx }) {
+const userEvents = s.subscription(async function* ({ ctx }) {
   yield* ctx.pubsub.subscribe<{ id: number; name: string; email: string }>('user:created')
 })
 
 // --- mapInput demo ---
-const getUserBySlug = query({
-  use: [
+const getUserBySlug = s
+  .$use(
     mapInput((input: { slug: string }) => ({
       name: input.slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
     })),
-  ],
-  resolve: async ({ input, ctx }) => {
+  )
+  .$resolve(async ({ input, ctx }) => {
     const name = (input as any).name ?? (input as any).slug
     const user = ctx.db.users.find((u) => u.name.toLowerCase() === name?.toLowerCase())
     if (!user) throw new SilgiError('NOT_FOUND', { status: 404, message: `User "${name}" not found` })
     return user
-  },
-})
+  })
 
 // ── Contract-first: Admin API ────────────────────────
 
@@ -454,7 +455,7 @@ directListUsers({ limit: 2 }).then((result) => {
 
 // ── Router ───────────────────────────────────────────
 
-const appRouter = router({
+const appRouter = s.router({
   health,
   users: {
     list: listUsers,
