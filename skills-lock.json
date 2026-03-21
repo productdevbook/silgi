@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "data-table-filters": {
+      "source": "openstatushq/data-table-filters",
+      "sourceType": "github",
+      "computedHash": "9013d8f8f0d30b89c2608b6feb1c6ee446a4899b7cafe1ef48aa653887e1d72d"
+    },
+    "shadcn": {
+      "source": "shadcn/ui",
+      "sourceType": "github",
+      "computedHash": "507f011a70e8b3ae242bdc0bb5b39fd91a1d4049a0f3c281991ccf84973d591c"
+    }
+  }
+}
