@@ -2,7 +2,7 @@
  * Standalone worker service — runs as a separate process.
  * Listens for RPC calls over NATS and handles them.
  *
- * Start: node --experimental-strip-types server/rpc/broker/worker.ts
+ * Run:   npx tsx server/rpc/broker/worker.ts
  */
 import { connect } from 'nats'
 import { silgiBroker } from 'silgi/broker'

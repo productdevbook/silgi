@@ -54,7 +54,7 @@ The `/broker` page calls a separate worker service via NATS. To run it:
 docker compose up -d
 
 # 2. Start the worker (separate terminal)
-node --experimental-strip-types server/rpc/broker/worker.ts
+npx tsx server/rpc/broker/worker.ts
 
 # 3. Start Nuxt
 pnpm dev
