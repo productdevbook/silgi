@@ -17,9 +17,11 @@ import { compileRouter } from './compile.ts'
 import { createFetchHandler } from './core/handler.ts'
 import { assignPaths, routerCache } from './core/router-utils.ts'
 import { createServeHandler } from './core/serve.ts'
+import { initStorage, useStorage } from './core/storage.ts'
 
 import type { ProcedureBuilder } from './builder.ts'
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
+import type { StorageConfig } from './core/storage.ts'
 import type { ScalarOptions } from './scalar.ts'
 import type {
   ProcedureDef,
@@ -53,6 +55,25 @@ export interface SilgiConfig<TCtx extends Record<string, unknown>> {
   context: (req: Request) => TCtx | Promise<TCtx>
   /** Register lifecycle hooks */
   hooks?: Partial<{ [K in keyof SilgiHooks]: SilgiHooks[K] | SilgiHooks[K][] }>
+  /**
+   * Storage configuration — mount drivers by path prefix.
+   *
+   * ```ts
+   * import redisDriver from 'unstorage/drivers/redis'
+   * import memoryDriver from 'unstorage/drivers/memory'
+   *
+   * storage: {
+   *   cache: redisDriver({ url: 'redis://localhost' }),
+   *   sessions: memoryDriver(),
+   * }
+   * ```
+   *
+   * Or pass a pre-built unstorage instance:
+   * ```ts
+   * storage: myStorageInstance
+   * ```
+   */
+  storage?: StorageConfig
 }
 
 export interface SilgiInstance<TBaseCtx extends Record<string, unknown>> {
@@ -61,6 +82,9 @@ export interface SilgiInstance<TBaseCtx extends Record<string, unknown>> {
 
   /** Remove a lifecycle hook */
   removeHook: Hookable<SilgiHooks>['removeHook']
+  /** Access storage with optional prefix — uses configured mounts */
+  useStorage: typeof useStorage
+
   /** Create a guard middleware (flat, zero-closure) */
   guard: GuardFactory<TBaseCtx>
 
@@ -210,6 +234,11 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
 ): SilgiInstance<TBaseCtx> {
   const contextFactory = config.context
 
+  // Initialize storage (if configured) — once at startup, zero per-request cost
+  if (config.storage) {
+    initStorage(config.storage)
+  }
+
   // Lifecycle hooks (sync fast-path when no hooks registered)
   const hooks = createHooks<SilgiHooks>()
   if (config.hooks) {
@@ -225,6 +254,7 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
   const instance: SilgiInstance<TBaseCtx> = {
     hook: hooks.hook,
     removeHook: hooks.removeHook.bind(hooks),
+    useStorage,
 
     guard: (fnOrConfig: any) => {
       if (typeof fnOrConfig === 'function') {
@@ -263,3 +293,5 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
 
 export { SilgiError, toSilgiError, isErrorStatus } from './core/error.ts'
 export { type, validateSchema, ValidationError } from './core/schema.ts'
+export { useStorage, initStorage, resetStorage } from './core/storage.ts'
+export type { StorageConfig, Storage, StorageValue, Driver } from './core/storage.ts'

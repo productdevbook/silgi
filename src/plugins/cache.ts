@@ -31,11 +31,39 @@
  * ```
  */
 
-import { defineCachedFunction, setStorage, useStorage } from 'ocache'
+import { defineCachedFunction, setStorage, useStorage as useOcacheStorage } from 'ocache'
 import { hash } from 'ohash'
+
+import { useStorage as useSilgiStorage } from '../core/storage.ts'
 
 import type { WrapDef } from '../types.ts'
 import type { CacheEntry, CacheOptions, StorageInterface } from 'ocache'
+
+/**
+ * Auto-connect ocache to silgi's storage.
+ * Called lazily on first cacheQuery() use.
+ */
+let _storageConnected = false
+function ensureStorageConnected(): void {
+  if (_storageConnected) return
+  _storageConnected = true
+  try {
+    // Connect ocache to silgi's storage under the 'cache' mount
+    const storage = useSilgiStorage('cache')
+    setStorage({
+      get: <T>(key: string) => storage.getItem(key) as Promise<T | null>,
+      set: <T>(key: string, value: T, opts?: { ttl?: number }) => {
+        if (value === null || value === undefined) {
+          storage.removeItem(key)
+          return
+        }
+        storage.setItem(key, value as string, opts?.ttl ? { ttl: opts.ttl } : undefined)
+      },
+    })
+  } catch {
+    // No silgi storage configured — ocache uses default in-memory
+  }
+}
 
 /** Registry of cached function keys for invalidation */
 const cacheKeyRegistry = new Map<string, Set<string>>()
@@ -165,6 +193,7 @@ export function cacheQuery<T = unknown>(options: CacheQueryOptions<T> = {}): Wra
   return {
     kind: 'wrap',
     fn: async (ctx, next) => {
+      ensureStorageConnected()
       if (!cachedFn) {
         if (!cacheName) {
           cacheName = (ctx as any).__procedurePath || `proc_${hash(next.toString()).slice(0, 8)}`
@@ -229,7 +258,7 @@ export function cacheQuery<T = unknown>(options: CacheQueryOptions<T> = {}): Wra
 export async function invalidateQueryCache(name: string): Promise<void> {
   const keys = cacheKeyRegistry.get(name)
   if (keys) {
-    const storage = useStorage()
+    const storage = useOcacheStorage()
     await Promise.all([...keys].map((key) => storage.set(key, null)))
     keys.clear()
   }
