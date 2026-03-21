@@ -116,9 +116,7 @@ describe('invalidateQueryCache', () => {
 
     const handler = k.handler(
       k.router({
-        data: k
-          .$use(cacheQuery({ maxAge: 60, swr: false, name: 'direct_inv' }))
-          .$resolve(() => ++callCount),
+        data: k.$use(cacheQuery({ maxAge: 60, swr: false, name: 'direct_inv' })).$resolve(() => ++callCount),
       }),
     )
 

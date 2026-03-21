@@ -22,10 +22,9 @@ import type { ClientLink, ClientContext, ClientOptions } from './types.ts'
  * const client = createClient<InferClient<AppRouter>>(link)
  * ```
  */
-export function createClient<
-  T,
-  TClientContext extends ClientContext = Record<never, never>,
->(link: ClientLink<TClientContext>): InferClient<T> extends never ? T : InferClient<T> {
+export function createClient<T, TClientContext extends ClientContext = Record<never, never>>(
+  link: ClientLink<TClientContext>,
+): InferClient<T> extends never ? T : InferClient<T> {
   return createClientProxy(link, []) as any
 }
 

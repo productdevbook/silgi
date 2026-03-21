@@ -3,26 +3,32 @@ const messages = ref<Array<{ id: string; direction: 'out' | 'in'; data: unknown;
 const connected = ref(false)
 const error = ref('')
 
+
 let ws: WebSocket | null = null
 let msgId = 0
+
 
 function connect() {
   error.value = ''
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
   ws = new WebSocket(`${proto}//${location.host}`)
 
+
   ws.addEventListener('open', () => {
     connected.value = true
   })
+
 
   ws.addEventListener('message', (event) => {
     const msg = JSON.parse(event.data)
     messages.value.push({ id: msg.id, direction: 'in', data: msg, ts: Date.now() })
   })
 
+
   ws.addEventListener('close', () => {
     connected.value = false
   })
+
 
   ws.addEventListener('error', () => {
     error.value = 'Connection failed'
@@ -30,10 +36,12 @@ function connect() {
   })
 }
 
+
 function disconnect() {
   ws?.close()
   ws = null
 }
+
 
 function send(path: string, input?: unknown) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return
@@ -43,23 +51,29 @@ function send(path: string, input?: unknown) {
   messages.value.push({ id, direction: 'out', data: payload, ts: Date.now() })
 }
 
+
 // ── Demo actions ──
+
 
 function callHealth() {
   send('demo/slow')
 }
 
+
 function callEcho() {
   send('demo/compute', { a: Math.floor(Math.random() * 100), b: Math.floor(Math.random() * 100), op: 'add' })
 }
+
 
 function callClock() {
   send('demo/clock')
 }
 
+
 function callNotFound() {
   send('does/not/exist')
 }
+
 
 onUnmounted(() => disconnect())
 </script>
@@ -135,11 +149,7 @@ onUnmounted(() => disconnect())
     <section>
       <div class="mb-2 flex items-center justify-between">
         <h2 class="text-sm font-semibold uppercase text-gray-500">Messages</h2>
-        <button
-          v-if="messages.length"
-          class="text-xs text-gray-400 hover:text-gray-600"
-          @click="messages = []"
-        >
+        <button v-if="messages.length" class="text-xs text-gray-400 hover:text-gray-600" @click="messages = []">
           Clear
         </button>
       </div>
@@ -149,11 +159,16 @@ onUnmounted(() => disconnect())
           v-for="(msg, i) in messages"
           :key="i"
           class="rounded-lg border p-2.5 text-xs font-mono"
-          :class="msg.direction === 'out'
-            ? 'border-blue-100 bg-blue-50 text-blue-800'
-            : 'border-gray-100 bg-gray-50 text-gray-700'"
+          :class="
+            msg.direction === 'out'
+              ? 'border-blue-100 bg-blue-50 text-blue-800'
+              : 'border-gray-100 bg-gray-50 text-gray-700'
+          "
         >
-          <span class="font-sans text-[10px] font-semibold uppercase" :class="msg.direction === 'out' ? 'text-blue-400' : 'text-gray-400'">
+          <span
+            class="font-sans text-[10px] font-semibold uppercase"
+            :class="msg.direction === 'out' ? 'text-blue-400' : 'text-gray-400'"
+          >
             {{ msg.direction === 'out' ? '→ send' : '← recv' }}
           </span>
           <pre class="mt-1 whitespace-pre-wrap break-all">{{ JSON.stringify(msg.data, null, 2) }}</pre>

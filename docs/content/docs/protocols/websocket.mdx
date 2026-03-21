@@ -51,7 +51,8 @@ const echo = s
 ```
 
 <Callout type='info'>
-  WebSocket-enabled procedures also work over HTTP. The `ws: true` flag adds WebSocket access, it doesn't remove HTTP access.
+  WebSocket-enabled procedures also work over HTTP. The `ws: true` flag adds WebSocket access, it doesn't remove HTTP
+  access.
 </Callout>
 
 ## Server setup
@@ -107,31 +108,35 @@ const hooks = createWSHooks(appRouter)
   import { createWSHooks } from 'silgi/ws'
   import { appRouter } from '../rpc/router'
 
-  // @ts-expect-error — Nitro auto-import
-  export default defineWebSocketHandler(createWSHooks(appRouter))
-  ```
+// @ts-expect-error — Nitro auto-import
+export default defineWebSocketHandler(createWSHooks(appRouter))
 
-  Enable in `nuxt.config.ts`:
+````
 
-  ```ts
-  export default defineNuxtConfig({
-    nitro: { features: { websocket: true } },
-  })
-  ```
+Enable in `nuxt.config.ts`:
+
+```ts
+export default defineNuxtConfig({
+  nitro: { features: { websocket: true } },
+})
+````
+
   </Tab>
   <Tab value='Deno'>
   ```ts
   import { createWSHooks } from 'silgi/ws'
 
-  Deno.serve({ handler: fetchHandler, websocket: createWSHooks(appRouter) })
-  ```
-  </Tab>
-  <Tab value='Bun'>
-  ```ts
-  import { createWSHooks } from 'silgi/ws'
+Deno.serve({ handler: fetchHandler, websocket: createWSHooks(appRouter) })
 
-  Bun.serve({ fetch: fetchHandler, websocket: createWSHooks(appRouter) })
-  ```
+````
+</Tab>
+<Tab value='Bun'>
+```ts
+import { createWSHooks } from 'silgi/ws'
+
+Bun.serve({ fetch: fetchHandler, websocket: createWSHooks(appRouter) })
+````
+
   </Tab>
 </Tabs>
 
@@ -256,7 +261,8 @@ With binary mode, messages are sent as MessagePack-encoded binary frames instead
 WebSocket-enabled procedures are documented in the OpenAPI spec with an automatic note in the description field. Scalar and other OpenAPI viewers will display this alongside the regular HTTP documentation.
 
 <Callout type='warn'>
-  OpenAPI 3.x does not have a native WebSocket specification. When Scalar adds AsyncAPI support, Silgi will generate AsyncAPI specs for WebSocket procedures.
+  OpenAPI 3.x does not have a native WebSocket specification. When Scalar adds AsyncAPI support, Silgi will generate
+  AsyncAPI specs for WebSocket procedures.
 </Callout>
 
 ## What's next?

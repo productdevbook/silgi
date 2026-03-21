@@ -141,7 +141,11 @@ export function createWSHooks(routerDef: RouterDef, options: WSAdapterOptions = 
  * server.listen(3000);
  * ```
  */
-export async function attachWebSocket(server: HttpServer, routerDef: RouterDef, options: WSAdapterOptions = {}): Promise<void> {
+export async function attachWebSocket(
+  server: HttpServer,
+  routerDef: RouterDef,
+  options: WSAdapterOptions = {},
+): Promise<void> {
   const nodeAdapter = (await import('crossws/adapters/node')).default
   const ws = nodeAdapter({ hooks: createWSHooks(routerDef, options) })
 
