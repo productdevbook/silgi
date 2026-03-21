@@ -1,5 +1,5 @@
 /**
- * Silgi + Nitro — direct integration (like Hono + Nitro).
+ * Silgi + Nitro — direct integration.
  *
  * Export an object with a `fetch` method — Nitro uses it as the server.
  * No adapters needed — just handler().
@@ -84,6 +84,6 @@ const appRouter = router({
   },
 })
 
-// Export with fetch method — Nitro detects this like Hono
+// Export with fetch method — Nitro detects this and routes all requests through it
 const fetchHandler = handler(appRouter)
 export default { fetch: fetchHandler }

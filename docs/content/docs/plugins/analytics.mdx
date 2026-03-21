@@ -1,0 +1,141 @@
+---
+title: Analytics
+description: Built-in monitoring dashboard with deep error tracing, AI-ready markdown export, and custom span tracking.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+
+Built-in analytics for Silgi. No Prometheus, no Grafana, no external infrastructure. One flag gives you a live dashboard, full error context, and one-click markdown export for AI debugging.
+
+## Quick start
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, {
+  port: 3000,
+  analytics: true,
+})
+```
+
+Open `http://localhost:3000/analytics` in your browser.
+
+## What it tracks
+
+| Metric                       | How                                | Overhead       |
+| ---------------------------- | ---------------------------------- | -------------- |
+| Request count per procedure  | Atomic counter                     | ~0             |
+| Error log with full context  | Input, headers, stack trace, spans | ~0             |
+| Latency (avg, p50, p95, p99) | Ring buffer + `performance.now()`  | ~2ns           |
+| Requests/sec                 | Count / elapsed time               | ~0             |
+| Time-series (sparkline)      | 1-second windows                   | ~0             |
+| Custom spans (DB, API calls) | `trace()` helper                   | ~0 when unused |
+
+All data lives in memory. No disk I/O, no network calls, no serialization until the dashboard is opened.
+
+## Tracing DB queries and API calls
+
+Use the `trace()` helper to measure any async operation inside your procedures:
+
+```ts twoslash
+// @noErrors
+import { trace } from 'silgi/analytics'
+
+const listUsers = s.$resolve(async ({ ctx }) => {
+  const users = await trace(ctx, 'db.users.findMany', () => db.users.findMany())
+  const count = await trace(ctx, 'db.users.count', () => db.users.count())
+  return { users, count }
+})
+```
+
+When analytics is disabled, `trace()` calls the function directly with zero overhead. When enabled, each span is recorded with its name, duration, and error status.
+
+Spans appear in:
+
+- The error detail panel (when a request fails)
+- The `/analytics/errors` JSON API
+
+## Error log — Copy for AI
+
+Every error is captured with full context:
+
+- **Procedure path** and error code/status
+- **Input** that caused the error
+- **Request headers** (authorization auto-redacted)
+- **Stack trace**
+- **Traced spans** with individual durations and errors
+- **Total request duration**
+
+The dashboard has a **"Copy for AI"** button that generates a structured markdown document you can paste directly into Claude, ChatGPT, or any AI assistant. The markdown includes all of the above in a format optimized for debugging.
+
+## Configuration
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, {
+  analytics: {
+    bufferSize: 2048, // latency samples per procedure (default: 1024)
+    historySeconds: 300, // sparkline history in seconds (default: 120)
+    maxErrors: 200, // error log entries to keep (default: 100)
+  },
+})
+```
+
+## With `handler()`
+
+Works the same way when using `s.handler()` instead of `s.serve()`:
+
+```ts twoslash
+// @noErrors
+const handle = s.handler(appRouter, { analytics: true })
+
+Bun.serve({ port: 3000, fetch: handle })
+// Dashboard at /analytics
+```
+
+## Dashboard
+
+Self-contained HTML page with vanilla JS — no external dependencies. Auto-refreshes every 2 seconds.
+
+**Overview tab:**
+
+- Total requests, req/s, error rate, average latency cards
+- Request rate sparkline with error markers
+- Per-procedure table with sortable columns
+
+**Errors tab:**
+
+- Chronological error log with expandable details
+- Full input, headers, stack trace, traced spans
+- **Copy for AI (Markdown)** — one click, paste into any AI
+- **Copy JSON** — raw error data
+
+## JSON API
+
+| Endpoint            | Description                                      |
+| ------------------- | ------------------------------------------------ |
+| `/analytics/api`    | Procedure metrics, percentiles, time-series      |
+| `/analytics/errors` | Full error log with input, headers, stack, spans |
+
+## Server-side markdown export
+
+You can also generate the markdown programmatically:
+
+```ts twoslash
+// @noErrors
+import { errorToMarkdown } from 'silgi/analytics'
+
+const md = errorToMarkdown(errorEntry)
+// Send to Slack, log to file, etc.
+```
+
+<Callout type='info'>
+  For production monitoring with alerting, long-term storage, and multi-service correlation, use
+  [OpenTelemetry](/docs/plugins/otel) with your preferred backend. The analytics plugin is designed for development and
+  single-service visibility.
+</Callout>
+
+## What's next?
+
+- [OpenTelemetry](/docs/plugins/otel) — distributed tracing for production
+- [Pino Logging](/docs/plugins/pino) — structured request logging
+- [Plugins](/docs/plugins) — all available plugins

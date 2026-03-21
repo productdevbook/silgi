@@ -19,7 +19,7 @@ export default function App() {
   return (
     <main style={{ padding: '2rem', fontFamily: 'system-ui', maxWidth: 600 }}>
       <h1>Silgi React Client</h1>
-      <p style={{ color: '#666' }}>Connects to any Silgi server (standalone, Hono, Express, etc.)</p>
+      <p style={{ color: '#666' }}>Connects to any Silgi server (standalone, Express, Elysia, etc.)</p>
 
       <section style={{ marginTop: '1.5rem' }}>
         <h2>Health</h2>

@@ -11,15 +11,15 @@
 | 3 middleware + Zod | **297 ns** | 1,718 ns | 3,954 ns | **5.8x** | **13.3x** |
 | 5 middleware + Zod | **413 ns** | 2,219 ns | 3,917 ns | **5.4x** | **9.5x** |
 
-## HTTP Performance (Silgi vs oRPC vs H3 vs Hono)
+## HTTP Performance (Silgi vs oRPC vs H3)
 
 3000 sequential requests per scenario.
 
-| Scenario | Silgi | oRPC | H3 v2 | Hono |
-|---|---|---|---|---|
-| Simple (no mw) | **79µs** (12,592/s) | 83µs (12,048/s) | 78µs (12,753/s) | 74µs (13,516/s) |
-| Zod validation | **86µs** (11,627/s) | 120µs (8,315/s) | 93µs (10,707/s) | 97µs (10,280/s) |
-| Guard + Zod | **79µs** (12,706/s) | 116µs (8,625/s) | 96µs (10,359/s) | 102µs (9,799/s) |
+| Scenario | Silgi | oRPC | H3 v2 |
+|---|---|---|---|
+| Simple (no mw) | **79µs** (12,592/s) | 83µs (12,048/s) | 78µs (12,753/s) |
+| Zod validation | **86µs** (11,627/s) | 120µs (8,315/s) | 93µs (10,707/s) |
+| Guard + Zod | **79µs** (12,706/s) | 116µs (8,625/s) | 96µs (10,359/s) |
 
 ### Comparison
 
@@ -27,7 +27,6 @@
 |---|---|---|---|
 | Silgi vs oRPC | ~tied | **1.4x faster** | **1.5x faster** |
 | Silgi vs H3 | ~tied | **1.1x faster** | **1.2x faster** |
-| Silgi vs Hono | 0.9x | **1.1x faster** | **1.3x faster** |
 
 ### Tail Latency (p99, Guard + Zod)
 
@@ -36,7 +35,6 @@
 | **Silgi** | **79µs** | **70µs** | **148µs** |
 | oRPC | 116µs | 103µs | 223µs |
 | H3 v2 | 96µs | 82µs | 236µs |
-| Hono | 102µs | 87µs | 194µs |
 
 ## Router Performance (Silgi compiled vs rou3)
 

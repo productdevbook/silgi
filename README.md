@@ -33,7 +33,7 @@ s.serve(appRouter, { port: 3000, scalar: true })
 
 ## Features
 
-- **Single package** — server, client, 15 plugins, 15 adapters. One install.
+- **Single package** — server, client, 15 plugins, 14 adapters. One install.
 - **Compiled pipeline** — guards unrolled, handlers pre-linked at startup.
 - **Guard / Wrap** — guards enrich context (flat, sync fast-path). Wraps run before + after (onion).
 - **Content negotiation** — JSON, MessagePack, devalue. Automatic from `Accept` header.
@@ -46,7 +46,6 @@ s.serve(appRouter, { port: 3000, scalar: true })
 |---|---|
 | Standalone | `s.serve()` / `s.handler()` |
 | Nitro v3 | `serverEntry` + `s.handler()` |
-| Hono | `silgi/hono` |
 | Express | `silgi/express` |
 | Fastify | `silgi/fastify` |
 | Elysia | `silgi/elysia` |
@@ -82,12 +81,11 @@ Built-in re-exports — no extra dependencies needed:
 
 ```bash
 npx giget@latest gh:productdevbook/silgi/examples/standalone my-app
-npx giget@latest gh:productdevbook/silgi/examples/hono my-hono-app
 npx giget@latest gh:productdevbook/silgi/examples/nextjs my-nextjs-app
 npx giget@latest gh:productdevbook/silgi/examples/nuxt my-nuxt-app
 ```
 
-10 examples: standalone, hono, express, elysia, nitro, nitro-h3, nextjs, nuxt, sveltekit, client-react.
+10 examples: standalone, bun, express, elysia, nitro, nitro-h3, nextjs, nuxt, sveltekit, client-react.
 
 ## Documentation
 
@@ -98,7 +96,7 @@ npx giget@latest gh:productdevbook/silgi/examples/nuxt my-nuxt-app
 - [oRPC](https://github.com/unnoq/orpc) — Pipeline architecture, client proxy, error handling, contract-first workflow
 - [tRPC](https://github.com/trpc/trpc) — Router/procedure model, end-to-end type inference
 - [Elysia](https://github.com/elysiajs/elysia) — Sucrose-style static handler analysis
-- [Hono](https://github.com/honojs/hono) — Middleware composition, multi-runtime support
+
 
 ## License
 

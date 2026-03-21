@@ -2,7 +2,7 @@
  * MessagePack codec for Silgi binary protocol.
  *
  * 2-4x faster encoding, ~50% smaller payloads vs JSON.
- * No competitor (oRPC, tRPC, Hono) offers binary transport.
+ * No competitor (oRPC, tRPC) offers binary transport.
  *
  * Uses msgpackr with record extension — repeated object shapes
  * (common in RPC: same fields every request) get 2-3x decode speedup.

@@ -5,7 +5,7 @@ description: Use Silgi with Nitro v3 — custom server entry with serverEntry co
 
 import { Callout } from 'fumadocs-ui/components/callout'
 
-[Nitro](https://nitro.build) is the server engine behind Nuxt and TanStack Start. Silgi integrates with Nitro using the `serverEntry` config — Silgi becomes the server framework, just like Hono does.
+[Nitro](https://nitro.build) is the server engine behind Nuxt and TanStack Start. Silgi integrates with Nitro using the `serverEntry` config — Silgi becomes the server framework.
 
 ## Setup
 
@@ -52,10 +52,7 @@ POST /health          → { status: "ok" }
 POST /users/list      → [{ id: 1, name: "Alice" }, ...]
 ```
 
-<Callout>
-  This is the same pattern Hono uses with Nitro. Nitro detects the `fetch` method on the default export and routes all
-  requests through it.
-</Callout>
+<Callout>Nitro detects the `fetch` method on the default export and routes all requests through it.</Callout>
 
 ## Nuxt
 

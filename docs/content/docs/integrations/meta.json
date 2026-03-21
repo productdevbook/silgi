@@ -10,7 +10,6 @@
     "elysia",
     "express",
     "fastify",
-    "hono",
     "message-port",
     "nestjs",
     "nextjs",

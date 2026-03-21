@@ -1,6 +1,6 @@
 ---
 title: Comparison
-description: How Silgi compares to oRPC, tRPC, ts-rest, and Hono — features, architecture, and benchmarks.
+description: How Silgi compares to oRPC, tRPC, and ts-rest — features, architecture, and benchmarks.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
@@ -36,7 +36,7 @@ import { Callout } from 'fumadocs-ui/components/callout'
 | NestJS integration                      | Yes               | Yes                  | Partial            | Yes         |
 | Message Port (Electron, Workers)        | Yes               | Yes                  | Partial            | No          |
 | CF WebSocket Hibernation                | No                | Yes                  | No                 | No          |
-| Framework adapters                      | **15**            | 17+                  | 4+                 | 2           |
+| Framework adapters                      | **14**            | 17+                  | 4+                 | 2           |
 | Typed guard errors (auto-merge)         | **Yes**           | No                   | No                 | No          |
 | Response caching (SWR, pluggable)       | **Built-in**      | No                   | No                 | No          |
 | Offline API docs (no CDN)               | **Yes**           | No                   | No                 | No          |
@@ -55,7 +55,7 @@ Silgi ships everything as one `npm install silgi` with subpath imports:
 // @noErrors
 import { silgi } from 'silgi'
 import { createClient } from 'silgi/client'
-import { silgiHono } from 'silgi/hono'
+import { silgiExpress } from 'silgi/express'
 import { otelWrap } from 'silgi/otel'
 ```
 
@@ -110,23 +110,22 @@ Measures raw middleware pipeline overhead — how fast the framework processes a
 
 Silgi's compiled pipeline (unrolled guards, context pool) is **3-6x faster than oRPC** and **9-18x faster than H3** at the pipeline level.
 
-### HTTP performance (Silgi vs oRPC vs H3 vs Hono)
+### HTTP performance (Silgi vs oRPC vs H3)
 
 Real HTTP servers, real TCP connections, 3000 sequential requests per scenario.
 
-| Scenario               | Silgi               | oRPC            | H3 v2           | Hono            |
-| ---------------------- | ------------------- | --------------- | --------------- | --------------- |
-| Simple (no middleware) | **79µs** (12,592/s) | 83µs (12,048/s) | 78µs (12,753/s) | 74µs (13,516/s) |
-| Zod validation         | **86µs** (11,627/s) | 120µs (8,315/s) | 93µs (10,707/s) | 97µs (10,280/s) |
-| Guard + Zod            | **79µs** (12,706/s) | 116µs (8,625/s) | 96µs (10,359/s) | 102µs (9,799/s) |
+| Scenario               | Silgi               | oRPC            | H3 v2           |
+| ---------------------- | ------------------- | --------------- | --------------- |
+| Simple (no middleware) | **79µs** (12,592/s) | 83µs (12,048/s) | 78µs (12,753/s) |
+| Zod validation         | **86µs** (11,627/s) | 120µs (8,315/s) | 93µs (10,707/s) |
+| Guard + Zod            | **79µs** (12,706/s) | 116µs (8,625/s) | 96µs (10,359/s) |
 
 | Comparison    | Simple | Zod             | Guard + Zod     |
 | ------------- | ------ | --------------- | --------------- |
 | Silgi vs oRPC | ~tied  | **1.4x faster** | **1.5x faster** |
 | Silgi vs H3   | ~tied  | **1.1x faster** | **1.2x faster** |
-| Silgi vs Hono | 0.9x   | **1.1x faster** | **1.3x faster** |
 
-For simple routes, all four are within 10% — TCP overhead dominates. As middleware complexity grows, Silgi's compiled pipeline pulls ahead: **1.5x faster than oRPC** and **1.2-1.3x faster than H3/Hono** with guards + validation.
+For simple routes, all three are within 10% — TCP overhead dominates. As middleware complexity grows, Silgi's compiled pipeline pulls ahead: **1.5x faster than oRPC** and **1.2x faster than H3** with guards + validation.
 
 ### Router performance (Silgi compiled vs rou3)
 
@@ -149,7 +148,6 @@ Silgi's router uses indexOf fast path for simple branches (avoids `split()`), sw
 | **Silgi**              | **79µs** | **70µs** | **148µs** |
 | oRPC                   | 116µs    | 103µs    | 223µs     |
 | H3 v2                  | 96µs     | 82µs     | 236µs     |
-| Hono                   | 102µs    | 87µs     | 194µs     |
 
 Silgi's p99 is **34% lower** than oRPC and **37% lower** than H3 — compiled pipelines keep tail latency predictable.
 

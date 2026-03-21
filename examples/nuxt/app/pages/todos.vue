@@ -5,6 +5,7 @@ const client = useClient()
 const todos = ref<any[]>([])
 const newTitle = ref('')
 const loading = ref(true)
+const errorMsg = ref('')
 
 
 onMounted(() => fetchTodos())
@@ -19,21 +20,67 @@ async function fetchTodos() {
 
 async function addTodo() {
   if (!newTitle.value.trim()) return
-  await client.todos.create({ title: newTitle.value.trim() })
-  newTitle.value = ''
-  await fetchTodos()
+  errorMsg.value = ''
+  try {
+    await client.todos.create({ title: newTitle.value.trim() })
+    newTitle.value = ''
+    await fetchTodos()
+  } catch (e: any) {
+    errorMsg.value = e?.data?.message || e?.message || 'Unknown error'
+  }
 }
 
 
 async function toggleTodo(id: number) {
-  await client.todos.toggle({ id })
-  await fetchTodos()
+  errorMsg.value = ''
+  try {
+    await client.todos.toggle({ id })
+    await fetchTodos()
+  } catch (e: any) {
+    errorMsg.value = e?.data?.code || e?.message || 'Unknown error'
+  }
 }
 
 
 async function removeTodo(id: number) {
-  await client.todos.remove({ id })
-  await fetchTodos()
+  errorMsg.value = ''
+  try {
+    await client.todos.remove({ id })
+    await fetchTodos()
+  } catch (e: any) {
+    errorMsg.value = e?.data?.code || e?.message || 'Unknown error'
+  }
+}
+
+
+// ── Error triggers for analytics testing ────────────
+async function triggerNotFound() {
+  errorMsg.value = ''
+  try {
+    await client.todos.toggle({ id: 99999 })
+  } catch (e: any) {
+    errorMsg.value = `NOT_FOUND: id=99999 does not exist`
+  }
+}
+
+
+async function triggerValidation() {
+  errorMsg.value = ''
+  try {
+    await (client.todos.create as any)({ title: '' })
+  } catch (e: any) {
+    errorMsg.value = `Validation: empty title rejected`
+  }
+}
+
+
+async function triggerBadType() {
+  errorMsg.value = ''
+  try {
+    await (client.todos.toggle as any)({ id: 'not-a-number' })
+  } catch (e: any) {
+    errorMsg.value = `Bad type: string sent instead of number`
+  }
 }
 </script>
 
@@ -41,7 +88,10 @@ async function removeTodo(id: number) {
   <main class="mx-auto max-w-lg px-4 py-12 font-sans">
     <div class="mb-6 flex items-center justify-between">
       <h1 class="text-xl font-bold">Todos</h1>
-      <NuxtLink to="/" class="text-sm text-gray-400 hover:text-gray-600">← Back</NuxtLink>
+      <div class="flex items-center gap-3">
+        <a href="/analytics" target="_blank" class="text-sm text-amber-500 hover:text-amber-400">Analytics</a>
+        <NuxtLink to="/" class="text-sm text-gray-400 hover:text-gray-600">&larr; Back</NuxtLink>
+      </div>
     </div>
 
     <form class="mb-6 flex gap-2" @submit.prevent="addTodo">
@@ -57,6 +107,32 @@ async function removeTodo(id: number) {
         Add
       </button>
     </form>
+
+    <!-- Error triggers -->
+    <div class="mb-6 rounded-lg border border-red-100 bg-red-50 p-3">
+      <p class="mb-2 text-xs font-semibold text-red-800">Error Triggers (check /analytics)</p>
+      <div class="flex flex-wrap gap-2">
+        <button
+          class="cursor-pointer rounded border border-red-200 bg-white px-3 py-1 text-xs text-red-700 hover:bg-red-50"
+          @click="triggerNotFound"
+        >
+          NOT_FOUND (id=99999)
+        </button>
+        <button
+          class="cursor-pointer rounded border border-red-200 bg-white px-3 py-1 text-xs text-red-700 hover:bg-red-50"
+          @click="triggerValidation"
+        >
+          Validation (empty title)
+        </button>
+        <button
+          class="cursor-pointer rounded border border-red-200 bg-white px-3 py-1 text-xs text-red-700 hover:bg-red-50"
+          @click="triggerBadType"
+        >
+          Bad Type (string as id)
+        </button>
+      </div>
+      <p v-if="errorMsg" class="mt-2 text-xs text-red-600">{{ errorMsg }}</p>
+    </div>
 
     <p v-if="loading" class="text-sm text-gray-400">Loading...</p>
 

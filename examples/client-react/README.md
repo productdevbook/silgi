@@ -2,7 +2,7 @@
 
 A React client app that connects to any Silgi server using `createClient`, `createLink` (ofetch), and `@tanstack/react-query` integration via `createQueryUtils`.
 
-Start a Silgi server first (e.g. the `standalone` or `hono` example on port 3000), then run this client.
+Start a Silgi server first (e.g. the `standalone` or `express` example on port 3000), then run this client.
 
 ## Quick Start
 

@@ -1,5 +1,6 @@
 import { ContextPool } from '../compile.ts'
 import { compileRouter } from '../compile.ts'
+import { AnalyticsCollector, RequestTrace, analyticsHTML } from '../plugins/analytics.ts'
 import { generateOpenAPI, scalarHTML } from '../scalar.ts'
 
 import { SilgiError, toSilgiError } from './error.ts'
@@ -8,6 +9,7 @@ import { ValidationError } from './schema.ts'
 import { iteratorToEventStream } from './sse.ts'
 import { stringifyJSON, parseEmptyableJSON } from './utils.ts'
 
+import type { AnalyticsOptions } from '../plugins/analytics.ts'
 import type { ScalarOptions } from '../scalar.ts'
 import type { SilgiHooks } from '../silgi.ts'
 import type { Hookable } from 'hookable'
@@ -56,7 +58,7 @@ export function createFetchHandler(
   routerDef: import('../types.ts').RouterDef,
   contextFactory: (req: Request) => Record<string, unknown> | Promise<Record<string, unknown>>,
   hooks?: Hookable<SilgiHooks>,
-  handlerOptions?: { scalar?: boolean | ScalarOptions },
+  handlerOptions?: { scalar?: boolean | ScalarOptions; analytics?: boolean | AnalyticsOptions },
 ): (request: Request) => Promise<Response> {
   // Compile router tree into JIT-compiled radix router
   let compiledRouter = routerCache.get(routerDef)
@@ -83,6 +85,16 @@ export function createFetchHandler(
     specHtml = scalarHTML('/openapi.json', scalarOpts)
   }
 
+  // Analytics (sync init — no race condition, module is pure JS with zero deps)
+  const analyticsEnabled = !!handlerOptions?.analytics
+  let collector: AnalyticsCollector | undefined
+  let analyticsDashboardHtml: string | undefined
+  if (analyticsEnabled) {
+    const analyticsOpts = typeof handlerOptions!.analytics === 'object' ? handlerOptions!.analytics : {}
+    collector = new AnalyticsCollector(analyticsOpts)
+    analyticsDashboardHtml = analyticsHTML()
+  }
+
   return async (request: Request): Promise<Response> => {
     // FAST pathname extraction — 40x faster than new URL()
     const url = request.url
@@ -100,6 +112,23 @@ export function createFetchHandler(
       }
     }
 
+    // Analytics: /analytics and /analytics/api
+    if (analyticsEnabled && collector) {
+      if (pathname === 'analytics') {
+        return new Response(analyticsDashboardHtml, { headers: { 'content-type': 'text/html' } })
+      }
+      if (pathname === 'analytics/api') {
+        return new Response(JSON.stringify(collector.toJSON()), {
+          headers: { 'content-type': 'application/json', 'cache-control': 'no-cache' },
+        })
+      }
+      if (pathname === 'analytics/errors') {
+        return new Response(JSON.stringify(collector.getErrors()), {
+          headers: { 'content-type': 'application/json', 'cache-control': 'no-cache' },
+        })
+      }
+    }
+
     // Compiled radix router lookup
     const match = compiledRouter!('POST', '/' + pathname)
     if (!match) {
@@ -109,6 +138,9 @@ export function createFetchHandler(
 
     // Borrow context from pool
     const ctx = ctxPool.borrow()
+    let t0 = 0
+    let reqTrace: RequestTrace | undefined
+    let rawInput: unknown
 
     try {
       // Populate context — direct property copy instead of Object.assign
@@ -119,8 +151,14 @@ export function createFetchHandler(
       // Surface URL params from radix router match
       if (match.params) ctx.params = match.params
 
+      // Inject trace helper when analytics is enabled
+      if (collector) {
+        reqTrace = new RequestTrace()
+        ctx.__analyticsTrace = reqTrace
+        ctx.trace = reqTrace.trace.bind(reqTrace)
+      }
+
       // Parse input — use .json() directly when possible
-      let rawInput: unknown
       if (request.method === 'GET') {
         if (qMark !== -1) {
           const searchStr = url.slice(qMark + 1)
@@ -151,22 +189,26 @@ export function createFetchHandler(
         }
       }
 
-      const t0 = performance.now()
+      t0 = performance.now()
       hooks?.callHook('request', { path: pathname, input: rawInput })
 
       // Execute compiled pipeline — sync dispatch when possible
       const pipelineResult = route.handler(ctx, rawInput, request.signal)
       const output = pipelineResult instanceof Promise ? await pipelineResult : pipelineResult
 
+      const durationMs = performance.now() - t0
+
       // Raw Response passthrough — full control over headers, status, body
       if (output instanceof Response) {
-        hooks?.callHook('response', { path: pathname, output: null, durationMs: performance.now() - t0 })
+        hooks?.callHook('response', { path: pathname, output: null, durationMs })
+        collector?.record(pathname, durationMs)
         return output
       }
 
       // ReadableStream passthrough — binary downloads, file streaming
       if (output instanceof ReadableStream) {
-        hooks?.callHook('response', { path: pathname, output: null, durationMs: performance.now() - t0 })
+        hooks?.callHook('response', { path: pathname, output: null, durationMs })
+        collector?.record(pathname, durationMs)
         return new Response(output, { headers: { 'content-type': 'application/octet-stream' } })
       }
 
@@ -177,7 +219,8 @@ export function createFetchHandler(
       }
 
       // Content negotiation: msgpack > devalue > json
-      hooks?.callHook('response', { path: pathname, output, durationMs: performance.now() - t0 })
+      hooks?.callHook('response', { path: pathname, output, durationMs })
+      collector?.record(pathname, durationMs)
       const accept = request.headers.get('accept')
       const fmt: ResponseFormat = accept?.includes('msgpack')
         ? 'msgpack'
@@ -187,7 +230,28 @@ export function createFetchHandler(
       const cacheHeaders = route.cacheControl ? { 'cache-control': route.cacheControl } : undefined
       return encodeResponse(output, 200, fmt, route.stringify, cacheHeaders)
     } catch (error) {
+      const errorDurationMs = performance.now() - t0
       hooks?.callHook('error', { path: pathname, error })
+      collector?.recordError(pathname, errorDurationMs, error instanceof Error ? error.message : String(error))
+
+      // Capture detailed error context for the error log
+      if (collector) {
+        const isValidation = error instanceof ValidationError
+        const silgiErr = isValidation ? null : error instanceof SilgiError ? error : toSilgiError(error)
+        collector.recordDetailedError({
+          timestamp: Date.now(),
+          procedure: pathname,
+          error: error instanceof Error ? error.message : String(error),
+          code: isValidation ? 'BAD_REQUEST' : (silgiErr?.code ?? 'INTERNAL_SERVER_ERROR'),
+          status: isValidation ? 400 : (silgiErr?.status ?? 500),
+          stack: error instanceof Error ? (error.stack ?? '') : '',
+          input: rawInput,
+          headers: Object.fromEntries(request.headers),
+          durationMs: Math.round(errorDurationMs * 100) / 100,
+          spans: reqTrace?.spans ?? [],
+        })
+      }
+
       const accept = request.headers.get('accept')
       const fmt: ResponseFormat = accept?.includes('msgpack')
         ? 'msgpack'

@@ -20,6 +20,7 @@ import type { ProcedureBuilder } from './builder.ts'
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
 import type { StorageConfig } from './core/storage.ts'
 import type { useStorage } from './core/storage.ts'
+import type { AnalyticsOptions } from './plugins/analytics.ts'
 import type { ScalarOptions } from './scalar.ts'
 import type {
   ProcedureDef,
@@ -122,6 +123,8 @@ export interface SilgiInstance<TBaseCtx extends Record<string, unknown>> {
     options?: {
       /** Enable Scalar API Reference UI at /reference and /openapi.json */
       scalar?: boolean | ScalarOptions
+      /** Enable analytics dashboard at /analytics */
+      analytics?: boolean | AnalyticsOptions
     },
   ) => (request: Request) => Promise<Response>
 
@@ -133,6 +136,8 @@ export interface SilgiInstance<TBaseCtx extends Record<string, unknown>> {
       hostname?: string
       /** Enable Scalar API Reference UI at /reference and /openapi.json */
       scalar?: boolean | ScalarOptions
+      /** Enable analytics dashboard at /analytics */
+      analytics?: boolean | AnalyticsOptions
       /** Enable WebSocket RPC (requires crossws) */
       ws?: boolean
       /** Enable HTTP/2 (requires cert + key for TLS) */

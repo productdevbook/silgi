@@ -2,6 +2,7 @@ import { serve } from 'srvx'
 
 import { createFetchHandler } from './handler.ts'
 
+import type { AnalyticsOptions } from '../plugins/analytics.ts'
 import type { ScalarOptions } from '../scalar.ts'
 import type { SilgiHooks } from '../silgi.ts'
 import type { RouterDef } from '../types.ts'
@@ -17,6 +18,7 @@ export async function createServeHandler(
     port?: number
     hostname?: string
     scalar?: boolean | ScalarOptions
+    analytics?: boolean | AnalyticsOptions
     ws?: boolean
     http2?: { cert: string; key: string }
   },
@@ -27,6 +29,7 @@ export async function createServeHandler(
   // Reuse the Fetch API handler — same logic for serve() and handler()
   const fetchHandler = createFetchHandler(routerDef, contextFactory, hooks, {
     scalar: options?.scalar,
+    analytics: options?.analytics,
   })
 
   const server = await serve({
@@ -56,6 +59,7 @@ export async function createServeHandler(
   if (options?.http2) console.log(`  HTTP/2 enabled (with HTTP/1.1 fallback)`)
   if (options?.ws) console.log(`  WebSocket RPC at ws://${hostname}:${port}`)
   if (options?.scalar) console.log(`  Scalar API Reference at ${url}/reference`)
+  if (options?.analytics) console.log(`  Analytics dashboard at ${url}/analytics`)
   console.log()
 
   hooks.callHook('serve:start', { url, port, hostname })

@@ -43,7 +43,7 @@ pnpm bench:memory   # Memory profiling (--expose-gc)
 
 ### Adapters (src/adapters/)
 
-15 framework adapters (fastify, h3, hono, express, elysia, nextjs, nitro, sveltekit, remix, astro, solidstart, nestjs, aws-lambda, message-port, peer). Each converts framework-specific request/response to `StandardRequest`/`StandardResponse`.
+14 framework adapters (fastify, h3, express, elysia, nextjs, nitro, sveltekit, remix, astro, solidstart, nestjs, aws-lambda, message-port, peer). Each converts framework-specific request/response to `StandardRequest`/`StandardResponse`.
 
 ### Plugins (src/plugins/)
 

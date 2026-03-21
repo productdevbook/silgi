@@ -9,7 +9,6 @@
     "express",
     "fastify",
     "h3",
-    "hono",
     "middleware",
     "msgpack",
     "nextjs",
@@ -93,6 +92,10 @@
       "import": "./dist/plugins/cache.mjs",
       "types": "./dist/plugins/cache.d.mts"
     },
+    "./analytics": {
+      "import": "./dist/plugins/analytics.mjs",
+      "types": "./dist/plugins/analytics.d.mts"
+    },
     "./cors": {
       "import": "./dist/plugins/cors.mjs",
       "types": "./dist/plugins/cors.d.mts"
@@ -132,10 +135,6 @@
     "./cookies": {
       "import": "./dist/plugins/cookies.mjs",
       "types": "./dist/plugins/cookies.d.mts"
-    },
-    "./hono": {
-      "import": "./dist/adapters/hono.mjs",
-      "types": "./dist/adapters/hono.d.mts"
     },
     "./express": {
       "import": "./dist/adapters/express.mjs",
@@ -223,7 +222,8 @@
     }
   },
   "scripts": {
-    "build": "tsdown",
+    "build": "pnpm --filter silgi-analytics-dashboard build && tsdown",
+    "build:dashboard": "pnpm --filter silgi-analytics-dashboard build",
     "dev": "vitest",
     "bench": "node --experimental-strip-types bench/update-benchmarks.ts",
     "bench:memory": "node --expose-gc --experimental-strip-types bench/memory.ts",
@@ -267,7 +267,6 @@
     "express": "^5.2.1",
     "fastify": "^5.8.2",
     "h3": "2.0.1-rc.16",
-    "hono": "^4.12.8",
     "ioredis": "^5.10.1",
     "mitata": "^1.0.34",
     "nats": "^2.29.3",
