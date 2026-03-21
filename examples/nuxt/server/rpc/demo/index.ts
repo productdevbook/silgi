@@ -33,7 +33,6 @@ let dbCallCount = 0
 
 export const serverCached = s.$use(cacheQuery({ maxAge: 10, name: 'expensive-query' })).$resolve(async () => {
   dbCallCount++
-  // Simulate expensive DB query
   await new Promise((r) => setTimeout(r, 50))
   return {
     value: Math.random(),
