@@ -13,7 +13,7 @@ Normally Silgi talks over HTTP. But sometimes your services need to talk to each
 
 You pick a **driver** for your broker. The driver handles the messaging — Silgi handles everything else (routing, validation, errors, types).
 
-<Mermaid chart="sequenceDiagram\n    participant A as Service A (client)\n    participant B as NATS / Redis\n    participant C as Service B (server)\n    A->>B: client.users.list()\n    B->>C: deliver request\n    C->>B: { users: [...] }\n    B->>A: deliver response" />
+<Mermaid chart='sequenceDiagram\n    participant A as Service A (client)\n    participant B as NATS / Redis\n    participant C as Service B (server)\n    A->>B: client.users.list()\n    B->>C: deliver request\n    C->>B: { users: [...] }\n    B->>A: deliver response' />
 
 Every driver has two sides:
 
