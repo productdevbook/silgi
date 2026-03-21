@@ -69,6 +69,16 @@ Content negotiation via `Accept` header: JSON (default), MessagePack, Devalue.
 
 ## Code Style
 
+- **Chain formatting**: ALWAYS break builder chains into separate lines. Never write long single-line chains.
+  ```ts
+  // BAD — never do this
+  const listUsers = s.$use(cacheQuery({ maxAge: 60 })).$resolve(({ ctx }) => ctx.db.users.findMany())
+
+  // GOOD — always break
+  const listUsers = s
+    .$use(cacheQuery({ maxAge: 60 }))
+    .$resolve(({ ctx }) => ctx.db.users.findMany())
+  ```
 - **Formatter**: oxfmt — single quotes, no semicolons, 120 char width, trailing commas
 - **Linter**: oxlint — plugins: unicorn, typescript, oxc, import. `no-explicit-any` and `no-non-null-assertion` are allowed
 - **Import sorting**: oxfmt auto-sorts imports by group (builtin → external → internal → parent → sibling → index → type) with newlines between groups. Internal patterns: `#src/`, `~/`

@@ -4,19 +4,22 @@ description: Production-grade response caching with TTL, SWR, request deduplicat
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
 
 Cache query results in memory, Redis, Cloudflare KV, or any storage backend. Powered by [ocache](https://github.com/unjs/ocache) with built-in TTL, stale-while-revalidate, and request deduplication.
 
 ## Basic usage
 
-Wrap a query with `cacheQuery()` to cache its results:
+Wrap a procedure with `cacheQuery()` to cache its results:
 
 ```ts twoslash
 // @noErrors
 import { cacheQuery } from 'silgi/cache'
 
-const listUsers = s.$use(cacheQuery({ maxAge: 60 })).$resolve(({ ctx }) => ctx.db.users.findMany())
+const listUsers = s
+  .$use(cacheQuery({ maxAge: 60 }))
+  .$resolve(({ ctx }) =>
+    ctx.db.users.findMany(),
+  )
 ```
 
 The first call runs the resolver and caches the result. Subsequent calls with the same input return the cached value for 60 seconds.
@@ -53,21 +56,26 @@ cacheQuery({
 
 Skip the cache entirely for specific requests, or force a refresh:
 
-````ts twoslash
+```ts twoslash
 // @noErrors
 import { cacheQuery } from 'silgi/cache'
 
 const listUsers = s
-  .$use(cacheQuery({
-    maxAge: 300,
-    // Admin users bypass cache
-    shouldBypassCache: (input) => (input as any)?.asAdmin === true,
-    // Refresh flag forces re-resolve
-    shouldInvalidateCache: (input) => (input as any)?.refresh === true,
-    // Only cache non-empty arrays
-    validate: (entry) => Array.isArray(entry.value) && entry.value.length > 0,
-  }))
-  .$resolve(({ ctx }) => ctx.db.users.findMany())
+  .$use(
+    cacheQuery({
+      maxAge: 300,
+      // Admin users bypass cache
+      shouldBypassCache: (input) => (input as any)?.asAdmin === true,
+      // Refresh flag forces re-resolve
+      shouldInvalidateCache: (input) => (input as any)?.refresh === true,
+      // Only cache non-empty arrays
+      validate: (entry) => Array.isArray(entry.value) && entry.value.length > 0,
+    }),
+  )
+  .$resolve(({ ctx }) =>
+    ctx.db.users.findMany(),
+  )
+```
 
 ## Invalidation
 
@@ -79,37 +87,46 @@ import { cacheQuery, invalidateQueryCache } from 'silgi/cache'
 
 const listUsers = s
   .$use(cacheQuery({ maxAge: 300, name: 'users_list' }))
-  .$resolve(({ ctx }) => ctx.db.users.findMany())
+  .$resolve(({ ctx }) =>
+    ctx.db.users.findMany(),
+  )
 
 const createUser = s.$resolve(async ({ input, ctx }) => {
   const user = await ctx.db.users.create(input)
-  await invalidateQueryCache('users_list') // clear the cache
+  await invalidateQueryCache('users_list')
   return user
 })
-````
+```
 
 ## Storage backends
 
 By default, cache lives in memory. For production, plug in any storage backend via [unstorage](https://unstorage.unjs.io) (included as a dependency).
 
+Configure it once at server startup — typically in your `server.ts`:
+
 ### Redis
 
-```ts twoslash
+```ts twoslash title="server.ts"
 // @noErrors
 import { setCacheStorage, createUnstorageAdapter } from 'silgi/cache'
 import { createStorage } from 'unstorage'
 import redisDriver from 'unstorage/drivers/redis'
 
+// Set up Redis cache before creating the handler
 const storage = createStorage({
   driver: redisDriver({ url: 'redis://localhost:6379' }),
 })
-
 setCacheStorage(createUnstorageAdapter(storage))
+
+// Then create your server
+const s = silgi({ context: () => ({ db }) })
+const appRouter = s.router({ ... })
+export default { fetch: s.handler(appRouter) }
 ```
 
 ### Cloudflare KV
 
-```ts twoslash
+```ts twoslash title="server.ts"
 // @noErrors
 import { setCacheStorage, createUnstorageAdapter } from 'silgi/cache'
 import { createStorage } from 'unstorage'
@@ -118,7 +135,6 @@ import cfKvDriver from 'unstorage/drivers/cloudflare-kv-binding'
 const storage = createStorage({
   driver: cfKvDriver({ binding: 'MY_KV' }),
 })
-
 setCacheStorage(createUnstorageAdapter(storage))
 ```
 
@@ -134,6 +150,31 @@ setCacheStorage({
   get: (key) => myStore.get(key),
   set: (key, value, opts) => myStore.set(key, value, opts?.ttl),
 })
+```
+
+## HTTP Cache vs Server Cache
+
+Silgi has two caching mechanisms — they serve different purposes:
+
+| Feature      | `$route({ cache })`    | `cacheQuery()`                |
+| ------------ | ---------------------- | ----------------------------- |
+| Where        | Browser / CDN          | Server memory / Redis / KV    |
+| How          | `Cache-Control` header | ocache (in-process)           |
+| Input-aware  | No                     | Yes (hashes input)            |
+| SWR          | CDN-level              | Built-in                      |
+| Invalidation | TTL only               | `invalidateQueryCache()`      |
+| Use case     | Public, static data    | DB queries, expensive compute |
+
+Use both together for maximum performance:
+
+```ts twoslash
+// @noErrors
+const listUsers = s
+  .$route({ cache: 60 })
+  .$use(cacheQuery({ maxAge: 300, name: 'users' }))
+  .$resolve(({ ctx }) =>
+    ctx.db.users.findMany(),
+  )
 ```
 
 ## How it works
