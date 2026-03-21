@@ -16,7 +16,7 @@ An error map is an object you pass to `.$errors()` on the builder. Each key is a
 // @noErrors
 import { z } from 'zod'
 
-const deleteUser = k
+const deleteUser = s
   .$input(z.object({ id: z.number() }))
   .$errors({
     NOT_FOUND: 404, // just a status code
@@ -253,7 +253,7 @@ const rateLimit = s.guard({
   },
 })
 
-const createUser = k
+const createUser = s
   .$use(auth, rateLimit)
   .$errors({ CONFLICT: 409 })
   .$resolve(({ fail }) => {

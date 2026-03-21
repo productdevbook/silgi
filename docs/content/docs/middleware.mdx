@@ -76,7 +76,7 @@ const auth = guard({
 })
 
 // In the procedure, fail() knows about 'UNAUTHORIZED' from the guard
-const createPost = k
+const createPost = s
   .$use(auth)
   .$errors({ CONFLICT: 409 })
   .$resolve(({ fail }) => {
@@ -151,7 +151,7 @@ When you stack middleware via `.$use()`, guards always run first (in order), the
 
 ```ts twoslash
 // @noErrors
-const proc = k
+const proc = s
   .$use(auth, rateLimit, adminOnly, timing, withSentry)
   //   ────── guards ──────────   ────── wraps ──────
   .$resolve(({ ctx, input }) => {

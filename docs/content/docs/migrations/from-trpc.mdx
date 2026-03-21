@@ -68,7 +68,7 @@ export const listUsers = t.procedure.input(z.object({ limit: z.number().optional
 // @noErrors
 import { z } from "zod"
 
-const listUsers = k
+const listUsers = s
   .$input(z.object({ limit: z.number().optional() }))
   .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))
 ````
@@ -108,7 +108,7 @@ const auth = s.guard(async (ctx) => {
   return { user: ctx.session.user }
 })
 
-const createUser = k
+const createUser = s
   .$use(auth)
   .$input(z.object({ name: z.string() }))
   .$resolve(({ input, ctx }) => {
@@ -148,7 +148,7 @@ import { SilgiError } from "silgi"
 throw new SilgiError("NOT_FOUND", { message: "User not found" })
 
 // Option 2: Typed errors with fail()
-const deleteUser = k
+const deleteUser = s
   .$errors({ NOT_FOUND: 404, FORBIDDEN: 403 })
   .$resolve(({ input, ctx, fail }) => {
     const user = ctx.db.users.find(input.id)

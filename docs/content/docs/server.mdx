@@ -198,7 +198,7 @@ The generated docs pull information from your procedure definitions. Add `route`
 
 ```ts twoslash
 // @noErrors
-const listUsers = k
+const listUsers = s
   .$input(z.object({ limit: z.number().optional() }))
   .$route({
     summary: 'List all users',
@@ -326,7 +326,7 @@ You can also add or remove hooks after the instance is created:
 s.hook('error', ({ error }) => reportToSentry(error))
 
 // Remove a hook
-k.removeHook('error', myHookFn)
+s.removeHook('error', myHookFn)
 ```
 
 | Hook          | When it fires                    | Payload                        |
@@ -394,7 +394,7 @@ For server-side code where you need to call a procedure directly — without HTT
 // @noErrors
 import { callable } from 'silgi'
 
-const getUsers = k
+const getUsers = s
   .$input(z.object({ limit: z.number().optional() }))
   .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))
 

@@ -47,18 +47,14 @@ Access storage via `s.useStorage()`:
 
 ```ts twoslash
 // @noErrors
-const getSession = s
-  .$input(z.object({ token: z.string() }))
-  .$resolve(async ({ input }) => {
+const getSession = s.$input(z.object({ token: z.string() })).$resolve(async ({ input }) => {
   const storage = s.useStorage('sessions')
   const session = await storage.getItem(input.token)
   if (!session) return { valid: false }
   return { valid: true, user: session }
 })
 
-const saveFile = s
-  .$input(z.object({ name: z.string(), data: z.string() }))
-  .$resolve(async ({ input }) => {
+const saveFile = s.$input(z.object({ name: z.string(), data: z.string() })).$resolve(async ({ input }) => {
   const files = s.useStorage('files')
   await files.setItem(input.name, input.data)
   return { ok: true }
@@ -81,11 +77,7 @@ const s = silgi({
 })
 
 // cacheQuery automatically uses the 'cache' mount → Redis
-const listUsers = s
-  .$use(cacheQuery({ maxAge: 60 }))
-  .$resolve(({ ctx }) =>
-    ctx.db.users.findMany(),
-  )
+const listUsers = s.$use(cacheQuery({ maxAge: 60 })).$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
 
 Without a `cache` mount, `cacheQuery()` falls back to in-memory (default).

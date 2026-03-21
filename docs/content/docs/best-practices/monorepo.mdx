@@ -59,8 +59,12 @@ export const ListInput = z.object({
 })
 
 // Procedure definitions — schemas only, no implementation
-const listUsers = s.$input(ListInput).$resolve(() => {} as any)
-const createUser = s.$input(UserInput).$resolve(() => {} as any)
+const listUsers = s
+  .$input(ListInput)
+  .$resolve(() => {} as any)
+const createUser = s
+  .$input(UserInput)
+  .$resolve(() => {} as any)
 
 export const contractRouter = s.router({
   users: { list: listUsers, create: createUser },
@@ -92,7 +96,7 @@ const s = silgi({
 
 const listUsers = s.$input(ListInput).$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit ?? 10 }))
 
-const createUser = k
+const createUser = s
   .$use(auth)
   .$input(UserInput)
   .$resolve(({ input, ctx }) => ctx.db.users.create(input))

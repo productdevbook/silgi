@@ -59,7 +59,7 @@ const s = silgi({
 
 // Export the helpers you need
 export const { guard, wrap, router } = s
-export { k }
+export { s }
 ```
 
 </Step>
@@ -71,7 +71,7 @@ A **procedure** is a single API endpoint. All procedures default to POST. Use `.
 
 ```ts twoslash title="src/server.ts"
 // @noErrors
-import { k, guard, router } from './rpc'
+import { s, guard, router } from './rpc'
 import { SilgiError } from 'silgi'
 import { z } from 'zod'
 
@@ -89,7 +89,7 @@ const listUsers = s.$input(z.object({ limit: z.number().min(1).max(100).optional
 })
 
 // A procedure that requires authentication
-const createUser = k
+const createUser = s
   .$use(auth)
   .$input(
     z.object({

@@ -226,7 +226,7 @@ If you want to publish your plugin as an npm package:
 // silgi-plugin-tenant/index.ts
 import type { SilgiInstance } from 'silgi'
 
-export function createTenantPlugin<T extends SilgiInstance>(k: T) {
+export function createTenantPlugin<T extends SilgiInstance>(s: T) {
   const tenantGuard = s.guard(async (ctx) => {
     // ...
     return { tenant }
@@ -242,7 +242,7 @@ Consumers install and use it:
 // @noErrors
 import { createTenantPlugin } from 'silgi-plugin-tenant'
 
-const { tenantGuard } = createTenantPlugin(k)
+const { tenantGuard } = createTenantPlugin(s)
 ```
 
 ## What's next?

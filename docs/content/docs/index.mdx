@@ -26,7 +26,7 @@ const s = silgi({
 })
 
 // 2. Define a procedure
-const getUsers = k
+const getUsers = s
   .$input(z.object({ limit: z.number().optional() }))
   .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))
 

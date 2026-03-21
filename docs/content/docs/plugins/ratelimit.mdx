@@ -197,8 +197,12 @@ const authLimit = rateLimitGuard({
   keyFn: (ctx) => ctx.user.id,
 })
 
-const listUsers = s.$use(publicLimit).$resolve(...)
-const createUser = s.$use(auth, authLimit).$resolve(...)
+const listUsers = s
+  .$use(publicLimit)
+  .$resolve(...)
+const createUser = s
+  .$use(auth, authLimit)
+  .$resolve(...)
 ```
 
 ## What's next?

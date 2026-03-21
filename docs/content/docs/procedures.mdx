@@ -33,7 +33,7 @@ When you need middleware, error definitions, or output validation, chain builder
 // @noErrors
 import { z } from 'zod'
 
-const createUser = k
+const createUser = s
   .$use(auth) // middleware
   .$input(z.object({ name: z.string() })) // input validation
   .$output(z.object({ id: z.number() })) // output validation (optional)
@@ -82,7 +82,7 @@ By default, all procedures use POST. To use GET (for cacheable reads), set the m
 
 ```ts twoslash
 // @noErrors
-const listUsers = k
+const listUsers = s
   .$route({ method: 'GET' })
   .$input(z.object({ limit: z.number().optional() }))
   .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))
@@ -124,7 +124,7 @@ const PostSchema = z.object({
   body: z.string(),
 })
 
-const createPost = k
+const createPost = s
   .$input(z.object({ title: z.string(), body: z.string() }))
   .$output(PostSchema)
   .$errors({ CONFLICT: 409 })
@@ -164,7 +164,7 @@ Attach custom key-value metadata to any procedure using `.$meta()`:
 
 ```ts twoslash
 // @noErrors
-const listUsers = k
+const listUsers = s
   .$input(z.object({ limit: z.number().optional() }))
   .$meta({ cacheable: true, rateLimit: 100 })
   .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))
