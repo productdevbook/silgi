@@ -34,7 +34,7 @@ export function silgiAstro<TCtx extends Record<string, unknown>>(
   options: AstroAdapterOptions<TCtx> = {},
 ): (ctx: { request: Request; params: Record<string, string> }) => Promise<Response> {
   const prefix = options.prefix ?? '/api/rpc'
-  let _handler: ((req: Request) => Promise<Response>) | null = null
+  let _handler: ((req: Request) => Response | Promise<Response>) | null = null
 
   return async ({ request }) => {
     if (!_handler) {

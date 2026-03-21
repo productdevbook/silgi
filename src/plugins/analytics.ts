@@ -113,6 +113,13 @@ export interface AnalyticsOptions {
   maxErrors?: number
   /** Max recent request entries to keep (default: 200) */
   maxRequests?: number
+  /**
+   * Protect dashboard access.
+   * - `string` — secret token checked against `Authorization: Bearer <token>` header or `?token=` query param
+   * - `(req: Request) => boolean | Promise<boolean>` — custom auth function
+   * - `undefined` — no auth (open access, NOT recommended in production)
+   */
+  auth?: string | ((req: Request) => boolean | Promise<boolean>)
 }
 
 export interface ProcedureSnapshot {

@@ -40,7 +40,7 @@ export function silgiNextjs<TCtx extends Record<string, unknown>>(
   const prefix = options.prefix ?? '/api/rpc'
 
   // Lazy import to avoid bundling silgi() in edge runtime
-  let _handler: ((req: Request) => Promise<Response>) | null = null
+  let _handler: ((req: Request) => Response | Promise<Response>) | null = null
 
   return async (req: Request): Promise<Response> => {
     if (!_handler) {

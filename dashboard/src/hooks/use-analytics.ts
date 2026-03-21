@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-
 import { mockData, mockErrors, mockRequests } from '@/lib/mock-data'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { AnalyticsData, ErrorEntry, RequestEntry } from '@/lib/types'
 
@@ -27,7 +26,12 @@ export function useAnalytics(intervalMs = 2000) {
         fetch(ENDPOINTS.requests),
       ])
 
-      // 404 or non-JSON = backend not available
+      // 401 = token expired or removed, reload to show server-side login page
+      if (apiRes.status === 401 || errRes.status === 401 || reqRes.status === 401) {
+        window.location.reload()
+        return
+      }
+
       if (!apiRes.ok || !errRes.ok || !reqRes.ok) {
         fallbackToMock()
         return

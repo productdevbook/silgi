@@ -13,7 +13,7 @@ export function ErrorChart({ procedures }: ErrorChartProps) {
   const data = useMemo(() => {
     return Object.entries(procedures)
       .filter(([, p]) => p.errors > 0)
-      .sort((a, b) => b[1].errors - a[1].errors)
+      .toSorted((a, b) => b[1].errors - a[1].errors)
       .slice(0, 5)
   }, [procedures])
 

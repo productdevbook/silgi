@@ -29,7 +29,7 @@ interface AppSidebarProps {
 
 export function AppSidebar({ route, navigate, data, errorCount, requestCount }: AppSidebarProps) {
   return (
-    <Sidebar variant='inset' collapsible='icon'>
+    <Sidebar collapsible='icon'>
       <SidebarHeader className='gap-0'>
         <div className='flex items-center gap-2 px-1 py-1 group-data-[collapsible=icon]:justify-center'>
           <div className='flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary'>
@@ -86,11 +86,7 @@ export function AppSidebar({ route, navigate, data, errorCount, requestCount }: 
               <div className='flex flex-col gap-1.5 px-2 text-[11px]'>
                 <NodeRow label='Req/s' value={fmt(data.requestsPerSecond)} />
                 <NodeRow label='Avg' value={fmtMs(data.avgLatency)} />
-                <NodeRow
-                  label='Errors'
-                  value={String(data.totalErrors)}
-                  danger={data.totalErrors > 0}
-                />
+                <NodeRow label='Errors' value={String(data.totalErrors)} danger={data.totalErrors > 0} />
                 <NodeRow label='Uptime' value={fmtUptime(data.uptime)} />
               </div>
             </SidebarGroupContent>

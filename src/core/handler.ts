@@ -7,7 +7,7 @@ import { SilgiError, toSilgiError } from './error.ts'
 import { routerCache } from './router-utils.ts'
 import { ValidationError } from './schema.ts'
 import { iteratorToEventStream } from './sse.ts'
-import { stringifyJSON, parseEmptyableJSON } from './utils.ts'
+import { stringifyJSON } from './utils.ts'
 
 import type { AnalyticsOptions } from '../plugins/analytics.ts'
 import type { ScalarOptions } from '../scalar.ts'
@@ -56,6 +56,30 @@ function round(n: number): number {
   return Math.round(n * 100) / 100
 }
 
+function checkAnalyticsAuth(
+  request: Request,
+  rawUrl: string,
+  auth: string | ((req: Request) => boolean | Promise<boolean>),
+): boolean | Promise<boolean> {
+  if (typeof auth === 'function') return auth(request)
+  // Token auth: check cookie, Authorization header, or ?token= query param
+  const cookie = request.headers.get('cookie')
+  if (cookie) {
+    const match = cookie.match(/(?:^|;\s*)silgi-auth=([^;]*)/)
+    if (match && decodeURIComponent(match[1]!) === auth) return true
+  }
+  const authHeader = request.headers.get('authorization')
+  if (authHeader === `Bearer ${auth}`) return true
+  const tokenIdx = rawUrl.indexOf('token=')
+  if (tokenIdx !== -1) {
+    const valueStart = tokenIdx + 6
+    const valueEnd = rawUrl.indexOf('&', valueStart)
+    const token = valueEnd === -1 ? rawUrl.slice(valueStart) : rawUrl.slice(valueStart, valueEnd)
+    if (decodeURIComponent(token) === auth) return true
+  }
+  return false
+}
+
 // ── Fetch Handler ───────────────────────────────────
 
 export function createFetchHandler(
@@ -63,7 +87,7 @@ export function createFetchHandler(
   contextFactory: (req: Request) => Record<string, unknown> | Promise<Record<string, unknown>>,
   hooks?: Hookable<SilgiHooks>,
   handlerOptions?: { scalar?: boolean | ScalarOptions; analytics?: boolean | AnalyticsOptions },
-): (request: Request) => Promise<Response> {
+): (request: Request) => Response | Promise<Response> {
   // Compile router tree into JIT-compiled radix router
   let compiledRouter = routerCache.get(routerDef)
   if (!compiledRouter) {
@@ -94,11 +118,54 @@ export function createFetchHandler(
   const analyticsEnabled = !!handlerOptions?.analytics
   let collector: AnalyticsCollector | undefined
   let analyticsDashboardHtml: string | undefined
+  let analyticsAuth: string | ((req: Request) => boolean | Promise<boolean>) | undefined
   if (analyticsEnabled) {
     const analyticsOpts = typeof handlerOptions!.analytics === 'object' ? handlerOptions!.analytics : {}
     collector = new AnalyticsCollector(analyticsOpts)
     analyticsDashboardHtml = analyticsHTML()
+    analyticsAuth = analyticsOpts.auth
   }
+
+  const analyticsLoginHTML = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Silgi Analytics</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,-apple-system,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0a0a0a;color:#e5e5e5}
+.c{width:100%;max-width:360px;padding:0 24px}
+.logo{display:flex;align-items:center;gap:8px;margin-bottom:20px}
+.logo svg{width:20px;height:20px;color:#c2822a}
+.logo span{font-size:14px;font-weight:600;letter-spacing:-.01em}
+p{font-size:13px;color:#737373;margin-bottom:16px;line-height:1.5}
+input{width:100%;height:40px;padding:0 12px;background:#171717;border:1px solid #262626;border-radius:6px;color:#e5e5e5;font-size:13px;outline:none}
+input:focus{border-color:#c2822a}
+input::placeholder{color:#525252}
+button{width:100%;height:36px;margin-top:10px;background:#c2822a;color:#0a0a0a;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer}
+button:hover{background:#d4943b}
+.err{color:#ef4444;font-size:12px;margin-top:8px;display:none}
+</style>
+</head>
+<body>
+<div class="c">
+<div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span>Silgi Analytics</span></div>
+<p>Enter your access token to view the dashboard.</p>
+<form id="f"><input id="t" type="password" placeholder="Access token" autofocus><div class="err" id="e">Invalid token</div><button type="submit">Authenticate</button></form>
+</div>
+<script>
+document.getElementById('f').onsubmit=function(e){
+e.preventDefault();
+var t=document.getElementById('t').value.trim();
+if(!t)return;
+document.cookie='silgi-auth='+encodeURIComponent(t)+';path=/analytics;samesite=strict';
+fetch('/analytics/_api/stats',{headers:{'cookie':'silgi-auth='+encodeURIComponent(t)}}).then(function(){
+location.reload();
+}).catch(function(){location.reload()});
+};
+</script>
+</body>
+</html>`
 
   // Pre-check: are hooks actually wired? Skip callHook overhead when nothing listens.
   const hasHooks = !!hooks
@@ -121,6 +188,36 @@ export function createFetchHandler(
     }
   } catch {}
 
+  function analyticsAuthResponse(pathname: string): Response {
+    // API endpoints get JSON 401, browser navigation gets HTML login
+    if (pathname.includes('_api/')) {
+      return new Response(JSON.stringify({ code: 'UNAUTHORIZED', status: 401, message: 'Invalid token' }), {
+        status: 401,
+        headers: jsonHeaders,
+      })
+    }
+    return new Response(analyticsLoginHTML, { status: 401, headers: { 'content-type': 'text/html' } })
+  }
+
+  function serveAnalytics(pathname: string, col: AnalyticsCollector): Response {
+    if (pathname === 'analytics/_api/stats') {
+      return new Response(JSON.stringify(col.toJSON()), {
+        headers: { 'content-type': 'application/json', 'cache-control': 'no-cache' },
+      })
+    }
+    if (pathname === 'analytics/_api/errors') {
+      return new Response(JSON.stringify(col.getErrors()), {
+        headers: { 'content-type': 'application/json', 'cache-control': 'no-cache' },
+      })
+    }
+    if (pathname === 'analytics/_api/requests') {
+      return new Response(JSON.stringify(col.getRequests()), {
+        headers: { 'content-type': 'application/json', 'cache-control': 'no-cache' },
+      })
+    }
+    return new Response(analyticsDashboardHtml, { headers: { 'content-type': 'text/html' } })
+  }
+
   function handleRequest(request: Request): Response | Promise<Response> {
     // FAST pathname extraction — 40x faster than new URL()
     const url = request.url
@@ -142,24 +239,17 @@ export function createFetchHandler(
 
     // Analytics: /analytics/* — dashboard SPA + JSON API
     if (analyticsEnabled && collector && pathname.startsWith('analytics')) {
-      // JSON API endpoints under /_api/ to avoid collision with SPA routes
-      if (pathname === 'analytics/_api/stats') {
-        return new Response(JSON.stringify(collector.toJSON()), {
-          headers: { 'content-type': 'application/json', 'cache-control': 'no-cache' },
-        })
+      if (analyticsAuth) {
+        const authResult = checkAnalyticsAuth(request, url, analyticsAuth)
+        if (authResult instanceof Promise) {
+          return authResult.then((ok) => {
+            if (!ok) return analyticsAuthResponse(pathname)
+            return serveAnalytics(pathname, collector!)
+          })
+        }
+        if (!authResult) return analyticsAuthResponse(pathname)
       }
-      if (pathname === 'analytics/_api/errors') {
-        return new Response(JSON.stringify(collector.getErrors()), {
-          headers: { 'content-type': 'application/json', 'cache-control': 'no-cache' },
-        })
-      }
-      if (pathname === 'analytics/_api/requests') {
-        return new Response(JSON.stringify(collector.getRequests()), {
-          headers: { 'content-type': 'application/json', 'cache-control': 'no-cache' },
-        })
-      }
-      // SPA fallback — serve dashboard HTML for all other /analytics/* routes
-      return new Response(analyticsDashboardHtml, { headers: { 'content-type': 'text/html' } })
+      return serveAnalytics(pathname, collector)
     }
 
     // Compiled radix router lookup — fullPath already has leading '/'
@@ -289,7 +379,9 @@ export function createFetchHandler(
             })
           })
           .catch((error) => handleError(error, pathname, request, rawInput, reqTrace, t0))
-          .finally(() => { if (usePool) ctxPool.release(ctx) })
+          .finally(() => {
+            if (usePool) ctxPool.release(ctx)
+          })
       } catch (error) {
         if (usePool) ctxPool.release(ctx)
         return handleError(error, pathname, request, undefined, undefined, t0)

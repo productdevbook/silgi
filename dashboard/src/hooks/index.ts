@@ -1,5 +1,6 @@
 export { useAnalytics } from './use-analytics'
 export { useCopy } from './use-copy'
+export { useKeyboard } from './use-keyboard'
 export { useIsMobile } from './use-mobile'
 export { useRoute } from './use-route'
 export { useTheme } from './use-theme'

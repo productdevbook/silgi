@@ -105,5 +105,5 @@ export function summarizeErrors(errors: ErrorEntry[]): ErrorListSummary {
 }
 
 export function getProcedureOptions(procedures: string[]) {
-  return [...new Set(procedures)].sort((a, b) => a.localeCompare(b))
+  return [...new Set(procedures)].toSorted((a, b) => a.localeCompare(b))
 }

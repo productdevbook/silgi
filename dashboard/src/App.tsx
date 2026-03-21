@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
-import { useAnalytics, useRoute, useTheme } from '@/hooks'
+import { useAnalytics, useKeyboard, useRoute, useTheme } from '@/hooks'
 import { cn } from '@/lib/utils'
 import { Moon02Icon, Sun03Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -18,8 +18,13 @@ export default function App() {
   const { route, navigate } = useRoute()
   const { theme, toggle: toggleTheme } = useTheme()
 
+  useKeyboard({
+    navigate,
+    toggleRefresh: () => analytics.setAutoRefresh(!analytics.autoRefresh),
+  })
+
   return (
-    <SidebarProvider className='bg-muted/20 p-1.5 md:p-2'>
+    <SidebarProvider>
       <AppSidebar
         route={route}
         navigate={navigate}
@@ -28,7 +33,7 @@ export default function App() {
         requestCount={analytics.requests.length}
         autoRefresh={analytics.autoRefresh}
       />
-      <SidebarInset className='overflow-hidden rounded-lg border bg-background shadow-none'>
+      <SidebarInset className='overflow-hidden'>
         <header className='sticky top-0 z-10 flex h-11 items-center justify-between gap-3 border-b bg-background/95 px-3 backdrop-blur md:px-4'>
           <div className='flex min-w-0 items-center gap-3'>
             <SidebarTrigger />
@@ -63,12 +68,16 @@ export default function App() {
           </div>
         </header>
         <main className='flex-1 overflow-auto'>
-          {route.page === 'overview' && <Overview data={analytics.data} />}
-          {route.page === 'errors' && !route.id && <Errors errors={analytics.errors} navigate={navigate} />}
+          {route.page === 'overview' && <Overview data={analytics.data} navigate={navigate} />}
+          {route.page === 'errors' && !route.id && (
+            <Errors errors={analytics.errors} navigate={navigate} initialProcedure={route.params.procedure} />
+          )}
           {route.page === 'errors' && route.id && (
             <ErrorDetailPage errors={analytics.errors} id={route.id} navigate={navigate} />
           )}
-          {route.page === 'requests' && !route.id && <Requests requests={analytics.requests} navigate={navigate} />}
+          {route.page === 'requests' && !route.id && (
+            <Requests requests={analytics.requests} navigate={navigate} initialProcedure={route.params.procedure} />
+          )}
           {route.page === 'requests' && route.id && (
             <RequestDetailPage requests={analytics.requests} id={route.id} navigate={navigate} />
           )}

@@ -63,9 +63,7 @@ export function errorToMarkdown(entry: ErrorEntry): string {
 export function errorToRedactedJson(entry: ErrorEntry): string {
   const redacted = {
     ...entry,
-    headers: Object.fromEntries(
-      Object.entries(entry.headers ?? {}).map(([k, v]) => [k, redactHeader(k, v)]),
-    ),
+    headers: Object.fromEntries(Object.entries(entry.headers ?? {}).map(([k, v]) => [k, redactHeader(k, v)])),
   }
   return JSON.stringify(redacted, null, 2)
 }

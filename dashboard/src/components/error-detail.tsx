@@ -71,7 +71,9 @@ export function ErrorDetail({ entry }: ErrorDetailProps) {
                   <span className='min-w-0 break-all font-mono text-[11px]'>
                     {SENSITIVE_HEADERS.has(key.toLowerCase()) ? (
                       <span className='text-muted-foreground/40'>[redacted]</span>
-                    ) : value}
+                    ) : (
+                      value
+                    )}
                   </span>
                 </div>
               ))}

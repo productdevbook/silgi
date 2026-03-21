@@ -12,7 +12,11 @@ function getInitialTheme(): Theme {
 }
 
 function applyTheme(theme: Theme) {
-  document.documentElement.classList.toggle('dark', theme === 'dark')
+  const root = document.documentElement
+  root.classList.add('theme-transition')
+  root.classList.toggle('dark', theme === 'dark')
+  // Remove transition class after animation completes to avoid interfering with other transitions
+  setTimeout(() => root.classList.remove('theme-transition'), 250)
 }
 
 export function useTheme() {

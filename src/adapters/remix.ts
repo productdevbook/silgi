@@ -33,7 +33,7 @@ export function silgiRemix<TCtx extends Record<string, unknown>>(
   options: RemixAdapterOptions<TCtx> = {},
 ): (args: { request: Request; params: Record<string, string> }) => Promise<Response> {
   const prefix = options.prefix ?? '/rpc'
-  let _handler: ((req: Request) => Promise<Response>) | null = null
+  let _handler: ((req: Request) => Response | Promise<Response>) | null = null
 
   return async ({ request }) => {
     if (!_handler) {

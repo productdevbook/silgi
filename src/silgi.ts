@@ -127,7 +127,7 @@ export interface SilgiInstance<TBaseCtx extends Record<string, unknown>> {
       /** Enable analytics dashboard at /analytics */
       analytics?: boolean | AnalyticsOptions
     },
-  ) => (request: Request) => Promise<Response>
+  ) => (request: Request) => Response | Promise<Response>
 
   /** Create & start a Node.js HTTP server */
   serve: (

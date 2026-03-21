@@ -1,6 +1,6 @@
+import { ErrorDetail } from '@/components/error-detail'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ErrorDetail } from '@/components/error-detail'
 import { useCopy } from '@/hooks'
 import { fmtMs, fmtTime } from '@/lib/format'
 import { errorToMarkdown, errorToRedactedJson } from '@/lib/markdown'
@@ -41,10 +41,16 @@ export function ErrorDetailPage({ errors, id, navigate }: ErrorDetailPageProps) 
         {entry.spans.length > 0 && <Badge variant='secondary'>{entry.spans.length} spans</Badge>}
         <span className='text-[11px] text-muted-foreground'>{fmtTime(entry.timestamp)}</span>
         <div className='ml-auto flex gap-1'>
-          <CopyBtn copied={copiedId === `md-${entry.id}`} onClick={() => copy(`md-${entry.id}`, errorToMarkdown(entry))}>
+          <CopyBtn
+            copied={copiedId === `md-${entry.id}`}
+            onClick={() => copy(`md-${entry.id}`, errorToMarkdown(entry))}
+          >
             md
           </CopyBtn>
-          <CopyBtn copied={copiedId === `json-${entry.id}`} onClick={() => copy(`json-${entry.id}`, errorToRedactedJson(entry))}>
+          <CopyBtn
+            copied={copiedId === `json-${entry.id}`}
+            onClick={() => copy(`json-${entry.id}`, errorToRedactedJson(entry))}
+          >
             json
           </CopyBtn>
         </div>

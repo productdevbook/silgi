@@ -1,6 +1,6 @@
+import { SpanWaterfall } from '@/components/span-waterfall'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { SpanWaterfall } from '@/components/span-waterfall'
 import { fmtMs, fmtTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { ArrowLeft01Icon } from '@hugeicons/core-free-icons'

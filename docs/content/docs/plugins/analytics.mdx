@@ -62,13 +62,11 @@ When analytics is enabled, every request context gets a `trace()` method. Use it
 
 ```ts twoslash
 // @noErrors
-const listUsers = s
-  .query()
-  .$resolve(async ({ ctx }) => {
-    const users = await ctx.trace('db.users.findMany', () => db.users.findMany())
-    const count = await ctx.trace('db.users.count', () => db.users.count())
-    return { users, count }
-  })
+const listUsers = s.query().$resolve(async ({ ctx }) => {
+  const users = await ctx.trace('db.users.findMany', () => db.users.findMany())
+  const count = await ctx.trace('db.users.count', () => db.users.count())
+  return { users, count }
+})
 ```
 
 Each traced operation records its name, duration, and error status. Spans appear in the error detail panel when a request fails, and in the JSON API responses.
@@ -81,13 +79,11 @@ If you prefer an explicit import over the context method, use the standalone `tr
 // @noErrors
 import { trace } from 'silgi/analytics'
 
-const listUsers = s
-  .query()
-  .$resolve(async ({ ctx }) => {
-    const users = await trace(ctx, 'db.users.findMany', () => db.users.findMany())
-    const weather = await trace(ctx, 'api.weather', () => fetch(weatherUrl))
-    return { users, weather }
-  })
+const listUsers = s.query().$resolve(async ({ ctx }) => {
+  const users = await trace(ctx, 'db.users.findMany', () => db.users.findMany())
+  const weather = await trace(ctx, 'api.weather', () => fetch(weatherUrl))
+  return { users, weather }
+})
 ```
 
 This is useful when you want tracing code that compiles cleanly regardless of whether the handler has analytics turned on.
@@ -105,6 +101,48 @@ Every error is captured with full context:
 
 The dashboard has a **"Copy for AI"** button that generates a structured markdown document you can paste directly into Claude, ChatGPT, or any AI assistant. The markdown includes all of the above in a format optimized for debugging.
 
+## Protecting the dashboard
+
+By default, the analytics dashboard is open to anyone who can reach the URL. In production you should always set the `auth` option.
+
+### Token auth
+
+Pass a secret string. The dashboard will prompt for the token on first visit and store it in the browser's session storage.
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, {
+  analytics: {
+    auth: process.env.ANALYTICS_TOKEN,
+  },
+})
+```
+
+The token is checked against the `Authorization: Bearer <token>` header or a `?token=<token>` query parameter.
+
+### Custom auth
+
+Pass a function for full control — check cookies, IP allowlists, OAuth tokens, or anything else:
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, {
+  analytics: {
+    auth: (req) => {
+      const cookie = req.headers.get('cookie') ?? ''
+      return cookie.includes('admin_session=valid')
+    },
+  },
+})
+```
+
+The function receives the raw `Request` and returns `boolean` or `Promise<boolean>`. Return `true` to allow access, `false` to block with a 401.
+
+<Callout type='warn'>
+  Never deploy analytics without `auth` in production. The dashboard exposes request payloads, headers, error stacks,
+  and internal procedure names.
+</Callout>
+
 ## Configuration
 
 Pass an options object instead of `true` to customize buffer sizes and history:
@@ -113,6 +151,7 @@ Pass an options object instead of `true` to customize buffer sizes and history:
 // @noErrors
 s.serve(appRouter, {
   analytics: {
+    auth: 'my-secret-token',
     bufferSize: 2048,
     historySeconds: 300,
     maxErrors: 200,
@@ -121,12 +160,13 @@ s.serve(appRouter, {
 })
 ```
 
-| Option           | Type     | Default | Description                                      |
-| ---------------- | -------- | ------- | ------------------------------------------------ |
-| `bufferSize`     | `number` | `1024`  | Latency samples to keep per procedure (ring buffer) |
-| `historySeconds` | `number` | `120`   | Time-series sparkline history in seconds          |
-| `maxErrors`      | `number` | `100`   | Maximum error log entries to keep                 |
-| `maxRequests`    | `number` | `200`   | Maximum recent request entries to keep            |
+| Option           | Type                                  | Default     | Description                                         |
+| ---------------- | ------------------------------------- | ----------- | --------------------------------------------------- |
+| `auth`           | `string \| (req: Request) => boolean` | `undefined` | Token string or custom auth function                |
+| `bufferSize`     | `number`                              | `1024`      | Latency samples to keep per procedure (ring buffer) |
+| `historySeconds` | `number`                              | `120`       | Time-series sparkline history in seconds            |
+| `maxErrors`      | `number`                              | `100`       | Maximum error log entries to keep                   |
+| `maxRequests`    | `number`                              | `200`       | Maximum recent request entries to keep              |
 
 All buffers are fixed-size ring buffers — memory usage stays constant regardless of traffic volume.
 
@@ -146,11 +186,11 @@ Bun.serve({ port: 3000, fetch: handle })
 
 The dashboard reads from three JSON endpoints. You can also query them directly for custom integrations, alerting, or external dashboards:
 
-| Endpoint                   | Description                                             |
-| -------------------------- | ------------------------------------------------------- |
-| `/analytics/_api/stats`    | Procedure metrics, latency percentiles, time-series     |
-| `/analytics/_api/errors`   | Full error log with input, headers, stack trace, spans  |
-| `/analytics/_api/requests` | Recent requests with trace spans                        |
+| Endpoint                   | Description                                            |
+| -------------------------- | ------------------------------------------------------ |
+| `/analytics/_api/stats`    | Procedure metrics, latency percentiles, time-series    |
+| `/analytics/_api/errors`   | Full error log with input, headers, stack trace, spans |
+| `/analytics/_api/requests` | Recent requests with trace spans                       |
 
 All endpoints return JSON with `cache-control: no-cache`.
 
@@ -161,20 +201,23 @@ The `/analytics/_api/stats` endpoint returns:
 ```ts twoslash
 // @noErrors
 interface AnalyticsSnapshot {
-  uptime: number             // seconds since start
+  uptime: number // seconds since start
   totalRequests: number
   totalErrors: number
-  errorRate: number          // percentage (0-100)
+  errorRate: number // percentage (0-100)
   requestsPerSecond: number
-  avgLatency: number         // milliseconds
-  procedures: Record<string, {
-    count: number
-    errors: number
-    errorRate: number
-    latency: { avg: number; p50: number; p95: number; p99: number }
-    lastError: string | null
-    lastErrorTime: number | null
-  }>
+  avgLatency: number // milliseconds
+  procedures: Record<
+    string,
+    {
+      count: number
+      errors: number
+      errorRate: number
+      latency: { avg: number; p50: number; p95: number; p99: number }
+      lastError: string | null
+      lastErrorTime: number | null
+    }
+  >
   timeSeries: Array<{ time: number; count: number; errors: number }>
 }
 ```

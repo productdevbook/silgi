@@ -27,9 +27,11 @@ function getSortValue(proc: ProcedureSnapshot, key: SortKey): number {
 
 interface ProcedureTableProps {
   procedures: Record<string, ProcedureSnapshot>
+  navigate?: (page: string, id?: string, params?: Record<string, string>) => void
+  filter?: string
 }
 
-export function ProcedureTable({ procedures }: ProcedureTableProps) {
+export function ProcedureTable({ procedures, navigate, filter }: ProcedureTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('count')
   const [sortAsc, setSortAsc] = useState(false)
 
@@ -45,14 +47,18 @@ export function ProcedureTable({ procedures }: ProcedureTableProps) {
   }, [])
 
   const entries = useMemo(() => {
-    const arr = Object.entries(procedures)
+    let arr = Object.entries(procedures)
+    if (filter) {
+      const q = filter.toLowerCase()
+      arr = arr.filter(([path]) => path.toLowerCase().includes(q))
+    }
     const dir = sortAsc ? 1 : -1
     arr.sort((a, b) => {
       if (sortKey === 'path') return dir * a[0].localeCompare(b[0])
       return dir * (getSortValue(a[1], sortKey) - getSortValue(b[1], sortKey))
     })
     return arr
-  }, [procedures, sortKey, sortAsc])
+  }, [procedures, sortKey, sortAsc, filter])
 
   const maxCount = useMemo(() => Math.max(1, ...Object.values(procedures).map((p) => p.count)), [procedures])
 
@@ -79,36 +85,61 @@ export function ProcedureTable({ procedures }: ProcedureTableProps) {
               )}
             >
               {col.label}
-              {sortKey === col.key && (sortAsc ? ' \u2191' : ' \u2193')}
+              {sortKey === col.key && (sortAsc ? ' ↑' : ' ↓')}
             </TableHead>
           ))}
         </TableRow>
       </TableHeader>
       <TableBody>
         {entries.map(([path, proc]) => (
-          <ProcedureRow key={path} path={path} proc={proc} maxCount={maxCount} />
+          <ProcedureRow key={path} path={path} proc={proc} maxCount={maxCount} navigate={navigate} />
         ))}
       </TableBody>
     </Table>
   )
 }
 
-function ProcedureRow({ path, proc, maxCount }: { path: string; proc: ProcedureSnapshot; maxCount: number }) {
+function ProcedureRow({
+  path,
+  proc,
+  maxCount,
+  navigate,
+}: {
+  path: string
+  proc: ProcedureSnapshot
+  maxCount: number
+  navigate?: (page: string, id?: string, params?: Record<string, string>) => void
+}) {
   const percentage = (proc.count / maxCount) * 100
 
   return (
     <Tooltip>
-      <TooltipTrigger render={<TableRow className='cursor-default' />}>
-        <TableCell className='px-3 py-2 font-medium text-primary'>{path.replace(/\//g, ' / ')}</TableCell>
+      <TooltipTrigger render={<TableRow className={cn(navigate && 'cursor-pointer')} />}>
+        <TableCell
+          className='px-3 py-2 font-medium text-primary'
+          onClick={() => navigate?.('requests', undefined, { procedure: path })}
+        >
+          {path.replace(/\//g, ' / ')}
+        </TableCell>
         <TableCell className='px-3 py-2 text-right'>
           <div className='flex items-center justify-end gap-2'>
             <Progress value={percentage} className='h-1.5 w-12' />
             <span className='tabular-nums'>{fmt(proc.count)}</span>
           </div>
         </TableCell>
-        <TableCell className='px-3 py-2 text-right'>
+        <TableCell
+          className='px-3 py-2 text-right'
+          onClick={(e) => {
+            if (proc.errors > 0 && navigate) {
+              e.stopPropagation()
+              navigate('errors', undefined, { procedure: path })
+            }
+          }}
+        >
           {proc.errors > 0 ? (
-            <Badge variant='destructive'>{proc.errors}</Badge>
+            <Badge variant='destructive' className={cn(navigate && 'cursor-pointer hover:opacity-80')}>
+              {proc.errors}
+            </Badge>
           ) : (
             <span className='text-muted-foreground'>0</span>
           )}

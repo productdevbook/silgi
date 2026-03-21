@@ -19,7 +19,7 @@ interface LatencyChartProps {
 export function LatencyChart({ procedures }: LatencyChartProps) {
   const data = useMemo(() => {
     return Object.entries(procedures)
-      .sort((a, b) => b[1].count - a[1].count)
+      .toSorted((a, b) => b[1].count - a[1].count)
       .slice(0, 6)
       .map(([path, proc]) => ({
         name: path.split('/').pop() || path,

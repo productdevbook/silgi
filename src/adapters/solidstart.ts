@@ -33,7 +33,7 @@ export function silgiSolidStart<TCtx extends Record<string, unknown>>(
   options: SolidStartAdapterOptions<TCtx> = {},
 ): (event: any) => Promise<Response> {
   const prefix = options.prefix ?? '/api/rpc'
-  let _handler: ((req: Request) => Promise<Response>) | null = null
+  let _handler: ((req: Request) => Response | Promise<Response>) | null = null
   let _currentEvent: any = null
 
   return async (event: any) => {

@@ -12,7 +12,8 @@ import {
 } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { fmtMs, fmtTime } from '@/lib/format'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { fmtMs, fmtRelativeTime, fmtTime } from '@/lib/format'
 import { filterErrors, getProcedureOptions } from '@/lib/list-filters'
 import { cn } from '@/lib/utils'
 import { useCallback, useMemo, useState } from 'react'
@@ -48,11 +49,12 @@ function getSortValue(entry: ErrorEntry, key: SortKey): string | number {
 interface ErrorsProps {
   errors: ErrorEntry[]
   navigate: (page: string, id?: string) => void
+  initialProcedure?: string
 }
 
-export function Errors({ errors, navigate }: ErrorsProps) {
+export function Errors({ errors, navigate, initialProcedure }: ErrorsProps) {
   const [query, setQuery] = useState('')
-  const [procedure, setProcedure] = useState('all')
+  const [procedure, setProcedure] = useState(initialProcedure || 'all')
   const [severity, setSeverity] = useState<ErrorSeverityFilter>('all')
   const [trace, setTrace] = useState<ErrorTraceFilter>('all')
   const [sortKey, setSortKey] = useState<SortKey>('time')
@@ -69,7 +71,7 @@ export function Errors({ errors, navigate }: ErrorsProps) {
   const procedures = useMemo(() => getProcedureOptions(errors.map((entry) => entry.procedure)), [errors])
 
   const filtered = useMemo(() => {
-    let result = filterErrors(errors, { query, procedure, severity, trace }).toReversed()
+    const result = filterErrors(errors, { query, procedure, severity, trace }).toReversed()
     const dir = sortAsc ? 1 : -1
     result.sort((a, b) => {
       const va = getSortValue(a, sortKey)
@@ -149,7 +151,9 @@ export function Errors({ errors, navigate }: ErrorsProps) {
           </ToggleGroup>
         </div>
         <div className='flex items-center gap-2'>
-          <span className='text-[11px] tabular-nums text-muted-foreground'>{filtered.length} of {errors.length}</span>
+          <span className='text-[11px] tabular-nums text-muted-foreground'>
+            {filtered.length} of {errors.length}
+          </span>
           {hasActiveFilters && (
             <Button variant='ghost' size='xs' onClick={clearFilters}>
               Clear
@@ -183,13 +187,14 @@ export function Errors({ errors, navigate }: ErrorsProps) {
           </TableHeader>
           <TableBody>
             {filtered.map((entry) => (
-              <TableRow
-                key={entry.id}
-                onClick={() => navigate('errors', String(entry.id))}
-                className='cursor-pointer'
-              >
+              <TableRow key={entry.id} onClick={() => navigate('errors', String(entry.id))} className='cursor-pointer'>
                 <TableCell className='px-3 py-2 whitespace-nowrap text-xs tabular-nums text-muted-foreground'>
-                  {fmtTime(entry.timestamp)}
+                  <Tooltip>
+                    <TooltipTrigger className='cursor-default'>{fmtRelativeTime(entry.timestamp)}</TooltipTrigger>
+                    <TooltipContent side='right' className='text-xs'>
+                      {fmtTime(entry.timestamp)}
+                    </TooltipContent>
+                  </Tooltip>
                 </TableCell>
                 <TableCell className='px-3 py-2 text-xs font-medium'>{entry.procedure}</TableCell>
                 <TableCell className='px-3 py-2'>

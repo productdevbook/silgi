@@ -75,9 +75,10 @@ export const mockErrors: ErrorEntry[] = [
     error: 'Forbidden: you do not own this todo',
     code: 'FORBIDDEN',
     status: 403,
-    stack: 'SilgiError: Forbidden\n    at Object.handler (src/procedures/todos.ts:48:9)\n    at compiledPipeline (src/compile.ts:209:18)',
+    stack:
+      'SilgiError: Forbidden\n    at Object.handler (src/procedures/todos.ts:48:9)\n    at compiledPipeline (src/compile.ts:209:18)',
     input: { id: 42 },
-    headers: { 'content-type': 'application/json', 'authorization': 'Bearer eyJ...', 'user-agent': 'Mozilla/5.0' },
+    headers: { 'content-type': 'application/json', authorization: 'Bearer eyJ...', 'user-agent': 'Mozilla/5.0' },
     durationMs: 3.62,
     spans: [
       { name: 'db.todos.findById', durationMs: 2.1 },
@@ -104,13 +105,12 @@ export const mockErrors: ErrorEntry[] = [
     error: 'Not Found',
     code: 'NOT_FOUND',
     status: 404,
-    stack: 'SilgiError: Not Found\n    at Object.handler (src/procedures/todos.ts:28:9)\n    at compiledPipeline (src/compile.ts:209:18)',
+    stack:
+      'SilgiError: Not Found\n    at Object.handler (src/procedures/todos.ts:28:9)\n    at compiledPipeline (src/compile.ts:209:18)',
     input: { id: 99999 },
     headers: { 'content-type': 'application/json', 'user-agent': 'curl/8.7.1' },
     durationMs: 3.54,
-    spans: [
-      { name: 'db.todos.findById', durationMs: 3.43 },
-    ],
+    spans: [{ name: 'db.todos.findById', durationMs: 3.43 }],
   },
 ]
 
@@ -174,8 +174,6 @@ export const mockRequests: RequestEntry[] = [
     durationMs: 1.2,
     status: 200,
     input: undefined,
-    spans: [
-      { name: 'cache.get', durationMs: 0.15 },
-    ],
+    spans: [{ name: 'cache.get', durationMs: 0.15 }],
   },
 ]

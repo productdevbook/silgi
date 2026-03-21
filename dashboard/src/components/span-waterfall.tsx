@@ -1,8 +1,7 @@
-import { useMemo } from 'react'
-
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { fmtMs } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { useMemo } from 'react'
 
 import type { TraceSpan } from '@/lib/types'
 
@@ -84,18 +83,17 @@ type SpanType = 'db' | 'http' | 'cache' | 'queue' | 'default'
 function guessSpanType(name: string): SpanType {
   const lower = name.toLowerCase()
   if (
-    lower.includes('db')
-    || lower.includes('sql')
-    || lower.includes('query')
-    || lower.includes('prisma')
-    || lower.includes('drizzle')
-    || lower.includes('mongo')
+    lower.includes('db') ||
+    lower.includes('sql') ||
+    lower.includes('query') ||
+    lower.includes('prisma') ||
+    lower.includes('drizzle') ||
+    lower.includes('mongo')
   )
     return 'db'
   if (lower.includes('http') || lower.includes('fetch') || lower.includes('api') || lower.includes('request'))
     return 'http'
-  if (lower.includes('cache') || lower.includes('redis') || lower.includes('memcache'))
-    return 'cache'
+  if (lower.includes('cache') || lower.includes('redis') || lower.includes('memcache')) return 'cache'
   if (lower.includes('queue') || lower.includes('publish') || lower.includes('nats') || lower.includes('kafka'))
     return 'queue'
   return 'default'

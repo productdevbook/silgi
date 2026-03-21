@@ -12,7 +12,8 @@ import {
 } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { fmtMs, fmtTime } from '@/lib/format'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { fmtMs, fmtRelativeTime, fmtTime } from '@/lib/format'
 import { filterRequests, getProcedureOptions } from '@/lib/list-filters'
 import { cn } from '@/lib/utils'
 import { useCallback, useMemo, useState } from 'react'
@@ -25,11 +26,12 @@ type SortKey = 'time' | 'procedure' | 'status' | 'duration' | 'spans'
 interface RequestsProps {
   requests: RequestEntry[]
   navigate: (page: string, id?: string) => void
+  initialProcedure?: string
 }
 
-export function Requests({ requests, navigate }: RequestsProps) {
+export function Requests({ requests, navigate, initialProcedure }: RequestsProps) {
   const [query, setQuery] = useState('')
-  const [procedure, setProcedure] = useState('all')
+  const [procedure, setProcedure] = useState(initialProcedure || 'all')
   const [status, setStatus] = useState<RequestStatusFilter>('all')
   const [latency, setLatency] = useState<RequestLatencyFilter>('all')
   const [sortKey, setSortKey] = useState<SortKey>('time')
@@ -46,7 +48,7 @@ export function Requests({ requests, navigate }: RequestsProps) {
   const procedures = useMemo(() => getProcedureOptions(requests.map((entry) => entry.procedure)), [requests])
 
   const filtered = useMemo(() => {
-    let result = filterRequests(requests, { query, procedure, status, latency }).toReversed()
+    const result = filterRequests(requests, { query, procedure, status, latency }).toReversed()
     const dir = sortAsc ? 1 : -1
     result.sort((a, b) => {
       switch (sortKey) {
@@ -135,7 +137,9 @@ export function Requests({ requests, navigate }: RequestsProps) {
           </ToggleGroup>
         </div>
         <div className='flex items-center gap-2'>
-          <span className='text-[11px] tabular-nums text-muted-foreground'>{filtered.length} of {requests.length}</span>
+          <span className='text-[11px] tabular-nums text-muted-foreground'>
+            {filtered.length} of {requests.length}
+          </span>
           {hasActiveFilters && (
             <Button variant='ghost' size='xs' onClick={clearFilters}>
               Clear
@@ -193,7 +197,12 @@ export function Requests({ requests, navigate }: RequestsProps) {
                 className='cursor-pointer'
               >
                 <TableCell className='px-3 py-2 whitespace-nowrap text-xs tabular-nums text-muted-foreground'>
-                  {fmtTime(entry.timestamp)}
+                  <Tooltip>
+                    <TooltipTrigger className='cursor-default'>{fmtRelativeTime(entry.timestamp)}</TooltipTrigger>
+                    <TooltipContent side='right' className='text-xs'>
+                      {fmtTime(entry.timestamp)}
+                    </TooltipContent>
+                  </Tooltip>
                 </TableCell>
                 <TableCell className='px-3 py-2 text-xs font-medium'>{entry.procedure}</TableCell>
                 <TableCell className='px-3 py-2'>

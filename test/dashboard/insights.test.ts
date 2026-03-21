@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { getProcedureFocusLists } from '../../dashboard/src/lib/insights'
-import { mockData } from '../../dashboard/src/lib/mock-data'
 import { getOverviewInsights } from '../../dashboard/src/lib/insights'
+import { mockData } from '../../dashboard/src/lib/mock-data'
 
 describe('getOverviewInsights', () => {
   it('returns an empty waiting state when no data is available', () => {

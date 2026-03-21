@@ -1,3 +1,4 @@
+import { SearchField } from '@/components/dashboard-shell'
 import { LatencyChart } from '@/components/latency-chart'
 import { ProcedureTable } from '@/components/procedure-table'
 import { RequestChart } from '@/components/request-chart'
@@ -5,16 +6,18 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { fmt, fmtMs, fmtUptime } from '@/lib/format'
 import { getOverviewInsights } from '@/lib/insights'
 import { cn } from '@/lib/utils'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 
 import type { AnalyticsData } from '@/lib/types'
 
 interface OverviewProps {
   data: AnalyticsData | null
+  navigate: (page: string, id?: string, params?: Record<string, string>) => void
 }
 
-export function Overview({ data }: OverviewProps) {
+export function Overview({ data, navigate }: OverviewProps) {
   const insights = useMemo(() => getOverviewInsights(data), [data])
+  const [procedureFilter, setProcedureFilter] = useState('')
 
   if (!data) {
     return (
@@ -75,11 +78,19 @@ export function Overview({ data }: OverviewProps) {
 
       {/* Procedure table */}
       <div>
-        <div className='flex items-baseline justify-between px-5 pt-4 pb-2'>
+        <div className='flex items-center justify-between gap-3 px-5 pt-4 pb-2'>
           <SectionLabel>Procedures</SectionLabel>
-          <span className='text-xs tabular-nums text-muted-foreground'>{procedureCount} routes</span>
+          <div className='flex items-center gap-3'>
+            <SearchField
+              value={procedureFilter}
+              onChange={(e) => setProcedureFilter(e.target.value)}
+              placeholder='Filter procedures...'
+              className='sm:max-w-48'
+            />
+            <span className='text-xs tabular-nums text-muted-foreground'>{procedureCount} routes</span>
+          </div>
         </div>
-        <ProcedureTable procedures={data.procedures} />
+        <ProcedureTable procedures={data.procedures} navigate={navigate} filter={procedureFilter} />
       </div>
     </div>
   )
@@ -103,11 +114,7 @@ function Stat({
       <div className='text-[11px] text-muted-foreground'>{label}</div>
       <div className='mt-1 flex items-baseline gap-1.5'>
         <span
-          className={cn(
-            'text-lg font-semibold tabular-nums tracking-tight',
-            danger && 'text-destructive',
-            className,
-          )}
+          className={cn('text-lg font-semibold tabular-nums tracking-tight', danger && 'text-destructive', className)}
         >
           {value}
         </span>
