@@ -67,16 +67,16 @@ export function RequestDetailPage({ requests, id, navigate }: RequestDetailPageP
       </div>
 
       {/* ── Body: procedures + metadata ── */}
-      <div className='grid flex-1 xl:grid-cols-[1.65fr_0.9fr]'>
+      <div className='grid flex-1 overflow-hidden xl:grid-cols-[1.65fr_0.9fr]'>
         {/* Left: procedures with waterfall */}
-        <div className='xl:border-r'>
+        <div className='min-w-0 xl:border-r'>
           {entry.procedures.map((proc, idx) => (
             <ProcedureSection key={idx} proc={proc} idx={idx} totalMs={entry.durationMs} totalProcs={entry.procedures.length} />
           ))}
         </div>
 
         {/* Right: HTTP metadata */}
-        <div>
+        <div className='min-w-0'>
           <Section label='HTTP Request'>
             <KV label='id' value={String(entry.id)} />
             <KV label='method' value={entry.method} />

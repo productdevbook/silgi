@@ -32,6 +32,8 @@ export interface TraceSpan {
   durationMs: number
   startOffsetMs?: number
   detail?: string
+  input?: unknown
+  output?: unknown
   error?: string
 }
 

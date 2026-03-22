@@ -160,7 +160,7 @@ describe('handler() — passthrough (wildcard catch-all)', () => {
     expect(await res.text()).toBe('not found')
   })
 
-  it('passthrough body clone does not interfere with handler body reading', async () => {
+  it('passthrough with analytics does not consume body before handler', async () => {
     const k2 = silgi({
       context: (req) => ({ req }),
     })
@@ -168,7 +168,6 @@ describe('handler() — passthrough (wildcard catch-all)', () => {
     const handler = k2
       .$route({ method: '*', path: '/api/proxy/**' })
       .$resolve(async ({ ctx }) => {
-        // Handler reads body — should work even when analytics clones it
         const body = await (ctx as any).req.json()
         return new Response(JSON.stringify(body), {
           headers: { 'content-type': 'application/json' },

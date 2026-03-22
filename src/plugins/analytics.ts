@@ -84,6 +84,8 @@ export interface TraceSpan {
   durationMs: number
   startOffsetMs?: number
   detail?: string
+  input?: unknown
+  output?: unknown
   error?: string
 }
 
@@ -217,9 +219,13 @@ function generateRequestId(): string {
 
 export class RequestTrace {
   spans: TraceSpan[] = []
+  /** Procedure-level input — set via `setProcedureInput()` or `trace(..., { procedure: { input } })` */
+  procedureInput: unknown = undefined
+  /** Procedure-level output — set via `setProcedureOutput()` or `trace(..., { procedure: { output } })` */
+  procedureOutput: unknown = undefined
   #t0 = performance.now()
 
-  async trace<T>(name: string, fn: () => T | Promise<T>, opts?: { kind?: SpanKind; detail?: string }): Promise<T> {
+  async trace<T>(name: string, fn: () => T | Promise<T>, opts?: { kind?: SpanKind; detail?: string; input?: unknown; output?: unknown | ((result: T) => unknown); procedure?: { input?: unknown; output?: unknown | ((result: T) => unknown) } }): Promise<T> {
     const start = performance.now()
     const kind = opts?.kind ?? guessKind(name)
     try {
@@ -230,7 +236,15 @@ export class RequestTrace {
         durationMs: round(performance.now() - start),
         startOffsetMs: round(start - this.#t0),
         detail: opts?.detail,
+        input: opts?.input,
+        output: typeof opts?.output === 'function' ? (opts.output as (r: T) => unknown)(result) : opts?.output,
       })
+      // Write procedure-level data if provided
+      if (opts?.procedure) {
+        if (opts.procedure.input !== undefined) this.procedureInput = opts.procedure.input
+        const po = opts.procedure.output
+        if (po !== undefined) this.procedureOutput = typeof po === 'function' ? (po as (r: T) => unknown)(result) : po
+      }
       return result
     } catch (err) {
       this.spans.push({
@@ -239,8 +253,10 @@ export class RequestTrace {
         durationMs: round(performance.now() - start),
         startOffsetMs: round(start - this.#t0),
         detail: opts?.detail,
+        input: opts?.input,
         error: err instanceof Error ? err.message : String(err),
       })
+      if (opts?.procedure?.input !== undefined) this.procedureInput = opts.procedure.input
       throw err
     }
   }
@@ -284,7 +300,7 @@ function guessKind(name: string): SpanKind {
  * })
  * ```
  */
-export async function trace<T>(ctx: Record<string, unknown>, name: string, fn: () => T | Promise<T>, opts?: { kind?: SpanKind; detail?: string }): Promise<T> {
+export async function trace<T>(ctx: Record<string, unknown>, name: string, fn: () => T | Promise<T>, opts?: { kind?: SpanKind; detail?: string; input?: unknown; output?: unknown | ((result: T) => unknown); procedure?: { input?: unknown; output?: unknown | ((result: T) => unknown) } }): Promise<T> {
   const reqTrace = ctx.__analyticsTrace as RequestTrace | undefined
   if (reqTrace) {
     return reqTrace.trace(name, fn, opts)

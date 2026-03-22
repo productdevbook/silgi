@@ -297,7 +297,7 @@ location.reload();
     // ── Fast sync path: GET, sync context factory, no body ──
     // Avoids async/await overhead entirely for simple queries
     const method = request.method
-    if (ctxFactoryIsSync && (method === 'GET' || !request.body || route.passthrough)) {
+    if (ctxFactoryIsSync && (method === 'GET' || !request.body) && !route.passthrough) {
       // Ultra-fast: skip pool when context is empty, no params, no analytics
       const usePool = !ctxFactoryIsEmpty || match.params || collector
       const ctx = usePool ? ctxPool.borrow() : (emptyCtx as Record<string, unknown>)
@@ -454,16 +454,7 @@ location.reload();
 
       // Parse input body (skip for passthrough routes — they consume the body themselves)
       if (route.passthrough) {
-        // Clone body for analytics without consuming the original request
-        if (collector && request.body && request.method !== 'GET') {
-          try {
-            const cloned = request.clone()
-            const ct = cloned.headers.get('content-type')
-            if (ct && ct.includes('json')) {
-              rawInput = await cloned.json()
-            }
-          } catch {}
-        }
+        // No body parsing — external handler reads it directly
       } else if (request.method === 'GET') {
         if (qMark !== -1) {
           const searchStr = url.slice(qMark + 1)
@@ -514,7 +505,7 @@ location.reload();
           if (collector) {
             collector.record(pathname, durationMs)
             if (accumulator) {
-              accumulator.addProcedure({ procedure: pathname, durationMs, status: output.status, input: rawInput, output: null, spans: reqTrace?.spans ?? [] })
+              accumulator.addProcedure({ procedure: pathname, durationMs, status: output.status, input: rawInput ?? reqTrace?.procedureInput ?? null, output: reqTrace?.procedureOutput ?? null, spans: reqTrace?.spans ?? [] })
             }
           }
         }

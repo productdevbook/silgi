@@ -120,13 +120,27 @@ The `trace()` method accepts an options object as the third argument:
 await ctx.trace('db.users.findMany', () => db.users.findMany(), {
   kind: 'db',
   detail: 'SELECT * FROM users WHERE active = true',
+  input: { filter: 'active' },
+  output: (result) => ({ count: result.length }),
 })
 ```
 
-| Option   | Type       | Description                                                    |
-| -------- | ---------- | -------------------------------------------------------------- |
-| `kind`   | `SpanKind` | Category for color-coding in the dashboard (see below)         |
-| `detail` | `string`   | Extra info shown in the expanded span view (SQL query, URL, etc.) |
+| Option      | Type                      | Description                                                        |
+| ----------- | ------------------------- | ------------------------------------------------------------------ |
+| `kind`      | `SpanKind`                | Category for color-coding in the dashboard (see below)             |
+| `detail`    | `string`                  | Extra info shown in the expanded span view (SQL query, URL, etc.)  |
+| `input`     | `unknown`                 | Input data captured for this span (shown in expanded detail)       |
+| `output`    | `unknown \| (result) => unknown` | Output data — a value or a function that receives the result |
+
+The `output` option can be a function to derive the captured value from the trace result, avoiding capturing the full response:
+
+```ts twoslash
+// @noErrors
+// Capture just the count, not the full user array
+await ctx.trace('db.users.findMany', () => db.users.findMany(), {
+  input: { limit: 10 },
+  output: (users) => ({ count: users.length }),
+})
 
 ### Span kinds
 
@@ -346,6 +360,8 @@ interface TraceSpan {
   durationMs: number
   startOffsetMs?: number
   detail?: string
+  input?: unknown
+  output?: unknown
   error?: string
 }
 ```

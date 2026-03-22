@@ -112,6 +112,22 @@ export function SpanWaterfall({ spans, totalMs }: SpanWaterfallProps) {
                   )}
                   <span className='text-muted-foreground'>({totalMs > 0 ? ((span.durationMs / totalMs) * 100).toFixed(0) : 0}% of total)</span>
                 </div>
+                {span.input != null && (
+                  <div className='mb-2'>
+                    <h5 className='mb-1 text-[10px] font-semibold text-muted-foreground'>Input</h5>
+                    <pre className='max-h-32 overflow-auto whitespace-pre-wrap rounded-md bg-background p-3 font-mono text-[10px] leading-relaxed text-muted-foreground'>
+                      {typeof span.input === 'string' ? span.input : JSON.stringify(span.input, null, 2)}
+                    </pre>
+                  </div>
+                )}
+                {span.output != null && (
+                  <div className='mb-2'>
+                    <h5 className='mb-1 text-[10px] font-semibold text-muted-foreground'>Output</h5>
+                    <pre className='max-h-32 overflow-auto whitespace-pre-wrap rounded-md bg-background p-3 font-mono text-[10px] leading-relaxed text-muted-foreground'>
+                      {typeof span.output === 'string' ? span.output : JSON.stringify(span.output, null, 2)}
+                    </pre>
+                  </div>
+                )}
                 {span.detail && (
                   <pre className='overflow-x-auto whitespace-pre-wrap rounded-md bg-background p-3 font-mono text-[10px] leading-relaxed text-muted-foreground'>
                     {span.detail}
@@ -122,7 +138,7 @@ export function SpanWaterfall({ spans, totalMs }: SpanWaterfallProps) {
                     {span.error}
                   </div>
                 )}
-                {!span.detail && !span.error && (
+                {!span.detail && !span.error && !span.input && !span.output && (
                   <p className='text-[11px] text-muted-foreground/60'>
                     No detail captured. Use <code className='rounded bg-muted px-1'>{'ctx.trace(name, fn, { detail: "..." })'}</code> to add query/URL info.
                   </p>
