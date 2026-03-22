@@ -3,7 +3,6 @@
   "defaultOpen": false,
   "pages": [
     "index",
-    "analytics",
     "batch-server",
     "body-limit",
     "cache",
