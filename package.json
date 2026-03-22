@@ -152,10 +152,6 @@
       "import": "./dist/adapters/aws-lambda.mjs",
       "types": "./dist/adapters/aws-lambda.d.mts"
     },
-    "./elysia": {
-      "import": "./dist/adapters/elysia.mjs",
-      "types": "./dist/adapters/elysia.d.mts"
-    },
     "./nextjs": {
       "import": "./dist/adapters/nextjs.mjs",
       "types": "./dist/adapters/nextjs.d.mts"
@@ -235,7 +231,7 @@
     "dev": "vitest",
     "bench": "node --experimental-strip-types bench/update-benchmarks.ts",
     "bench:memory": "node --expose-gc --experimental-strip-types bench/memory.ts",
-    "bench:elysia": "bun bench/elysia.ts",
+
     "bench:bun": "bun test/bun-compat.ts",
     "play": "pnpm build && pnpm --filter silgi-playground dev",
     "lint": "oxlint . && oxfmt --check .",
@@ -274,7 +270,7 @@
     "@types/ws": "^8.18.1",
     "@typescript/native-preview": "7.0.0-dev.20260316.1",
     "ai": "^6.0.134",
-    "elysia": "^1.4.28",
+
     "express": "^5.2.1",
     "fastify": "^5.8.2",
     "h3": "2.0.1-rc.16",

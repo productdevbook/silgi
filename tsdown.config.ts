@@ -32,7 +32,7 @@ export default defineConfig({
     'src/adapters/fastify.ts',
     'src/adapters/express.ts',
     'src/adapters/aws-lambda.ts',
-    'src/adapters/elysia.ts',
+
     'src/adapters/nextjs.ts',
     'src/adapters/sveltekit.ts',
     'src/adapters/remix.ts',

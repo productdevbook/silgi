@@ -9,7 +9,7 @@
     "drizzle",
     "astro",
     "aws-lambda",
-    "elysia",
+
     "express",
     "fastify",
     "message-port",
