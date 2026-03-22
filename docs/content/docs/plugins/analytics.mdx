@@ -1,11 +1,11 @@
 ---
 title: Analytics
-description: Built-in monitoring dashboard with deep error tracing, AI-ready markdown export, and custom span tracking.
+description: Built-in monitoring dashboard with session tracking, deep error tracing, AI-ready markdown export, and custom span tracking.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
 
-Built-in analytics for Silgi. No Prometheus, no Grafana, no external infrastructure. One flag gives you a live dashboard, full error context, and one-click markdown export for AI debugging.
+Built-in analytics for Silgi. No Prometheus, no Grafana, no external infrastructure. One flag gives you a live dashboard, full error context, session tracking, and one-click markdown export for AI debugging.
 
 ## Quick start
 
@@ -31,12 +31,15 @@ Open `http://localhost:3000/analytics` in your browser.
 | Requests/sec                 | Count / elapsed time               | ~0             |
 | Time-series (sparkline)      | 1-second windows                   | ~0             |
 | Custom spans (DB, API calls) | `trace()` helper                   | ~0 when unused |
+| HTTP request grouping        | Request accumulator with IDs       | ~0             |
+| Session tracking             | Cookie-based (`_sid`)              | ~0             |
+| Response headers             | Captured after Response is built   | ~0             |
 
 All data lives in memory. No disk I/O, no network calls, no serialization until the dashboard is opened.
 
 ## Dashboard
 
-The dashboard is a self-contained single-file app served at `/analytics`. It auto-refreshes every 2 seconds and groups the most important signals into overview, request, and error workflows.
+The dashboard is a self-contained single-file app served at `/analytics`. It auto-refreshes every 2 seconds and groups the most important signals into overview, request, session, and error workflows.
 
 **Overview tab:**
 
@@ -47,14 +50,51 @@ The dashboard is a self-contained single-file app served at `/analytics`. It aut
 **Requests tab:**
 
 - Recent traced requests with procedure, status, and latency filters plus sortable columns
-- Per-request detail pages with span waterfall timing and captured input payloads
+- Clickable session ID badges to navigate to the session detail
+- Per-request detail pages with span waterfall timing, captured input/output payloads, request and response headers, timing breakdown by category (db, cache, http, etc.), and session link
+
+**Sessions tab:**
+
+- All active sessions with request count, error count, total/average latency, and procedures called
+- Search and sortable columns
+- Session detail page with:
+  - Stat strip (requests, errors, wall clock time, CPU time, avg latency, slowest/fastest request)
+  - Procedure journey — visual breadcrumb trail showing the sequence of procedures called across the session
+  - Session flow Gantt chart — timeline visualization of when each request happened relative to session start
+  - Clickable request timeline with inline span waterfall and input/output preview
+  - Per-request mini timing bars showing db/cache/http breakdown at a glance
+  - Method and status code breakdown
+  - Time by category chart with tooltips
+  - Per-procedure stats cards (call count, total/avg duration, spans, errors)
+  - **Copy for AI (Markdown)** and **Copy JSON** for the entire session
 
 **Errors tab:**
 
 - Filterable error log with procedure, severity, and trace-presence controls
 - Detail pages with full input, headers, stack trace, and traced spans for each error
+- Clickable request ID badge to navigate to the HTTP request that caused the error
 - **Copy for AI (Markdown)** — one click to copy a structured markdown document, paste into any AI assistant
-- **Copy JSON** — raw error data for programmatic use
+- **Copy JSON** — raw error data for programmatic use (sensitive headers auto-redacted)
+
+## Request IDs
+
+Every response includes an `x-request-id` header with a unique Snowflake-style ID. The ID is a 13-character Base36 string that is lexicographically time-sorted and collision-resistant across processes.
+
+```
+x-request-id: 1a2b3c4d5e6f7
+```
+
+Request IDs link HTTP requests to errors in the dashboard — clicking an error's request badge navigates to the full request detail.
+
+## Session tracking
+
+Analytics automatically tracks user sessions via a `_sid` cookie. Sessions group multiple HTTP requests from the same browser or client, letting you see the full user journey.
+
+- **Cookie**: `_sid` — `HttpOnly`, `SameSite=Lax`, 1-year expiry
+- **ID format**: Same Snowflake format as request IDs — unique and time-sorted
+- **No server-side session state**: Session data is derived from request entries client-side
+
+Sessions appear in the dashboard's **Sessions tab** and as clickable badges in request detail pages.
 
 ## Tracing DB queries and API calls
 
@@ -69,7 +109,38 @@ const listUsers = s.query().$resolve(async ({ ctx }) => {
 })
 ```
 
-Each traced operation records its name, duration, and error status. Spans appear in the error detail panel when a request fails, and in the JSON API responses.
+Each traced operation records its name, duration, start offset, and error status. Spans appear in the request detail page with a waterfall timeline, and in the error detail panel when a request fails.
+
+### Span options
+
+The `trace()` method accepts an options object as the third argument:
+
+```ts twoslash
+// @noErrors
+await ctx.trace('db.users.findMany', () => db.users.findMany(), {
+  kind: 'db',
+  detail: 'SELECT * FROM users WHERE active = true',
+})
+```
+
+| Option   | Type       | Description                                                    |
+| -------- | ---------- | -------------------------------------------------------------- |
+| `kind`   | `SpanKind` | Category for color-coding in the dashboard (see below)         |
+| `detail` | `string`   | Extra info shown in the expanded span view (SQL query, URL, etc.) |
+
+### Span kinds
+
+Spans are automatically categorized by their name prefix. You can override this with the `kind` option.
+
+| Kind     | Auto-detected when name contains                                  | Dashboard color |
+| -------- | ----------------------------------------------------------------- | --------------- |
+| `db`     | `db.`, `sql`, `prisma`, `drizzle`, `query`, `mongo`              | Purple          |
+| `http`   | `http.`, `fetch`, `api.`                                         | Blue            |
+| `cache`  | `cache.`, `redis`, `memcache`                                    | Emerald         |
+| `queue`  | `queue`, `publish`, `nats`, `kafka`                               | Amber           |
+| `email`  | `email`, `smtp`, `ses`                                            | Orange          |
+| `ai`     | `ai`, `llm`, `openai`, `gemini`                                  | Cyan            |
+| `custom` | Anything else                                                     | Gray            |
 
 ### Standalone `trace()` helper
 
@@ -88,18 +159,16 @@ const listUsers = s.query().$resolve(async ({ ctx }) => {
 
 This is useful when you want tracing code that compiles cleanly regardless of whether the handler has analytics turned on.
 
-## Error log — Copy for AI
+## Copy for AI
 
-Every error is captured with full context:
+Both errors and requests support one-click copy for AI debugging:
 
-- **Procedure path** and error code/status
-- **Input** that caused the error
-- **Request headers** (authorization auto-redacted)
-- **Stack trace**
-- **Traced spans** with individual durations and errors
-- **Total request duration**
+- **Errors**: Full context with procedure path, error code, input, headers (authorization redacted), stack trace, traced spans, and total duration
+- **Requests**: HTTP metadata, all procedure calls with input/output, span waterfall with timing breakdown
+- **Timing**: Focused performance view with just the span timeline and timing categories
+- **Sessions**: Full session summary with all requests and their procedures
 
-The dashboard has a **"Copy for AI"** button that generates a structured markdown document you can paste directly into Claude, ChatGPT, or any AI assistant. The markdown includes all of the above in a format optimized for debugging.
+The markdown format is optimized for pasting into Claude, ChatGPT, or any AI assistant. Each export ends with analysis prompts for performance optimization.
 
 ## Protecting the dashboard
 
@@ -190,13 +259,11 @@ The dashboard reads from three JSON endpoints. You can also query them directly 
 | -------------------------- | ------------------------------------------------------ |
 | `/analytics/_api/stats`    | Procedure metrics, latency percentiles, time-series    |
 | `/analytics/_api/errors`   | Full error log with input, headers, stack trace, spans |
-| `/analytics/_api/requests` | Recent requests with trace spans                       |
+| `/analytics/_api/requests` | Recent requests with trace spans and session IDs       |
 
 All endpoints return JSON with `cache-control: no-cache`.
 
 ### Stats response shape
-
-The `/analytics/_api/stats` endpoint returns:
 
 ```ts twoslash
 // @noErrors
@@ -222,16 +289,83 @@ interface AnalyticsSnapshot {
 }
 ```
 
+### Error response shape
+
+```ts twoslash
+// @noErrors
+interface ErrorEntry {
+  id: number
+  requestId: string // links to the HTTP request that caused this error
+  timestamp: number
+  procedure: string
+  error: string
+  code: string // e.g. 'BAD_REQUEST', 'NOT_FOUND', 'INTERNAL_SERVER_ERROR'
+  status: number
+  stack: string
+  input: unknown
+  headers: Record<string, string> // authorization redacted
+  durationMs: number
+  spans: TraceSpan[]
+}
+```
+
+### Request response shape
+
+```ts twoslash
+// @noErrors
+interface RequestEntry {
+  id: number
+  requestId: string // unique ID (also in x-request-id response header)
+  sessionId: string // persistent session ID (from cookie)
+  timestamp: number
+  durationMs: number
+  method: string
+  path: string
+  ip: string
+  headers: Record<string, string>
+  responseHeaders: Record<string, string>
+  userAgent: string
+  status: number
+  procedures: ProcedureCall[]
+  isBatch: boolean
+}
+
+interface ProcedureCall {
+  procedure: string
+  durationMs: number
+  status: number
+  input: unknown
+  output: unknown
+  spans: TraceSpan[]
+  error?: string
+}
+
+interface TraceSpan {
+  name: string
+  kind: 'db' | 'http' | 'cache' | 'queue' | 'email' | 'ai' | 'custom'
+  durationMs: number
+  startOffsetMs?: number
+  detail?: string
+  error?: string
+}
+```
+
 ## Server-side markdown export
 
 You can also generate the markdown programmatically for Slack notifications, log files, or custom alerting:
 
 ```ts twoslash
 // @noErrors
-import { errorToMarkdown } from 'silgi/analytics'
+import { errorToMarkdown, requestToMarkdown, sessionToMarkdown } from 'silgi/analytics'
 
+// Error context for AI debugging
 const md = errorToMarkdown(errorEntry)
-// Send to Slack, log to file, etc.
+
+// Full request with all procedures and spans
+const reqMd = requestToMarkdown(requestEntry)
+
+// Entire session with all requests
+const sesMd = sessionToMarkdown(sessionRequests, sessionId)
 ```
 
 <Callout type='info'>

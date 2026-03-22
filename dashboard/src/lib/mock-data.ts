@@ -70,6 +70,7 @@ export const mockData: AnalyticsData = {
 export const mockErrors: ErrorEntry[] = [
   {
     id: 1,
+    requestId: 'req-4-d9e3b7',
     timestamp: timeAgo(15 * SEC),
     procedure: 'todos/delete',
     error: 'Forbidden: you do not own this todo',
@@ -87,6 +88,7 @@ export const mockErrors: ErrorEntry[] = [
   },
   {
     id: 2,
+    requestId: 'req-2-b7d4e9',
     timestamp: timeAgo(30 * SEC),
     procedure: 'todos/create',
     error: 'Validation failed: title must be at least 1 character',
@@ -100,6 +102,7 @@ export const mockErrors: ErrorEntry[] = [
   },
   {
     id: 3,
+    requestId: 'req-4-d9e3b7',
     timestamp: timeAgo(60 * SEC),
     procedure: 'todos/toggle',
     error: 'Not Found',

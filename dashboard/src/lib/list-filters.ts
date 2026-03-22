@@ -1,6 +1,6 @@
 import type { ErrorEntry, RequestEntry } from './types'
 
-export const SLOW_REQUEST_MS = 10
+export const SLOW_REQUEST_MS = 100
 
 export type RequestStatusFilter = 'all' | 'success' | 'client' | 'server'
 export type RequestLatencyFilter = 'all' | 'fast' | 'slow'

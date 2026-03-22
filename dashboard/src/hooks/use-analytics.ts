@@ -54,8 +54,9 @@ export function useAnalytics(intervalMs = 2000) {
   }
 
   useEffect(() => {
+    if (useMock.current) return
     poll()
-    if (!autoRefresh || useMock.current) return
+    if (!autoRefresh) return
     const timer = setInterval(poll, intervalMs)
     return () => clearInterval(timer)
   }, [poll, intervalMs, autoRefresh])

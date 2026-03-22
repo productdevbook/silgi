@@ -302,6 +302,8 @@ location.reload();
       const usePool = !ctxFactoryIsEmpty || match.params || collector
       const ctx = usePool ? ctxPool.borrow() : (emptyCtx as Record<string, unknown>)
       let t0 = 0
+      let reqTrace: RequestTrace | undefined
+      let rawInput: unknown
       try {
         // Skip context factory + keys iteration when factory returns empty object
         if (!ctxFactoryIsEmpty) {
@@ -312,15 +314,11 @@ location.reload();
         if (match.params) ctx.params = match.params
 
         // Inject trace helper when analytics is enabled
-        let reqTrace: RequestTrace | undefined
         if (collector) {
           reqTrace = new RequestTrace()
           ctx.__analyticsTrace = reqTrace
           ctx.trace = reqTrace.trace.bind(reqTrace)
         }
-
-        // Parse GET query input
-        let rawInput: unknown
         if (method === 'GET' && qMark !== -1) {
           const searchStr = url.slice(qMark + 1)
           const dataIdx = searchStr.indexOf('data=')
@@ -347,15 +345,24 @@ location.reload();
               collector.record(pathname, durationMs)
               if (accumulator) {
                 accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output, spans: reqTrace?.spans ?? [] })
-                accumulator.flush()
+
               }
             }
           }
 
           if (output instanceof Response) return output
-          if (output instanceof ReadableStream)
+          if (output instanceof ReadableStream) {
+            if (collector && accumulator) {
+              accumulator.addProcedure({ procedure: pathname, durationMs: collector ? round(performance.now() - t0) : 0, status: 200, input: rawInput, output: null, spans: reqTrace?.spans ?? [] })
+
+            }
             return new Response(output, { headers: { 'content-type': 'application/octet-stream' } })
+          }
           if (output && typeof output === 'object' && Symbol.asyncIterator in (output as object)) {
+            if (collector && accumulator) {
+              accumulator.addProcedure({ procedure: pathname, durationMs: collector ? round(performance.now() - t0) : 0, status: 200, input: rawInput, output: null, spans: reqTrace?.spans ?? [] })
+
+            }
             return new Response(iteratorToEventStream(output as AsyncIterableIterator<unknown>), {
               headers: sseHeaders,
             })
@@ -385,7 +392,7 @@ location.reload();
               collector.record(pathname, durationMs)
               if (accumulator) {
                 accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output, spans: reqTrace?.spans ?? [] })
-                accumulator.flush()
+
               }
             }
             if (output instanceof Response) return output
@@ -407,7 +414,7 @@ location.reload();
           })
       } catch (error) {
         if (usePool) ctxPool.release(ctx)
-        return handleError(error, pathname, request, undefined, undefined, t0, accumulator)
+        return handleError(error, pathname, request, rawInput, reqTrace, t0, accumulator)
       }
     }
 
@@ -490,9 +497,26 @@ location.reload();
       const output = pipelineResult instanceof Promise ? await pipelineResult : pipelineResult
 
       if (output instanceof Response) return output
-      if (output instanceof ReadableStream)
+      if (output instanceof ReadableStream) {
+        if (collector) {
+          const durationMs = round(performance.now() - t0)
+          collector.record(pathname, durationMs)
+          if (accumulator) {
+            accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output: null, spans: reqTrace?.spans ?? [] })
+
+          }
+        }
         return new Response(output, { headers: { 'content-type': 'application/octet-stream' } })
+      }
       if (output && typeof output === 'object' && Symbol.asyncIterator in (output as object)) {
+        if (collector) {
+          const durationMs = round(performance.now() - t0)
+          collector.record(pathname, durationMs)
+          if (accumulator) {
+            accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output: null, spans: reqTrace?.spans ?? [] })
+
+          }
+        }
         return new Response(iteratorToEventStream(output as AsyncIterableIterator<unknown>), { headers: sseHeaders })
       }
 
@@ -502,7 +526,7 @@ location.reload();
         collector.record(pathname, durationMs)
         if (accumulator) {
           accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output, spans: reqTrace?.spans ?? [] })
-          accumulator.flush()
+
         }
       }
 
@@ -543,6 +567,7 @@ location.reload();
 
       collector.recordError(pathname, durationMs, errorMsg)
       collector.recordDetailedError({
+        requestId: accumulator?.requestId ?? '',
         timestamp: Date.now(),
         procedure: pathname,
         error: errorMsg,
@@ -558,7 +583,7 @@ location.reload();
       // Also record in HTTP request accumulator
       if (accumulator) {
         accumulator.addProcedure({ procedure: pathname, durationMs, status: errStatus, input: rawInput, output: null, spans: reqTrace?.spans ?? [], error: errorMsg })
-        accumulator.flush()
+
       }
     }
 
@@ -591,6 +616,8 @@ location.reload();
       res.headers.set('x-request-id', acc.requestId)
       const cookie = acc.getSessionCookie()
       if (cookie) res.headers.append('set-cookie', cookie)
+      // Flush AFTER response headers are finalized — captures actual response headers
+      acc.flushWithResponse(res)
       return res
     }
 

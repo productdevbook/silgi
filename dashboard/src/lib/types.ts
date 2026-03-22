@@ -37,6 +37,7 @@ export interface TraceSpan {
 
 export interface ErrorEntry {
   id: number
+  requestId: string
   timestamp: number
   procedure: string
   error: string

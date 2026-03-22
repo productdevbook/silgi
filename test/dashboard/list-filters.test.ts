@@ -14,18 +14,18 @@ describe('dashboard list filters', () => {
     const requests = [
       ...mockRequests,
       {
-        ...mockRequests[0],
+        ...mockRequests[0]!,
         id: 100,
-        procedure: 'todos/delete',
         status: 500,
-        durationMs: SLOW_REQUEST_MS + 4,
+        durationMs: SLOW_REQUEST_MS + 50,
+        procedures: [{ ...mockRequests[0]!.procedures[0]!, procedure: 'todos/delete', status: 500, durationMs: SLOW_REQUEST_MS + 50 }],
       },
       {
-        ...mockRequests[1],
+        ...mockRequests[1]!,
         id: 101,
-        procedure: 'users/me',
         status: 404,
-        durationMs: SLOW_REQUEST_MS - 2,
+        durationMs: SLOW_REQUEST_MS - 10,
+        procedures: [{ ...mockRequests[1]!.procedures[0]!, procedure: 'users/me', status: 404, durationMs: SLOW_REQUEST_MS - 10 }],
       },
     ]
 
@@ -57,7 +57,7 @@ describe('dashboard list filters', () => {
     const errorSummary = summarizeErrors(mockErrors)
 
     expect(requestSummary.maxSpans).toBe(4)
-    expect(requestSummary.uniqueProcedures).toBe(4)
+    expect(requestSummary.uniqueProcedures).toBe(5)
     expect(errorSummary.uniqueCodes).toBe(3)
     expect(errorSummary.tracedCount).toBe(2)
   })

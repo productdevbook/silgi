@@ -18,7 +18,8 @@ interface RequestDetailPageProps {
 
 export function RequestDetailPage({ requests, id, navigate }: RequestDetailPageProps) {
   const { copiedId, copy } = useCopy()
-  const entry = requests.find((r) => r.id === Number(id))
+  const numId = Number(id)
+  const entry = requests.find((r) => (Number.isNaN(numId) ? r.requestId === id : r.id === numId))
 
   if (!entry) {
     return (

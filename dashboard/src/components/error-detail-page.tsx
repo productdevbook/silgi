@@ -12,7 +12,7 @@ import type { ErrorEntry } from '@/lib/types'
 interface ErrorDetailPageProps {
   errors: ErrorEntry[]
   id: string
-  navigate: (page: string) => void
+  navigate: (page: string, id?: string) => void
 }
 
 export function ErrorDetailPage({ errors, id, navigate }: ErrorDetailPageProps) {
@@ -39,6 +39,15 @@ export function ErrorDetailPage({ errors, id, navigate }: ErrorDetailPageProps) 
         <Badge variant='secondary'>{entry.status}</Badge>
         <Badge variant='secondary'>{fmtMs(entry.durationMs)}</Badge>
         {entry.spans.length > 0 && <Badge variant='secondary'>{entry.spans.length} spans</Badge>}
+        {entry.requestId && (
+          <Badge
+            variant='outline'
+            className='cursor-pointer font-mono text-[9px] hover:bg-muted'
+            onClick={() => navigate('requests', entry.requestId)}
+          >
+            req:{entry.requestId.slice(0, 8)}
+          </Badge>
+        )}
         <span className='text-[11px] text-muted-foreground'>{fmtTime(entry.timestamp)}</span>
         <div className='ml-auto flex gap-1'>
           <CopyBtn

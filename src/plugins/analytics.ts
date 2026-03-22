@@ -89,6 +89,8 @@ export interface TraceSpan {
 
 export interface ErrorEntry {
   id: number
+  /** Links back to the RequestEntry that produced this error. */
+  requestId: string
   timestamp: number
   procedure: string
   error: string
@@ -477,16 +479,24 @@ export class RequestAccumulator {
   /** Get Set-Cookie header value (only if new session). */
   getSessionCookie(): string | null {
     if (!this.isNewSession) return null
-    return `${SESSION_COOKIE}=${this.sessionId}; Path=/; Max-Age=${SESSION_MAX_AGE}; SameSite=Lax`
+    return `${SESSION_COOKIE}=${this.sessionId}; Path=/; Max-Age=${SESSION_MAX_AGE}; SameSite=Lax; HttpOnly`
   }
 
-  flush(responseHeaders?: Record<string, string>): void {
+  /** Flush with response headers extracted from the actual Response object. */
+  flushWithResponse(res: Response): void {
     if (this.#procedures.length === 0) return
 
     const durationMs = round(performance.now() - this.#t0)
     const headers: Record<string, string> = {}
     this.#request.headers.forEach((v, k) => {
       headers[k] = k === 'authorization' || k === 'cookie' ? '[REDACTED]' : v
+    })
+
+    // Capture actual response headers
+    const responseHeaders: Record<string, string> = {}
+    res.headers.forEach((v, k) => {
+      // Skip cookie values from response headers for privacy
+      responseHeaders[k] = k === 'set-cookie' ? '[REDACTED]' : v
     })
 
     let worstStatus = 200
@@ -509,12 +519,17 @@ export class RequestAccumulator {
       path,
       ip: headers['x-forwarded-for'] || headers['x-real-ip'] || '',
       headers,
-      responseHeaders: responseHeaders ?? {},
+      responseHeaders,
       userAgent: this.#request.headers.get('user-agent') ?? '',
       status: worstStatus,
       procedures: this.#procedures,
       isBatch: this.#procedures.length > 1,
     })
+  }
+
+  /** Whether any procedures have been recorded. */
+  get hasProcedures(): boolean {
+    return this.#procedures.length > 0
   }
 }
 

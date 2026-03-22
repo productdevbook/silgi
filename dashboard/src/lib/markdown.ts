@@ -199,7 +199,12 @@ export function requestTimingMarkdown(entry: RequestEntry): string {
 }
 
 export function requestToRedactedJson(entry: RequestEntry): string {
-  return JSON.stringify(entry, null, 2)
+  const redacted = {
+    ...entry,
+    headers: Object.fromEntries(Object.entries(entry.headers ?? {}).map(([k, v]) => [k, redactHeader(k, v)])),
+    responseHeaders: Object.fromEntries(Object.entries(entry.responseHeaders ?? {}).map(([k, v]) => [k, redactHeader(k, v)])),
+  }
+  return JSON.stringify(redacted, null, 2)
 }
 
 // ── Session markdown ──
