@@ -118,6 +118,22 @@ export function Errors({ errors, navigate, initialProcedure }: ErrorsProps) {
         <Stat label='Procedures' value={String(summary.byProc.length)} />
       </div>
 
+      {/* ── Error codes strip ── */}
+      <div className='flex items-center gap-3 border-b px-4 py-2'>
+        <span className='text-[10px] font-semibold uppercase tracking-wider text-muted-foreground'>Codes</span>
+        {summary.byCodes.map(([code, count]) => (
+          <Badge key={code} variant='destructive' className='text-[9px]'>
+            {code} <span className='ml-1 opacity-70'>{count}</span>
+          </Badge>
+        ))}
+        <span className='text-[10px] font-semibold uppercase tracking-wider text-muted-foreground ml-auto'>Top</span>
+        {summary.byProc.slice(0, 3).map(([proc, count]) => (
+          <span key={proc} className='font-mono text-[10px] text-muted-foreground'>
+            {proc} <span className='text-destructive'>{count}</span>
+          </span>
+        ))}
+      </div>
+
       {/* ── Filter bar ── */}
       <div className='flex flex-col gap-2 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between'>
         <div className='flex flex-1 flex-wrap items-center gap-2'>

@@ -1,7 +1,4 @@
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { fmt, fmtMs } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useCallback, useMemo, useState } from 'react'
@@ -9,15 +6,6 @@ import { useCallback, useMemo, useState } from 'react'
 import type { ProcedureSnapshot } from '@/lib/types'
 
 type SortKey = 'path' | 'count' | 'errors' | 'errorRate' | 'avg' | 'p95'
-
-const COLUMNS: readonly { key: SortKey; label: string; align: 'left' | 'right' }[] = [
-  { key: 'path', label: 'Procedure', align: 'left' },
-  { key: 'count', label: 'Count', align: 'right' },
-  { key: 'errors', label: 'Errors', align: 'right' },
-  { key: 'errorRate', label: 'Error rate', align: 'right' },
-  { key: 'avg', label: 'Avg', align: 'right' },
-  { key: 'p95', label: 'p95', align: 'right' },
-] as const
 
 function getSortValue(proc: ProcedureSnapshot, key: SortKey): number {
   if (key === 'count' || key === 'errors' || key === 'errorRate') return proc[key]
@@ -37,11 +25,8 @@ export function ProcedureTable({ procedures, navigate, filter }: ProcedureTableP
 
   const handleSort = useCallback((key: SortKey) => {
     setSortKey((prev) => {
-      if (prev === key) {
-        setSortAsc((a) => !a)
-      } else {
-        setSortAsc(false)
-      }
+      if (prev === key) setSortAsc((a) => !a)
+      else setSortAsc(false)
       return key
     })
   }, [])
@@ -64,95 +49,96 @@ export function ProcedureTable({ procedures, navigate, filter }: ProcedureTableP
 
   if (entries.length === 0) {
     return (
-      <div className='flex min-h-40 items-center justify-center px-4 py-8 text-sm text-muted-foreground'>
-        No requests yet
-      </div>
+      <div className='flex min-h-40 items-center justify-center text-sm text-muted-foreground'>No requests yet</div>
     )
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          {COLUMNS.map((col) => (
-            <TableHead
-              key={col.key}
-              onClick={() => handleSort(col.key)}
-              className={cn(
-                'cursor-pointer select-none px-3 py-2 text-[11px]',
-                col.align === 'right' && 'text-right',
-                sortKey === col.key && 'text-primary',
+    <div>
+      {/* Header row */}
+      <div className='flex items-center gap-2 border-b px-5 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground'>
+        <SortCol label='Procedure' sortKey='path' currentKey={sortKey} asc={sortAsc} onSort={handleSort} className='flex-1' />
+        <SortCol label='Count' sortKey='count' currentKey={sortKey} asc={sortAsc} onSort={handleSort} className='w-20 text-right' />
+        <span className='hidden w-20 lg:block' />
+        <SortCol label='Errors' sortKey='errors' currentKey={sortKey} asc={sortAsc} onSort={handleSort} className='w-14 text-right' />
+        <SortCol label='Rate' sortKey='errorRate' currentKey={sortKey} asc={sortAsc} onSort={handleSort} className='w-12 text-right' />
+        <SortCol label='Avg' sortKey='avg' currentKey={sortKey} asc={sortAsc} onSort={handleSort} className='w-14 text-right' />
+        <SortCol label='p95' sortKey='p95' currentKey={sortKey} asc={sortAsc} onSort={handleSort} className='w-14 text-right' />
+      </div>
+
+      {/* Rows */}
+      {entries.map(([path, proc]) => {
+        const countPct = (proc.count / maxCount) * 100
+        const hasErrors = proc.errors > 0
+
+        return (
+          <div
+            key={path}
+            className={cn('flex items-center gap-2 border-b border-dashed px-5 py-2 hover:bg-muted/20', navigate && 'cursor-pointer')}
+            onClick={() => navigate?.('requests', undefined, { procedure: path })}
+          >
+            {/* Procedure name */}
+            <span className='min-w-0 flex-1 truncate font-mono text-[11px] font-semibold'>{path}</span>
+
+            {/* Count */}
+            <span className='w-20 shrink-0 text-right font-mono text-[11px] tabular-nums'>{fmt(proc.count)}</span>
+
+            {/* Count bar */}
+            <div className='hidden w-20 lg:block'>
+              <div className='h-1.5 w-full rounded-full bg-muted'>
+                <div className='h-full rounded-full bg-primary/30' style={{ width: `${countPct}%` }} />
+              </div>
+            </div>
+
+            {/* Errors */}
+            <div className='w-14 shrink-0 text-right'>
+              {hasErrors ? (
+                <Badge
+                  variant='destructive'
+                  className='text-[9px]'
+                  onClick={(e) => {
+                    if (navigate) {
+                      e.stopPropagation()
+                      navigate('errors', undefined, { procedure: path })
+                    }
+                  }}
+                >
+                  {proc.errors}
+                </Badge>
+              ) : (
+                <span className='text-[11px] text-muted-foreground/40'>0</span>
               )}
-            >
-              {col.label}
-              {sortKey === col.key && (sortAsc ? ' ↑' : ' ↓')}
-            </TableHead>
-          ))}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {entries.map(([path, proc]) => (
-          <ProcedureRow key={path} path={path} proc={proc} maxCount={maxCount} navigate={navigate} />
-        ))}
-      </TableBody>
-    </Table>
+            </div>
+
+            {/* Error rate */}
+            <span className={cn('w-12 shrink-0 text-right text-[11px] tabular-nums', hasErrors ? 'text-destructive' : 'text-muted-foreground/40')}>
+              {proc.errorRate.toFixed(1)}%
+            </span>
+
+            {/* Avg */}
+            <span className='w-14 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground'>
+              {fmtMs(proc.latency.avg)}
+            </span>
+
+            {/* p95 */}
+            <span className='w-14 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground'>
+              {fmtMs(proc.latency.p95)}
+            </span>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
-function ProcedureRow({
-  path,
-  proc,
-  maxCount,
-  navigate,
-}: {
-  path: string
-  proc: ProcedureSnapshot
-  maxCount: number
-  navigate?: (page: string, id?: string, params?: Record<string, string>) => void
-}) {
-  const percentage = (proc.count / maxCount) * 100
+// ── Shared ──
 
+function SortCol({ label, sortKey, currentKey, asc, onSort, className }: {
+  label: string; sortKey: SortKey; currentKey: SortKey; asc: boolean; onSort: (k: SortKey) => void; className?: string
+}) {
   return (
-    <Tooltip>
-      <TooltipTrigger render={<TableRow className={cn(navigate && 'cursor-pointer')} />}>
-        <TableCell
-          className='px-3 py-2 font-semibold text-primary'
-          onClick={() => navigate?.('requests', undefined, { procedure: path })}
-        >
-          {path.replace(/\//g, ' / ')}
-        </TableCell>
-        <TableCell className='px-3 py-2 text-right'>
-          <div className='flex items-center justify-end gap-2'>
-            <Progress value={percentage} className='h-1.5 w-12' />
-            <span className='tabular-nums'>{fmt(proc.count)}</span>
-          </div>
-        </TableCell>
-        <TableCell
-          className='px-3 py-2 text-right'
-          onClick={(e) => {
-            if (proc.errors > 0 && navigate) {
-              e.stopPropagation()
-              navigate('errors', undefined, { procedure: path })
-            }
-          }}
-        >
-          {proc.errors > 0 ? (
-            <Badge variant='destructive' className={cn(navigate && 'cursor-pointer hover:opacity-80')}>
-              {proc.errors}
-            </Badge>
-          ) : (
-            <span className='text-muted-foreground'>0</span>
-          )}
-        </TableCell>
-        <TableCell className='px-3 py-2 text-right tabular-nums text-muted-foreground'>
-          {proc.errorRate.toFixed(1)}%
-        </TableCell>
-        <TableCell className='px-3 py-2 text-right tabular-nums'>{fmtMs(proc.latency.avg)}</TableCell>
-        <TableCell className='px-3 py-2 text-right tabular-nums'>{fmtMs(proc.latency.p95)}</TableCell>
-      </TooltipTrigger>
-      <TooltipContent side='bottom'>
-        <span className='font-medium'>{path}</span> — {proc.count} requests, p95 {fmtMs(proc.latency.p95)}
-      </TooltipContent>
-    </Tooltip>
+    <span className={cn('cursor-pointer select-none', currentKey === sortKey && 'text-primary', className)} onClick={() => onSort(sortKey)}>
+      {label}{currentKey === sortKey && (asc ? ' ↑' : ' ↓')}
+    </span>
   )
 }
