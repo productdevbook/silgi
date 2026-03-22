@@ -129,8 +129,9 @@ await ctx.trace('db.users.findMany', () => db.users.findMany(), {
 | ----------- | ------------------------- | ------------------------------------------------------------------ |
 | `kind`      | `SpanKind`                | Category for color-coding in the dashboard (see below)             |
 | `detail`    | `string`                  | Extra info shown in the expanded span view (SQL query, URL, etc.)  |
-| `input`     | `unknown`                 | Input data captured for this span (shown in expanded detail)       |
-| `output`    | `unknown \| (result) => unknown` | Output data — a value or a function that receives the result |
+| `input`     | `unknown`                        | Input data captured for this span (shown in expanded detail)       |
+| `output`    | `unknown \| (result) => unknown` | Output data — a value or a function that receives the result       |
+| `procedure` | `{ input?, output? }`            | Set procedure-level input/output (recorded on the HTTP request)    |
 
 The `output` option can be a function to derive the captured value from the trace result, avoiding capturing the full response:
 
@@ -141,6 +142,25 @@ await ctx.trace('db.users.findMany', () => db.users.findMany(), {
   input: { limit: 10 },
   output: (users) => ({ count: users.length }),
 })
+```
+
+### Procedure-level capture
+
+Use `procedure` to record input/output at the HTTP request level (visible in the request detail page), not just on the individual span:
+
+```ts twoslash
+// @noErrors
+const getUser = s.$input(z.object({ id: z.number() })).$resolve(async ({ input, ctx }) => {
+  return ctx.trace('db.users.findById', () => db.users.findById(input.id), {
+    input: { id: input.id },
+    output: (user) => ({ name: user.name }),
+    procedure: {
+      input,
+      output: (user) => user,
+    },
+  })
+})
+```
 
 ### Span kinds
 
