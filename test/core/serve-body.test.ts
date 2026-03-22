@@ -57,3 +57,74 @@ describe('handler() — body parsing safety', () => {
     expect(res.status).toBeLessThan(600)
   })
 })
+
+describe('handler() — passthrough (wildcard catch-all)', () => {
+  it('does not consume request body for passthrough routes', async () => {
+    const k2 = silgi({
+      context: (req) => ({ req }),
+    })
+
+    // Simulate an external handler that reads the body itself (like Better Auth)
+    const externalHandler = k2
+      .$route({ method: '*', path: '/api/auth/**' })
+      .$resolve(async ({ ctx }) => {
+        const body = await (ctx as any).req.json()
+        return new Response(JSON.stringify({ received: body }), {
+          headers: { 'content-type': 'application/json' },
+        })
+      })
+
+    const router = k2.router({ auth: { handler: externalHandler } })
+    const handle2 = k2.handler(router)
+
+    const res = await handle2(
+      new Request('http://localhost/api/auth/sign-in', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: 'test@test.com', password: 'secret' }),
+      }),
+    )
+
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.received).toEqual({ email: 'test@test.com', password: 'secret' })
+  })
+
+  it('passthrough route returns Response directly', async () => {
+    const k2 = silgi({ context: () => ({}) })
+
+    const proxy = k2
+      .$route({ method: '*', path: '/proxy/**' })
+      .$resolve(() => new Response('proxied', { status: 200 }))
+
+    const router = k2.router({ proxy })
+    const handle2 = k2.handler(router)
+
+    const res = await handle2(new Request('http://localhost/proxy/some/path'))
+    expect(res.status).toBe(200)
+    expect(await res.text()).toBe('proxied')
+  })
+
+  it('passthrough GET request works without body', async () => {
+    const k2 = silgi({
+      context: (req) => ({ req }),
+    })
+
+    const handler = k2
+      .$route({ method: '*', path: '/ext/**' })
+      .$resolve(({ ctx }) => {
+        const url = new URL((ctx as any).req.url)
+        return new Response(JSON.stringify({ path: url.pathname }), {
+          headers: { 'content-type': 'application/json' },
+        })
+      })
+
+    const router = k2.router({ ext: { handler } })
+    const handle2 = k2.handler(router)
+
+    const res = await handle2(new Request('http://localhost/ext/hello/world'))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.path).toBe('/ext/hello/world')
+  })
+})

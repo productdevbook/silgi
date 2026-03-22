@@ -297,7 +297,7 @@ location.reload();
     // ── Fast sync path: GET, sync context factory, no body ──
     // Avoids async/await overhead entirely for simple queries
     const method = request.method
-    if (ctxFactoryIsSync && (method === 'GET' || !request.body)) {
+    if (ctxFactoryIsSync && (method === 'GET' || !request.body || route.passthrough)) {
       // Ultra-fast: skip pool when context is empty, no params, no analytics
       const usePool = !ctxFactoryIsEmpty || match.params || collector
       const ctx = usePool ? ctxPool.borrow() : (emptyCtx as Record<string, unknown>)
@@ -452,8 +452,10 @@ location.reload();
         ctx.trace = reqTrace.trace.bind(reqTrace)
       }
 
-      // Parse input body
-      if (request.method === 'GET') {
+      // Parse input body (skip for passthrough routes — they consume the body themselves)
+      if (route.passthrough) {
+        // No body parsing — procedure receives raw request via context
+      } else if (request.method === 'GET') {
         if (qMark !== -1) {
           const searchStr = url.slice(qMark + 1)
           const dataIdx = searchStr.indexOf('data=')

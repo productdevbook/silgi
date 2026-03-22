@@ -354,6 +354,8 @@ export interface CompiledRoute {
   cacheControl?: string
   /** Procedure is accessible over WebSocket */
   ws?: boolean
+  /** Skip body parsing — procedure receives raw request (e.g. catch-all proxy) */
+  passthrough?: boolean
 }
 
 /** Compiled router function — returns matched route + params */
@@ -392,6 +394,7 @@ export function compileRouter(def: Record<string, unknown>): CompiledRouterFn {
         stringify: compileStringify(proc.output),
         cacheControl,
         ws: route?.ws ?? undefined,
+        passthrough: routePath.includes('**') || undefined,
       }
 
       addRadixRoute(radix, method, routePath, compiled)
