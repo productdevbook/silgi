@@ -77,9 +77,9 @@ export function SessionDetailPage({ requests, sessionId, navigate }: SessionDeta
     <div className='flex min-h-full flex-col'>
       {/* ── Header ── */}
       <div className='flex flex-wrap items-center gap-2 border-b px-5 py-3'>
-        <Button variant='ghost' size='xs' onClick={() => navigate('requests')}>
+        <Button variant='ghost' size='xs' onClick={() => navigate('sessions')}>
           <HugeiconsIcon icon={ArrowLeft01Icon} data-icon='inline-start' />
-          Requests
+          Sessions
         </Button>
         <span className='text-muted-foreground'>/</span>
         <span className='text-sm font-semibold'>Session</span>

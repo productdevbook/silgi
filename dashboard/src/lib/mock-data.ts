@@ -81,7 +81,7 @@ export const mockErrors: ErrorEntry[] = [
     input: { id: 42 },
     headers: { 'content-type': 'application/json', authorization: 'Bearer eyJ...', 'user-agent': 'Mozilla/5.0' },
     durationMs: 3.62,
-    output: null, headers: {}, responseHeaders: {}, spans: [
+    spans: [
       { kind: 'db', name: 'db.todos.findById', durationMs: 2.1 },
       { kind: 'db', name: 'auth.checkOwnership', durationMs: 1.3, error: 'Forbidden: you do not own this todo' },
     ],
@@ -98,7 +98,7 @@ export const mockErrors: ErrorEntry[] = [
     input: { title: '' },
     headers: { 'content-type': 'application/json', 'user-agent': 'curl/8.7.1' },
     durationMs: 0.35,
-    output: null, headers: {}, responseHeaders: {}, spans: [],
+    spans: [],
   },
   {
     id: 3,
@@ -113,7 +113,7 @@ export const mockErrors: ErrorEntry[] = [
     input: { id: 99999 },
     headers: { 'content-type': 'application/json', 'user-agent': 'curl/8.7.1' },
     durationMs: 3.54,
-    output: null, headers: {}, responseHeaders: {}, spans: [{ kind: 'db', name: 'db.todos.findById', durationMs: 3.43 }],
+    spans: [{ kind: 'db', name: 'db.todos.findById', durationMs: 3.43 }],
   },
 ]
 

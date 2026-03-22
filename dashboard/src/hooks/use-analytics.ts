@@ -37,9 +37,10 @@ export function useAnalytics(intervalMs = 2000) {
         return
       }
 
-      setData(await apiRes.json())
-      setErrors(await errRes.json())
-      setRequests(await reqRes.json())
+      const [newData, newErrors, newRequests] = await Promise.all([apiRes.json(), errRes.json(), reqRes.json()])
+      setData(newData)
+      setErrors(newErrors)
+      setRequests(newRequests)
     } catch {
       fallbackToMock()
     }

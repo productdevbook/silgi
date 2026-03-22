@@ -36,7 +36,6 @@ export default function App() {
         errorCount={analytics.errors.length}
         requestCount={analytics.requests.length}
         sessionCount={sessionCount}
-        autoRefresh={analytics.autoRefresh}
       />
       <SidebarInset className='overflow-hidden'>
         <header className='sticky top-0 z-10 flex h-11 items-center justify-between gap-3 border-b bg-background/95 px-3 backdrop-blur md:px-4'>

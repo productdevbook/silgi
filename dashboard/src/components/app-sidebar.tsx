@@ -25,7 +25,6 @@ interface AppSidebarProps {
   errorCount: number
   requestCount: number
   sessionCount: number
-  autoRefresh: boolean
 }
 
 export function AppSidebar({ route, navigate, data, errorCount, requestCount, sessionCount }: AppSidebarProps) {

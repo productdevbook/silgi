@@ -247,5 +247,10 @@ export function sessionToMarkdown(requests: RequestEntry[], sessionId: string): 
 }
 
 export function sessionToRedactedJson(requests: RequestEntry[], sessionId: string): string {
-  return JSON.stringify({ sessionId, requests }, null, 2)
+  const redacted = requests.map((r) => ({
+    ...r,
+    headers: Object.fromEntries(Object.entries(r.headers ?? {}).map(([k, v]) => [k, redactHeader(k, v)])),
+    responseHeaders: Object.fromEntries(Object.entries(r.responseHeaders ?? {}).map(([k, v]) => [k, redactHeader(k, v)])),
+  }))
+  return JSON.stringify({ sessionId, requests: redacted }, null, 2)
 }

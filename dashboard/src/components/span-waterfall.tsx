@@ -67,7 +67,7 @@ export function SpanWaterfall({ spans, totalMs }: SpanWaterfallProps) {
                       className={cn('absolute inset-y-0 rounded', barColor)}
                       style={{
                         left: `${Math.min((span.startOffsetMs / totalMs) * 100, 99)}%`,
-                        width: `${Math.max(pct, 1.5)}%`,
+                        width: `${Math.max(totalPct, 1.5)}%`,
                       }}
                     />
                   ) : (
