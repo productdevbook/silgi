@@ -1,6 +1,6 @@
 {
   "name": "silgi",
-  "version": "0.1.0",
+  "version": "0.1.0-beta.1",
   "private": false,
   "description": "The fastest end-to-end type-safe RPC framework for TypeScript — compiled pipelines, single package, every runtime",
   "keywords": [
@@ -236,6 +236,8 @@
     "fix": "oxlint --fix . && oxfmt .",
     "test": "vitest run",
     "typecheck": "tsgo --noEmit",
+    "release:beta": "pnpm build && npm publish --tag beta --access public",
+    "release": "pnpm build && npm publish --access public",
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {
