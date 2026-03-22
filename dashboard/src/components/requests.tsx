@@ -204,7 +204,7 @@ export function Requests({ requests, navigate, initialProcedure }: RequestsProps
                     </TooltipContent>
                   </Tooltip>
                 </TableCell>
-                <TableCell className='px-3 py-2 text-xs font-medium'>
+                <TableCell className='px-3 py-2 text-xs font-semibold'>
                   <div className='flex items-center gap-1.5'>
                     <span className='font-mono text-[10px] text-muted-foreground'>{entry.method}</span>
                     <span>{entry.procedures.map(p => p.procedure).join(', ')}</span>

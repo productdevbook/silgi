@@ -34,7 +34,7 @@ export function ErrorDetailPage({ errors, id, navigate }: ErrorDetailPageProps) 
           Errors
         </Button>
         <span className='text-muted-foreground'>/</span>
-        <span className='font-mono text-sm font-medium'>{entry.procedure}</span>
+        <span className='font-mono text-sm font-semibold'>{entry.procedure}</span>
         <Badge variant='destructive'>{entry.code}</Badge>
         <Badge variant='secondary'>{entry.status}</Badge>
         <Badge variant='secondary'>{fmtMs(entry.durationMs)}</Badge>

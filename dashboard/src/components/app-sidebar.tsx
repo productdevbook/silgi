@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/sidebar'
 import { fmt, fmtMs, fmtUptime } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { Alert02Icon, DashboardBrowsingIcon, Pulse01Icon, RocketIcon } from '@hugeicons/core-free-icons'
+import { Alert02Icon, DashboardBrowsingIcon, Pulse01Icon, RocketIcon, UserMultiple02Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 
 import type { Route } from '@/hooks/use-route'
@@ -24,10 +24,11 @@ interface AppSidebarProps {
   data: AnalyticsData | null
   errorCount: number
   requestCount: number
+  sessionCount: number
   autoRefresh: boolean
 }
 
-export function AppSidebar({ route, navigate, data, errorCount, requestCount }: AppSidebarProps) {
+export function AppSidebar({ route, navigate, data, errorCount, requestCount, sessionCount }: AppSidebarProps) {
   return (
     <Sidebar collapsible='icon'>
       <SidebarHeader className='gap-0'>
@@ -72,6 +73,17 @@ export function AppSidebar({ route, navigate, data, errorCount, requestCount }: 
                     >
                       {errorCount > 99 ? '99+' : errorCount}
                     </Badge>
+                  )}
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton isActive={route.page === 'sessions'} onClick={() => navigate('sessions')}>
+                  <HugeiconsIcon icon={UserMultiple02Icon} size={15} />
+                  <span>Sessions</span>
+                  {sessionCount > 0 && (
+                    <span className='ml-auto font-mono text-[10px] tabular-nums text-muted-foreground group-data-[collapsible=icon]:hidden'>
+                      {sessionCount}
+                    </span>
                   )}
                 </SidebarMenuButton>
               </SidebarMenuItem>

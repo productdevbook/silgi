@@ -13,7 +13,7 @@ import type { ProcedureCall, RequestEntry, SpanKind } from '@/lib/types'
 interface RequestDetailPageProps {
   requests: RequestEntry[]
   id: string
-  navigate: (page: string) => void
+  navigate: (page: string, id?: string) => void
 }
 
 export function RequestDetailPage({ requests, id, navigate }: RequestDetailPageProps) {
@@ -29,7 +29,7 @@ export function RequestDetailPage({ requests, id, navigate }: RequestDetailPageP
   const totalSpans = entry.procedures.reduce((sum, p) => sum + p.spans.length, 0)
 
   return (
-    <div>
+    <div className='flex min-h-full flex-col'>
       {/* Header */}
       <div className='flex flex-wrap items-center gap-2 border-b px-5 py-3'>
         <Button variant='ghost' size='xs' onClick={() => navigate('requests')}>
@@ -38,7 +38,7 @@ export function RequestDetailPage({ requests, id, navigate }: RequestDetailPageP
         </Button>
         <span className='text-muted-foreground'>/</span>
         <span className='font-mono text-xs text-muted-foreground'>{entry.method}</span>
-        <span className='font-mono text-sm font-medium'>{entry.path}</span>
+        <span className='font-mono text-sm font-semibold'>{entry.path}</span>
         <Badge variant={entry.status >= 400 ? 'destructive' : 'secondary'}>{entry.status}</Badge>
         <Badge variant='secondary'>{fmtMs(entry.durationMs)}</Badge>
         {entry.procedures.length > 1 && <Badge variant='outline'>batch × {entry.procedures.length}</Badge>}
@@ -58,7 +58,7 @@ export function RequestDetailPage({ requests, id, navigate }: RequestDetailPageP
       </div>
 
       {/* HTTP Request Info + Procedures */}
-      <div className='grid xl:grid-cols-[1.65fr_0.9fr]'>
+      <div className='grid flex-1 xl:grid-cols-[1.65fr_0.9fr]'>
         {/* Left: Procedures with waterfall */}
         <div className='xl:border-r'>
           {entry.procedures.map((proc, idx) => (
@@ -79,6 +79,18 @@ export function RequestDetailPage({ requests, id, navigate }: RequestDetailPageP
               <KV label='total spans' value={String(totalSpans)} />
               <KV label='ip' value={entry.ip || '-'} />
               <KV label='time' value={fmtTime(entry.timestamp)} />
+              {entry.sessionId && (
+                <div className='flex items-center justify-between border-b border-dashed py-1.5 last:border-0'>
+                  <span className='text-[11px] text-muted-foreground'>session</span>
+                  <Badge
+                    variant='outline'
+                    className='cursor-pointer font-mono text-[10px] hover:bg-muted'
+                    onClick={() => navigate('sessions', entry.sessionId)}
+                  >
+                    {entry.sessionId.slice(0, 12)}
+                  </Badge>
+                </div>
+              )}
               {entry.isBatch && <KV label='batch' value='yes' />}
             </div>
           </Section>
@@ -130,7 +142,7 @@ function ProcedureSection({ proc, idx, totalMs, totalProcs }: { proc: ProcedureC
       {totalProcs > 1 && (
         <div className='flex items-center gap-2 border-b bg-muted/30 px-5 py-2 text-[11px]'>
           <span>{emoji}</span>
-          <span className='font-mono font-medium'>{proc.procedure}</span>
+          <span className='font-mono font-semibold'>{proc.procedure}</span>
           <Badge variant={proc.status >= 400 ? 'destructive' : 'secondary'} className='text-[9px]'>{proc.status}</Badge>
           <span className='text-muted-foreground'>{fmtMs(proc.durationMs)}</span>
           <span className='text-muted-foreground'>({proc.spans.length} spans)</span>
@@ -223,7 +235,7 @@ function TimingBreakdown({ procedures, totalMs }: { procedures: ProcedureCall[];
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className='border-b px-5 py-4 last:border-b-0'>
-      <h4 className='mb-3 text-[11px] font-medium text-muted-foreground'>{label}</h4>
+      <h4 className='mb-3 text-[11px] font-semibold text-muted-foreground'>{label}</h4>
       {children}
     </div>
   )

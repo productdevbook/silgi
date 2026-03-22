@@ -105,7 +105,7 @@ export function SpanWaterfall({ spans, totalMs }: SpanWaterfallProps) {
               <div className='border-b bg-muted/10 px-4 py-3'>
                 <div className='mb-2 flex flex-wrap items-center gap-2 text-[11px]'>
                   <KindBadge kind={span.kind} />
-                  <span className='font-mono font-medium'>{span.name}</span>
+                  <span className='font-mono font-semibold'>{span.name}</span>
                   <span className='tabular-nums text-muted-foreground'>{fmtMs(span.durationMs)}</span>
                   {span.startOffsetMs != null && (
                     <span className='text-muted-foreground'>at +{span.startOffsetMs.toFixed(1)}ms</span>

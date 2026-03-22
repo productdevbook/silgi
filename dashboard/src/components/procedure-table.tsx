@@ -116,7 +116,7 @@ function ProcedureRow({
     <Tooltip>
       <TooltipTrigger render={<TableRow className={cn(navigate && 'cursor-pointer')} />}>
         <TableCell
-          className='px-3 py-2 font-medium text-primary'
+          className='px-3 py-2 font-semibold text-primary'
           onClick={() => navigate?.('requests', undefined, { procedure: path })}
         >
           {path.replace(/\//g, ' / ')}

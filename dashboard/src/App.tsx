@@ -5,6 +5,7 @@ import { Overview } from '@/components/overview'
 import { RequestDetailPage } from '@/components/request-detail-page'
 import { Requests } from '@/components/requests'
 import { SessionDetailPage } from '@/components/session-detail-page'
+import { Sessions } from '@/components/sessions'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -24,6 +25,8 @@ export default function App() {
     toggleRefresh: () => analytics.setAutoRefresh(!analytics.autoRefresh),
   })
 
+  const sessionCount = new Set(analytics.requests.map((r) => r.sessionId).filter(Boolean)).size
+
   return (
     <SidebarProvider defaultOpen={false}>
       <AppSidebar
@@ -32,6 +35,7 @@ export default function App() {
         data={analytics.data}
         errorCount={analytics.errors.length}
         requestCount={analytics.requests.length}
+        sessionCount={sessionCount}
         autoRefresh={analytics.autoRefresh}
       />
       <SidebarInset className='overflow-hidden'>
@@ -39,7 +43,7 @@ export default function App() {
           <div className='flex min-w-0 items-center gap-3'>
             <SidebarTrigger />
             <Separator orientation='vertical' className='h-4' />
-            <span className='text-[11px] font-medium tracking-[0.3em] text-muted-foreground uppercase'>
+            <span className='text-[11px] font-semibold tracking-[0.3em] text-muted-foreground uppercase'>
               Silgi Analytics
             </span>
           </div>
@@ -81,6 +85,9 @@ export default function App() {
           )}
           {route.page === 'requests' && route.id && (
             <RequestDetailPage requests={analytics.requests} id={route.id} navigate={navigate} />
+          )}
+          {route.page === 'sessions' && !route.id && (
+            <Sessions requests={analytics.requests} navigate={navigate} />
           )}
           {route.page === 'sessions' && route.id && (
             <SessionDetailPage requests={analytics.requests} sessionId={route.id} navigate={navigate} />

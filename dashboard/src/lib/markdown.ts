@@ -201,3 +201,46 @@ export function requestTimingMarkdown(entry: RequestEntry): string {
 export function requestToRedactedJson(entry: RequestEntry): string {
   return JSON.stringify(entry, null, 2)
 }
+
+// ── Session markdown ──
+
+export function sessionToMarkdown(requests: RequestEntry[], sessionId: string): string {
+  const lines: string[] = []
+  const sorted = [...requests].sort((a, b) => a.timestamp - b.timestamp)
+  const first = sorted[0]!
+  const last = sorted[sorted.length - 1]!
+  const totalMs = requests.reduce((sum, r) => sum + r.durationMs, 0)
+  const errorCount = requests.filter((r) => r.status >= 400).length
+  const uniqueProcs = new Set(requests.flatMap((r) => r.procedures.map((p) => p.procedure)))
+
+  lines.push(`## Session \`${sessionId}\``)
+  lines.push('')
+  lines.push('| Field | Value |')
+  lines.push('|-------|-------|')
+  lines.push(`| Requests | ${requests.length} |`)
+  lines.push(`| Errors | ${errorCount} |`)
+  lines.push(`| Total Duration | ${totalMs.toFixed(1)}ms |`)
+  lines.push(`| Avg Duration | ${(totalMs / requests.length).toFixed(1)}ms |`)
+  lines.push(`| First Seen | ${new Date(first.timestamp).toISOString()} |`)
+  lines.push(`| Last Seen | ${new Date(last.timestamp).toISOString()} |`)
+  lines.push(`| Procedures | ${[...uniqueProcs].join(', ')} |`)
+  lines.push(`| IP | ${last.ip} |`)
+  lines.push('')
+
+  for (let i = 0; i < sorted.length; i++) {
+    const r = sorted[i]!
+    const emoji = r.status >= 500 ? '💥' : r.status >= 400 ? '⚠️' : '✅'
+    lines.push(`### ${emoji} ${i + 1}. ${r.method} ${r.path} → ${r.status} (${r.durationMs}ms)`)
+    lines.push('')
+    for (const p of r.procedures) {
+      lines.push(`- \`${p.procedure}\` — ${p.status} — ${p.durationMs}ms — ${p.spans.length} spans`)
+    }
+    lines.push('')
+  }
+
+  return lines.join('\n')
+}
+
+export function sessionToRedactedJson(requests: RequestEntry[], sessionId: string): string {
+  return JSON.stringify({ sessionId, requests }, null, 2)
+}
