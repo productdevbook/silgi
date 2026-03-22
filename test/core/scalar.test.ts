@@ -129,4 +129,69 @@ describe('generateOpenAPI', () => {
     expect(secretOp.responses['401']).toBeDefined()
     expect(secretOp.responses['403']).toBeDefined()
   })
+
+  it('$route with explicit method uses that method as OpenAPI key', () => {
+    const router = k.router({
+      users: {
+        list: k
+          .$route({ method: 'get', path: '/users' })
+          .$resolve(() => []),
+      },
+    })
+    const spec = generateOpenAPI(router)
+    expect((spec.paths as any)['/users']?.get).toBeDefined()
+    expect((spec.paths as any)['/users']?.post).toBeUndefined()
+  })
+
+  it('method: "*" produces valid OpenAPI methods, not literal "*"', () => {
+    const router = k.router({
+      auth: {
+        handler: k
+          .$route({ method: '*', path: '/api/auth/**' })
+          .$resolve(() => new Response('ok')),
+      },
+    })
+    const spec = generateOpenAPI(router)
+    const paths = spec.paths as Record<string, Record<string, unknown>>
+    // Should not have literal '*' as method key — invalid in OpenAPI
+    for (const pathObj of Object.values(paths)) {
+      expect(pathObj['*']).toBeUndefined()
+    }
+  })
+
+  it('wildcard path ** is converted to OpenAPI parameter syntax', () => {
+    const router = k.router({
+      files: {
+        serve: k
+          .$route({ method: 'get', path: '/files/**' })
+          .$resolve(() => new Response('ok')),
+      },
+    })
+    const spec = generateOpenAPI(router)
+    const paths = Object.keys(spec.paths as Record<string, unknown>)
+    // Should not contain literal '**' — not valid OpenAPI
+    for (const p of paths) {
+      expect(p).not.toContain('**')
+    }
+  })
+
+  it('catch-all route appears with valid path and method in spec', () => {
+    const router = k.router({
+      proxy: k
+        .$route({ method: '*', path: '/api/proxy/**' })
+        .$resolve(() => new Response('proxied')),
+    })
+    const spec = generateOpenAPI(router)
+    const paths = spec.paths as Record<string, Record<string, unknown>>
+    const pathKeys = Object.keys(paths)
+    // Path should be valid OpenAPI (no **)
+    expect(pathKeys.length).toBe(1)
+    expect(pathKeys[0]).not.toContain('**')
+    // Method should be valid OpenAPI (not *)
+    const methods = Object.keys(paths[pathKeys[0]!]!)
+    const validMethods = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']
+    for (const m of methods) {
+      expect(validMethods).toContain(m)
+    }
+  })
 })

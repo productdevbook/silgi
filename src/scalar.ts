@@ -76,8 +76,13 @@ export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}):
 
   collectProcedures(router, [], (path, proc) => {
     const route = proc.route as Route | null
-    const httpPath = route?.path ?? '/' + path.join('/')
-    const method = route?.method?.toLowerCase() ?? 'post'
+    const rawPath = route?.path ?? '/' + path.join('/')
+    // Convert wildcard ** to OpenAPI path parameter syntax
+    const httpPath = rawPath.replace(/\/\*\*$/, '/{path}').replace(/\/\*\*/g, '/{path}')
+    const rawMethod = route?.method?.toLowerCase() ?? 'post'
+    // method: '*' → expand to all standard methods, otherwise use as-is
+    const validMethods = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']
+    const methods = rawMethod === '*' ? validMethods : [rawMethod]
     const operationId = path.join('_')
 
     // Collect tags from first path segment
@@ -115,35 +120,12 @@ export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}):
       operation.security = [{ auth: [] }]
     }
 
-    // Input → request body or query params
-    if (proc.input) {
-      const schema = zodToJsonSchema(proc.input)
-      if (method === 'get') {
-        operation.parameters = objectSchemaToParams(schema)
-      } else {
-        operation.requestBody = {
-          required: true,
-          content: {
-            'application/json': { schema },
-          },
-        }
-      }
-    }
+    // Input → request body or query params (built per-method below)
+    const inputSchema = proc.input ? zodToJsonSchema(proc.input) : null
 
     // Output → success response
     const successStatus = route?.successStatus ?? 200
     const successDesc = route?.successDescription ?? 'Successful response'
-    if (proc.output) {
-      const schema = zodToJsonSchema(proc.output)
-      ;(operation.responses as any)[String(successStatus)] = {
-        description: successDesc,
-        content: {
-          'application/json': { schema },
-        },
-      }
-    } else {
-      ;(operation.responses as any)[String(successStatus)] = { description: successDesc }
-    }
 
     // Errors → error responses (merge guard errors + procedure errors)
     const guards = (proc.use ?? []).filter((m: any) => m.kind === 'guard' && m.errors)
@@ -153,57 +135,91 @@ export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}):
       if (ge) allErrors = allErrors ? { ...allErrors, ...ge } : { ...ge }
     }
 
-    if (allErrors) {
-      const byStatus = new Map<number, { code: string; schema?: JSONSchema }[]>()
-      for (const [code, def] of Object.entries(allErrors)) {
-        const status = typeof def === 'number' ? def : def.status
-        if (!byStatus.has(status)) byStatus.set(status, [])
-        const entry: { code: string; schema?: JSONSchema } = { code }
-        if (typeof def === 'object' && def.data) {
-          entry.schema = zodToJsonSchema(def.data)
-        }
-        byStatus.get(status)!.push(entry)
+    paths[httpPath] ??= {}
+
+    for (const method of methods) {
+      const op = { ...operation, responses: {} }
+
+      if (methods.length > 1) {
+        op.operationId = `${operationId}_${method}`
       }
 
-      for (const [status, errors] of byStatus) {
-        const errorSchemas = errors.map((e) => {
-          const s: JSONSchema = {
-            type: 'object',
-            properties: {
-              code: { const: e.code, type: 'string' },
-              status: { const: status, type: 'integer' },
-              message: { type: 'string' },
+      if (inputSchema) {
+        if (method === 'get') {
+          op.parameters = objectSchemaToParams(inputSchema)
+        } else {
+          op.requestBody = {
+            required: true,
+            content: {
+              'application/json': { schema: inputSchema },
             },
-            required: ['code', 'status', 'message'],
           }
-          if (e.schema) {
-            s.properties!.data = e.schema
-            s.required!.push('data')
-          }
-          return s
-        })
+        }
+      }
 
-        ;(operation.responses as any)[String(status)] = {
-          description: errors.map((e) => e.code).join(' | '),
+      if (proc.output) {
+        const schema = zodToJsonSchema(proc.output)
+        ;(op.responses as any)[String(successStatus)] = {
+          description: successDesc,
           content: {
-            'application/json': {
-              schema: errorSchemas.length === 1 ? errorSchemas[0]! : { oneOf: errorSchemas },
-            },
+            'application/json': { schema },
           },
         }
+      } else {
+        ;(op.responses as any)[String(successStatus)] = { description: successDesc }
       }
-    }
 
-    // Subscription
-    if (proc.type === 'subscription') {
-      ;(operation.responses as any)[String(successStatus)] = {
-        description: 'SSE event stream',
-        content: { 'text/event-stream': { schema: { type: 'string' } } },
+      if (allErrors) {
+        const byStatus = new Map<number, { code: string; schema?: JSONSchema }[]>()
+        for (const [code, def] of Object.entries(allErrors)) {
+          const status = typeof def === 'number' ? def : def.status
+          if (!byStatus.has(status)) byStatus.set(status, [])
+          const entry: { code: string; schema?: JSONSchema } = { code }
+          if (typeof def === 'object' && def.data) {
+            entry.schema = zodToJsonSchema(def.data)
+          }
+          byStatus.get(status)!.push(entry)
+        }
+
+        for (const [status, errors] of byStatus) {
+          const errorSchemas = errors.map((e) => {
+            const s: JSONSchema = {
+              type: 'object',
+              properties: {
+                code: { const: e.code, type: 'string' },
+                status: { const: status, type: 'integer' },
+                message: { type: 'string' },
+              },
+              required: ['code', 'status', 'message'],
+            }
+            if (e.schema) {
+              s.properties!.data = e.schema
+              s.required!.push('data')
+            }
+            return s
+          })
+
+          ;(op.responses as any)[String(status)] = {
+            description: errors.map((e) => e.code).join(' | '),
+            content: {
+              'application/json': {
+                schema: errorSchemas.length === 1 ? errorSchemas[0]! : { oneOf: errorSchemas },
+              },
+            },
+          }
+        }
       }
-    }
 
-    paths[httpPath] ??= {}
-    paths[httpPath]![method] = operation
+      // Subscription
+      if (proc.type === 'subscription') {
+        ;(op.responses as any)[String(successStatus)] = {
+          description: 'SSE event stream',
+          content: { 'text/event-stream': { schema: { type: 'string' } } },
+        }
+      }
+
+      paths[httpPath]![method] = op
+    }
   })
 
   const doc: Record<string, unknown> = {
