@@ -111,7 +111,7 @@ function Stat({
 }) {
   return (
     <div className='border-r px-5 py-4 last:border-r-0'>
-      <div className='text-[11px] text-muted-foreground'>{label}</div>
+      <div className='text-[11px] font-semibold text-muted-foreground'>{label}</div>
       <div className='mt-1 flex items-baseline gap-1.5'>
         <span
           className={cn('text-lg font-semibold tabular-nums tracking-tight', danger && 'text-destructive', className)}
@@ -125,5 +125,5 @@ function Stat({
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <h3 className='text-xs font-medium text-muted-foreground'>{children}</h3>
+  return <h3 className='text-xs font-semibold text-muted-foreground'>{children}</h3>
 }

@@ -196,7 +196,7 @@ export function Errors({ errors, navigate, initialProcedure }: ErrorsProps) {
                     </TooltipContent>
                   </Tooltip>
                 </TableCell>
-                <TableCell className='px-3 py-2 text-xs font-medium'>{entry.procedure}</TableCell>
+                <TableCell className='px-3 py-2 text-xs font-semibold'>{entry.procedure}</TableCell>
                 <TableCell className='px-3 py-2'>
                   <Badge variant='destructive' className='text-[10px]'>
                     {entry.code}
