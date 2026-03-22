@@ -1,84 +1,153 @@
 ---
 title: Nitro
-description: Use Silgi with Nitro v3 — custom server entry with serverEntry config.
+description: Use Silgi with Nitro v3 — modular server entry with analytics, tracing, and typed procedures.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
+import { Files, Folder, File } from 'fumadocs-ui/components/files'
 
 [Nitro](https://nitro.build) is the server engine behind Nuxt and TanStack Start. Silgi integrates with Nitro using the `serverEntry` config — Silgi becomes the server framework.
 
+## Project structure
+
+<Files>
+  <File name="nitro.config.ts" />
+  <File name="server.ts" />
+  <Folder name="server/rpc" defaultOpen>
+    <File name="instance.ts" />
+    <File name="router.ts" />
+    <Folder name="todos" defaultOpen>
+      <File name="schema.ts" />
+      <File name="index.ts" />
+    </Folder>
+    <Folder name="auth">
+      <File name="schema.ts" />
+      <File name="index.ts" />
+    </Folder>
+  </Folder>
+</Files>
+
 ## Setup
 
-Create a `server.ts` that exports a `fetch` handler:
+### 1. Silgi instance
 
-```ts twoslash title="server.ts"
-// @noErrors
+```ts title="server/rpc/instance.ts"
 import { silgi } from 'silgi'
-import { z } from 'zod'
+import { todos } from './todos/schema'
 
-const s = silgi({
-  context: (req) => ({
-    db: getDB(),
-    headers: Object.fromEntries(req.headers),
-  }),
+export const s = silgi({
+  context: () => ({ todos }),
 })
-
-const health = s.$resolve(() => ({ status: 'ok' }))
-
-const listUsers = s
-  .$input(z.object({ limit: z.number().optional() }))
-  .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))
-
-const appRouter = s.router({ health, users: { list: listUsers } })
-
-export default { fetch: s.handler(appRouter) }
 ```
 
-Point Nitro to it:
+### 2. Procedures with tracing
+
+```ts twoslash title="server/rpc/todos/index.ts"
+// @noErrors
+import { trace } from 'silgi/analytics'
+import { s } from '../instance'
+import { CreateTodoSchema, TodoIdSchema, TodoListSchema, TodoSchema, OkSchema, getNextId } from './schema'
+
+export const list = s
+  .$route({ method: 'GET' })
+  .$output(TodoListSchema)
+  .$resolve(async ({ ctx }) => {
+    return trace(ctx, 'db.todos.findMany', () => [...ctx.todos])
+  })
+
+export const create = s
+  .$input(CreateTodoSchema)
+  .$output(TodoSchema)
+  .$resolve(async ({ input, ctx }) => {
+    const todo = { id: getNextId(), title: input.title, completed: false, createdAt: new Date().toISOString() }
+    await trace(ctx, 'db.todos.insert', () => ctx.todos.push(todo))
+    return todo
+  })
+
+export const toggle = s
+  .$input(TodoIdSchema)
+  .$output(TodoSchema)
+  .$errors({ NOT_FOUND: 404 })
+  .$resolve(async ({ input, ctx, fail }) => {
+    const todo = await trace(ctx, 'db.todos.findById', () => ctx.todos.find((t) => t.id === input.id))
+    if (!todo) return fail('NOT_FOUND')
+    todo.completed = !todo.completed
+    return todo
+  })
+
+export const remove = s
+  .$input(TodoIdSchema)
+  .$output(OkSchema)
+  .$errors({ NOT_FOUND: 404 })
+  .$resolve(async ({ input, ctx, fail }) => {
+    const idx = ctx.todos.findIndex((t) => t.id === input.id)
+    if (idx === -1) return fail('NOT_FOUND')
+    ctx.todos.splice(idx, 1)
+    return { ok: true }
+  })
+```
+
+### 3. Router
+
+```ts title="server/rpc/router.ts"
+import * as auth from './auth'
+import { s } from './instance'
+import * as todos from './todos'
+
+export const appRouter = s.router({
+  auth: {
+    login: auth.doLogin,
+    logout: auth.doLogout,
+    me: auth.me,
+  },
+  todos: {
+    list: todos.list,
+    create: todos.create,
+    toggle: todos.toggle,
+    remove: todos.remove,
+  },
+})
+
+export type AppRouter = typeof appRouter
+```
+
+### 4. Server entry
+
+```ts title="server.ts"
+import { s } from './server/rpc/instance'
+import { appRouter } from './server/rpc/router'
+
+export default {
+  fetch: s.handler(appRouter, {
+    scalar: true,
+    analytics: {
+      auth: process.env.ANALYTICS_TOKEN,
+    },
+  }),
+}
+```
+
+### 5. Nitro config
 
 ```ts title="nitro.config.ts"
 import { defineNitroConfig } from 'nitro/config'
 
 export default defineNitroConfig({
   compatibilityDate: '2025-01-01',
-  serverEntry: './server.ts',
 })
 ```
 
-That's it. No file-system routing, no adapters — Silgi IS the framework.
-
-```
-POST /health          → { status: "ok" }
-POST /users/list      → [{ id: 1, name: "Alice" }, ...]
-```
-
-<Callout>Nitro detects the `fetch` method on the default export and routes all requests through it.</Callout>
-
-## Nuxt
-
-For Nuxt apps, use the same `server.ts` entry. Add it to your Nuxt config:
-
-```ts title="nuxt.config.ts"
-export default defineNuxtConfig({
-  compatibilityDate: '2025-01-01',
-  nitro: {
-    serverEntry: './server/server.ts',
-  },
-})
-```
+<Callout>Nitro detects the `fetch` method on the default export and routes all requests through it. The analytics dashboard is available at `/analytics`.</Callout>
 
 ## Coexisting with existing routes
 
-When you add Silgi to an app that already has its own routes — GraphQL endpoints, REST API routes, file-system routes — the default `fetch` export takes over **all** requests. Silgi returns a `404` response for any procedure it doesn't recognize, which prevents Nitro/Nuxt from handling those routes normally.
-
-To fix this, wrap the handler and return `undefined` for unmatched routes. This tells Nitro to continue with its normal routing pipeline:
+When you add Silgi to an app that already has its own routes — GraphQL endpoints, REST API routes, file-system routes — the default `fetch` export takes over **all** requests. To let unmatched routes fall through to Nitro's normal routing:
 
 ```ts twoslash title="server.ts"
 // @noErrors
 import { silgi } from 'silgi'
 
 const s = silgi()
-
 const appRouter = s.router({
   health: s.$resolve(() => ({ status: 'ok' })),
 })
@@ -88,18 +157,14 @@ const silgiHandler = s.handler(appRouter)
 export default {
   fetch: async (request: Request) => {
     const response = await silgiHandler(request)
-    // Let Nitro handle routes that silgi doesn't know about
     if (response.status === 404) return
     return response
   },
 }
 ```
 
-With this pattern, requests matching silgi procedures go through silgi. Everything else — your GraphQL endpoint, Nitro API routes, Nuxt pages — continues to work as before.
-
-<Callout>Only use this pattern when you need to mix silgi with other routes. For apps where silgi handles everything, the simpler `export default { fetch: s.handler(appRouter) }` is fine.</Callout>
-
 ## What's next?
 
+- [Nuxt](/docs/integrations/nuxt) — Silgi with Nuxt 4 (Vue pages, typed client composable)
+- [Analytics](/docs/analytics) — built-in monitoring dashboard
 - [Server](/docs/server) — standalone `serve()` with full protocol support
-- [Integrations](/docs/integrations) — other available integrations

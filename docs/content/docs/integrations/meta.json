@@ -4,7 +4,9 @@
   "pages": [
     "index",
     "ai-sdk",
+    "better-auth",
     "broker",
+    "drizzle",
     "astro",
     "aws-lambda",
     "elysia",
@@ -14,6 +16,7 @@
     "nestjs",
     "nextjs",
     "nitro",
+    "nuxt",
     "openapi-client",
     "peer",
     "react",
