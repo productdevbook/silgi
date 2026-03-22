@@ -112,6 +112,16 @@ export function SpanWaterfall({ spans, totalMs }: SpanWaterfallProps) {
                   )}
                   <span className='text-muted-foreground'>({totalMs > 0 ? ((span.durationMs / totalMs) * 100).toFixed(0) : 0}% of total)</span>
                 </div>
+                {span.attributes && Object.keys(span.attributes).length > 0 && (
+                  <div className='mb-2 flex flex-wrap gap-1.5'>
+                    {Object.entries(span.attributes).map(([k, v]) => (
+                      <span key={k} className='inline-flex items-center gap-1 rounded bg-muted/40 px-1.5 py-0.5 font-mono text-[9px]'>
+                        <span className='text-muted-foreground'>{k}</span>
+                        <span className='text-foreground'>{String(v)}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
                 {span.input != null && (
                   <div className='mb-2'>
                     <h5 className='mb-1 text-[10px] font-semibold text-muted-foreground'>Input</h5>
@@ -138,7 +148,7 @@ export function SpanWaterfall({ spans, totalMs }: SpanWaterfallProps) {
                     {span.error}
                   </div>
                 )}
-                {!span.detail && !span.error && !span.input && !span.output && (
+                {!span.detail && !span.error && !span.input && !span.output && !span.attributes && (
                   <p className='text-[11px] text-muted-foreground/60'>
                     No detail captured. Use <code className='rounded bg-muted px-1'>{'ctx.trace(name, fn, { detail: "..." })'}</code> to add query/URL info.
                   </p>

@@ -87,6 +87,8 @@ export interface TraceSpan {
   input?: unknown
   output?: unknown
   error?: string
+  /** Structured key-value attributes (db.name, auth.operation, user.id, etc.) */
+  attributes?: Record<string, string | number | boolean>
 }
 
 export interface ErrorEntry {
@@ -223,7 +225,8 @@ export class RequestTrace {
   procedureInput: unknown = undefined
   /** Procedure-level output — set via `setProcedureOutput()` or `trace(..., { procedure: { output } })` */
   procedureOutput: unknown = undefined
-  #t0 = performance.now()
+  /** @internal Start time — used by integrations (drizzle etc.) for span offset calculation */
+  readonly t0 = performance.now()
 
   async trace<T>(name: string, fn: () => T | Promise<T>, opts?: { kind?: SpanKind; detail?: string; input?: unknown; output?: unknown | ((result: T) => unknown); procedure?: { input?: unknown; output?: unknown | ((result: T) => unknown) } }): Promise<T> {
     const start = performance.now()
@@ -234,7 +237,7 @@ export class RequestTrace {
         name,
         kind,
         durationMs: round(performance.now() - start),
-        startOffsetMs: round(start - this.#t0),
+        startOffsetMs: round(start - this.t0),
         detail: opts?.detail,
         input: opts?.input,
         output: typeof opts?.output === 'function' ? (opts.output as (r: T) => unknown)(result) : opts?.output,
@@ -251,7 +254,7 @@ export class RequestTrace {
         name,
         kind,
         durationMs: round(performance.now() - start),
-        startOffsetMs: round(start - this.#t0),
+        startOffsetMs: round(start - this.t0),
         detail: opts?.detail,
         input: opts?.input,
         error: err instanceof Error ? err.message : String(err),
@@ -473,7 +476,7 @@ export class RequestAccumulator {
 
   constructor(request: Request, collector: AnalyticsCollector) {
     this.requestId = generateRequestId()
-    this.#t0 = performance.now()
+    this.t0 = performance.now()
     this.#request = request
     this.#collector = collector
 
@@ -502,7 +505,7 @@ export class RequestAccumulator {
   flushWithResponse(res: Response): void {
     if (this.#procedures.length === 0) return
 
-    const durationMs = round(performance.now() - this.#t0)
+    const durationMs = round(performance.now() - this.t0)
     const headers: Record<string, string> = {}
     this.#request.headers.forEach((v, k) => {
       headers[k] = k === 'authorization' || k === 'cookie' ? '[REDACTED]' : v

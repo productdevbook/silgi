@@ -35,6 +35,7 @@ export interface TraceSpan {
   input?: unknown
   output?: unknown
   error?: string
+  attributes?: Record<string, string | number | boolean>
 }
 
 export interface ErrorEntry {

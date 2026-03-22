@@ -84,6 +84,10 @@
       "import": "./dist/integrations/tanstack-query/index.mjs",
       "types": "./dist/integrations/tanstack-query/index.d.mts"
     },
+    "./drizzle": {
+      "import": "./dist/integrations/drizzle/index.mjs",
+      "types": "./dist/integrations/drizzle/index.d.mts"
+    },
     "./plugins": {
       "import": "./dist/plugins/index.mjs",
       "types": "./dist/plugins/index.d.mts"
@@ -115,6 +119,10 @@
     "./ai": {
       "import": "./dist/integrations/ai/index.mjs",
       "types": "./dist/integrations/ai/index.d.mts"
+    },
+    "./better-auth": {
+      "import": "./dist/integrations/better-auth/index.mjs",
+      "types": "./dist/integrations/better-auth/index.d.mts"
     },
     "./fastify": {
       "import": "./dist/adapters/fastify.mjs",

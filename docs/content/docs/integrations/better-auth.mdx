@@ -1,0 +1,164 @@
+---
+title: Better Auth
+description: Trace Better Auth operations in silgi analytics — login flows, OAuth, session management with structured attributes.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs'
+
+The Better Auth integration traces every auth operation — sign-in, sign-up, OAuth flows, session management — into silgi analytics. Each operation appears as a span with `user.id`, `session.id`, `auth.operation`, and success/failure status. Two integration points cover both HTTP requests and programmatic API calls.
+
+## Setup
+
+<Tabs items={['pnpm', 'npm', 'bun']}>
+  <Tab value='pnpm'>
+  ```bash
+  pnpm add silgi better-auth
+  ```
+  </Tab>
+  <Tab value='npm'>
+  ```bash
+  npm install silgi better-auth
+  ```
+  </Tab>
+  <Tab value='bun'>
+  ```bash
+  bun add silgi better-auth
+  ```
+  </Tab>
+</Tabs>
+
+There are two ways to trace auth operations:
+
+1. **`silgiTracing()` plugin** — traces HTTP-level auth requests (sign-in forms, OAuth callbacks)
+2. **`instrumentBetterAuth()`** — traces programmatic `auth.api.*` calls (server-side session fetches, background jobs)
+
+Use one or both depending on your setup.
+
+## Plugin setup
+
+Add `silgiTracing()` to your Better Auth plugins. Pass `createAuthMiddleware` from `better-auth/api` so the plugin can wrap the after-hook handler:
+
+```ts twoslash title="auth.ts"
+// @noErrors
+import { betterAuth } from 'better-auth'
+import { createAuthMiddleware } from 'better-auth/api'
+import { silgiTracing } from 'silgi/better-auth'
+
+export const auth = betterAuth({
+  database: { url: process.env.DATABASE_URL! },
+  plugins: [
+    silgiTracing({ createAuthMiddleware }),
+  ],
+})
+```
+
+## Handler setup
+
+In your silgi handler, set `request.__silgiCtx = ctx` before passing the request to Better Auth. This bridges the silgi request context to the auth plugin:
+
+```ts twoslash title="server.ts"
+// @noErrors
+import { silgi } from 'silgi'
+import { auth } from './auth'
+
+const s = silgi()
+
+const authHandler = s.$resolve(async ({ ctx, request }) => {
+  ;(request as any).__silgiCtx = ctx
+  return auth.handler(request)
+})
+
+const appRouter = s.router({
+  auth: { handler: authHandler },
+})
+
+export default { fetch: s.handler(appRouter) }
+```
+
+<Callout type='warn'>
+  `request.__silgiCtx = ctx` must be set before calling `auth.handler(request)`. Without it, the plugin has no access to the request trace and spans are silently skipped.
+</Callout>
+
+## What gets captured
+
+Each auth operation produces a span with these attributes:
+
+| Attribute | Type | Description |
+| --- | --- | --- |
+| `auth.operation` | `string` | Operation name (`signin`, `signup`, `signout`, `get_session`, etc.) |
+| `auth.method` | `string` | Auth method (`email`, `oauth`) |
+| `auth.provider` | `string` | OAuth provider name (`google`, `github`, etc.) |
+| `auth.success` | `boolean` | Whether the operation succeeded |
+| `user.id` | `string` | Authenticated user's ID |
+| `user.email` | `string` | Authenticated user's email |
+| `session.id` | `string` | Session ID |
+
+## Operation mapping
+
+The plugin maps Better Auth URL paths to structured span names:
+
+| Path | Span name | Operation |
+| --- | --- | --- |
+| `/sign-up/email` | `auth.signup.email` | `signup` |
+| `/sign-in/email` | `auth.signin.email` | `signin` |
+| `/sign-out` | `auth.signout` | `signout` |
+| `/get-session` | `auth.get_session` | `get_session` |
+| `/update-user` | `auth.update_user` | `update_user` |
+| `/delete-user` | `auth.delete_user` | `delete_user` |
+| `/change-password` | `auth.change_password` | `change_password` |
+| `/change-email` | `auth.change_email` | `change_email` |
+| `/verify-email` | `auth.verify_email` | `verify_email` |
+| `/forget-password` | `auth.forgot_password` | `forgot_password` |
+| `/reset-password` | `auth.reset_password` | `reset_password` |
+| `/list-sessions` | `auth.list_sessions` | `list_sessions` |
+| `/revoke-session` | `auth.revoke_session` | `revoke_session` |
+| `/sign-in/{provider}` | `auth.oauth.initiate.{provider}` | `oauth_initiate` |
+| `/callback/{provider}` | `auth.oauth.callback.{provider}` | `oauth_callback` |
+
+Unrecognized paths fall back to `auth.{last_segment}` with operation `unknown`.
+
+## Programmatic API tracing
+
+For server-side calls to `auth.api.*` (session validation, background user management), use `instrumentBetterAuth` with `withSilgiCtx`:
+
+```ts twoslash title="auth.ts"
+// @noErrors
+import { betterAuth } from 'better-auth'
+import { instrumentBetterAuth } from 'silgi/better-auth'
+
+export const auth = instrumentBetterAuth(
+  betterAuth({
+    database: { url: process.env.DATABASE_URL! },
+  }),
+)
+```
+
+Then wrap API calls in `withSilgiCtx`:
+
+```ts twoslash title="server.ts"
+// @noErrors
+import { silgi } from 'silgi'
+import { withSilgiCtx } from 'silgi/better-auth'
+import { auth } from './auth'
+
+const s = silgi()
+
+const me = s.$resolve(async ({ ctx, request }) => {
+  return withSilgiCtx(ctx, () =>
+    auth.api.getSession({ headers: request.headers }),
+  )
+})
+```
+
+Programmatic spans are named `auth.api.{operation}` (e.g. `auth.api.get_session`, `auth.api.signin`). All known API methods are mapped to their operation names automatically. Unknown methods are also traced using a camelCase-to-snake_case conversion of the method name.
+
+## Configuration
+
+Options for the `silgiTracing()` plugin:
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `captureInput` | `boolean` | `true` | Capture request body as span input |
+| `captureOutput` | `boolean` | `true` | Capture response data as span output |
+| `createAuthMiddleware` | `function` | `undefined` | Pass `createAuthMiddleware` from `better-auth/api` to wrap the after-hook handler |
