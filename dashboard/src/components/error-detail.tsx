@@ -88,7 +88,7 @@ export function ErrorDetail({ entry }: ErrorDetailProps) {
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className='border-b px-5 py-4 last:border-b-0'>
-      <h4 className='mb-3 text-[11px] font-medium text-muted-foreground'>{label}</h4>
+      <h4 className='mb-3 text-[11px] font-semibold text-muted-foreground'>{label}</h4>
       {children}
     </div>
   )
