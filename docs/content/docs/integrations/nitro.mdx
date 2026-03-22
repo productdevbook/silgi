@@ -67,6 +67,38 @@ export default defineNuxtConfig({
 })
 ```
 
+## Coexisting with existing routes
+
+When you add Silgi to an app that already has its own routes — GraphQL endpoints, REST API routes, file-system routes — the default `fetch` export takes over **all** requests. Silgi returns a `404` response for any procedure it doesn't recognize, which prevents Nitro/Nuxt from handling those routes normally.
+
+To fix this, wrap the handler and return `undefined` for unmatched routes. This tells Nitro to continue with its normal routing pipeline:
+
+```ts twoslash title="server.ts"
+// @noErrors
+import { silgi } from 'silgi'
+
+const s = silgi()
+
+const appRouter = s.router({
+  health: s.$resolve(() => ({ status: 'ok' })),
+})
+
+const silgiHandler = s.handler(appRouter)
+
+export default {
+  fetch: async (request: Request) => {
+    const response = await silgiHandler(request)
+    // Let Nitro handle routes that silgi doesn't know about
+    if (response.status === 404) return
+    return response
+  },
+}
+```
+
+With this pattern, requests matching silgi procedures go through silgi. Everything else — your GraphQL endpoint, Nitro API routes, Nuxt pages — continues to work as before.
+
+<Callout>Only use this pattern when you need to mix silgi with other routes. For apps where silgi handles everything, the simpler `export default { fetch: s.handler(appRouter) }` is fine.</Callout>
+
 ## What's next?
 
 - [Server](/docs/server) — standalone `serve()` with full protocol support

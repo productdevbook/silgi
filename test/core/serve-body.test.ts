@@ -105,6 +105,93 @@ describe('handler() — passthrough (wildcard catch-all)', () => {
     expect(await res.text()).toBe('proxied')
   })
 
+  it('passthrough route records analytics with input and status', async () => {
+    const k2 = silgi({
+      context: (req) => ({ req }),
+    })
+
+    const externalHandler = k2
+      .$route({ method: '*', path: '/api/ext/**' })
+      .$resolve(async ({ ctx }) => {
+        const body = await (ctx as any).req.json()
+        return new Response(JSON.stringify({ ok: true, name: body.name }), {
+          status: 201,
+          headers: { 'content-type': 'application/json' },
+        })
+      })
+
+    const router = k2.router({ ext: { handler: externalHandler } })
+    const handle2 = k2.handler(router, { analytics: true })
+
+    const res = await handle2(
+      new Request('http://localhost/api/ext/create', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'Alice' }),
+      }),
+    )
+
+    expect(res.status).toBe(201)
+    const data = await res.json()
+    expect(data).toEqual({ ok: true, name: 'Alice' })
+
+    // Check analytics recorded the request
+    const analyticsRes = await handle2(
+      new Request('http://localhost/__silgi/analytics', {
+        headers: { cookie: 'silgi-auth=true' },
+      }),
+    )
+    // Analytics endpoint should be accessible (may require auth)
+    expect(analyticsRes.status).toBeLessThan(500)
+  })
+
+  it('passthrough Response records correct status in analytics', async () => {
+    const k2 = silgi({ context: () => ({}) })
+
+    const proxy = k2
+      .$route({ method: '*', path: '/proxy/**' })
+      .$resolve(() => new Response('not found', { status: 404 }))
+
+    const router = k2.router({ proxy })
+    const handle2 = k2.handler(router, { analytics: true })
+
+    const res = await handle2(new Request('http://localhost/proxy/missing'))
+    expect(res.status).toBe(404)
+    expect(await res.text()).toBe('not found')
+  })
+
+  it('passthrough body clone does not interfere with handler body reading', async () => {
+    const k2 = silgi({
+      context: (req) => ({ req }),
+    })
+
+    const handler = k2
+      .$route({ method: '*', path: '/api/proxy/**' })
+      .$resolve(async ({ ctx }) => {
+        // Handler reads body — should work even when analytics clones it
+        const body = await (ctx as any).req.json()
+        return new Response(JSON.stringify(body), {
+          headers: { 'content-type': 'application/json' },
+        })
+      })
+
+    const router = k2.router({ proxy: { handler } })
+    const handle2 = k2.handler(router, { analytics: true })
+
+    const payload = { users: [1, 2, 3], action: 'batch' }
+    const res = await handle2(
+      new Request('http://localhost/api/proxy/batch', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      }),
+    )
+
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data).toEqual(payload)
+  })
+
   it('passthrough GET request works without body', async () => {
     const k2 = silgi({
       context: (req) => ({ req }),

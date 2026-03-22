@@ -454,7 +454,16 @@ location.reload();
 
       // Parse input body (skip for passthrough routes — they consume the body themselves)
       if (route.passthrough) {
-        // No body parsing — procedure receives raw request via context
+        // Clone body for analytics without consuming the original request
+        if (collector && request.body && request.method !== 'GET') {
+          try {
+            const cloned = request.clone()
+            const ct = cloned.headers.get('content-type')
+            if (ct && ct.includes('json')) {
+              rawInput = await cloned.json()
+            }
+          } catch {}
+        }
       } else if (request.method === 'GET') {
         if (qMark !== -1) {
           const searchStr = url.slice(qMark + 1)
@@ -498,7 +507,19 @@ location.reload();
       const pipelineResult = route.handler(ctx, rawInput, request.signal)
       const output = pipelineResult instanceof Promise ? await pipelineResult : pipelineResult
 
-      if (output instanceof Response) return output
+      if (output instanceof Response) {
+        if (hasHooks || collector) {
+          const durationMs = collector ? round(performance.now() - t0) : 0
+          if (hasHooks) hooks!.callHook('response', { path: pathname, output: null, durationMs })
+          if (collector) {
+            collector.record(pathname, durationMs)
+            if (accumulator) {
+              accumulator.addProcedure({ procedure: pathname, durationMs, status: output.status, input: rawInput, output: null, spans: reqTrace?.spans ?? [] })
+            }
+          }
+        }
+        return output
+      }
       if (output instanceof ReadableStream) {
         if (collector) {
           const durationMs = round(performance.now() - t0)
