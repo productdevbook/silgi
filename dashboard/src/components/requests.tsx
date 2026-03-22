@@ -45,7 +45,7 @@ export function Requests({ requests, navigate, initialProcedure }: RequestsProps
     })
   }, [])
 
-  const procedures = useMemo(() => getProcedureOptions(requests.map((entry) => entry.procedure)), [requests])
+  const procedures = useMemo(() => getProcedureOptions(requests.flatMap((entry) => entry.procedures.map(p => p.procedure))), [requests])
 
   const filtered = useMemo(() => {
     const result = filterRequests(requests, { query, procedure, status, latency }).toReversed()
@@ -55,13 +55,13 @@ export function Requests({ requests, navigate, initialProcedure }: RequestsProps
         case 'time':
           return dir * (a.timestamp - b.timestamp)
         case 'procedure':
-          return dir * a.procedure.localeCompare(b.procedure)
+          return dir * (a.procedures[0]?.procedure ?? '').localeCompare(b.procedures[0]?.procedure ?? '')
         case 'status':
           return dir * (a.status - b.status)
         case 'duration':
           return dir * (a.durationMs - b.durationMs)
         case 'spans':
-          return dir * (a.spans.length - b.spans.length)
+          return dir * (a.procedures.reduce((s, p) => s + p.spans.length, 0) - b.procedures.reduce((s, p) => s + p.spans.length, 0))
       }
     })
     return result
@@ -204,7 +204,13 @@ export function Requests({ requests, navigate, initialProcedure }: RequestsProps
                     </TooltipContent>
                   </Tooltip>
                 </TableCell>
-                <TableCell className='px-3 py-2 text-xs font-medium'>{entry.procedure}</TableCell>
+                <TableCell className='px-3 py-2 text-xs font-medium'>
+                  <div className='flex items-center gap-1.5'>
+                    <span className='font-mono text-[10px] text-muted-foreground'>{entry.method}</span>
+                    <span>{entry.procedures.map(p => p.procedure).join(', ')}</span>
+                    {entry.isBatch && <Badge variant='outline' className='text-[9px]'>batch</Badge>}
+                  </div>
+                </TableCell>
                 <TableCell className='px-3 py-2'>
                   <Badge variant={entry.status >= 400 ? 'destructive' : 'secondary'} className='text-[10px]'>
                     {entry.status}
@@ -212,11 +218,20 @@ export function Requests({ requests, navigate, initialProcedure }: RequestsProps
                 </TableCell>
                 <TableCell className='px-3 py-2 text-right'>
                   <Badge variant='secondary' className='text-[10px]'>
-                    {entry.spans.length}
+                    {entry.procedures.reduce((sum, p) => sum + p.spans.length, 0)}
                   </Badge>
                 </TableCell>
                 <TableCell className='px-3 py-2 text-right text-xs tabular-nums text-muted-foreground'>
                   {fmtMs(entry.durationMs)}
+                </TableCell>
+                <TableCell className='px-3 py-2'>
+                  <Badge
+                    variant='outline'
+                    className='cursor-pointer font-mono text-[9px] hover:bg-muted'
+                    onClick={(e) => { e.stopPropagation(); navigate('sessions', entry.sessionId) }}
+                  >
+                    {entry.sessionId?.slice(0, 8) ?? '-'}
+                  </Badge>
                 </TableCell>
               </TableRow>
             ))}

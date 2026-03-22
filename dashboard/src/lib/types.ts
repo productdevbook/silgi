@@ -24,9 +24,14 @@ export interface AnalyticsData {
   timeSeries: TimeWindow[]
 }
 
+export type SpanKind = 'db' | 'http' | 'cache' | 'queue' | 'email' | 'ai' | 'custom'
+
 export interface TraceSpan {
   name: string
+  kind: SpanKind
   durationMs: number
+  startOffsetMs?: number
+  detail?: string
   error?: string
 }
 
@@ -44,12 +49,31 @@ export interface ErrorEntry {
   spans: TraceSpan[]
 }
 
-export interface RequestEntry {
-  id: number
-  timestamp: number
+/** A single procedure call within an HTTP request. */
+export interface ProcedureCall {
   procedure: string
   durationMs: number
   status: number
   input: unknown
+  output: unknown
   spans: TraceSpan[]
+  error?: string
+}
+
+/** An HTTP request containing one or more procedure calls. */
+export interface RequestEntry {
+  id: number
+  requestId: string
+  sessionId: string
+  timestamp: number
+  durationMs: number
+  method: string
+  path: string
+  ip: string
+  headers: Record<string, string>
+  responseHeaders: Record<string, string>
+  userAgent: string
+  status: number
+  procedures: ProcedureCall[]
+  isBatch: boolean
 }

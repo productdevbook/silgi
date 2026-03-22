@@ -1,6 +1,6 @@
 import { ContextPool } from '../compile.ts'
 import { compileRouter } from '../compile.ts'
-import { AnalyticsCollector, RequestTrace, analyticsHTML } from '../plugins/analytics.ts'
+import { AnalyticsCollector, RequestAccumulator, RequestTrace, analyticsHTML, requestToMarkdown, errorToMarkdown } from '../plugins/analytics.ts'
 import { generateOpenAPI, scalarHTML } from '../scalar.ts'
 
 import { SilgiError, toSilgiError } from './error.ts'
@@ -215,6 +215,38 @@ location.reload();
         headers: { 'content-type': 'application/json', 'cache-control': 'no-cache' },
       })
     }
+    // Markdown export: /analytics/_api/requests/:id/md
+    if (pathname.startsWith('analytics/_api/requests/') && pathname.endsWith('/md')) {
+      const id = Number(pathname.slice('analytics/_api/requests/'.length, -'/md'.length))
+      const entry = col.getRequests().find(r => r.id === id)
+      if (entry) {
+        return new Response(requestToMarkdown(entry), {
+          headers: { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-cache' },
+        })
+      }
+      return new Response('not found', { status: 404 })
+    }
+    // Markdown export: /analytics/_api/errors/:id/md
+    if (pathname.startsWith('analytics/_api/errors/') && pathname.endsWith('/md')) {
+      const id = Number(pathname.slice('analytics/_api/errors/'.length, -'/md'.length))
+      const entry = col.getErrors().find(e => e.id === id)
+      if (entry) {
+        return new Response(errorToMarkdown(entry), {
+          headers: { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-cache' },
+        })
+      }
+      return new Response('not found', { status: 404 })
+    }
+    // All errors as single markdown
+    if (pathname === 'analytics/_api/errors/md') {
+      const errors = col.getErrors()
+      const md = errors.length === 0
+        ? 'No errors.\n'
+        : `# Errors (${errors.length})\n\n` + errors.map(e => errorToMarkdown(e)).join('\n\n---\n\n')
+      return new Response(md, {
+        headers: { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-cache' },
+      })
+    }
     return new Response(analyticsDashboardHtml, { headers: { 'content-type': 'text/html' } })
   }
 
@@ -226,6 +258,9 @@ location.reload();
     // Keep leading '/' for router, use +1 slice for readable path comparisons
     const fullPath = qMark === -1 ? url.slice(pathStart) : url.slice(pathStart, qMark)
     const pathname = fullPath.length > 1 ? fullPath.slice(1) : ''
+
+    // HTTP-level request accumulator — created by wrapper, or fallback here
+    const accumulator: RequestAccumulator | undefined = (request as any).__acc ?? (collector ? new RequestAccumulator(request, collector) : undefined)
 
     // Scalar: /openapi.json and /reference
     if (scalarEnabled) {
@@ -310,15 +345,9 @@ location.reload();
             if (hasHooks) hooks!.callHook('response', { path: pathname, output, durationMs })
             if (collector) {
               collector.record(pathname, durationMs)
-              if (reqTrace && reqTrace.spans.length > 0) {
-                collector.recordDetailedRequest({
-                  timestamp: Date.now(),
-                  procedure: pathname,
-                  durationMs,
-                  status: 200,
-                  input: rawInput,
-                  spans: reqTrace.spans,
-                })
+              if (accumulator) {
+                accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output, spans: reqTrace?.spans ?? [] })
+                accumulator.flush()
               }
             }
           }
@@ -354,15 +383,9 @@ location.reload();
             if (hasHooks) hooks!.callHook('response', { path: pathname, output, durationMs })
             if (collector) {
               collector.record(pathname, durationMs)
-              if (reqTrace && reqTrace.spans.length > 0) {
-                collector.recordDetailedRequest({
-                  timestamp: Date.now(),
-                  procedure: pathname,
-                  durationMs,
-                  status: 200,
-                  input: rawInput,
-                  spans: reqTrace.spans,
-                })
+              if (accumulator) {
+                accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output, spans: reqTrace?.spans ?? [] })
+                accumulator.flush()
               }
             }
             if (output instanceof Response) return output
@@ -378,18 +401,18 @@ location.reload();
               headers: cacheHeaders ? { ...jsonHeaders, ...cacheHeaders } : jsonHeaders,
             })
           })
-          .catch((error) => handleError(error, pathname, request, rawInput, reqTrace, t0))
+          .catch((error) => handleError(error, pathname, request, rawInput, reqTrace, t0, accumulator))
           .finally(() => {
             if (usePool) ctxPool.release(ctx)
           })
       } catch (error) {
         if (usePool) ctxPool.release(ctx)
-        return handleError(error, pathname, request, undefined, undefined, t0)
+        return handleError(error, pathname, request, undefined, undefined, t0, accumulator)
       }
     }
 
     // ── Full async path: POST with body, async context factory, codecs ──
-    return handleAsync(request, url, pathname, qMark, match, route)
+    return handleAsync(request, url, pathname, qMark, match, route, accumulator)
   }
 
   async function handleAsync(
@@ -399,10 +422,12 @@ location.reload();
     qMark: number,
     match: NonNullable<ReturnType<typeof compiledRouter>>,
     route: import('../compile.ts').CompiledRoute,
+    accumulator?: RequestAccumulator,
   ): Promise<Response> {
     const ctx = ctxPool.borrow()
     let reqTrace: RequestTrace | undefined
     let rawInput: unknown
+    let t0 = 0
 
     try {
       // Context factory — skip await when sync, skip copy when empty
@@ -460,7 +485,7 @@ location.reload();
 
       if (hasHooks) hooks!.callHook('request', { path: pathname, input: rawInput })
 
-      const t0 = collector ? performance.now() : 0
+      t0 = collector ? performance.now() : 0
       const pipelineResult = route.handler(ctx, rawInput, request.signal)
       const output = pipelineResult instanceof Promise ? await pipelineResult : pipelineResult
 
@@ -475,15 +500,9 @@ location.reload();
       if (hasHooks) hooks!.callHook('response', { path: pathname, output, durationMs })
       if (collector) {
         collector.record(pathname, durationMs)
-        if (reqTrace && reqTrace.spans.length > 0) {
-          collector.recordDetailedRequest({
-            timestamp: Date.now(),
-            procedure: pathname,
-            durationMs,
-            status: 200,
-            input: rawInput,
-            spans: reqTrace.spans,
-          })
+        if (accumulator) {
+          accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output, spans: reqTrace?.spans ?? [] })
+          accumulator.flush()
         }
       }
 
@@ -499,7 +518,7 @@ location.reload();
         headers: cacheHeaders ? { ...jsonHeaders, ...cacheHeaders } : jsonHeaders,
       })
     } catch (error) {
-      return handleError(error, pathname, request, rawInput, reqTrace, t0) as Response
+      return handleError(error, pathname, request, rawInput, reqTrace, t0, accumulator) as Response
     } finally {
       ctxPool.release(ctx)
     }
@@ -512,25 +531,35 @@ location.reload();
     rawInput: unknown,
     reqTrace: RequestTrace | undefined,
     t0: number,
+    accumulator?: RequestAccumulator,
   ): Response | Promise<Response> {
     if (hasHooks) hooks!.callHook('error', { path: pathname, error })
     if (collector) {
       const durationMs = t0 ? round(performance.now() - t0) : 0
-      collector.recordError(pathname, durationMs, error instanceof Error ? error.message : String(error))
+      const errorMsg = error instanceof Error ? error.message : String(error)
       const isValidation = error instanceof ValidationError
       const silgiErr = isValidation ? null : error instanceof SilgiError ? error : toSilgiError(error)
+      const errStatus = isValidation ? 400 : (silgiErr?.status ?? 500)
+
+      collector.recordError(pathname, durationMs, errorMsg)
       collector.recordDetailedError({
         timestamp: Date.now(),
         procedure: pathname,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMsg,
         code: isValidation ? 'BAD_REQUEST' : (silgiErr?.code ?? 'INTERNAL_SERVER_ERROR'),
-        status: isValidation ? 400 : (silgiErr?.status ?? 500),
+        status: errStatus,
         stack: error instanceof Error ? (error.stack ?? '') : '',
         input: rawInput,
         headers: Object.fromEntries(request.headers),
         durationMs,
         spans: reqTrace?.spans ?? [],
       })
+
+      // Also record in HTTP request accumulator
+      if (accumulator) {
+        accumulator.addProcedure({ procedure: pathname, durationMs, status: errStatus, input: rawInput, output: null, spans: reqTrace?.spans ?? [], error: errorMsg })
+        accumulator.flush()
+      }
     }
 
     const accept = request.headers.get('accept')
@@ -547,5 +576,25 @@ location.reload();
     return encodeResponse(e.toJSON(), e.status, fmt)
   }
 
-  return handleRequest
+  if (!collector) return handleRequest
+
+  // Wrap to inject x-request-id + session cookie headers
+  return (request: Request): Response | Promise<Response> => {
+    // Create accumulator BEFORE handleRequest so we own the reference
+    const acc = new RequestAccumulator(request, collector!)
+    // Store on request for handleRequest to find
+    ;(request as any).__acc = acc
+
+    const result = handleRequest(request)
+
+    function injectHeaders(res: Response): Response {
+      res.headers.set('x-request-id', acc.requestId)
+      const cookie = acc.getSessionCookie()
+      if (cookie) res.headers.append('set-cookie', cookie)
+      return res
+    }
+
+    if (result instanceof Promise) return result.then(injectHeaders)
+    return injectHeaders(result)
+  }
 }

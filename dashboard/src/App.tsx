@@ -4,6 +4,7 @@ import { Errors } from '@/components/errors'
 import { Overview } from '@/components/overview'
 import { RequestDetailPage } from '@/components/request-detail-page'
 import { Requests } from '@/components/requests'
+import { SessionDetailPage } from '@/components/session-detail-page'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -24,7 +25,7 @@ export default function App() {
   })
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={false}>
       <AppSidebar
         route={route}
         navigate={navigate}
@@ -80,6 +81,9 @@ export default function App() {
           )}
           {route.page === 'requests' && route.id && (
             <RequestDetailPage requests={analytics.requests} id={route.id} navigate={navigate} />
+          )}
+          {route.page === 'sessions' && route.id && (
+            <SessionDetailPage requests={analytics.requests} sessionId={route.id} navigate={navigate} />
           )}
         </main>
       </SidebarInset>

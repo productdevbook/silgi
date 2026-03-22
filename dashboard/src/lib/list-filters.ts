@@ -35,13 +35,24 @@ export interface ErrorListSummary {
   uniqueProcedures: number
 }
 
+/** Get all procedure names from a request. */
+function requestProcedures(entry: RequestEntry): string {
+  return entry.procedures.map(p => p.procedure).join(', ')
+}
+
+/** Get all spans from all procedures in a request. */
+function requestSpans(entry: RequestEntry) {
+  return entry.procedures.flatMap(p => p.spans)
+}
+
 export function filterRequests(requests: RequestEntry[], filters: RequestListFilters) {
   const query = filters.query.trim().toLowerCase()
 
   return requests.filter((entry) => {
-    if (query && !entry.procedure.toLowerCase().includes(query)) return false
+    const procs = requestProcedures(entry)
+    if (query && !procs.toLowerCase().includes(query) && !entry.path.toLowerCase().includes(query)) return false
 
-    if (filters.procedure !== 'all' && entry.procedure !== filters.procedure) return false
+    if (filters.procedure !== 'all' && !entry.procedures.some(p => p.procedure === filters.procedure)) return false
 
     if (filters.status === 'success' && entry.status >= 400) return false
 
@@ -64,8 +75,8 @@ export function summarizeRequests(requests: RequestEntry[]): RequestListSummary 
   return {
     averageDuration,
     errorCount: requests.filter((entry) => entry.status >= 400).length,
-    maxSpans: requests.reduce((max, entry) => Math.max(max, entry.spans.length), 0),
-    uniqueProcedures: getProcedureOptions(requests.map((entry) => entry.procedure)).length,
+    maxSpans: requests.reduce((max, entry) => Math.max(max, requestSpans(entry).length), 0),
+    uniqueProcedures: getProcedureOptions(requests.flatMap((entry) => entry.procedures.map(p => p.procedure))).length,
   }
 }
 
