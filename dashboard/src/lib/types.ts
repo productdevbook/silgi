@@ -61,19 +61,11 @@ export interface ProcedureCall {
   error?: string
 }
 
-export interface AnalyticsUser {
-  id?: string | number
-  name?: string
-  email?: string
-  [key: string]: unknown
-}
-
 /** An HTTP request containing one or more procedure calls. */
 export interface RequestEntry {
   id: number
   requestId: string
   sessionId: string
-  user?: AnalyticsUser
   timestamp: number
   durationMs: number
   method: string

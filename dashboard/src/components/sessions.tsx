@@ -20,7 +20,6 @@ interface SessionSummary {
   procedures: string[]
   ip: string
   userAgent: string
-  userName?: string
 }
 
 type SortKey = 'time' | 'requests' | 'errors' | 'duration' | 'avg'
@@ -69,7 +68,6 @@ export function Sessions({ requests, navigate }: SessionsProps) {
         procedures,
         ip: sorted[sorted.length - 1]!.ip,
         userAgent: sorted[sorted.length - 1]!.userAgent,
-        userName: reqs.find((r) => r.user)?.user?.name || reqs.find((r) => r.user)?.user?.email || (reqs.find((r) => r.user)?.user?.id ? String(reqs.find((r) => r.user)?.user?.id) : undefined),
       })
     }
 
@@ -80,8 +78,7 @@ export function Sessions({ requests, navigate }: SessionsProps) {
         (s) =>
           s.sessionId.toLowerCase().includes(q) ||
           s.procedures.some((p) => p.toLowerCase().includes(q)) ||
-          s.ip.includes(q) ||
-          s.userName?.toLowerCase().includes(q),
+          s.ip.includes(q),
       )
     }
 
@@ -157,7 +154,6 @@ export function Sessions({ requests, navigate }: SessionsProps) {
           <TableHeader>
             <TableRow>
               <TableHead className='px-3 py-2 text-[11px]'>Session</TableHead>
-              <TableHead className='px-3 py-2 text-[11px]'>User</TableHead>
               {([
                 ['time', 'Last seen'],
                 ['requests', 'Requests'],
@@ -192,9 +188,6 @@ export function Sessions({ requests, navigate }: SessionsProps) {
                   <Badge variant='secondary' className='font-mono text-[10px]'>
                     {session.sessionId.slice(0, 12)}
                   </Badge>
-                </TableCell>
-                <TableCell className='px-3 py-2 text-xs text-muted-foreground'>
-                  {session.userName || <span className='text-muted-foreground/40'>—</span>}
                 </TableCell>
                 <TableCell className='px-3 py-2 whitespace-nowrap text-xs tabular-nums text-muted-foreground'>
                   <Tooltip>
