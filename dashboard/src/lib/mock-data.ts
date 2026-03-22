@@ -120,6 +120,7 @@ export const mockErrors: ErrorEntry[] = [
 export const mockRequests: RequestEntry[] = [
   {
     id: 1, requestId: "req-1-a3f2c1", sessionId: "ses-1-x7k9m2",
+    user: { id: 1, name: 'Alice', email: 'alice@example.com' },
     timestamp: timeAgo(2 * SEC),
     durationMs: 4.82,
     method: 'GET',

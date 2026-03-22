@@ -344,7 +344,7 @@ location.reload();
             if (collector) {
               collector.record(pathname, durationMs)
               if (accumulator) {
-                accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output, spans: reqTrace?.spans ?? [] })
+                accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output, spans: reqTrace?.spans ?? [] }, ctx)
 
               }
             }
@@ -353,14 +353,14 @@ location.reload();
           if (output instanceof Response) return output
           if (output instanceof ReadableStream) {
             if (collector && accumulator) {
-              accumulator.addProcedure({ procedure: pathname, durationMs: collector ? round(performance.now() - t0) : 0, status: 200, input: rawInput, output: null, spans: reqTrace?.spans ?? [] })
+              accumulator.addProcedure({ procedure: pathname, durationMs: collector ? round(performance.now() - t0) : 0, status: 200, input: rawInput, output: null, spans: reqTrace?.spans ?? [] }, ctx)
 
             }
             return new Response(output, { headers: { 'content-type': 'application/octet-stream' } })
           }
           if (output && typeof output === 'object' && Symbol.asyncIterator in (output as object)) {
             if (collector && accumulator) {
-              accumulator.addProcedure({ procedure: pathname, durationMs: collector ? round(performance.now() - t0) : 0, status: 200, input: rawInput, output: null, spans: reqTrace?.spans ?? [] })
+              accumulator.addProcedure({ procedure: pathname, durationMs: collector ? round(performance.now() - t0) : 0, status: 200, input: rawInput, output: null, spans: reqTrace?.spans ?? [] }, ctx)
 
             }
             return new Response(iteratorToEventStream(output as AsyncIterableIterator<unknown>), {
@@ -391,7 +391,7 @@ location.reload();
             if (collector) {
               collector.record(pathname, durationMs)
               if (accumulator) {
-                accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output, spans: reqTrace?.spans ?? [] })
+                accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output, spans: reqTrace?.spans ?? [] }, ctx)
 
               }
             }
@@ -502,8 +502,7 @@ location.reload();
           const durationMs = round(performance.now() - t0)
           collector.record(pathname, durationMs)
           if (accumulator) {
-            accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output: null, spans: reqTrace?.spans ?? [] })
-
+            accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output: null, spans: reqTrace?.spans ?? [] }, ctx)
           }
         }
         return new Response(output, { headers: { 'content-type': 'application/octet-stream' } })
@@ -513,8 +512,7 @@ location.reload();
           const durationMs = round(performance.now() - t0)
           collector.record(pathname, durationMs)
           if (accumulator) {
-            accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output: null, spans: reqTrace?.spans ?? [] })
-
+            accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output: null, spans: reqTrace?.spans ?? [] }, ctx)
           }
         }
         return new Response(iteratorToEventStream(output as AsyncIterableIterator<unknown>), { headers: sseHeaders })
@@ -525,7 +523,7 @@ location.reload();
       if (collector) {
         collector.record(pathname, durationMs)
         if (accumulator) {
-          accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output, spans: reqTrace?.spans ?? [] })
+          accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output, spans: reqTrace?.spans ?? [] }, ctx)
 
         }
       }

@@ -114,6 +114,14 @@ export interface ProcedureCall {
   error?: string
 }
 
+/** Identity info captured from ctx.user (set by auth guards). */
+export interface AnalyticsUser {
+  id?: string | number
+  name?: string
+  email?: string
+  [key: string]: unknown
+}
+
 /** An HTTP request containing one or more procedure calls. */
 export interface RequestEntry {
   id: number
@@ -121,6 +129,8 @@ export interface RequestEntry {
   requestId: string
   /** Persistent session ID (from cookie — survives browser restart). */
   sessionId: string
+  /** User identity captured from ctx.user (if set by auth guard). */
+  user?: AnalyticsUser
   timestamp: number
   durationMs: number
   method: string
@@ -454,6 +464,7 @@ export class RequestAccumulator {
   #request: Request
   #procedures: ProcedureCall[] = []
   #collector: AnalyticsCollector
+  #user?: AnalyticsUser
 
   constructor(request: Request, collector: AnalyticsCollector) {
     this.requestId = generateRequestId()
@@ -472,8 +483,12 @@ export class RequestAccumulator {
     }
   }
 
-  addProcedure(call: ProcedureCall): void {
+  addProcedure(call: ProcedureCall, ctx?: Record<string, unknown>): void {
     this.#procedures.push(call)
+    // Capture user identity from ctx.user on first occurrence
+    if (!this.#user && ctx?.user && typeof ctx.user === 'object') {
+      this.#user = ctx.user as AnalyticsUser
+    }
   }
 
   /** Get Set-Cookie header value (only if new session). */
@@ -522,6 +537,7 @@ export class RequestAccumulator {
       responseHeaders,
       userAgent: this.#request.headers.get('user-agent') ?? '',
       status: worstStatus,
+      user: this.#user,
       procedures: this.#procedures,
       isBatch: this.#procedures.length > 1,
     })

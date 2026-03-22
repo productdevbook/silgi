@@ -58,6 +58,9 @@ export function SessionDetailPage({ requests, sessionId, navigate }: SessionDeta
   const allSpans = sessionRequests.flatMap((r) => r.procedures.flatMap((p) => p.spans))
   const maxDuration = Math.max(...sessionRequests.map((r) => r.durationMs), 0.1)
 
+  // User identity — pick from the most recent request that has it
+  const sessionUser = sessionRequests.find((r) => r.user)?.user
+
   const selectedReq = selectedIdx !== null ? sessionRequests[selectedIdx] : null
 
   return (
@@ -73,6 +76,11 @@ export function SessionDetailPage({ requests, sessionId, navigate }: SessionDeta
         <Badge variant='secondary' className='font-mono text-[10px]'>
           {sessionId.slice(0, 13)}
         </Badge>
+        {sessionUser && (
+          <span className='flex items-center gap-1.5 text-[11px] text-muted-foreground'>
+            {sessionUser.name || sessionUser.email || sessionUser.id || 'unknown'}
+          </span>
+        )}
         <div className='ml-auto flex gap-1'>
           <CopyBtn
             copied={copiedId === `md-${sessionId}`}
@@ -89,14 +97,31 @@ export function SessionDetailPage({ requests, sessionId, navigate }: SessionDeta
         </div>
       </div>
 
-      {/* Stat strip */}
-      <div className='grid grid-cols-3 gap-x-0 border-b xl:grid-cols-6'>
-        <Stat label='Requests' value={String(sessionRequests.length)} />
-        <Stat label='Errors' value={String(errorCount)} danger={errorCount > 0} />
-        <Stat label='Avg latency' value={fmtMs(totalMs / sessionRequests.length)} />
-        <Stat label='Total CPU' value={fmtMs(totalMs)} />
-        <Stat label='Duration' value={fmtMs(wallClockMs)} />
-        <Stat label='Spans' value={String(allSpans.length)} />
+      {/* User + Stat strip */}
+      <div className='flex border-b'>
+        {sessionUser && (
+          <div className='flex items-center gap-2.5 border-r px-4 py-2.5'>
+            <div className='flex size-7 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary'>
+              {(sessionUser.name?.[0] || sessionUser.email?.[0] || String(sessionUser.id)?.[0] || '?').toUpperCase()}
+            </div>
+            <div className='min-w-0'>
+              {(sessionUser.name || sessionUser.id) && (
+                <div className='truncate text-[11px] font-semibold'>{sessionUser.name || String(sessionUser.id)}</div>
+              )}
+              {sessionUser.email && (
+                <div className='truncate text-[10px] text-muted-foreground'>{sessionUser.email}</div>
+              )}
+            </div>
+          </div>
+        )}
+        <div className='grid flex-1 grid-cols-3 xl:grid-cols-6'>
+          <Stat label='Requests' value={String(sessionRequests.length)} />
+          <Stat label='Errors' value={String(errorCount)} danger={errorCount > 0} />
+          <Stat label='Avg latency' value={fmtMs(totalMs / sessionRequests.length)} />
+          <Stat label='Total CPU' value={fmtMs(totalMs)} />
+          <Stat label='Duration' value={fmtMs(wallClockMs)} />
+          <Stat label='Spans' value={String(allSpans.length)} />
+        </div>
       </div>
 
       {/* Mini overview chart */}
