@@ -20,18 +20,6 @@ export interface OverviewInsights {
   procedureCount: number
 }
 
-export interface OverviewFocusItem {
-  path: string
-  value: string
-  meta: string
-  tone: 'default' | 'secondary' | 'destructive'
-}
-
-export interface ProcedureFocusLists {
-  traffic: OverviewFocusItem[]
-  latency: OverviewFocusItem[]
-  failures: OverviewFocusItem[]
-}
 
 export function getOverviewInsights(data: AnalyticsData | null): OverviewInsights {
   if (!data) {
@@ -82,54 +70,6 @@ export function getOverviewInsights(data: AnalyticsData | null): OverviewInsight
         }
       : null,
     procedureCount: procedures.length,
-  }
-}
-
-export function getProcedureFocusLists(data: AnalyticsData | null): ProcedureFocusLists {
-  if (!data) {
-    return {
-      traffic: [],
-      latency: [],
-      failures: [],
-    }
-  }
-
-  const procedures = Object.entries(data.procedures)
-
-  return {
-    traffic: procedures
-      .toSorted((a, b) => b[1].count - a[1].count)
-      .slice(0, 4)
-      .map(([path, procedure]) => ({
-        path,
-        value: `${procedure.count} req`,
-        meta: `p95 ${procedure.latency.p95.toFixed(1)}ms`,
-        tone: 'secondary',
-      })),
-    latency: procedures
-      .toSorted((a, b) => b[1].latency.p95 - a[1].latency.p95)
-      .slice(0, 4)
-      .map(([path, procedure]) => ({
-        path,
-        value: `${procedure.latency.p95.toFixed(1)}ms`,
-        meta: `${procedure.count} requests`,
-        tone: procedure.latency.p95 >= 25 ? 'destructive' : 'secondary',
-      })),
-    failures: procedures
-      .filter(([, procedure]) => procedure.errors > 0)
-      .toSorted((a, b) => {
-        if (b[1].errors !== a[1].errors) return b[1].errors - a[1].errors
-        if (b[1].latency.p95 !== a[1].latency.p95) return b[1].latency.p95 - a[1].latency.p95
-        if (b[1].errorRate !== a[1].errorRate) return b[1].errorRate - a[1].errorRate
-        return b[1].count - a[1].count
-      })
-      .slice(0, 4)
-      .map(([path, procedure]) => ({
-        path,
-        value: `${procedure.errors} err`,
-        meta: `${procedure.errorRate.toFixed(1)}% rate, p95 ${procedure.latency.p95.toFixed(1)}ms`,
-        tone: 'destructive',
-      })),
   }
 }
 

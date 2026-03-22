@@ -4,8 +4,6 @@ import {
   SLOW_REQUEST_MS,
   filterErrors,
   filterRequests,
-  summarizeErrors,
-  summarizeRequests,
 } from '../../dashboard/src/lib/list-filters'
 import { mockErrors, mockRequests } from '../../dashboard/src/lib/mock-data'
 
@@ -50,15 +48,5 @@ describe('dashboard list filters', () => {
 
     expect(result).toHaveLength(1)
     expect(result[0]?.code).toBe('FORBIDDEN')
-  })
-
-  it('summarizes visible request and error sets', () => {
-    const requestSummary = summarizeRequests(mockRequests)
-    const errorSummary = summarizeErrors(mockErrors)
-
-    expect(requestSummary.maxSpans).toBe(4)
-    expect(requestSummary.uniqueProcedures).toBe(5)
-    expect(errorSummary.uniqueCodes).toBe(3)
-    expect(errorSummary.tracedCount).toBe(2)
   })
 })

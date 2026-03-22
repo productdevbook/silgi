@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 
-import { getProcedureFocusLists } from '../../dashboard/src/lib/insights'
 import { getOverviewInsights } from '../../dashboard/src/lib/insights'
 import { mockData } from '../../dashboard/src/lib/mock-data'
 
@@ -40,14 +39,5 @@ describe('getOverviewInsights', () => {
 
     expect(degraded.health.tone).toBe('degraded')
     expect(critical.health.tone).toBe('critical')
-  })
-
-  it('builds focus lists for traffic, latency, and failures', () => {
-    const focusLists = getProcedureFocusLists(mockData)
-
-    expect(focusLists.traffic[0]?.path).toBe('todos/list')
-    expect(focusLists.latency[0]?.path).toBe('todos/create')
-    expect(focusLists.failures[0]?.path).toBe('todos/create')
-    expect(focusLists.failures.every((item) => item.tone === 'destructive')).toBe(true)
   })
 })

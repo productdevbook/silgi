@@ -21,29 +21,12 @@ export interface ErrorListFilters {
   trace: ErrorTraceFilter
 }
 
-export interface RequestListSummary {
-  averageDuration: number
-  errorCount: number
-  maxSpans: number
-  uniqueProcedures: number
-}
-
-export interface ErrorListSummary {
-  uniqueCodes: number
-  longestDuration: number
-  tracedCount: number
-  uniqueProcedures: number
-}
 
 /** Get all procedure names from a request. */
 function requestProcedures(entry: RequestEntry): string {
   return entry.procedures.map(p => p.procedure).join(', ')
 }
 
-/** Get all spans from all procedures in a request. */
-function requestSpans(entry: RequestEntry) {
-  return entry.procedures.flatMap(p => p.spans)
-}
 
 export function filterRequests(requests: RequestEntry[], filters: RequestListFilters) {
   const query = filters.query.trim().toLowerCase()
@@ -66,18 +49,6 @@ export function filterRequests(requests: RequestEntry[], filters: RequestListFil
 
     return true
   })
-}
-
-export function summarizeRequests(requests: RequestEntry[]): RequestListSummary {
-  const averageDuration =
-    requests.length > 0 ? requests.reduce((sum, entry) => sum + entry.durationMs, 0) / requests.length : 0
-
-  return {
-    averageDuration,
-    errorCount: requests.filter((entry) => entry.status >= 400).length,
-    maxSpans: requests.reduce((max, entry) => Math.max(max, requestSpans(entry).length), 0),
-    uniqueProcedures: getProcedureOptions(requests.flatMap((entry) => entry.procedures.map(p => p.procedure))).length,
-  }
 }
 
 export function filterErrors(errors: ErrorEntry[], filters: ErrorListFilters) {
@@ -106,14 +77,6 @@ export function filterErrors(errors: ErrorEntry[], filters: ErrorListFilters) {
   })
 }
 
-export function summarizeErrors(errors: ErrorEntry[]): ErrorListSummary {
-  return {
-    uniqueCodes: new Set(errors.map((entry) => entry.code)).size,
-    longestDuration: errors.reduce((max, entry) => Math.max(max, entry.durationMs), 0),
-    tracedCount: errors.filter((entry) => entry.spans.length > 0).length,
-    uniqueProcedures: getProcedureOptions(errors.map((entry) => entry.procedure)).length,
-  }
-}
 
 export function getProcedureOptions(procedures: string[]) {
   return [...new Set(procedures)].toSorted((a, b) => a.localeCompare(b))
