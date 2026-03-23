@@ -21,6 +21,7 @@
     "---",
     "best-practices",
     "advanced",
-    "migrations"
+    "migrations",
+    "changelog"
   ]
 }

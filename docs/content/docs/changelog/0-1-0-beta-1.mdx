@@ -1,0 +1,55 @@
+---
+title: 0.1.0-beta.1
+description: Initial beta release with core features.
+---
+
+Initial beta release.
+
+## Core
+
+- Compiled pipelines with unrolled guard paths (0/1/2/3/4 guards, no loops)
+- ContextPool for zero per-request allocation
+- Frozen child paths for V8 optimization
+- Fixed ProcedureDef shape for monomorphic inline caches
+
+## Server
+
+- `serve()` and `handler()` with full Fetch API support
+- 14 framework adapters (Fastify, Express, Nitro, Next.js, SvelteKit, Remix, Astro, SolidStart, NestJS, AWS Lambda, Message Port, Peer)
+- Lifecycle hooks (request, response, error)
+
+## Client
+
+- Proxy-based RPC client with `createClient()`
+- `safe()` wrapper for `[error, data]` tuples
+- Fetch and ofetch link adapters
+
+## Analytics
+
+- Built-in dashboard at `/analytics`
+- Per-procedure metrics (count, errors, latency percentiles)
+- Session tracking via cookie
+- Span tracing with `trace()` helper
+- Copy for AI (markdown export)
+- JSON API endpoints
+
+## Protocols
+
+- JSON (default)
+- MessagePack codec
+- Devalue codec
+- Server-Sent Events for subscriptions
+- WebSocket support
+
+## Schema
+
+- Standard Schema v1 support (Zod, Valibot, ArkType)
+- Input/output validation with type inference
+
+## Plugins
+
+- CORS, Rate Limiting, Body Limit, Cookies, Compression
+- Cache with SWR, Storage (unstorage), PubSub
+- OpenTelemetry, Pino logging
+- Smart coercion, Signing/Encryption
+- Batch server, Custom serializers

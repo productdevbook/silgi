@@ -1,0 +1,86 @@
+---
+title: 0.1.0-beta.3
+description: Analytics redesign, span I/O, Drizzle + Better Auth integrations, coexisting routes.
+---
+
+## Analytics dashboard redesign
+
+The built-in analytics dashboard has been completely redesigned with a Chrome DevTools-inspired UI.
+
+All pages now share the same UX pattern: full-width list on the left, detail panel slides in from the right when you click an item, X to close.
+
+- **Overview** — compact traffic chart, slowest procedures + error hotspots lists, sortable procedure table
+- **Requests** — Recharts overview bar chart, inline waterfall bars, right panel with span waterfall + I/O
+- **Errors** — stat strip with error codes + top procedures, right panel with stack trace + headers
+- **Sessions** — Recharts overview bar chart, right panel switches between session summary and request detail
+- **Session detail** — timing donut chart, procedure stats, status breakdown
+
+## Span input/output capture
+
+`trace()` now captures input and output data on individual spans:
+
+```ts
+await ctx.trace('db.users.findMany', () => db.users.findMany(), {
+  input: { limit: 10 },
+  output: (users) => ({ count: users.length }),
+})
+```
+
+The `output` option accepts a derive function to avoid capturing the full response. Span input/output is displayed in the expanded span detail view in the dashboard.
+
+### Procedure-level capture
+
+New `procedure` option on `trace()` to record input/output at the HTTP request level:
+
+```ts
+ctx.trace('db.query', () => query(), {
+  procedure: { input, output: (result) => result },
+})
+```
+
+## New integrations
+
+- **Drizzle ORM** — type-safe database queries with automatic tracing
+- **Better Auth** — authentication with session management and route protection
+- **Nuxt** — dedicated docs page with typed client composable, project structure, binary protocols
+
+## Coexisting routes
+
+Silgi can now coexist with existing Nitro/Nuxt routes. Return `undefined` for unmatched routes to let the framework handle them:
+
+```ts
+export default {
+  fetch: async (request: Request) => {
+    const response = await silgiHandler(request)
+    if (response.status === 404) return
+    return response
+  },
+}
+```
+
+## Response headers captured
+
+Analytics now captures actual response headers (content-type, cache-control, x-request-id) by deferring the flush to after the Response is constructed.
+
+## Error to request cross-reference
+
+Errors now include a `requestId` field linking back to the HTTP request. The dashboard shows a clickable badge to navigate from error to request.
+
+## Streaming analytics
+
+ReadableStream and SSE responses are now recorded in analytics. Previously they were invisible.
+
+## Security fixes
+
+- Session cookie now has `HttpOnly` flag
+- `requestToRedactedJson` now actually redacts sensitive headers
+- `sessionToRedactedJson` redacts headers
+
+## Other changes
+
+- Slow request threshold: 10ms to 100ms
+- Sync fast-path error now correctly captures input and spans
+- Removed Elysia integration
+- Docs: analytics moved from plugins to top-level
+- Docs: integrations split into Framework Adapters and Library Integrations
+- Docs: examples URLs fixed to productdevbook/silgi
