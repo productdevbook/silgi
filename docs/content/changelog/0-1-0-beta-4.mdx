@@ -1,0 +1,60 @@
+---
+title: 0.1.0-beta.4
+description: Tab navigation, blog/changelog/showcase pages, Elysia removal, docs restructure.
+version: 0.1.0-beta.4
+date: 2026-03-23
+---
+
+## Documentation restructure — tab navigation
+
+The entire documentation site has been reorganized with a Fumadocs tab navigation system. The sidebar now features a dropdown selector at the top with four sections:
+
+- **Silgi** — core documentation (getting started, concepts, procedures, middleware, errors, server, client, analytics, protocols, best practices, advanced topics)
+- **Adapters** — framework integrations (Nitro, Nuxt, Next.js, Fastify, Express, SvelteKit, Remix, Astro, SolidStart, NestJS, AWS Lambda, Message Port, Peer)
+- **Plugins** — extensibility (cache, CORS, rate limiting, body limit, cookies, compression, OpenTelemetry, Pino, signing, coercion, batch, pub/sub, custom serializers, file upload, storage)
+- **Libraries** — database, auth & tooling integrations (Drizzle ORM, Better Auth, AI SDK, TanStack Query, React Server Actions, OpenAPI Client, Broker, tRPC Interop)
+
+Each section has an **Overview** index page with a card grid linking to every item in that section.
+
+## New site pages
+
+### Blog
+
+A dedicated blog section at `/blog` with individual post pages at `/blog/[slug]`. Built with Fumadocs MDX collections — each blog post is an MDX file with `author` and `date` frontmatter. The index shows posts sorted by date with title, description, and formatted date.
+
+First post: **Introducing Silgi** — why we built another RPC framework, compiled pipelines, single package philosophy, and built-in analytics.
+
+### Changelog
+
+The changelog has been moved out of the docs sidebar into a standalone page at `/changelog`. Each release gets its own detail page at `/changelog/[slug]`. The index renders a vertical timeline with dots, version numbers, dates, and "Read full changelog" links.
+
+Changelog content is now a separate Fumadocs MDX collection with `version` and `date` frontmatter — completely independent from the docs content tree.
+
+### Showcase
+
+A project gallery at `/showcase` for community projects built with Silgi. Currently empty with an "Add your project" button linking directly to the GitHub file for PRs.
+
+### Sponsors
+
+A dedicated sponsors page at `/sponsors` with Platinum, Gold, and Silver tiers. Each tier shows a responsive grid of sponsor logos. Currently empty with a "Become a Sponsor" CTA linking to GitHub Sponsors.
+
+## Header navigation
+
+The site header now includes icon-labeled links:
+
+- 📖 **Docs** — documentation with tab navigation
+- ✏️ **Blog** — news and updates
+- 🕐 **Changelog** — release timeline
+- 🚩 **Showcase** — community projects
+- ❤️ **Sponsors** — funding and support
+
+## Elysia integration removed
+
+The Elysia adapter has been removed entirely — Elysia is a direct competitor, not an integration target. Removed: adapter source, tests, example project, documentation page, benchmark files, package.json export and dependency.
+
+## Other changes
+
+- Nuxt and Nitro docs completely rewritten with modular project structure examples
+- Integrations index split into "Framework Adapters" and "Library Integrations" sections
+- Deploy Dockerfile switched to `--no-frozen-lockfile` (workspace packages excluded from rsync)
+- Lockfile regenerated after dependency changes
