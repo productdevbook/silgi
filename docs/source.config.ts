@@ -1,6 +1,6 @@
 import { rehypeCodeDefaultOptions } from 'fumadocs-core/mdx-plugins'
-import { defineCollections, defineConfig, defineDocs } from 'fumadocs-mdx/config'
 import { pageSchema } from 'fumadocs-core/source/schema'
+import { defineCollections, defineConfig, defineDocs } from 'fumadocs-mdx/config'
 import { transformerTwoslash } from 'fumadocs-twoslash'
 import { createFileSystemTypesCache } from 'fumadocs-twoslash/cache-fs'
 import { z } from 'zod'

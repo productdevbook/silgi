@@ -174,7 +174,7 @@ function buildUnrolledObjectFn(
   expr += `+'}'`
 
   // eslint-disable-next-line no-new-func -- JIT-compiled stringify, runs at init time
-  return new Function('f', 'k', `return function(o){${expr}}`) (fns, keys) as FastStringify
+  return new Function('f', 'k', `return function(o){${expr}}`)(fns, keys) as FastStringify
 }
 
 // ── String escaping ─────────────────────────────────

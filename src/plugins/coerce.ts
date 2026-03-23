@@ -2,7 +2,7 @@
  * Smart coercion — convert string query parameters to proper types.
  *
  * When procedures receive GET requests, input arrives as strings via
- * query parameters. This guard coerces common types automatically:
+ * query parameters. This wrap coerces common types automatically:
  * "123" → 123, "true" → true, "null" → null, etc.
  *
  * @example
@@ -19,7 +19,9 @@
  * ```
  */
 
-import type { GuardDef } from '../types.ts'
+import { RAW_INPUT } from '../compile.ts'
+
+import type { WrapDef } from '../types.ts'
 
 /**
  * Coerce string values in the input to their proper JavaScript types.
@@ -32,13 +34,18 @@ import type { GuardDef } from '../types.ts'
  * - "undefined" → undefined
  * - "" → undefined (empty strings become undefined)
  * - Everything else → kept as-is
+ *
+ * Implemented as a wrap (not a guard) so it runs after __rawInput is populated
+ * by the pipeline compiler.
  */
-export const coerceGuard: GuardDef<Record<string, unknown>> = {
-  kind: 'guard',
-  fn: (ctx: Record<string, unknown>) => {
-    const input = ctx.__rawInput
-    if (typeof input !== 'object' || input === null) return
-    coerceObject(input as Record<string, unknown>)
+export const coerceGuard: WrapDef<Record<string, unknown>> = {
+  kind: 'wrap',
+  fn: async (ctx, next) => {
+    const input = (ctx as any)[RAW_INPUT]
+    if (typeof input === 'object' && input !== null) {
+      coerceObject(input as Record<string, unknown>)
+    }
+    return next()
   },
 }
 

@@ -65,9 +65,7 @@ export class BatchLink<TClientContext extends ClientContext = ClientContext> imp
       chunks.push(batch.slice(i, i + this.#maxSize))
     }
 
-    for (const chunk of chunks) {
-      await this.#sendChunk(chunk)
-    }
+    await Promise.all(chunks.map((chunk) => this.#sendChunk(chunk)))
   }
 
   async #sendChunk(chunk: PendingCall[]): Promise<void> {
@@ -81,7 +79,12 @@ export class BatchLink<TClientContext extends ClientContext = ClientContext> imp
       const result = await this.#link.call(
         [this.#batchPath.slice(1)], // Remove leading /
         batchBody,
-        { signal: chunk[0]?.options.signal },
+        {
+          signal:
+            chunk.length === 1
+              ? chunk[0]!.options.signal
+              : AbortSignal.any(chunk.map((c) => c.options.signal).filter(Boolean) as AbortSignal[]),
+        },
       )
 
       const responses = result as Array<{

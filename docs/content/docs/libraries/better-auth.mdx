@@ -11,21 +11,9 @@ The Better Auth integration traces every auth operation — sign-in, sign-up, OA
 ## Setup
 
 <Tabs items={['pnpm', 'npm', 'bun']}>
-  <Tab value='pnpm'>
-  ```bash
-  pnpm add silgi better-auth
-  ```
-  </Tab>
-  <Tab value='npm'>
-  ```bash
-  npm install silgi better-auth
-  ```
-  </Tab>
-  <Tab value='bun'>
-  ```bash
-  bun add silgi better-auth
-  ```
-  </Tab>
+  <Tab value='pnpm'>```bash pnpm add silgi better-auth ```</Tab>
+  <Tab value='npm'>```bash npm install silgi better-auth ```</Tab>
+  <Tab value='bun'>```bash bun add silgi better-auth ```</Tab>
 </Tabs>
 
 There are two ways to trace auth operations:
@@ -47,9 +35,7 @@ import { silgiTracing } from 'silgi/better-auth'
 
 export const auth = betterAuth({
   database: { url: process.env.DATABASE_URL! },
-  plugins: [
-    silgiTracing({ createAuthMiddleware }),
-  ],
+  plugins: [silgiTracing({ createAuthMiddleware })],
 })
 ```
 
@@ -77,44 +63,45 @@ export default { fetch: s.handler(appRouter) }
 ```
 
 <Callout type='warn'>
-  `request.__silgiCtx = ctx` must be set before calling `auth.handler(request)`. Without it, the plugin has no access to the request trace and spans are silently skipped.
+  `request.__silgiCtx = ctx` must be set before calling `auth.handler(request)`. Without it, the plugin has no access to
+  the request trace and spans are silently skipped.
 </Callout>
 
 ## What gets captured
 
 Each auth operation produces a span with these attributes:
 
-| Attribute | Type | Description |
-| --- | --- | --- |
-| `auth.operation` | `string` | Operation name (`signin`, `signup`, `signout`, `get_session`, etc.) |
-| `auth.method` | `string` | Auth method (`email`, `oauth`) |
-| `auth.provider` | `string` | OAuth provider name (`google`, `github`, etc.) |
-| `auth.success` | `boolean` | Whether the operation succeeded |
-| `user.id` | `string` | Authenticated user's ID |
-| `user.email` | `string` | Authenticated user's email |
-| `session.id` | `string` | Session ID |
+| Attribute        | Type      | Description                                                         |
+| ---------------- | --------- | ------------------------------------------------------------------- |
+| `auth.operation` | `string`  | Operation name (`signin`, `signup`, `signout`, `get_session`, etc.) |
+| `auth.method`    | `string`  | Auth method (`email`, `oauth`)                                      |
+| `auth.provider`  | `string`  | OAuth provider name (`google`, `github`, etc.)                      |
+| `auth.success`   | `boolean` | Whether the operation succeeded                                     |
+| `user.id`        | `string`  | Authenticated user's ID                                             |
+| `user.email`     | `string`  | Authenticated user's email                                          |
+| `session.id`     | `string`  | Session ID                                                          |
 
 ## Operation mapping
 
 The plugin maps Better Auth URL paths to structured span names:
 
-| Path | Span name | Operation |
-| --- | --- | --- |
-| `/sign-up/email` | `auth.signup.email` | `signup` |
-| `/sign-in/email` | `auth.signin.email` | `signin` |
-| `/sign-out` | `auth.signout` | `signout` |
-| `/get-session` | `auth.get_session` | `get_session` |
-| `/update-user` | `auth.update_user` | `update_user` |
-| `/delete-user` | `auth.delete_user` | `delete_user` |
-| `/change-password` | `auth.change_password` | `change_password` |
-| `/change-email` | `auth.change_email` | `change_email` |
-| `/verify-email` | `auth.verify_email` | `verify_email` |
-| `/forget-password` | `auth.forgot_password` | `forgot_password` |
-| `/reset-password` | `auth.reset_password` | `reset_password` |
-| `/list-sessions` | `auth.list_sessions` | `list_sessions` |
-| `/revoke-session` | `auth.revoke_session` | `revoke_session` |
-| `/sign-in/{provider}` | `auth.oauth.initiate.{provider}` | `oauth_initiate` |
-| `/callback/{provider}` | `auth.oauth.callback.{provider}` | `oauth_callback` |
+| Path                   | Span name                        | Operation         |
+| ---------------------- | -------------------------------- | ----------------- |
+| `/sign-up/email`       | `auth.signup.email`              | `signup`          |
+| `/sign-in/email`       | `auth.signin.email`              | `signin`          |
+| `/sign-out`            | `auth.signout`                   | `signout`         |
+| `/get-session`         | `auth.get_session`               | `get_session`     |
+| `/update-user`         | `auth.update_user`               | `update_user`     |
+| `/delete-user`         | `auth.delete_user`               | `delete_user`     |
+| `/change-password`     | `auth.change_password`           | `change_password` |
+| `/change-email`        | `auth.change_email`              | `change_email`    |
+| `/verify-email`        | `auth.verify_email`              | `verify_email`    |
+| `/forget-password`     | `auth.forgot_password`           | `forgot_password` |
+| `/reset-password`      | `auth.reset_password`            | `reset_password`  |
+| `/list-sessions`       | `auth.list_sessions`             | `list_sessions`   |
+| `/revoke-session`      | `auth.revoke_session`            | `revoke_session`  |
+| `/sign-in/{provider}`  | `auth.oauth.initiate.{provider}` | `oauth_initiate`  |
+| `/callback/{provider}` | `auth.oauth.callback.{provider}` | `oauth_callback`  |
 
 Unrecognized paths fall back to `auth.{last_segment}` with operation `unknown`.
 
@@ -145,9 +132,7 @@ import { auth } from './auth'
 const s = silgi()
 
 const me = s.$resolve(async ({ ctx, request }) => {
-  return withSilgiCtx(ctx, () =>
-    auth.api.getSession({ headers: request.headers }),
-  )
+  return withSilgiCtx(ctx, () => auth.api.getSession({ headers: request.headers }))
 })
 ```
 
@@ -157,8 +142,8 @@ Programmatic spans are named `auth.api.{operation}` (e.g. `auth.api.get_session`
 
 Options for the `silgiTracing()` plugin:
 
-| Name | Type | Default | Description |
-| --- | --- | --- | --- |
-| `captureInput` | `boolean` | `true` | Capture request body as span input |
-| `captureOutput` | `boolean` | `true` | Capture response data as span output |
+| Name                   | Type       | Default     | Description                                                                       |
+| ---------------------- | ---------- | ----------- | --------------------------------------------------------------------------------- |
+| `captureInput`         | `boolean`  | `true`      | Capture request body as span input                                                |
+| `captureOutput`        | `boolean`  | `true`      | Capture response data as span output                                              |
 | `createAuthMiddleware` | `function` | `undefined` | Pass `createAuthMiddleware` from `better-auth/api` to wrap the after-hook handler |

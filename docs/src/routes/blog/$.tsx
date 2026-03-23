@@ -27,7 +27,7 @@ const blogLoader = createServerFn({ method: 'GET' })
       path: page.path,
       title: page.data.title,
       description: page.data.description ?? '',
-      author: (page.data as Record<string, unknown>).author as string ?? 'Silgi Team',
+      author: ((page.data as Record<string, unknown>).author as string) ?? 'Silgi Team',
       date: String((page.data as Record<string, unknown>).date ?? ''),
     }
   })
@@ -36,7 +36,10 @@ const blogClientLoader = browserCollections.blogPosts.createClientLoader({
   component({ default: MDX }, props: { title: string; description: string; author: string; date: string }) {
     return (
       <article className='mx-auto w-full max-w-3xl px-4 py-16'>
-        <Link to='/blog' className='mb-8 inline-flex items-center gap-1.5 text-sm text-fd-muted-foreground hover:text-fd-primary'>
+        <Link
+          to='/blog'
+          className='mb-8 inline-flex items-center gap-1.5 text-sm text-fd-muted-foreground hover:text-fd-primary'
+        >
           <span aria-hidden>←</span> Back to blog
         </Link>
         <h1 className='mb-3 text-4xl font-bold tracking-tight'>{props.title}</h1>
@@ -44,7 +47,9 @@ const blogClientLoader = browserCollections.blogPosts.createClientLoader({
         <div className='mb-10 flex items-center gap-3 text-sm text-fd-muted-foreground'>
           <span>{props.author}</span>
           <span>·</span>
-          <span>{new Date(props.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+          <span>
+            {new Date(props.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+          </span>
         </div>
         <div className='prose min-w-0'>
           <MDX components={useMDXComponents()} />

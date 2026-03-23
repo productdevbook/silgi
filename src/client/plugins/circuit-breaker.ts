@@ -49,10 +49,12 @@ export function withCircuitBreaker<TClientContext extends ClientContext>(
   let state: CircuitState = 'closed'
   let failures = 0
   let openedAt = 0
+  let probeSent = false
 
   function setState(newState: CircuitState) {
     if (state !== newState) {
       state = newState
+      if (newState !== 'half-open') probeSent = false
       options.onStateChange?.(state, { failures })
     }
   }
@@ -80,6 +82,12 @@ export function withCircuitBreaker<TClientContext extends ClientContext>(
         }
       }
 
+      // In half-open, only allow one probe request through
+      if (state === 'half-open') {
+        if (probeSent) throw new CircuitBreakerOpenError()
+        probeSent = true
+      }
+
       try {
         const result = await link.call(path, input, callOptions)
         recordSuccess()
@@ -91,7 +99,11 @@ export function withCircuitBreaker<TClientContext extends ClientContext>(
     },
 
     getState: () => state,
-    reset: () => { failures = 0; setState('closed') },
+    reset: () => {
+      failures = 0
+      probeSent = false
+      setState('closed')
+    },
   }
 
   return wrapper

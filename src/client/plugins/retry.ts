@@ -65,7 +65,7 @@ export function withRetry<TClientContext extends ClientContext>(
   const onRetry = options.onRetry
 
   function getDelay(attempt: number): number {
-    const base = typeof baseDelay === 'function' ? baseDelay(attempt) : baseDelay * (2 ** attempt)
+    const base = typeof baseDelay === 'function' ? baseDelay(attempt) : baseDelay * 2 ** attempt
     const jitter = useJitter ? base * Math.random() * 0.25 : 0
     return Math.round(base + jitter)
   }
@@ -80,12 +80,10 @@ export function withRetry<TClientContext extends ClientContext>(
 
   return {
     async call(path, input, callOptions) {
-      let lastError: unknown
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
           return await link.call(path, input, callOptions)
         } catch (error) {
-          lastError = error
           if (attempt === maxRetries) throw error
           if (callOptions.signal?.aborted) throw error
           if (!isRetryable(error, attempt)) throw error
@@ -96,14 +94,19 @@ export function withRetry<TClientContext extends ClientContext>(
           await new Promise<void>((resolve, reject) => {
             const timer = setTimeout(resolve, delay)
             // Cancel wait if signal aborts during delay
-            callOptions.signal?.addEventListener('abort', () => {
-              clearTimeout(timer)
-              reject(callOptions.signal!.reason)
-            }, { once: true })
+            callOptions.signal?.addEventListener(
+              'abort',
+              () => {
+                clearTimeout(timer)
+                reject(callOptions.signal!.reason)
+              },
+              { once: true },
+            )
           })
         }
       }
-      throw lastError
+      // Unreachable — loop always throws on last attempt
+      throw new Error('Retry exhausted')
     },
   }
 }

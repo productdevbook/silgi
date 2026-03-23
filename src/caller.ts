@@ -137,10 +137,10 @@ export function createCaller(
           if (match.params) ctx.params = match.params
 
           // Resolve signal: per-call > default timeout > no signal
-          const signal = callOptions?.signal
-            ?? (defaultTimeout !== null ? AbortSignal.timeout(defaultTimeout) : undefined)
+          const signal =
+            callOptions?.signal ?? (defaultTimeout !== null ? AbortSignal.timeout(defaultTimeout) : undefined)
 
-          const result = match.data.handler(ctx, input, signal!)
+          const result = match.data.handler(ctx, input, signal as AbortSignal)
           return result instanceof Promise ? await result : result
         })()
       },

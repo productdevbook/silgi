@@ -9,18 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SponsorsRouteImport } from './routes/sponsors'
-import { Route as ShowcaseRouteImport } from './routes/showcase'
-import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
-import { Route as LlmsFullDottxtRouteImport } from './routes/llms-full[.]txt'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as ChangelogIndexRouteImport } from './routes/changelog/index'
-import { Route as BlogIndexRouteImport } from './routes/blog/index'
-import { Route as DocsSplatRouteImport } from './routes/docs/$'
-import { Route as ChangelogSplatRouteImport } from './routes/changelog/$'
-import { Route as BlogSplatRouteImport } from './routes/blog/$'
 import { Route as ApiSearchRouteImport } from './routes/api/search'
+import { Route as BlogSplatRouteImport } from './routes/blog/$'
+import { Route as BlogIndexRouteImport } from './routes/blog/index'
+import { Route as ChangelogSplatRouteImport } from './routes/changelog/$'
+import { Route as ChangelogIndexRouteImport } from './routes/changelog/index'
+import { Route as DocsSplatRouteImport } from './routes/docs/$'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as LlmsFullDottxtRouteImport } from './routes/llms-full[.]txt'
 import { Route as LlmsDotmdxDocsSplatRouteImport } from './routes/llms[.]mdx.docs.$'
+import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
+import { Route as ShowcaseRouteImport } from './routes/showcase'
+import { Route as SponsorsRouteImport } from './routes/sponsors'
 
 const SponsorsRoute = SponsorsRouteImport.update({
   id: '/sponsors',
@@ -289,9 +289,7 @@ const rootRouteChildren: RootRouteChildren = {
   ChangelogIndexRoute: ChangelogIndexRoute,
   LlmsDotmdxDocsSplatRoute: LlmsDotmdxDocsSplatRoute,
 }
-export const routeTree = rootRouteImport
-  ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>()
+export const routeTree = rootRouteImport._addFileChildren(rootRouteChildren)._addFileTypes<FileRouteTypes>()
 
 import type { getRouter } from './router.tsx'
 import type { createStart } from '@tanstack/react-start'

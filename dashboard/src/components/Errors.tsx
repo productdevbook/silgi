@@ -3,7 +3,13 @@ import { SpanWaterfall } from '@/components/span-waterfall'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
-  Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -25,11 +31,16 @@ const SENSITIVE_HEADERS = new Set(['authorization', 'cookie', 'x-api-key'])
 
 function getSortValue(entry: ErrorEntry, key: SortKey): string | number {
   switch (key) {
-    case 'time': return entry.timestamp
-    case 'procedure': return entry.procedure
-    case 'code': return entry.code
-    case 'status': return entry.status
-    case 'duration': return entry.durationMs
+    case 'time':
+      return entry.timestamp
+    case 'procedure':
+      return entry.procedure
+    case 'code':
+      return entry.code
+    case 'status':
+      return entry.status
+    case 'duration':
+      return entry.durationMs
   }
 }
 
@@ -73,7 +84,12 @@ export function Errors({ errors, navigate, initialProcedure }: ErrorsProps) {
   }, [errors, query, procedure, severity, trace, sortKey, sortAsc])
 
   const hasActiveFilters = query.length > 0 || procedure !== 'all' || severity !== 'all' || trace !== 'all'
-  const clearFilters = useCallback(() => { setQuery(''); setProcedure('all'); setSeverity('all'); setTrace('all') }, [])
+  const clearFilters = useCallback(() => {
+    setQuery('')
+    setProcedure('all')
+    setSeverity('all')
+    setTrace('all')
+  }, [])
 
   const selectedErr = selectedIdx !== null ? filtered[selectedIdx] : null
 
@@ -137,7 +153,12 @@ export function Errors({ errors, navigate, initialProcedure }: ErrorsProps) {
       {/* ── Filter bar ── */}
       <div className='flex flex-col gap-2 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between'>
         <div className='flex flex-1 flex-wrap items-center gap-2'>
-          <SearchField value={query} onChange={(e) => setQuery(e.target.value)} placeholder='Search errors...' className='sm:max-w-56' />
+          <SearchField
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder='Search errors...'
+            className='sm:max-w-56'
+          />
           <Select value={procedure} onValueChange={(v) => setProcedure(v ?? 'all')}>
             <SelectTrigger size='sm' className='w-full sm:w-40'>
               <SelectValue placeholder='All procedures' />
@@ -146,24 +167,46 @@ export function Errors({ errors, navigate, initialProcedure }: ErrorsProps) {
               <SelectGroup>
                 <SelectLabel>Procedure</SelectLabel>
                 <SelectItem value='all'>All procedures</SelectItem>
-                {procedures.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
+                {procedures.map((item) => (
+                  <SelectItem key={item} value={item}>
+                    {item}
+                  </SelectItem>
+                ))}
               </SelectGroup>
             </SelectContent>
           </Select>
-          <ToggleGroup value={severity} onValueChange={(v) => setSeverity((v as ErrorSeverityFilter) || 'all')} variant='outline' size='sm' spacing={1}>
+          <ToggleGroup
+            value={severity}
+            onValueChange={(v) => setSeverity((v as ErrorSeverityFilter) || 'all')}
+            variant='outline'
+            size='sm'
+            spacing={1}
+          >
             <ToggleGroupItem value='all'>All</ToggleGroupItem>
             <ToggleGroupItem value='client'>4xx</ToggleGroupItem>
             <ToggleGroupItem value='server'>5xx</ToggleGroupItem>
           </ToggleGroup>
-          <ToggleGroup value={trace} onValueChange={(v) => setTrace((v as ErrorTraceFilter) || 'all')} variant='outline' size='sm' spacing={1}>
+          <ToggleGroup
+            value={trace}
+            onValueChange={(v) => setTrace((v as ErrorTraceFilter) || 'all')}
+            variant='outline'
+            size='sm'
+            spacing={1}
+          >
             <ToggleGroupItem value='all'>All</ToggleGroupItem>
             <ToggleGroupItem value='traced'>Traced</ToggleGroupItem>
             <ToggleGroupItem value='untraced'>Untraced</ToggleGroupItem>
           </ToggleGroup>
         </div>
         <div className='flex items-center gap-2'>
-          <span className='text-[11px] tabular-nums text-muted-foreground'>{filtered.length} of {errors.length}</span>
-          {hasActiveFilters && <Button variant='ghost' size='xs' onClick={clearFilters}>Clear</Button>}
+          <span className='text-[11px] tabular-nums text-muted-foreground'>
+            {filtered.length} of {errors.length}
+          </span>
+          {hasActiveFilters && (
+            <Button variant='ghost' size='xs' onClick={clearFilters}>
+              Clear
+            </Button>
+          )}
         </div>
       </div>
 
@@ -171,8 +214,14 @@ export function Errors({ errors, navigate, initialProcedure }: ErrorsProps) {
       {filtered.length === 0 ? (
         <div className='flex min-h-48 flex-col items-center justify-center gap-1 text-center'>
           <p className='text-sm font-semibold'>No matching failures</p>
-          <p className='text-xs text-muted-foreground'>{hasActiveFilters ? 'Adjust filters.' : 'Waiting for errors.'}</p>
-          {hasActiveFilters && <Button variant='outline' size='xs' className='mt-2' onClick={clearFilters}>Clear filters</Button>}
+          <p className='text-xs text-muted-foreground'>
+            {hasActiveFilters ? 'Adjust filters.' : 'Waiting for errors.'}
+          </p>
+          {hasActiveFilters && (
+            <Button variant='outline' size='xs' className='mt-2' onClick={clearFilters}>
+              Clear filters
+            </Button>
+          )}
         </div>
       ) : (
         <div className='flex flex-1 overflow-hidden'>
@@ -194,7 +243,9 @@ export function Errors({ errors, navigate, initialProcedure }: ErrorsProps) {
                 <div className='min-w-0 flex-1'>
                   <div className='flex items-center gap-2'>
                     <span className='truncate font-mono text-[11px] font-semibold'>{entry.procedure}</span>
-                    <Badge variant='destructive' className='text-[9px]'>{entry.code}</Badge>
+                    <Badge variant='destructive' className='text-[9px]'>
+                      {entry.code}
+                    </Badge>
                     <span className='text-[10px] tabular-nums text-muted-foreground'>{entry.status}</span>
                   </div>
                   <p className='mt-0.5 truncate text-[11px] text-muted-foreground'>{entry.error}</p>
@@ -204,18 +255,26 @@ export function Errors({ errors, navigate, initialProcedure }: ErrorsProps) {
                 <div className='shrink-0 text-right'>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span className='text-[11px] tabular-nums text-muted-foreground'>{fmtRelativeTime(entry.timestamp)}</span>
+                      <span className='text-[11px] tabular-nums text-muted-foreground'>
+                        {fmtRelativeTime(entry.timestamp)}
+                      </span>
                     </TooltipTrigger>
-                    <TooltipContent side='left' className='text-xs'>{fmtTime(entry.timestamp)}</TooltipContent>
+                    <TooltipContent side='left' className='text-xs'>
+                      {fmtTime(entry.timestamp)}
+                    </TooltipContent>
                   </Tooltip>
-                  <div className='font-mono text-[10px] tabular-nums text-muted-foreground/60'>{fmtMs(entry.durationMs)}</div>
+                  <div className='font-mono text-[10px] tabular-nums text-muted-foreground/60'>
+                    {fmtMs(entry.durationMs)}
+                  </div>
                 </div>
               </div>
             ))}
           </div>
 
           {/* Right panel: error summary (idle) or error detail (selected) */}
-          <div className={cn('flex w-full flex-col border-l xl:w-[420px] xl:shrink-0', !selectedErr && 'hidden xl:flex')}>
+          <div
+            className={cn('flex w-full flex-col border-l xl:w-[420px] xl:shrink-0', !selectedErr && 'hidden xl:flex')}
+          >
             {selectedErr ? (
               <ErrorDetailPanel entry={selectedErr} onClose={() => setSelectedIdx(null)} navigate={navigate} />
             ) : (
@@ -230,7 +289,9 @@ export function Errors({ errors, navigate, initialProcedure }: ErrorsProps) {
 
 // ── Error summary panel (idle state) ──
 
-function ErrorSummaryPanel({ summary }: {
+function ErrorSummaryPanel({
+  summary,
+}: {
   summary: {
     byCodes: [string, number][]
     byProc: [string, number][]
@@ -244,7 +305,9 @@ function ErrorSummaryPanel({ summary }: {
       <PanelSection label='Error codes'>
         {summary.byCodes.map(([code, count]) => (
           <div key={code} className='flex items-center justify-between border-b border-dashed py-1.5 last:border-0'>
-            <Badge variant='destructive' className='text-[9px]'>{code}</Badge>
+            <Badge variant='destructive' className='text-[9px]'>
+              {code}
+            </Badge>
             <span className='font-mono text-[10px] tabular-nums text-muted-foreground'>{count}</span>
           </div>
         ))}
@@ -252,7 +315,10 @@ function ErrorSummaryPanel({ summary }: {
 
       <PanelSection label='Top procedures'>
         {summary.byProc.slice(0, 10).map(([proc, count]) => (
-          <div key={proc} className='flex items-center justify-between gap-2 border-b border-dashed py-1.5 last:border-0'>
+          <div
+            key={proc}
+            className='flex items-center justify-between gap-2 border-b border-dashed py-1.5 last:border-0'
+          >
             <span className='min-w-0 truncate font-mono text-[10px] font-semibold'>{proc}</span>
             <span className='shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground'>{count}</span>
           </div>
@@ -263,7 +329,10 @@ function ErrorSummaryPanel({ summary }: {
         <PanelKV label='client (4xx)' value={String(summary.clientCount)} />
         <PanelKV label='server (5xx)' value={String(summary.serverCount)} danger={summary.serverCount > 0} />
         <PanelKV label='traced' value={String(summary.tracedCount)} />
-        <PanelKV label='untraced' value={String(summary.byCodes.reduce((s, [, c]) => s + c, 0) - summary.tracedCount)} />
+        <PanelKV
+          label='untraced'
+          value={String(summary.byCodes.reduce((s, [, c]) => s + c, 0) - summary.tracedCount)}
+        />
       </PanelSection>
     </div>
   )
@@ -271,7 +340,15 @@ function ErrorSummaryPanel({ summary }: {
 
 // ── Error detail panel ──
 
-function ErrorDetailPanel({ entry, onClose, navigate }: { entry: ErrorEntry; onClose: () => void; navigate: (page: string, id?: string) => void }) {
+function ErrorDetailPanel({
+  entry,
+  onClose,
+  navigate,
+}: {
+  entry: ErrorEntry
+  onClose: () => void
+  navigate: (page: string, id?: string) => void
+}) {
   const headerEntries = Object.entries(entry.headers ?? {})
 
   return (
@@ -279,13 +356,19 @@ function ErrorDetailPanel({ entry, onClose, navigate }: { entry: ErrorEntry; onC
       <div className='flex items-center gap-2 border-b px-4 py-2'>
         <span className='size-1.5 shrink-0 rounded-full bg-destructive' />
         <span className='flex-1 truncate font-mono text-[11px] font-semibold'>{entry.procedure}</span>
-        <Badge variant='destructive' className='text-[9px]'>{entry.code}</Badge>
+        <Badge variant='destructive' className='text-[9px]'>
+          {entry.code}
+        </Badge>
         <span className='font-mono text-[11px] tabular-nums text-muted-foreground'>{fmtMs(entry.durationMs)}</span>
-        <Button variant='ghost' size='icon-sm' onClick={onClose}><HugeiconsIcon icon={Cancel01Icon} size={14} /></Button>
+        <Button variant='ghost' size='icon-sm' onClick={onClose}>
+          <HugeiconsIcon icon={Cancel01Icon} size={14} />
+        </Button>
       </div>
       <div className='flex-1 overflow-y-auto'>
         <PanelSection label='Error'>
-          <pre className='overflow-x-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-destructive/90'>{entry.error}</pre>
+          <pre className='overflow-x-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-destructive/90'>
+            {entry.error}
+          </pre>
         </PanelSection>
 
         {entry.spans.length > 0 && (
@@ -296,13 +379,17 @@ function ErrorDetailPanel({ entry, onClose, navigate }: { entry: ErrorEntry; onC
 
         {entry.stack && (
           <PanelSection label='Stack trace'>
-            <pre className='overflow-x-auto whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-muted-foreground'>{entry.stack}</pre>
+            <pre className='overflow-x-auto whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-muted-foreground'>
+              {entry.stack}
+            </pre>
           </PanelSection>
         )}
 
         {entry.input !== undefined && entry.input !== null && (
           <PanelSection label='Input'>
-            <pre className='overflow-x-auto whitespace-pre-wrap rounded-md bg-muted/30 p-2.5 font-mono text-[10px] leading-relaxed'>{JSON.stringify(entry.input, null, 2)}</pre>
+            <pre className='overflow-x-auto whitespace-pre-wrap rounded-md bg-muted/30 p-2.5 font-mono text-[10px] leading-relaxed'>
+              {JSON.stringify(entry.input, null, 2)}
+            </pre>
           </PanelSection>
         )}
 
@@ -320,7 +407,11 @@ function ErrorDetailPanel({ entry, onClose, navigate }: { entry: ErrorEntry; onC
               <div key={key} className='flex gap-3 border-b border-dashed py-1 last:border-0'>
                 <span className='w-24 shrink-0 truncate font-mono text-[10px] text-muted-foreground'>{key}</span>
                 <span className='min-w-0 break-all font-mono text-[10px]'>
-                  {SENSITIVE_HEADERS.has(key.toLowerCase()) ? <span className='text-muted-foreground/40'>[redacted]</span> : value}
+                  {SENSITIVE_HEADERS.has(key.toLowerCase()) ? (
+                    <span className='text-muted-foreground/40'>[redacted]</span>
+                  ) : (
+                    value
+                  )}
                 </span>
               </div>
             ))}
@@ -329,7 +420,14 @@ function ErrorDetailPanel({ entry, onClose, navigate }: { entry: ErrorEntry; onC
 
         <div className='flex gap-2 px-4 py-3'>
           {entry.requestId && (
-            <Button variant='outline' size='xs' className='flex-1' onClick={() => navigate('requests', entry.requestId)}>View request</Button>
+            <Button
+              variant='outline'
+              size='xs'
+              className='flex-1'
+              onClick={() => navigate('requests', entry.requestId)}
+            >
+              View request
+            </Button>
           )}
         </div>
       </div>
@@ -343,7 +441,9 @@ function Stat({ label, value, danger }: { label: string; value: string; danger?:
   return (
     <div className='border-r px-4 py-2.5 last:border-r-0'>
       <div className='text-[10px] font-semibold text-muted-foreground'>{label}</div>
-      <div className={cn('mt-0.5 text-base font-semibold tabular-nums tracking-tight', danger && 'text-destructive')}>{value}</div>
+      <div className={cn('mt-0.5 text-base font-semibold tabular-nums tracking-tight', danger && 'text-destructive')}>
+        {value}
+      </div>
     </div>
   )
 }

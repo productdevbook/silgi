@@ -148,8 +148,7 @@ function patchSession(session: any, cfg: ResolvedConfig, isTx: boolean): boolean
       const reqTrace = ctx?.__analyticsTrace as RequestTrace | undefined
       if (!reqTrace) return prepared
 
-      const queryText =
-        extractQueryText(args[0]) ?? prepared.rawQueryConfig?.text ?? prepared.queryConfig?.text ?? null
+      const queryText = extractQueryText(args[0]) ?? prepared.rawQueryConfig?.text ?? prepared.queryConfig?.text ?? null
 
       const originalExecute = prepared.execute.bind(prepared)
 
@@ -214,7 +213,8 @@ function patchSession(session: any, cfg: ResolvedConfig, isTx: boolean): boolean
 function patchRawClient(client: any, cfg: ResolvedConfig): boolean {
   if (!client || client[INSTRUMENTED]) return false
 
-  const methodName = typeof client.query === 'function' ? 'query' : typeof client.execute === 'function' ? 'execute' : null
+  const methodName =
+    typeof client.query === 'function' ? 'query' : typeof client.execute === 'function' ? 'execute' : null
 
   if (!methodName) return false
 
@@ -310,8 +310,7 @@ function pushSpan(
   attributes: Record<string, string | number | boolean>,
   error: unknown,
 ): void {
-  const detail =
-    cfg.captureQueryText && queryText ? truncateQuery(queryText, cfg.maxQueryTextLength) : undefined
+  const detail = cfg.captureQueryText && queryText ? truncateQuery(queryText, cfg.maxQueryTextLength) : undefined
 
   reqTrace.spans.push({
     name,

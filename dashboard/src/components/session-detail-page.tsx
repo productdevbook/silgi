@@ -1,7 +1,7 @@
-import { ChartContainer, ChartTooltip } from '@/components/ui/chart'
 import { SpanWaterfall } from '@/components/span-waterfall'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ChartContainer, ChartTooltip } from '@/components/ui/chart'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useCopy } from '@/hooks'
 import { fmtMs, fmtRelativeTime, fmtTime } from '@/lib/format'
@@ -18,8 +18,14 @@ import type { RequestEntry } from '@/lib/types'
 // ── Constants ──
 
 const KIND_HEX: Record<string, string> = {
-  db: '#a855f7', redis: '#ef4444', http: '#3b82f6', cache: '#10b981',
-  queue: '#f59e0b', email: '#f97316', ai: '#06b6d4', custom: '#a1a1aa',
+  db: '#a855f7',
+  redis: '#ef4444',
+  http: '#3b82f6',
+  cache: '#10b981',
+  queue: '#f59e0b',
+  email: '#f97316',
+  ai: '#06b6d4',
+  custom: '#a1a1aa',
 }
 
 const OVERVIEW_CHART_CONFIG = {
@@ -83,10 +89,22 @@ export function SessionDetailPage({ requests, sessionId, navigate }: SessionDeta
         </Button>
         <span className='text-muted-foreground'>/</span>
         <span className='text-sm font-semibold'>Session</span>
-        <Badge variant='secondary' className='font-mono text-[10px]'>{sessionId.slice(0, 13)}</Badge>
+        <Badge variant='secondary' className='font-mono text-[10px]'>
+          {sessionId.slice(0, 13)}
+        </Badge>
         <div className='ml-auto flex gap-1'>
-          <CopyBtn copied={copiedId === `md-${sessionId}`} onClick={() => copy(`md-${sessionId}`, sessionToMarkdown(sessionRequests, sessionId))}>md</CopyBtn>
-          <CopyBtn copied={copiedId === `json-${sessionId}`} onClick={() => copy(`json-${sessionId}`, sessionToRedactedJson(sessionRequests, sessionId))}>json</CopyBtn>
+          <CopyBtn
+            copied={copiedId === `md-${sessionId}`}
+            onClick={() => copy(`md-${sessionId}`, sessionToMarkdown(sessionRequests, sessionId))}
+          >
+            md
+          </CopyBtn>
+          <CopyBtn
+            copied={copiedId === `json-${sessionId}`}
+            onClick={() => copy(`json-${sessionId}`, sessionToRedactedJson(sessionRequests, sessionId))}
+          >
+            json
+          </CopyBtn>
         </div>
       </div>
 
@@ -126,7 +144,11 @@ export function SessionDetailPage({ requests, sessionId, navigate }: SessionDeta
         {/* Right panel: session info (idle) or request detail (selected) */}
         <div className={cn('flex w-full flex-col border-l xl:w-[420px] xl:shrink-0', !selectedReq && 'hidden xl:flex')}>
           {selectedReq ? (
-            <RequestDetailPanel req={selectedReq} onClose={() => setSelectedIdx(null)} onOpenFull={() => navigate('requests', String(selectedReq.id))} />
+            <RequestDetailPanel
+              req={selectedReq}
+              onClose={() => setSelectedIdx(null)}
+              onOpenFull={() => navigate('requests', String(selectedReq.id))}
+            />
           ) : (
             <SessionInfoPanel
               sessionId={sessionId}
@@ -150,7 +172,12 @@ export function SessionDetailPage({ requests, sessionId, navigate }: SessionDeta
 
 // ── Request row ──
 
-function RequestRow({ req, isSelected, maxDuration, onClick }: {
+function RequestRow({
+  req,
+  isSelected,
+  maxDuration,
+  onClick,
+}: {
   req: RequestEntry
   isSelected: boolean
   maxDuration: number
@@ -162,21 +189,30 @@ function RequestRow({ req, isSelected, maxDuration, onClick }: {
 
   return (
     <div
-      className={cn('flex cursor-pointer items-center gap-2 border-b border-dashed px-5 py-2 hover:bg-muted/20', isSelected && 'bg-primary/5')}
+      className={cn(
+        'flex cursor-pointer items-center gap-2 border-b border-dashed px-5 py-2 hover:bg-muted/20',
+        isSelected && 'bg-primary/5',
+      )}
       onClick={onClick}
     >
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className='w-14 shrink-0 text-[11px] tabular-nums text-muted-foreground'>{fmtRelativeTime(req.timestamp)}</span>
+          <span className='w-14 shrink-0 text-[11px] tabular-nums text-muted-foreground'>
+            {fmtRelativeTime(req.timestamp)}
+          </span>
         </TooltipTrigger>
-        <TooltipContent side='right' className='text-xs'>{fmtTime(req.timestamp)}</TooltipContent>
+        <TooltipContent side='right' className='text-xs'>
+          {fmtTime(req.timestamp)}
+        </TooltipContent>
       </Tooltip>
       <span className={cn('size-1.5 shrink-0 rounded-full', isError ? 'bg-destructive' : 'bg-emerald-500')} />
       <span className='w-8 shrink-0 font-mono text-[10px] text-muted-foreground'>{req.method}</span>
       <span className='min-w-0 flex-1 truncate font-mono text-[11px] font-semibold'>
         {req.procedures.map((p) => p.procedure).join(', ')}
       </span>
-      <Badge variant={isError ? 'destructive' : 'secondary'} className='text-[9px]'>{req.status}</Badge>
+      <Badge variant={isError ? 'destructive' : 'secondary'} className='text-[9px]'>
+        {req.status}
+      </Badge>
       <div className='hidden w-28 lg:block'>
         <div className='h-1.5 w-full rounded-full bg-muted'>
           <div
@@ -185,7 +221,9 @@ function RequestRow({ req, isSelected, maxDuration, onClick }: {
           />
         </div>
       </div>
-      <span className='w-14 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground'>{fmtMs(req.durationMs)}</span>
+      <span className='w-14 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground'>
+        {fmtMs(req.durationMs)}
+      </span>
       <span className='w-4 shrink-0 text-right font-mono text-[9px] text-muted-foreground/50'>{spanCount || ''}</span>
     </div>
   )
@@ -193,14 +231,24 @@ function RequestRow({ req, isSelected, maxDuration, onClick }: {
 
 // ── Request detail panel (right side) ──
 
-function RequestDetailPanel({ req, onClose, onOpenFull }: { req: RequestEntry; onClose: () => void; onOpenFull: () => void }) {
+function RequestDetailPanel({
+  req,
+  onClose,
+  onOpenFull,
+}: {
+  req: RequestEntry
+  onClose: () => void
+  onOpenFull: () => void
+}) {
   return (
     <>
       <div className='flex items-center gap-2 border-b px-4 py-2'>
         <span className='flex-1 truncate font-mono text-[11px] font-semibold'>
           {req.procedures.map((p) => p.procedure).join(', ')}
         </span>
-        <Badge variant={req.status >= 400 ? 'destructive' : 'secondary'} className='text-[9px]'>{req.status}</Badge>
+        <Badge variant={req.status >= 400 ? 'destructive' : 'secondary'} className='text-[9px]'>
+          {req.status}
+        </Badge>
         <span className='font-mono text-[11px] tabular-nums text-muted-foreground'>{fmtMs(req.durationMs)}</span>
         <Button variant='ghost' size='icon-sm' onClick={onClose}>
           <HugeiconsIcon icon={Cancel01Icon} size={14} />
@@ -212,7 +260,9 @@ function RequestDetailPanel({ req, onClose, onOpenFull }: { req: RequestEntry; o
             {req.procedures.length > 1 && (
               <div className='flex items-center gap-2 border-b bg-muted/20 px-4 py-1.5 text-[11px]'>
                 <span className='font-mono font-semibold'>{proc.procedure}</span>
-                <Badge variant={proc.status >= 400 ? 'destructive' : 'secondary'} className='text-[9px]'>{proc.status}</Badge>
+                <Badge variant={proc.status >= 400 ? 'destructive' : 'secondary'} className='text-[9px]'>
+                  {proc.status}
+                </Badge>
                 <span className='text-muted-foreground'>{fmtMs(proc.durationMs)}</span>
               </div>
             )}
@@ -237,7 +287,9 @@ function RequestDetailPanel({ req, onClose, onOpenFull }: { req: RequestEntry; o
             )}
             {proc.error && (
               <PanelSection label='Error'>
-                <div className='rounded-md bg-destructive/10 px-2.5 py-2 font-mono text-[10px] text-destructive'>{proc.error}</div>
+                <div className='rounded-md bg-destructive/10 px-2.5 py-2 font-mono text-[10px] text-destructive'>
+                  {proc.error}
+                </div>
               </PanelSection>
             )}
           </div>
@@ -251,7 +303,9 @@ function RequestDetailPanel({ req, onClose, onOpenFull }: { req: RequestEntry; o
           <PanelKV label='ip' value={req.ip || '-'} />
         </PanelSection>
         <div className='px-4 py-3'>
-          <Button variant='outline' size='xs' className='w-full' onClick={onOpenFull}>Open full detail</Button>
+          <Button variant='outline' size='xs' className='w-full' onClick={onOpenFull}>
+            Open full detail
+          </Button>
         </div>
       </div>
     </>
@@ -260,7 +314,19 @@ function RequestDetailPanel({ req, onClose, onOpenFull }: { req: RequestEntry; o
 
 // ── Session info panel (right side, when idle) ──
 
-function SessionInfoPanel({ sessionId, first, last, wallClockMs, totalMs, sessionRequests, errorCount, byStatus, byKind, appMs, uniqueProcedures }: {
+function SessionInfoPanel({
+  sessionId,
+  first,
+  last,
+  wallClockMs,
+  totalMs,
+  sessionRequests,
+  errorCount,
+  byStatus,
+  byKind,
+  appMs,
+  uniqueProcedures,
+}: {
   sessionId: string
   first: RequestEntry
   last: RequestEntry
@@ -290,11 +356,17 @@ function SessionInfoPanel({ sessionId, first, last, wallClockMs, totalMs, sessio
 
       <PanelSection label='Status'>
         <div className='flex flex-wrap gap-1.5'>
-          {[...byStatus].toSorted((a, b) => a[0].localeCompare(b[0])).map(([bucket, count]) => (
-            <Badge key={bucket} variant={bucket === '4xx' || bucket === '5xx' ? 'destructive' : 'secondary'} className='text-[10px]'>
-              {bucket} <span className='ml-1 opacity-70'>{count}</span>
-            </Badge>
-          ))}
+          {[...byStatus]
+            .toSorted((a, b) => a[0].localeCompare(b[0]))
+            .map(([bucket, count]) => (
+              <Badge
+                key={bucket}
+                variant={bucket === '4xx' || bucket === '5xx' ? 'destructive' : 'secondary'}
+                className='text-[10px]'
+              >
+                {bucket} <span className='ml-1 opacity-70'>{count}</span>
+              </Badge>
+            ))}
         </div>
       </PanelSection>
 
@@ -311,10 +383,17 @@ function SessionInfoPanel({ sessionId, first, last, wallClockMs, totalMs, sessio
           const avg = matching.reduce((sum, p) => sum + p.durationMs, 0) / count
           const errors = matching.filter((p) => p.status >= 400).length
           return (
-            <div key={proc} className='flex items-center justify-between gap-2 border-b border-dashed py-1.5 last:border-0'>
+            <div
+              key={proc}
+              className='flex items-center justify-between gap-2 border-b border-dashed py-1.5 last:border-0'
+            >
               <div className='flex min-w-0 items-center gap-1.5'>
                 <span className='truncate font-mono text-[10px] font-semibold'>{proc}</span>
-                {errors > 0 && <Badge variant='destructive' className='text-[9px]'>{errors}</Badge>}
+                {errors > 0 && (
+                  <Badge variant='destructive' className='text-[9px]'>
+                    {errors}
+                  </Badge>
+                )}
               </div>
               <div className='flex shrink-0 gap-2 text-[10px] tabular-nums text-muted-foreground'>
                 <span>x{count}</span>
@@ -330,20 +409,26 @@ function SessionInfoPanel({ sessionId, first, last, wallClockMs, totalMs, sessio
 
 // ── Overview bar chart (header) ──
 
-function OverviewBarChart({ requests, totalRequests, selectedIdx, onSelect }: {
+function OverviewBarChart({
+  requests,
+  totalRequests,
+  selectedIdx,
+  onSelect,
+}: {
   requests: RequestEntry[]
   totalRequests: number
   selectedIdx: number | null
   onSelect: (chronIdx: number | null) => void
 }) {
   const chartData = useMemo(
-    () => requests.map((req, i) => ({
-      index: i,
-      procedure: req.procedures.map((p) => p.procedure).join(', '),
-      duration: req.durationMs,
-      status: req.status,
-      isError: req.status >= 400,
-    })),
+    () =>
+      requests.map((req, i) => ({
+        index: i,
+        procedure: req.procedures.map((p) => p.procedure).join(', '),
+        duration: req.durationMs,
+        status: req.status,
+        isError: req.status >= 400,
+      })),
     [requests],
   )
 
@@ -368,7 +453,9 @@ function OverviewBarChart({ requests, totalRequests, selectedIdx, onSelect }: {
               return (
                 <div className='rounded-md border bg-background px-2.5 py-1.5 text-xs shadow-sm'>
                   <div className='font-semibold'>{d.procedure}</div>
-                  <div className='text-muted-foreground'>{fmtMs(d.duration)} &middot; {d.status}</div>
+                  <div className='text-muted-foreground'>
+                    {fmtMs(d.duration)} &middot; {d.status}
+                  </div>
                 </div>
               )
             }}
@@ -401,10 +488,28 @@ function TimingDonut({ byKind, appMs, totalMs }: { byKind: Map<string, number>; 
     <div className='flex items-center gap-4'>
       <ChartContainer config={{ value: { label: 'Time' } }} className='h-24 w-24 shrink-0'>
         <PieChart>
-          <Pie data={data} dataKey='value' nameKey='name' cx='50%' cy='50%' innerRadius={22} outerRadius={38} strokeWidth={1} stroke='var(--background)'>
-            {data.map((entry) => <Cell key={entry.name} fill={entry.fill} />)}
+          <Pie
+            data={data}
+            dataKey='value'
+            nameKey='name'
+            cx='50%'
+            cy='50%'
+            innerRadius={22}
+            outerRadius={38}
+            strokeWidth={1}
+            stroke='var(--background)'
+          >
+            {data.map((entry) => (
+              <Cell key={entry.name} fill={entry.fill} />
+            ))}
           </Pie>
-          <text x='50%' y='50%' textAnchor='middle' dominantBaseline='middle' className='fill-foreground text-[10px] font-semibold'>
+          <text
+            x='50%'
+            y='50%'
+            textAnchor='middle'
+            dominantBaseline='middle'
+            className='fill-foreground text-[10px] font-semibold'
+          >
             {fmtMs(totalMs)}
           </text>
           <ChartTooltip
@@ -442,7 +547,9 @@ function Stat({ label, value, danger }: { label: string; value: string; danger?:
   return (
     <div className='border-r px-4 py-2.5 last:border-r-0'>
       <div className='text-[10px] font-semibold text-muted-foreground'>{label}</div>
-      <div className={cn('mt-0.5 text-base font-semibold tabular-nums tracking-tight', danger && 'text-destructive')}>{value}</div>
+      <div className={cn('mt-0.5 text-base font-semibold tabular-nums tracking-tight', danger && 'text-destructive')}>
+        {value}
+      </div>
     </div>
   )
 }

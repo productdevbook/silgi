@@ -1,6 +1,13 @@
 import { createContext } from '../compile.ts'
 import { compileRouter } from '../compile.ts'
-import { AnalyticsCollector, RequestAccumulator, RequestTrace, analyticsHTML, requestToMarkdown, errorToMarkdown } from '../plugins/analytics.ts'
+import {
+  AnalyticsCollector,
+  RequestAccumulator,
+  RequestTrace,
+  analyticsHTML,
+  requestToMarkdown,
+  errorToMarkdown,
+} from '../plugins/analytics.ts'
 import { generateOpenAPI, scalarHTML } from '../scalar.ts'
 
 import { SilgiError, toSilgiError } from './error.ts'
@@ -17,6 +24,9 @@ import type { Hookable } from 'hookable'
 // Lazy-loaded codecs — resolved on first non-JSON request
 let _msgpack: typeof import('../codec/msgpack.ts') | undefined
 let _devalue: typeof import('../codec/devalue.ts') | undefined
+
+// WeakMap for analytics accumulator — avoids mutating Request objects (strict runtimes like CF Workers freeze them)
+const _accMap = new WeakMap<Request, RequestAccumulator>()
 
 // ── Response Encoding Helper ────────────────────────
 
@@ -174,26 +184,42 @@ location.reload();
     }
     return false
   }
+
+  /** Fire-and-forget hook call — swallows both sync throws and async rejections.
+   *  Hooks must never corrupt a successful response or crash the process. */
+  function safeCallHook(name: keyof SilgiHooks, event: any): void {
+    try {
+      const result = hooks!.callHook(name, event)
+      if (result instanceof Promise) result.catch(() => {})
+    } catch {}
+  }
   const hasHooksAtInit = hasActiveHooks()
 
   // Runtime detection: Bun's request.json() is native C++ — faster than text() + JSON.parse()
   const isBun = typeof globalThis.Bun !== 'undefined'
 
-
   // Pre-check: is context factory sync? Also detect empty context for zero-copy path.
+  // Uses Function.toString() introspection to avoid calling the real factory (which may
+  // have side effects like DB connections, session creation, or auth logging).
   let ctxFactoryIsSync = false
   let ctxFactoryIsEmpty = false
-  try {
-    const testResult = contextFactory(new Request('http://localhost'))
-    if (testResult instanceof Promise) {
-      testResult.then((r) => {
-        ctxFactoryIsEmpty = Object.keys(r).length === 0
-      }).catch(() => { /* probe failure is non-fatal — assume non-empty */ })
-    } else {
-      ctxFactoryIsSync = true
-      ctxFactoryIsEmpty = Object.keys(testResult).length === 0
-    }
-  } catch {}
+  const _ctxSrc = contextFactory.toString()
+  // Heuristic: if function body contains await or returns a Promise, treat as async
+  const _looksAsync = _ctxSrc.startsWith('async') || _ctxSrc.includes('await ') || _ctxSrc.includes('.then(')
+  if (!_looksAsync) {
+    // Only probe sync factories — these are safe since they run synchronously and we
+    // can detect empty results without side-effect risk from dangling async work.
+    try {
+      const testResult = contextFactory(new Request('http://localhost'))
+      if (testResult instanceof Promise) {
+        // Guessed wrong — it's actually async. Swallow the result.
+        testResult.catch(() => {})
+      } else {
+        ctxFactoryIsSync = true
+        ctxFactoryIsEmpty = Object.keys(testResult).length === 0
+      }
+    } catch {}
+  }
 
   function analyticsAuthResponse(pathname: string): Response {
     // API endpoints get JSON 401, browser navigation gets HTML login
@@ -225,7 +251,7 @@ location.reload();
     // Markdown export: /analytics/_api/requests/:id/md
     if (pathname.startsWith('analytics/_api/requests/') && pathname.endsWith('/md')) {
       const id = Number(pathname.slice('analytics/_api/requests/'.length, -'/md'.length))
-      const entry = col.getRequests().find(r => r.id === id)
+      const entry = col.getRequests().find((r) => r.id === id)
       if (entry) {
         return new Response(requestToMarkdown(entry), {
           headers: { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-cache' },
@@ -236,7 +262,7 @@ location.reload();
     // Markdown export: /analytics/_api/errors/:id/md
     if (pathname.startsWith('analytics/_api/errors/') && pathname.endsWith('/md')) {
       const id = Number(pathname.slice('analytics/_api/errors/'.length, -'/md'.length))
-      const entry = col.getErrors().find(e => e.id === id)
+      const entry = col.getErrors().find((e) => e.id === id)
       if (entry) {
         return new Response(errorToMarkdown(entry), {
           headers: { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-cache' },
@@ -247,9 +273,10 @@ location.reload();
     // All errors as single markdown
     if (pathname === 'analytics/_api/errors/md') {
       const errors = col.getErrors()
-      const md = errors.length === 0
-        ? 'No errors.\n'
-        : `# Errors (${errors.length})\n\n` + errors.map(e => errorToMarkdown(e)).join('\n\n---\n\n')
+      const md =
+        errors.length === 0
+          ? 'No errors.\n'
+          : `# Errors (${errors.length})\n\n` + errors.map((e) => errorToMarkdown(e)).join('\n\n---\n\n')
       return new Response(md, {
         headers: { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-cache' },
       })
@@ -270,7 +297,7 @@ location.reload();
     // HTTP-level request accumulator — only when analytics collector exists
     let accumulator: RequestAccumulator | undefined
     if (collector) {
-      accumulator = (request as any).__acc ?? new RequestAccumulator(request, collector)
+      accumulator = _accMap.get(request) ?? new RequestAccumulator(request, collector)
     }
 
     // Scalar: /openapi.json and /reference
@@ -341,7 +368,7 @@ location.reload();
           }
         }
 
-        if (hasActiveHooks()) hooks!.callHook('request', { path: pathname, input: rawInput })
+        if (hasActiveHooks()) safeCallHook('request', { path: pathname, input: rawInput })
 
         t0 = collector ? performance.now() : 0
         const pipelineResult = route.handler(ctx, rawInput, request.signal)
@@ -351,12 +378,18 @@ location.reload();
           const output = pipelineResult
           if (hasActiveHooks() || collector) {
             const durationMs = collector ? round(performance.now() - t0) : 0
-            if (hasActiveHooks()) hooks!.callHook('response', { path: pathname, output, durationMs })
+            if (hasActiveHooks()) safeCallHook('response', { path: pathname, output, durationMs })
             if (collector) {
               collector.record(pathname, durationMs)
               if (accumulator) {
-                accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output, spans: reqTrace?.spans ?? [] })
-
+                accumulator.addProcedure({
+                  procedure: pathname,
+                  durationMs,
+                  status: 200,
+                  input: rawInput,
+                  output,
+                  spans: reqTrace?.spans ?? [],
+                })
               }
             }
           }
@@ -364,15 +397,27 @@ location.reload();
           if (output instanceof Response) return output
           if (output instanceof ReadableStream) {
             if (collector && accumulator) {
-              accumulator.addProcedure({ procedure: pathname, durationMs: collector ? round(performance.now() - t0) : 0, status: 200, input: rawInput, output: null, spans: reqTrace?.spans ?? [] })
-
+              accumulator.addProcedure({
+                procedure: pathname,
+                durationMs: collector ? round(performance.now() - t0) : 0,
+                status: 200,
+                input: rawInput,
+                output: null,
+                spans: reqTrace?.spans ?? [],
+              })
             }
             return new Response(output, { headers: { 'content-type': 'application/octet-stream' } })
           }
           if (output && typeof output === 'object' && Symbol.asyncIterator in (output as object)) {
             if (collector && accumulator) {
-              accumulator.addProcedure({ procedure: pathname, durationMs: collector ? round(performance.now() - t0) : 0, status: 200, input: rawInput, output: null, spans: reqTrace?.spans ?? [] })
-
+              accumulator.addProcedure({
+                procedure: pathname,
+                durationMs: collector ? round(performance.now() - t0) : 0,
+                status: 200,
+                input: rawInput,
+                output: null,
+                spans: reqTrace?.spans ?? [],
+              })
             }
             return new Response(iteratorToEventStream(output as AsyncIterableIterator<unknown>), {
               headers: sseHeaders,
@@ -398,12 +443,18 @@ location.reload();
         return pipelineResult
           .then((output) => {
             const durationMs = collector ? round(performance.now() - t0) : 0
-            if (hasActiveHooks()) hooks!.callHook('response', { path: pathname, output, durationMs })
+            if (hasActiveHooks()) safeCallHook('response', { path: pathname, output, durationMs })
             if (collector) {
               collector.record(pathname, durationMs)
               if (accumulator) {
-                accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output, spans: reqTrace?.spans ?? [] })
-
+                accumulator.addProcedure({
+                  procedure: pathname,
+                  durationMs,
+                  status: 200,
+                  input: rawInput,
+                  output,
+                  spans: reqTrace?.spans ?? [],
+                })
               }
             }
             if (output instanceof Response) return output
@@ -448,19 +499,21 @@ location.reload();
 
       return bodyParse
         .then((rawInput: unknown) => {
-          if (hasActiveHooks()) hooks!.callHook('request', { path: pathname, input: rawInput })
+          if (hasActiveHooks()) safeCallHook('request', { path: pathname, input: rawInput })
 
           const pipelineResult = route.handler(ctx, rawInput, request.signal)
           if (!(pipelineResult instanceof Promise)) {
-            if (hasActiveHooks()) hooks!.callHook('response', { path: pathname, output: pipelineResult, durationMs: 0 })
+            if (hasActiveHooks()) safeCallHook('response', { path: pathname, output: pipelineResult, durationMs: 0 })
             return _makeResponse(pipelineResult, route)
           }
           return pipelineResult.then((output) => {
-            if (hasActiveHooks()) hooks!.callHook('response', { path: pathname, output, durationMs: 0 })
+            if (hasActiveHooks()) safeCallHook('response', { path: pathname, output, durationMs: 0 })
             return _makeResponse(output, route)
           })
         })
-        .catch((error: unknown) => handleError(error, pathname, request, undefined, undefined, 0, accumulator) as Response)
+        .catch(
+          (error: unknown) => handleError(error, pathname, request, undefined, undefined, 0, accumulator) as Response,
+        )
     }
 
     // ── Full async path: POST with body, async context factory, codecs, analytics ──
@@ -550,7 +603,7 @@ location.reload();
         }
       }
 
-      if (hasActiveHooks()) hooks!.callHook('request', { path: pathname, input: rawInput })
+      if (hasActiveHooks()) safeCallHook('request', { path: pathname, input: rawInput })
 
       t0 = collector ? performance.now() : 0
       const pipelineResult = route.handler(ctx, rawInput, request.signal)
@@ -559,11 +612,18 @@ location.reload();
       if (output instanceof Response) {
         if (hasActiveHooks() || collector) {
           const durationMs = collector ? round(performance.now() - t0) : 0
-          if (hasActiveHooks()) hooks!.callHook('response', { path: pathname, output: null, durationMs })
+          if (hasActiveHooks()) safeCallHook('response', { path: pathname, output: null, durationMs })
           if (collector) {
             collector.record(pathname, durationMs)
             if (accumulator) {
-              accumulator.addProcedure({ procedure: pathname, durationMs, status: output.status, input: rawInput ?? reqTrace?.procedureInput ?? null, output: reqTrace?.procedureOutput ?? null, spans: reqTrace?.spans ?? [] })
+              accumulator.addProcedure({
+                procedure: pathname,
+                durationMs,
+                status: output.status,
+                input: rawInput ?? reqTrace?.procedureInput ?? null,
+                output: reqTrace?.procedureOutput ?? null,
+                spans: reqTrace?.spans ?? [],
+              })
             }
           }
         }
@@ -574,7 +634,14 @@ location.reload();
           const durationMs = round(performance.now() - t0)
           collector.record(pathname, durationMs)
           if (accumulator) {
-            accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output: null, spans: reqTrace?.spans ?? [] })
+            accumulator.addProcedure({
+              procedure: pathname,
+              durationMs,
+              status: 200,
+              input: rawInput,
+              output: null,
+              spans: reqTrace?.spans ?? [],
+            })
           }
         }
         return new Response(output, { headers: { 'content-type': 'application/octet-stream' } })
@@ -584,18 +651,32 @@ location.reload();
           const durationMs = round(performance.now() - t0)
           collector.record(pathname, durationMs)
           if (accumulator) {
-            accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output: null, spans: reqTrace?.spans ?? [] })
+            accumulator.addProcedure({
+              procedure: pathname,
+              durationMs,
+              status: 200,
+              input: rawInput,
+              output: null,
+              spans: reqTrace?.spans ?? [],
+            })
           }
         }
         return new Response(iteratorToEventStream(output as AsyncIterableIterator<unknown>), { headers: sseHeaders })
       }
 
       const durationMs = collector ? round(performance.now() - t0) : 0
-      if (hasActiveHooks()) hooks!.callHook('response', { path: pathname, output, durationMs })
+      if (hasActiveHooks()) safeCallHook('response', { path: pathname, output, durationMs })
       if (collector) {
         collector.record(pathname, durationMs)
         if (accumulator) {
-          accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output, spans: reqTrace?.spans ?? [] })
+          accumulator.addProcedure({
+            procedure: pathname,
+            durationMs,
+            status: 200,
+            input: rawInput,
+            output,
+            spans: reqTrace?.spans ?? [],
+          })
         }
       }
 
@@ -624,7 +705,7 @@ location.reload();
     t0: number,
     accumulator?: RequestAccumulator,
   ): Response | Promise<Response> {
-    if (hasActiveHooks()) hooks!.callHook('error', { path: pathname, error })
+    if (hasActiveHooks()) safeCallHook('error', { path: pathname, error })
     if (collector) {
       const durationMs = t0 ? round(performance.now() - t0) : 0
       const errorMsg = error instanceof Error ? error.message : String(error)
@@ -649,8 +730,15 @@ location.reload();
 
       // Also record in HTTP request accumulator
       if (accumulator) {
-        accumulator.addProcedure({ procedure: pathname, durationMs, status: errStatus, input: rawInput, output: null, spans: reqTrace?.spans ?? [], error: errorMsg })
-
+        accumulator.addProcedure({
+          procedure: pathname,
+          durationMs,
+          status: errStatus,
+          input: rawInput,
+          output: null,
+          spans: reqTrace?.spans ?? [],
+          error: errorMsg,
+        })
       }
     }
 
@@ -662,6 +750,10 @@ location.reload();
         : 'json'
     if (error instanceof ValidationError) {
       const errBody = { code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } }
+      return encodeResponse(errBody, 400, fmt)
+    }
+    if (error instanceof SyntaxError) {
+      const errBody = { code: 'BAD_REQUEST', status: 400, message: 'Invalid JSON body' }
       return encodeResponse(errBody, 400, fmt)
     }
     const e = error instanceof SilgiError ? error : toSilgiError(error)
@@ -708,19 +800,19 @@ location.reload();
             }
           }
 
-          if (hasActiveHooks()) hooks!.callHook('request', { path: fullPath.slice(1), input })
+          if (hasActiveHooks()) safeCallHook('request', { path: fullPath.slice(1), input })
           const result = route.handler(ctx, input, request.signal)
           if (!(result instanceof Promise)) {
-            if (hasActiveHooks()) hooks!.callHook('response', { path: fullPath.slice(1), output: result, durationMs: 0 })
+            if (hasActiveHooks()) safeCallHook('response', { path: fullPath.slice(1), output: result, durationMs: 0 })
             return _minimalResponse(result, route, request)
           }
           return result.then(
             (output) => {
-              if (hasActiveHooks()) hooks!.callHook('response', { path: fullPath.slice(1), output, durationMs: 0 })
+              if (hasActiveHooks()) safeCallHook('response', { path: fullPath.slice(1), output, durationMs: 0 })
               return _minimalResponse(output, route, request)
             },
             (error) => {
-              if (hasActiveHooks()) hooks!.callHook('error', { path: fullPath.slice(1), error })
+              if (hasActiveHooks()) safeCallHook('error', { path: fullPath.slice(1), error })
               return _minimalError(error, request)
             },
           )
@@ -771,26 +863,30 @@ location.reload();
       const _path = fullPath.slice(1)
       return bodyPromise
         .then((rawInput: unknown) => {
-          if (hasActiveHooks()) hooks!.callHook('request', { path: _path, input: rawInput })
+          if (hasActiveHooks()) safeCallHook('request', { path: _path, input: rawInput })
           const result = route.handler(ctx, rawInput, request.signal)
           if (!(result instanceof Promise)) {
-            if (hasActiveHooks()) hooks!.callHook('response', { path: _path, output: result, durationMs: 0 })
+            if (hasActiveHooks()) safeCallHook('response', { path: _path, output: result, durationMs: 0 })
             return _minimalResponse(result, route, request)
           }
           return result.then((output) => {
-            if (hasActiveHooks()) hooks!.callHook('response', { path: _path, output, durationMs: 0 })
+            if (hasActiveHooks()) safeCallHook('response', { path: _path, output, durationMs: 0 })
             return _minimalResponse(output, route, request)
           })
         })
         .catch((error: unknown) => {
-          if (hasActiveHooks()) hooks!.callHook('error', { path: _path, error })
+          if (hasActiveHooks()) safeCallHook('error', { path: _path, error })
           return _minimalError(error, request)
         })
     }
   }
 
   /** Response builder for minimalHandler — includes codec negotiation */
-  function _minimalResponse(output: unknown, route: import('../compile.ts').CompiledRoute, request: Request): Response | Promise<Response> {
+  function _minimalResponse(
+    output: unknown,
+    route: import('../compile.ts').CompiledRoute,
+    request: Request,
+  ): Response | Promise<Response> {
     if (output instanceof Response) return output
     if (output instanceof ReadableStream)
       return new Response(output, { headers: { 'content-type': 'application/octet-stream' } })
@@ -823,6 +919,10 @@ location.reload();
       const errBody = { code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } }
       return encodeResponse(errBody, 400, fmt)
     }
+    if (error instanceof SyntaxError) {
+      const errBody = { code: 'BAD_REQUEST', status: 400, message: 'Invalid JSON body' }
+      return encodeResponse(errBody, 400, fmt)
+    }
     const e = error instanceof SilgiError ? error : toSilgiError(error)
     return encodeResponse(e.toJSON(), e.status, fmt)
   }
@@ -834,7 +934,7 @@ location.reload();
     // Create accumulator BEFORE handleRequest so we own the reference
     const acc = new RequestAccumulator(request, collector!)
     // Store on request for handleRequest to find
-    ;(request as any).__acc = acc
+    _accMap.set(request, acc)
 
     const result = handleRequest(request)
 

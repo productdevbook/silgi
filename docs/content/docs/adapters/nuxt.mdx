@@ -12,28 +12,28 @@ import { Files, Folder, File } from 'fumadocs-ui/components/files'
 ## Project structure
 
 <Files>
-  <File name="nuxt.config.ts" />
-  <File name="server.ts" />
-  <Folder name="server/rpc" defaultOpen>
-    <File name="instance.ts" />
-    <File name="router.ts" />
-    <File name="guards.ts" />
-    <Folder name="todos" defaultOpen>
-      <File name="schema.ts" />
-      <File name="index.ts" />
+  <File name='nuxt.config.ts' />
+  <File name='server.ts' />
+  <Folder name='server/rpc' defaultOpen>
+    <File name='instance.ts' />
+    <File name='router.ts' />
+    <File name='guards.ts' />
+    <Folder name='todos' defaultOpen>
+      <File name='schema.ts' />
+      <File name='index.ts' />
     </Folder>
-    <Folder name="auth">
-      <File name="schema.ts" />
-      <File name="index.ts" />
+    <Folder name='auth'>
+      <File name='schema.ts' />
+      <File name='index.ts' />
     </Folder>
   </Folder>
-  <Folder name="app">
-    <Folder name="composables">
-      <File name="useClient.ts" />
+  <Folder name='app'>
+    <Folder name='composables'>
+      <File name='useClient.ts' />
     </Folder>
-    <Folder name="pages">
-      <File name="index.vue" />
-      <File name="todos.vue" />
+    <Folder name='pages'>
+      <File name='index.vue' />
+      <File name='todos.vue' />
     </Folder>
   </Folder>
 </Files>
@@ -68,9 +68,7 @@ export const TodoIdSchema = z.object({ id: z.number() })
 
 export type Todo = z.infer<typeof TodoSchema>
 
-export const todos: Todo[] = [
-  { id: 1, title: 'Buy groceries', completed: false, createdAt: '2026-03-20T10:00:00Z' },
-]
+export const todos: Todo[] = [{ id: 1, title: 'Buy groceries', completed: false, createdAt: '2026-03-20T10:00:00Z' }]
 ```
 
 ```ts twoslash title="server/rpc/todos/index.ts"

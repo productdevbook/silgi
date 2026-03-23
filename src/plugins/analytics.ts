@@ -198,7 +198,7 @@ function generateRequestId(): string {
   let now = Date.now()
 
   if (now === _lastTime) {
-    _counter = (_counter + 1) & 0xFFF // 12 bits = 4096 per ms
+    _counter = (_counter + 1) & 0xfff // 12 bits = 4096 per ms
     if (_counter === 0) {
       // Counter overflow — busy-wait to next ms (only at >4M req/sec)
       while (now === _lastTime) now = Date.now()
@@ -212,7 +212,7 @@ function generateRequestId(): string {
   // High: upper 32 bits of timestamp
   // Low: lower 10 bits of timestamp | 12-bit counter | 10-bit random
   const high = Math.floor(now / 1024) // upper 32 bits (ts >> 10)
-  const low = ((now & 0x3FF) << 22) | (_counter << 10) | ((Math.random() * 1024) >>> 0)
+  const low = ((now & 0x3ff) << 22) | (_counter << 10) | ((Math.random() * 1024) >>> 0)
 
   return high.toString(36) + low.toString(36).padStart(7, '0')
 }
@@ -228,7 +228,17 @@ export class RequestTrace {
   /** @internal Start time — used by integrations (drizzle etc.) for span offset calculation */
   readonly t0 = performance.now()
 
-  async trace<T>(name: string, fn: () => T | Promise<T>, opts?: { kind?: SpanKind; detail?: string; input?: unknown; output?: unknown | ((result: T) => unknown); procedure?: { input?: unknown; output?: unknown | ((result: T) => unknown) } }): Promise<T> {
+  async trace<T>(
+    name: string,
+    fn: () => T | Promise<T>,
+    opts?: {
+      kind?: SpanKind
+      detail?: string
+      input?: unknown
+      output?: unknown | ((result: T) => unknown)
+      procedure?: { input?: unknown; output?: unknown | ((result: T) => unknown) }
+    },
+  ): Promise<T> {
     const start = performance.now()
     const kind = opts?.kind ?? guessKind(name)
     try {
@@ -275,18 +285,21 @@ export class RequestTrace {
 
 function guessKind(name: string): SpanKind {
   const lower = name.toLowerCase()
-  if (lower.startsWith('db.') || lower.includes('sql') || lower.includes('prisma') || lower.includes('drizzle') || lower.includes('query') || lower.includes('mongo'))
+  if (
+    lower.startsWith('db.') ||
+    lower.includes('sql') ||
+    lower.includes('prisma') ||
+    lower.includes('drizzle') ||
+    lower.includes('query') ||
+    lower.includes('mongo')
+  )
     return 'db'
-  if (lower.startsWith('http.') || lower.includes('fetch') || lower.includes('api.'))
-    return 'http'
-  if (lower.startsWith('cache.') || lower.includes('redis') || lower.includes('memcache'))
-    return 'cache'
+  if (lower.startsWith('http.') || lower.includes('fetch') || lower.includes('api.')) return 'http'
+  if (lower.startsWith('cache.') || lower.includes('redis') || lower.includes('memcache')) return 'cache'
   if (lower.includes('queue') || lower.includes('publish') || lower.includes('nats') || lower.includes('kafka'))
     return 'queue'
-  if (lower.includes('email') || lower.includes('smtp') || lower.includes('ses'))
-    return 'email'
-  if (lower.includes('ai') || lower.includes('llm') || lower.includes('openai') || lower.includes('gemini'))
-    return 'ai'
+  if (lower.includes('email') || lower.includes('smtp') || lower.includes('ses')) return 'email'
+  if (lower.includes('ai') || lower.includes('llm') || lower.includes('openai') || lower.includes('gemini')) return 'ai'
   return 'custom'
 }
 
@@ -303,7 +316,18 @@ function guessKind(name: string): SpanKind {
  * })
  * ```
  */
-export async function trace<T>(ctx: Record<string, unknown>, name: string, fn: () => T | Promise<T>, opts?: { kind?: SpanKind; detail?: string; input?: unknown; output?: unknown | ((result: T) => unknown); procedure?: { input?: unknown; output?: unknown | ((result: T) => unknown) } }): Promise<T> {
+export async function trace<T>(
+  ctx: Record<string, unknown>,
+  name: string,
+  fn: () => T | Promise<T>,
+  opts?: {
+    kind?: SpanKind
+    detail?: string
+    input?: unknown
+    output?: unknown | ((result: T) => unknown)
+    procedure?: { input?: unknown; output?: unknown | ((result: T) => unknown) }
+  },
+): Promise<T> {
   const reqTrace = ctx.__analyticsTrace as RequestTrace | undefined
   if (reqTrace) {
     return reqTrace.trace(name, fn, opts)

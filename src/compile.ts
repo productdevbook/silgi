@@ -4,7 +4,7 @@
  * Innovations:
  * 1. UNROLLED GUARDS — 0-4 guard specialization (no loop, V8 inlines)
  * 2. FLAT MAP ROUTER — O(1) lookup via Map.get()
- * 3. CONTEXT POOL — pre-allocated, zero per-request allocation
+ * 3. ZERO-ALLOC CONTEXT — Object.create(null) with direct property set
  * 4. AbortSignal.any() — native signal composition
  * 5. Promise.withResolvers() — cleaner deferred patterns
  * 6. RESULT-BASED ERRORS — avoid throw for typed errors (optional)
@@ -17,6 +17,9 @@ import { validateSchema } from './core/schema.ts'
 import { compileStringify } from './fast-stringify.ts'
 
 import type { ProcedureDef, GuardDef, WrapDef, ErrorDef } from './types.ts'
+
+/** Internal symbol for pipeline raw input — prevents collision with user context keys */
+export const RAW_INPUT = Symbol.for('silgi.rawInput')
 
 /**
  * Compiled pipeline — called per request.
@@ -243,8 +246,8 @@ function _validateAndResolve(
   try {
     const input = inputSchema ? validateSchema(inputSchema, rawInput ?? {}) : rawInput
     if (isThenable(input)) {
-      return (input as Promise<unknown>).then(
-        (resolvedInput) => _resolveWithOutput(resolveFn, resolvedInput, ctx, failFn, signal, outputSchema),
+      return (input as Promise<unknown>).then((resolvedInput) =>
+        _resolveWithOutput(resolveFn, resolvedInput, ctx, failFn, signal, outputSchema),
       )
     }
     return _resolveWithOutput(resolveFn, input, ctx, failFn, signal, outputSchema)
@@ -356,10 +359,10 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
     }
 
     // Store input on context so wraps (e.g. mapInput) can read/modify it
-    ctx.__rawInput = input
+    ;(ctx as any)[RAW_INPUT] = input
 
     let execute: () => Promise<unknown> = () => {
-      const resolvedInput = ctx.__rawInput ?? input
+      const resolvedInput = (ctx as any)[RAW_INPUT] ?? input
       return Promise.resolve(
         resolveFn({
           input: resolvedInput,

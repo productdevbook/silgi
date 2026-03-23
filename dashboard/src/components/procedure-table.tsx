@@ -57,13 +57,55 @@ export function ProcedureTable({ procedures, navigate, filter }: ProcedureTableP
     <div>
       {/* Header row */}
       <div className='flex items-center gap-2 border-b px-5 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground'>
-        <SortCol label='Procedure' sortKey='path' currentKey={sortKey} asc={sortAsc} onSort={handleSort} className='flex-1' />
-        <SortCol label='Count' sortKey='count' currentKey={sortKey} asc={sortAsc} onSort={handleSort} className='w-20 text-right' />
+        <SortCol
+          label='Procedure'
+          sortKey='path'
+          currentKey={sortKey}
+          asc={sortAsc}
+          onSort={handleSort}
+          className='flex-1'
+        />
+        <SortCol
+          label='Count'
+          sortKey='count'
+          currentKey={sortKey}
+          asc={sortAsc}
+          onSort={handleSort}
+          className='w-20 text-right'
+        />
         <span className='hidden w-20 lg:block' />
-        <SortCol label='Errors' sortKey='errors' currentKey={sortKey} asc={sortAsc} onSort={handleSort} className='w-14 text-right' />
-        <SortCol label='Rate' sortKey='errorRate' currentKey={sortKey} asc={sortAsc} onSort={handleSort} className='w-12 text-right' />
-        <SortCol label='Avg' sortKey='avg' currentKey={sortKey} asc={sortAsc} onSort={handleSort} className='w-14 text-right' />
-        <SortCol label='p95' sortKey='p95' currentKey={sortKey} asc={sortAsc} onSort={handleSort} className='w-14 text-right' />
+        <SortCol
+          label='Errors'
+          sortKey='errors'
+          currentKey={sortKey}
+          asc={sortAsc}
+          onSort={handleSort}
+          className='w-14 text-right'
+        />
+        <SortCol
+          label='Rate'
+          sortKey='errorRate'
+          currentKey={sortKey}
+          asc={sortAsc}
+          onSort={handleSort}
+          className='w-12 text-right'
+        />
+        <SortCol
+          label='Avg'
+          sortKey='avg'
+          currentKey={sortKey}
+          asc={sortAsc}
+          onSort={handleSort}
+          className='w-14 text-right'
+        />
+        <SortCol
+          label='p95'
+          sortKey='p95'
+          currentKey={sortKey}
+          asc={sortAsc}
+          onSort={handleSort}
+          className='w-14 text-right'
+        />
       </div>
 
       {/* Rows */}
@@ -74,7 +116,10 @@ export function ProcedureTable({ procedures, navigate, filter }: ProcedureTableP
         return (
           <div
             key={path}
-            className={cn('flex items-center gap-2 border-b border-dashed px-5 py-2 hover:bg-muted/20', navigate && 'cursor-pointer')}
+            className={cn(
+              'flex items-center gap-2 border-b border-dashed px-5 py-2 hover:bg-muted/20',
+              navigate && 'cursor-pointer',
+            )}
             onClick={() => navigate?.('requests', undefined, { procedure: path })}
           >
             {/* Procedure name */}
@@ -111,7 +156,12 @@ export function ProcedureTable({ procedures, navigate, filter }: ProcedureTableP
             </div>
 
             {/* Error rate */}
-            <span className={cn('w-12 shrink-0 text-right text-[11px] tabular-nums', hasErrors ? 'text-destructive' : 'text-muted-foreground/40')}>
+            <span
+              className={cn(
+                'w-12 shrink-0 text-right text-[11px] tabular-nums',
+                hasErrors ? 'text-destructive' : 'text-muted-foreground/40',
+              )}
+            >
               {proc.errorRate.toFixed(1)}%
             </span>
 
@@ -133,12 +183,28 @@ export function ProcedureTable({ procedures, navigate, filter }: ProcedureTableP
 
 // ── Shared ──
 
-function SortCol({ label, sortKey, currentKey, asc, onSort, className }: {
-  label: string; sortKey: SortKey; currentKey: SortKey; asc: boolean; onSort: (k: SortKey) => void; className?: string
+function SortCol({
+  label,
+  sortKey,
+  currentKey,
+  asc,
+  onSort,
+  className,
+}: {
+  label: string
+  sortKey: SortKey
+  currentKey: SortKey
+  asc: boolean
+  onSort: (k: SortKey) => void
+  className?: string
 }) {
   return (
-    <span className={cn('cursor-pointer select-none', currentKey === sortKey && 'text-primary', className)} onClick={() => onSort(sortKey)}>
-      {label}{currentKey === sortKey && (asc ? ' ↑' : ' ↓')}
+    <span
+      className={cn('cursor-pointer select-none', currentKey === sortKey && 'text-primary', className)}
+      onClick={() => onSort(sortKey)}
+    >
+      {label}
+      {currentKey === sortKey && (asc ? ' ↑' : ' ↓')}
     </span>
   )
 }

@@ -12,7 +12,13 @@ import {
 } from '@/components/ui/sidebar'
 import { fmt, fmtMs, fmtUptime } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { Alert02Icon, DashboardBrowsingIcon, Pulse01Icon, RocketIcon, UserMultiple02Icon } from '@hugeicons/core-free-icons'
+import {
+  Alert02Icon,
+  DashboardBrowsingIcon,
+  Pulse01Icon,
+  RocketIcon,
+  UserMultiple02Icon,
+} from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 
 import type { Route } from '@/hooks/use-route'

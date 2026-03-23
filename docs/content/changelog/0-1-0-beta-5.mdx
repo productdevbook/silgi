@@ -33,10 +33,13 @@ const adminCaller = s.createCaller(appRouter, {
 Pass `signal` or `context` as a second argument to any call:
 
 ```ts
-await caller.users.create({ name: 'Alice' }, {
-  context: { token: 'valid-jwt' },
-  signal: AbortSignal.timeout(5000),
-})
+await caller.users.create(
+  { name: 'Alice' },
+  {
+    context: { token: 'valid-jwt' },
+    signal: AbortSignal.timeout(5000),
+  },
+)
 ```
 
 ### Configurable timeout
@@ -51,6 +54,7 @@ const nolimit = s.createCaller(appRouter, { timeout: null })
 ### What runs in the pipeline
 
 Everything that runs in HTTP also runs in createCaller:
+
 - Guards (`$use(s.guard(...))`)
 - Input validation (`$input(z.object(...))`)
 - Output validation (`$output(z.object(...))`)

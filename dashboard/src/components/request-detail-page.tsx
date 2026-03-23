@@ -1,6 +1,7 @@
 import { SpanWaterfall } from '@/components/span-waterfall'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ChartContainer, ChartTooltip } from '@/components/ui/chart'
 import { useCopy } from '@/hooks'
 import { fmtMs, fmtTime } from '@/lib/format'
 import { requestTimingMarkdown, requestToMarkdown, requestToRedactedJson } from '@/lib/markdown'
@@ -10,15 +11,19 @@ import { HugeiconsIcon } from '@hugeicons/react'
 import { useMemo } from 'react'
 import { Cell, Pie, PieChart } from 'recharts'
 
-import { ChartContainer, ChartTooltip } from '@/components/ui/chart'
-
 import type { ProcedureCall, RequestEntry } from '@/lib/types'
 
 // ── Constants ──
 
 const KIND_HEX: Record<string, string> = {
-  db: '#a855f7', redis: '#ef4444', http: '#3b82f6', cache: '#10b981',
-  queue: '#f59e0b', email: '#f97316', ai: '#06b6d4', custom: '#a1a1aa',
+  db: '#a855f7',
+  redis: '#ef4444',
+  http: '#3b82f6',
+  cache: '#10b981',
+  queue: '#f59e0b',
+  email: '#f97316',
+  ai: '#06b6d4',
+  custom: '#a1a1aa',
 }
 
 // ── Main component ──
@@ -59,9 +64,24 @@ export function RequestDetailPage({ requests, id, navigate }: RequestDetailPageP
         {totalSpans > 0 && <Badge variant='secondary'>{totalSpans} spans</Badge>}
         <span className='text-[11px] text-muted-foreground'>{fmtTime(entry.timestamp)}</span>
         <div className='ml-auto flex gap-1'>
-          <CopyBtn copied={copiedId === `md-${entry.id}`} onClick={() => copy(`md-${entry.id}`, requestToMarkdown(entry))}>md</CopyBtn>
-          <CopyBtn copied={copiedId === `timing-${entry.id}`} onClick={() => copy(`timing-${entry.id}`, requestTimingMarkdown(entry))}>timing</CopyBtn>
-          <CopyBtn copied={copiedId === `json-${entry.id}`} onClick={() => copy(`json-${entry.id}`, requestToRedactedJson(entry))}>json</CopyBtn>
+          <CopyBtn
+            copied={copiedId === `md-${entry.id}`}
+            onClick={() => copy(`md-${entry.id}`, requestToMarkdown(entry))}
+          >
+            md
+          </CopyBtn>
+          <CopyBtn
+            copied={copiedId === `timing-${entry.id}`}
+            onClick={() => copy(`timing-${entry.id}`, requestTimingMarkdown(entry))}
+          >
+            timing
+          </CopyBtn>
+          <CopyBtn
+            copied={copiedId === `json-${entry.id}`}
+            onClick={() => copy(`json-${entry.id}`, requestToRedactedJson(entry))}
+          >
+            json
+          </CopyBtn>
         </div>
       </div>
 
@@ -70,7 +90,13 @@ export function RequestDetailPage({ requests, id, navigate }: RequestDetailPageP
         {/* Left: procedures with waterfall */}
         <div className='min-w-0 xl:border-r'>
           {entry.procedures.map((proc, idx) => (
-            <ProcedureSection key={idx} proc={proc} idx={idx} totalMs={entry.durationMs} totalProcs={entry.procedures.length} />
+            <ProcedureSection
+              key={idx}
+              proc={proc}
+              idx={idx}
+              totalMs={entry.durationMs}
+              totalProcs={entry.procedures.length}
+            />
           ))}
         </div>
 
@@ -136,7 +162,17 @@ export function RequestDetailPage({ requests, id, navigate }: RequestDetailPageP
 
 // ── Procedure section ──
 
-function ProcedureSection({ proc, idx, totalMs, totalProcs }: { proc: ProcedureCall; idx: number; totalMs: number; totalProcs: number }) {
+function ProcedureSection({
+  proc,
+  idx,
+  totalMs,
+  totalProcs,
+}: {
+  proc: ProcedureCall
+  idx: number
+  totalMs: number
+  totalProcs: number
+}) {
   const hasInput = proc.input !== undefined && proc.input !== null
   const hasOutput = proc.output !== undefined && proc.output !== null
 
@@ -146,13 +182,21 @@ function ProcedureSection({ proc, idx, totalMs, totalProcs }: { proc: ProcedureC
         <div className='flex items-center gap-2 border-b bg-muted/30 px-5 py-2 text-[11px]'>
           <span className={cn('size-1.5 rounded-full', proc.status >= 400 ? 'bg-destructive' : 'bg-emerald-500')} />
           <span className='font-mono font-semibold'>{proc.procedure}</span>
-          <Badge variant={proc.status >= 400 ? 'destructive' : 'secondary'} className='text-[9px]'>{proc.status}</Badge>
+          <Badge variant={proc.status >= 400 ? 'destructive' : 'secondary'} className='text-[9px]'>
+            {proc.status}
+          </Badge>
           <span className='text-muted-foreground'>{fmtMs(proc.durationMs)}</span>
           <span className='text-muted-foreground'>({proc.spans.length} spans)</span>
         </div>
       )}
 
-      <Section label={totalProcs === 1 ? `${proc.procedure} — ${proc.spans.length} spans, ${fmtMs(proc.durationMs)} total` : 'Span timeline'}>
+      <Section
+        label={
+          totalProcs === 1
+            ? `${proc.procedure} — ${proc.spans.length} spans, ${fmtMs(proc.durationMs)} total`
+            : 'Span timeline'
+        }
+      >
         {proc.spans.length > 0 ? (
           <SpanWaterfall spans={proc.spans} totalMs={proc.durationMs} />
         ) : (
@@ -178,7 +222,9 @@ function ProcedureSection({ proc, idx, totalMs, totalProcs }: { proc: ProcedureC
 
       {proc.error && (
         <Section label='Error'>
-          <div className='rounded-md bg-destructive/10 px-3 py-2 font-mono text-[11px] text-destructive'>{proc.error}</div>
+          <div className='rounded-md bg-destructive/10 px-3 py-2 font-mono text-[11px] text-destructive'>
+            {proc.error}
+          </div>
         </Section>
       )}
     </div>
@@ -206,10 +252,28 @@ function TimingDonut({ procedures, totalMs }: { procedures: ProcedureCall[]; tot
     <div className='flex items-center gap-4'>
       <ChartContainer config={{ value: { label: 'Time' } }} className='h-24 w-24 shrink-0'>
         <PieChart>
-          <Pie data={data} dataKey='value' nameKey='name' cx='50%' cy='50%' innerRadius={22} outerRadius={38} strokeWidth={1} stroke='var(--background)'>
-            {data.map((entry) => <Cell key={entry.name} fill={entry.fill} />)}
+          <Pie
+            data={data}
+            dataKey='value'
+            nameKey='name'
+            cx='50%'
+            cy='50%'
+            innerRadius={22}
+            outerRadius={38}
+            strokeWidth={1}
+            stroke='var(--background)'
+          >
+            {data.map((entry) => (
+              <Cell key={entry.name} fill={entry.fill} />
+            ))}
           </Pie>
-          <text x='50%' y='50%' textAnchor='middle' dominantBaseline='middle' className='fill-foreground text-[10px] font-semibold'>
+          <text
+            x='50%'
+            y='50%'
+            textAnchor='middle'
+            dominantBaseline='middle'
+            className='fill-foreground text-[10px] font-semibold'
+          >
             {fmtMs(totalMs)}
           </text>
           <ChartTooltip

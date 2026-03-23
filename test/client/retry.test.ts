@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { withRetry } from '#src/client/plugins/retry'
+
 import { withCircuitBreaker, CircuitBreakerOpenError } from '#src/client/plugins/circuit-breaker'
+import { withRetry } from '#src/client/plugins/retry'
 import { withTimeout } from '#src/client/plugins/timeout'
 
 import type { ClientLink } from '#src/client/types'
@@ -35,11 +36,7 @@ describe('withRetry', () => {
   })
 
   it('retries on failure then succeeds', async () => {
-    const link = mockLink([
-      { error: errorWithStatus(500) },
-      { error: errorWithStatus(502) },
-      { value: 'recovered' },
-    ])
+    const link = mockLink([{ error: errorWithStatus(500) }, { error: errorWithStatus(502) }, { value: 'recovered' }])
     const retryLink = withRetry(link, { baseDelay: 10 })
     expect(await retryLink.call(['test'], undefined, {})).toBe('recovered')
   })
@@ -62,10 +59,7 @@ describe('withRetry', () => {
   })
 
   it('retries network errors (no status)', async () => {
-    const link = mockLink([
-      { error: new Error('fetch failed') },
-      { value: 'ok' },
-    ])
+    const link = mockLink([{ error: new Error('fetch failed') }, { value: 'ok' }])
     const retryLink = withRetry(link, { baseDelay: 10 })
     expect(await retryLink.call(['test'], undefined, {})).toBe('ok')
   })
@@ -77,10 +71,7 @@ describe('withRetry', () => {
   })
 
   it('respects shouldRetry predicate', async () => {
-    const link = mockLink([
-      { error: errorWithStatus(500) },
-      { value: 'never reached' },
-    ])
+    const link = mockLink([{ error: errorWithStatus(500) }, { value: 'never reached' }])
     const retryLink = withRetry(link, {
       baseDelay: 10,
       shouldRetry: () => false,
@@ -90,41 +81,33 @@ describe('withRetry', () => {
 
   it('calls onRetry callback', async () => {
     const onRetry = vi.fn()
-    const link = mockLink([
-      { error: errorWithStatus(500) },
-      { value: 'ok' },
-    ])
+    const link = mockLink([{ error: errorWithStatus(500) }, { value: 'ok' }])
     const retryLink = withRetry(link, { baseDelay: 10, onRetry })
     await retryLink.call(['users', 'list'], undefined, {})
     expect(onRetry).toHaveBeenCalledOnce()
-    expect(onRetry).toHaveBeenCalledWith(expect.objectContaining({
-      attempt: 1,
-      path: ['users', 'list'],
-    }))
+    expect(onRetry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attempt: 1,
+        path: ['users', 'list'],
+      }),
+    )
   })
 
   it('uses exponential backoff', async () => {
     const delays: number[] = []
-    const link = mockLink([
-      { error: errorWithStatus(500) },
-      { error: errorWithStatus(500) },
-      { value: 'ok' },
-    ])
+    const link = mockLink([{ error: errorWithStatus(500) }, { error: errorWithStatus(500) }, { value: 'ok' }])
     const retryLink = withRetry(link, {
       baseDelay: 100,
       jitter: false,
       onRetry: ({ delay }) => delays.push(delay),
     })
     await retryLink.call(['test'], undefined, {})
-    expect(delays[0]).toBe(100)  // 100 * 2^0
-    expect(delays[1]).toBe(200)  // 100 * 2^1
+    expect(delays[0]).toBe(100) // 100 * 2^0
+    expect(delays[1]).toBe(200) // 100 * 2^1
   })
 
   it('stops retrying on abort', async () => {
-    const link = mockLink([
-      { error: errorWithStatus(500) },
-      { error: errorWithStatus(500) },
-    ])
+    const link = mockLink([{ error: errorWithStatus(500) }, { error: errorWithStatus(500) }])
     const controller = new AbortController()
     controller.abort()
     const retryLink = withRetry(link, { baseDelay: 10 })
@@ -170,11 +153,7 @@ describe('withCircuitBreaker', () => {
   })
 
   it('resets to closed after success', async () => {
-    const link = mockLink([
-      { error: new Error('fail') },
-      { error: new Error('fail') },
-      { value: 'ok' },
-    ])
+    const link = mockLink([{ error: new Error('fail') }, { error: new Error('fail') }, { value: 'ok' }])
     const cb = withCircuitBreaker(link, { failureThreshold: 5 })
 
     await expect(cb.call(['test'], undefined, {})).rejects.toThrow()
@@ -207,10 +186,7 @@ describe('withCircuitBreaker', () => {
   })
 
   it('moves to half-open after resetTimeout', async () => {
-    const link = mockLink([
-      ...Array.from({ length: 3 }, () => ({ error: new Error('fail') })),
-      { value: 'recovered' },
-    ])
+    const link = mockLink([...Array.from({ length: 3 }, () => ({ error: new Error('fail') })), { value: 'recovered' }])
     const cb = withCircuitBreaker(link, { failureThreshold: 3, resetTimeout: 10 })
 
     for (let i = 0; i < 3; i++) {
@@ -239,10 +215,14 @@ describe('withTimeout', () => {
       async call(_path, _input, options) {
         await new Promise((resolve, reject) => {
           const timer = setTimeout(resolve, 500)
-          options.signal?.addEventListener('abort', () => {
-            clearTimeout(timer)
-            reject(new DOMException('Aborted', 'AbortError'))
-          }, { once: true })
+          options.signal?.addEventListener(
+            'abort',
+            () => {
+              clearTimeout(timer)
+              reject(new DOMException('Aborted', 'AbortError'))
+            },
+            { once: true },
+          )
         })
         return 'too slow'
       },
@@ -256,17 +236,11 @@ describe('withTimeout', () => {
 
 describe('plugin composition', () => {
   it('withRetry + withCircuitBreaker + withTimeout compose correctly', async () => {
-    const link = mockLink([
-      { error: errorWithStatus(500) },
-      { value: 'recovered' },
-    ])
-    const composed = withRetry(
-      withCircuitBreaker(
-        withTimeout(link, { timeout: 5000 }),
-        { failureThreshold: 10 },
-      ),
-      { maxRetries: 3, baseDelay: 5 },
-    )
+    const link = mockLink([{ error: errorWithStatus(500) }, { value: 'recovered' }])
+    const composed = withRetry(withCircuitBreaker(withTimeout(link, { timeout: 5000 }), { failureThreshold: 10 }), {
+      maxRetries: 3,
+      baseDelay: 5,
+    })
     const result = await composed.call(['test'], undefined, {})
     expect(result).toBe('recovered')
   })

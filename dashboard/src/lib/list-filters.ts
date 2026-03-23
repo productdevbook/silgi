@@ -21,12 +21,10 @@ export interface ErrorListFilters {
   trace: ErrorTraceFilter
 }
 
-
 /** Get all procedure names from a request. */
 function requestProcedures(entry: RequestEntry): string {
-  return entry.procedures.map(p => p.procedure).join(', ')
+  return entry.procedures.map((p) => p.procedure).join(', ')
 }
-
 
 export function filterRequests(requests: RequestEntry[], filters: RequestListFilters) {
   const query = filters.query.trim().toLowerCase()
@@ -35,7 +33,7 @@ export function filterRequests(requests: RequestEntry[], filters: RequestListFil
     const procs = requestProcedures(entry)
     if (query && !procs.toLowerCase().includes(query) && !entry.path.toLowerCase().includes(query)) return false
 
-    if (filters.procedure !== 'all' && !entry.procedures.some(p => p.procedure === filters.procedure)) return false
+    if (filters.procedure !== 'all' && !entry.procedures.some((p) => p.procedure === filters.procedure)) return false
 
     if (filters.status === 'success' && entry.status >= 400) return false
 
@@ -76,7 +74,6 @@ export function filterErrors(errors: ErrorEntry[], filters: ErrorListFilters) {
     return true
   })
 }
-
 
 export function getProcedureOptions(procedures: string[]) {
   return [...new Set(procedures)].toSorted((a, b) => a.localeCompare(b))

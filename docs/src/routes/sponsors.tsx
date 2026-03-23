@@ -55,7 +55,12 @@ function SponsorsPage() {
 function SponsorTier({ title, sponsors, size }: { title: string; sponsors: Sponsor[]; size: 'lg' | 'md' | 'sm' }) {
   if (sponsors.length === 0) return null
 
-  const gridCols = size === 'lg' ? 'grid-cols-1 sm:grid-cols-2' : size === 'md' ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-3 sm:grid-cols-5'
+  const gridCols =
+    size === 'lg'
+      ? 'grid-cols-1 sm:grid-cols-2'
+      : size === 'md'
+        ? 'grid-cols-2 sm:grid-cols-3'
+        : 'grid-cols-3 sm:grid-cols-5'
   const h = size === 'lg' ? 'h-28' : size === 'md' ? 'h-20' : 'h-14'
 
   return (

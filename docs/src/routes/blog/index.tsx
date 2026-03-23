@@ -16,7 +16,7 @@ const getBlogPosts = createServerFn({ method: 'GET' }).handler(async () => {
       url: p.url,
       title: p.data.title,
       description: p.data.description ?? '',
-      author: (p.data as Record<string, unknown>).author as string ?? 'Silgi Team',
+      author: ((p.data as Record<string, unknown>).author as string) ?? 'Silgi Team',
       date: String((p.data as Record<string, unknown>).date ?? ''),
     }))
     .toSorted((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())

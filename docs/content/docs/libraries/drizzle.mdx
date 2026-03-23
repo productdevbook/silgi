@@ -13,21 +13,9 @@ Every database query is a potential bottleneck. The Drizzle integration wraps yo
 Install both packages:
 
 <Tabs items={['pnpm', 'npm', 'bun']}>
-  <Tab value='pnpm'>
-  ```bash
-  pnpm add silgi drizzle-orm
-  ```
-  </Tab>
-  <Tab value='npm'>
-  ```bash
-  npm install silgi drizzle-orm
-  ```
-  </Tab>
-  <Tab value='bun'>
-  ```bash
-  bun add silgi drizzle-orm
-  ```
-  </Tab>
+  <Tab value='pnpm'>```bash pnpm add silgi drizzle-orm ```</Tab>
+  <Tab value='npm'>```bash npm install silgi drizzle-orm ```</Tab>
+  <Tab value='bun'>```bash bun add silgi drizzle-orm ```</Tab>
 </Tabs>
 
 Wrap your Drizzle instance with `instrumentDrizzle`, then use `withSilgiCtx` inside procedures to connect queries to the current request trace:
@@ -39,10 +27,7 @@ import { instrumentDrizzle, withSilgiCtx } from 'silgi/drizzle'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import * as schema from './schema'
 
-const db = instrumentDrizzle(
-  drizzle(process.env.DATABASE_URL!, { schema }),
-  { dbName: 'myapp' },
-)
+const db = instrumentDrizzle(drizzle(process.env.DATABASE_URL!, { schema }), { dbName: 'myapp' })
 
 const s = silgi()
 
@@ -57,15 +42,15 @@ export default { fetch: s.handler(s.router({ users: { list: listUsers } })) }
 
 Each query produces a span with these attributes:
 
-| Attribute | Type | Description |
-| --- | --- | --- |
-| `db.system` | `string` | Database system identifier (default: `postgresql`) |
-| `db.name` | `string` | Logical database name (e.g. `auth`, `ecommerce`) |
-| `db.operation` | `string` | SQL operation (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) |
-| `db.statement` | `string` | Full SQL text (truncated to `maxQueryTextLength`) |
-| `db.transaction` | `boolean` | `true` when the query runs inside a transaction |
-| `net.peer.name` | `string` | Database host |
-| `net.peer.port` | `number` | Database port |
+| Attribute        | Type      | Description                                            |
+| ---------------- | --------- | ------------------------------------------------------ |
+| `db.system`      | `string`  | Database system identifier (default: `postgresql`)     |
+| `db.name`        | `string`  | Logical database name (e.g. `auth`, `ecommerce`)       |
+| `db.operation`   | `string`  | SQL operation (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) |
+| `db.statement`   | `string`  | Full SQL text (truncated to `maxQueryTextLength`)      |
+| `db.transaction` | `boolean` | `true` when the query runs inside a transaction        |
+| `net.peer.name`  | `string`  | Database host                                          |
+| `net.peer.port`  | `number`  | Database port                                          |
 
 ## Span naming
 
@@ -86,14 +71,14 @@ This is more useful than generic names like `db.query` — you can immediately s
 
 All options are optional. Pass them as the second argument to `instrumentDrizzle`:
 
-| Name | Type | Default | Description |
-| --- | --- | --- | --- |
-| `dbName` | `string` | `undefined` | Logical database name. Appears as `db.name` attribute |
-| `dbSystem` | `string` | `'postgresql'` | Database system identifier |
-| `captureQueryText` | `boolean` | `true` | Include SQL text in spans |
-| `maxQueryTextLength` | `number` | `1000` | Truncate SQL text after this many characters |
-| `peerName` | `string` | `undefined` | Database host. Appears as `net.peer.name` |
-| `peerPort` | `number` | `undefined` | Database port. Appears as `net.peer.port` |
+| Name                 | Type      | Default        | Description                                           |
+| -------------------- | --------- | -------------- | ----------------------------------------------------- |
+| `dbName`             | `string`  | `undefined`    | Logical database name. Appears as `db.name` attribute |
+| `dbSystem`           | `string`  | `'postgresql'` | Database system identifier                            |
+| `captureQueryText`   | `boolean` | `true`         | Include SQL text in spans                             |
+| `maxQueryTextLength` | `number`  | `1000`         | Truncate SQL text after this many characters          |
+| `peerName`           | `string`  | `undefined`    | Database host. Appears as `net.peer.name`             |
+| `peerPort`           | `number`  | `undefined`    | Database port. Appears as `net.peer.port`             |
 
 ## Multiple databases
 
@@ -104,15 +89,17 @@ Instrument each database separately with a distinct `dbName`:
 import { instrumentDrizzle } from 'silgi/drizzle'
 import { drizzle } from 'drizzle-orm/node-postgres'
 
-const authDb = instrumentDrizzle(
-  drizzle(process.env.AUTH_DATABASE_URL!),
-  { dbName: 'auth', peerName: 'db.example.com', peerPort: 5432 },
-)
+const authDb = instrumentDrizzle(drizzle(process.env.AUTH_DATABASE_URL!), {
+  dbName: 'auth',
+  peerName: 'db.example.com',
+  peerPort: 5432,
+})
 
-const ecommerceDb = instrumentDrizzle(
-  drizzle(process.env.ECOMMERCE_DATABASE_URL!),
-  { dbName: 'ecommerce', peerName: 'db.example.com', peerPort: 5432 },
-)
+const ecommerceDb = instrumentDrizzle(drizzle(process.env.ECOMMERCE_DATABASE_URL!), {
+  dbName: 'ecommerce',
+  peerName: 'db.example.com',
+  peerPort: 5432,
+})
 ```
 
 In your analytics, spans from each database are distinguished by the `db.name` attribute.
@@ -131,9 +118,7 @@ const createOrder = s.$resolve(async ({ ctx, input }) => {
       // span: db.tx.insert.order
       const [order] = await tx.insert(schema.orders).values(input).returning()
       // span: db.tx.insert.order_item
-      await tx.insert(schema.orderItems).values(
-        input.items.map((item) => ({ ...item, orderId: order.id })),
-      )
+      await tx.insert(schema.orderItems).values(input.items.map((item) => ({ ...item, orderId: order.id })))
       return order
     }),
   )
@@ -149,13 +134,10 @@ By default, the full SQL text is captured in spans. If your queries contain sens
 import { instrumentDrizzle } from 'silgi/drizzle'
 import { drizzle } from 'drizzle-orm/node-postgres'
 
-const db = instrumentDrizzle(
-  drizzle(process.env.DATABASE_URL!),
-  {
-    dbName: 'myapp',
-    captureQueryText: process.env.NODE_ENV !== 'production',
-  },
-)
+const db = instrumentDrizzle(drizzle(process.env.DATABASE_URL!), {
+  dbName: 'myapp',
+  captureQueryText: process.env.NODE_ENV !== 'production',
+})
 ```
 
 You still get span names, durations, and operation types — just not the raw SQL.

@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  SLOW_REQUEST_MS,
-  filterErrors,
-  filterRequests,
-} from '../../dashboard/src/lib/list-filters'
+import { SLOW_REQUEST_MS, filterErrors, filterRequests } from '../../dashboard/src/lib/list-filters'
 import { mockErrors, mockRequests } from '../../dashboard/src/lib/mock-data'
 
 describe('dashboard list filters', () => {
@@ -16,14 +12,23 @@ describe('dashboard list filters', () => {
         id: 100,
         status: 500,
         durationMs: SLOW_REQUEST_MS + 50,
-        procedures: [{ ...mockRequests[0]!.procedures[0]!, procedure: 'todos/delete', status: 500, durationMs: SLOW_REQUEST_MS + 50 }],
+        procedures: [
+          {
+            ...mockRequests[0]!.procedures[0]!,
+            procedure: 'todos/delete',
+            status: 500,
+            durationMs: SLOW_REQUEST_MS + 50,
+          },
+        ],
       },
       {
         ...mockRequests[1]!,
         id: 101,
         status: 404,
         durationMs: SLOW_REQUEST_MS - 10,
-        procedures: [{ ...mockRequests[1]!.procedures[0]!, procedure: 'users/me', status: 404, durationMs: SLOW_REQUEST_MS - 10 }],
+        procedures: [
+          { ...mockRequests[1]!.procedures[0]!, procedure: 'users/me', status: 404, durationMs: SLOW_REQUEST_MS - 10 },
+        ],
       },
     ]
 

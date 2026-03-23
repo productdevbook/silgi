@@ -13,12 +13,14 @@
  * Run: node --experimental-strip-types bench/http.ts
  */
 
-import { Hono } from 'hono'
-import { serve as honoServe } from '@hono/node-server'
-import Fastify from 'fastify'
-import express from 'express'
 import http from 'node:http'
+
+import { serve as honoServe } from '@hono/node-server'
+import express from 'express'
+import Fastify from 'fastify'
+import { Hono } from 'hono'
 import { serve as srvxServe } from 'srvx'
+
 import { silgi } from '../src/silgi.ts'
 
 const REQUESTS = 5000
@@ -39,13 +41,21 @@ async function measure(url: string, n: number): Promise<Result> {
   const times: number[] = []
 
   for (let i = 0; i < WARMUP; i++) {
-    const res = await fetch(url, { method: 'POST', body: '{"limit":10}', headers: { 'content-type': 'application/json' } })
+    const res = await fetch(url, {
+      method: 'POST',
+      body: '{"limit":10}',
+      headers: { 'content-type': 'application/json' },
+    })
     await res.json()
   }
 
   for (let i = 0; i < n; i++) {
     const start = performance.now()
-    const res = await fetch(url, { method: 'POST', body: '{"limit":10}', headers: { 'content-type': 'application/json' } })
+    const res = await fetch(url, {
+      method: 'POST',
+      body: '{"limit":10}',
+      headers: { 'content-type': 'application/json' },
+    })
     await res.json()
     times.push(performance.now() - start)
   }
@@ -57,21 +67,32 @@ async function measure(url: string, n: number): Promise<Result> {
   const p99 = times[Math.floor(times.length * 0.99)]!
   const rps = Math.round(1000 / avg)
 
-  return { avg: Math.round(avg * 1000), p50: Math.round(p50 * 1000), p95: Math.round(p95 * 1000), p99: Math.round(p99 * 1000), rps }
+  return {
+    avg: Math.round(avg * 1000),
+    p50: Math.round(p50 * 1000),
+    p95: Math.round(p95 * 1000),
+    p99: Math.round(p99 * 1000),
+    rps,
+  }
 }
 
 async function verify(url: string): Promise<void> {
   const res = await fetch(url, { method: 'POST', body: '{"limit":3}', headers: { 'content-type': 'application/json' } })
   if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`)
-  const body = await res.json() as any
+  const body = (await res.json()) as any
   if (!body.users || body.users.length !== 3) throw new Error(`Expected 3 users, got ${JSON.stringify(body)}`)
-  if (body.users[0].id !== 1 || body.users[0].name !== 'User 1') throw new Error(`Bad user shape: ${JSON.stringify(body.users[0])}`)
+  if (body.users[0].id !== 1 || body.users[0].name !== 'User 1')
+    throw new Error(`Bad user shape: ${JSON.stringify(body.users[0])}`)
 }
 
-function fmt(us: number): string { return `${us}µs` }
-function fmtRps(n: number): string { return `${n.toLocaleString()}/s` }
+function fmt(us: number): string {
+  return `${us}µs`
+}
+function fmtRps(n: number): string {
+  return `${n.toLocaleString()}/s`
+}
 function median(arr: Result[]): Result {
-  const sorted = [...arr].sort((a, b) => a.avg - b.avg)
+  const sorted = [...arr].toSorted((a, b) => a.avg - b.avg)
   return sorted[Math.floor(sorted.length / 2)]!
 }
 

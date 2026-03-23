@@ -202,7 +202,9 @@ export function requestToRedactedJson(entry: RequestEntry): string {
   const redacted = {
     ...entry,
     headers: Object.fromEntries(Object.entries(entry.headers ?? {}).map(([k, v]) => [k, redactHeader(k, v)])),
-    responseHeaders: Object.fromEntries(Object.entries(entry.responseHeaders ?? {}).map(([k, v]) => [k, redactHeader(k, v)])),
+    responseHeaders: Object.fromEntries(
+      Object.entries(entry.responseHeaders ?? {}).map(([k, v]) => [k, redactHeader(k, v)]),
+    ),
   }
   return JSON.stringify(redacted, null, 2)
 }
@@ -250,7 +252,9 @@ export function sessionToRedactedJson(requests: RequestEntry[], sessionId: strin
   const redacted = requests.map((r) => ({
     ...r,
     headers: Object.fromEntries(Object.entries(r.headers ?? {}).map(([k, v]) => [k, redactHeader(k, v)])),
-    responseHeaders: Object.fromEntries(Object.entries(r.responseHeaders ?? {}).map(([k, v]) => [k, redactHeader(k, v)])),
+    responseHeaders: Object.fromEntries(
+      Object.entries(r.responseHeaders ?? {}).map(([k, v]) => [k, redactHeader(k, v)]),
+    ),
   }))
   return JSON.stringify({ sessionId, requests: redacted }, null, 2)
 }

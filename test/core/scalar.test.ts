@@ -133,9 +133,7 @@ describe('generateOpenAPI', () => {
   it('$route with explicit method uses that method as OpenAPI key', () => {
     const router = k.router({
       users: {
-        list: k
-          .$route({ method: 'get', path: '/users' })
-          .$resolve(() => []),
+        list: k.$route({ method: 'get', path: '/users' }).$resolve(() => []),
       },
     })
     const spec = generateOpenAPI(router)
@@ -146,9 +144,7 @@ describe('generateOpenAPI', () => {
   it('method: "*" produces valid OpenAPI methods, not literal "*"', () => {
     const router = k.router({
       auth: {
-        handler: k
-          .$route({ method: '*', path: '/api/auth/**' })
-          .$resolve(() => new Response('ok')),
+        handler: k.$route({ method: '*', path: '/api/auth/**' }).$resolve(() => new Response('ok')),
       },
     })
     const spec = generateOpenAPI(router)
@@ -162,9 +158,7 @@ describe('generateOpenAPI', () => {
   it('wildcard path ** is converted to OpenAPI parameter syntax', () => {
     const router = k.router({
       files: {
-        serve: k
-          .$route({ method: 'get', path: '/files/**' })
-          .$resolve(() => new Response('ok')),
+        serve: k.$route({ method: 'get', path: '/files/**' }).$resolve(() => new Response('ok')),
       },
     })
     const spec = generateOpenAPI(router)
@@ -198,9 +192,7 @@ describe('generateOpenAPI', () => {
 
   it('converts :param(regex) to {param}', () => {
     const router = k.router({
-      items: k
-        .$route({ method: 'GET', path: '/items/:id(\\d+)' })
-        .$resolve(() => ({})),
+      items: k.$route({ method: 'GET', path: '/items/:id(\\d+)' }).$resolve(() => ({})),
     })
     const spec = generateOpenAPI(router)
     expect((spec.paths as any)['/items/{id}']).toBeDefined()
@@ -208,9 +200,7 @@ describe('generateOpenAPI', () => {
 
   it('declares {path} parameter for ** wildcard', () => {
     const router = k.router({
-      files: k
-        .$route({ method: 'GET', path: '/files/**' })
-        .$resolve(() => new Response('ok')),
+      files: k.$route({ method: 'GET', path: '/files/**' }).$resolve(() => new Response('ok')),
     })
     const spec = generateOpenAPI(router)
     const getOp = (spec.paths as any)['/files/{path}'].get
@@ -223,9 +213,7 @@ describe('generateOpenAPI', () => {
   it('uses Route.tags when provided', () => {
     const router = k.router({
       users: {
-        list: k
-          .$route({ tags: ['Users', 'Public'] })
-          .$resolve(() => []),
+        list: k.$route({ tags: ['Users', 'Public'] }).$resolve(() => []),
       },
     })
     const spec = generateOpenAPI(router)
@@ -249,9 +237,7 @@ describe('generateOpenAPI', () => {
   it('uses custom operationId from Route', () => {
     const router = k.router({
       users: {
-        list: k
-          .$route({ operationId: 'listAllUsers' })
-          .$resolve(() => []),
+        list: k.$route({ operationId: 'listAllUsers' }).$resolve(() => []),
       },
     })
     const spec = generateOpenAPI(router)
@@ -263,9 +249,7 @@ describe('generateOpenAPI', () => {
 
   it('marks procedure as public with security: false', () => {
     const router = k.router({
-      public: k
-        .$route({ security: false })
-        .$resolve(() => ({ ok: true })),
+      public: k.$route({ security: false }).$resolve(() => ({ ok: true })),
     })
     const spec = generateOpenAPI(router, { security: { type: 'http', scheme: 'bearer' } })
     const op = (spec.paths as any)['/public'].post
@@ -274,9 +258,7 @@ describe('generateOpenAPI', () => {
 
   it('uses per-procedure security schemes', () => {
     const router = k.router({
-      admin: k
-        .$route({ security: ['bearerAuth', 'apiKey'] })
-        .$resolve(() => ({ ok: true })),
+      admin: k.$route({ security: ['bearerAuth', 'apiKey'] }).$resolve(() => ({ ok: true })),
     })
     const spec = generateOpenAPI(router)
     const op = (spec.paths as any)['/admin'].post
@@ -287,9 +269,7 @@ describe('generateOpenAPI', () => {
 
   it('auto-documents 400 for procedures with input', () => {
     const router = k.router({
-      create: k
-        .$input(z.object({ name: z.string() }))
-        .$resolve(({ input }) => input),
+      create: k.$input(z.object({ name: z.string() })).$resolve(({ input }) => input),
     })
     const spec = generateOpenAPI(router)
     const op = (spec.paths as any)['/create'].post
@@ -310,9 +290,7 @@ describe('generateOpenAPI', () => {
 
   it('merges spec object override', () => {
     const router = k.router({
-      docs: k
-        .$route({ spec: { externalDocs: { url: 'https://example.com' }, 'x-custom': true } })
-        .$resolve(() => ({})),
+      docs: k.$route({ spec: { externalDocs: { url: 'https://example.com' }, 'x-custom': true } }).$resolve(() => ({})),
     })
     const spec = generateOpenAPI(router)
     const op = (spec.paths as any)['/docs'].post
@@ -322,9 +300,7 @@ describe('generateOpenAPI', () => {
 
   it('applies spec function override', () => {
     const router = k.router({
-      custom: k
-        .$route({ spec: (op) => ({ ...op, 'x-rate-limit': 100 }) })
-        .$resolve(() => ({})),
+      custom: k.$route({ spec: (op) => ({ ...op, 'x-rate-limit': 100 }) }).$resolve(() => ({})),
     })
     const spec = generateOpenAPI(router)
     const op = (spec.paths as any)['/custom'].post
@@ -335,9 +311,7 @@ describe('generateOpenAPI', () => {
 
   it('includes error message as default in spec', () => {
     const router = k.router({
-      fail: k
-        .$errors({ CONFLICT: { status: 409, message: 'Already exists' } })
-        .$resolve(() => ({})),
+      fail: k.$errors({ CONFLICT: { status: 409, message: 'Already exists' } }).$resolve(() => ({})),
     })
     const spec = generateOpenAPI(router)
     const op = (spec.paths as any)['/fail'].post
@@ -349,7 +323,9 @@ describe('generateOpenAPI', () => {
 
   it('subscription uses text/event-stream content type', () => {
     const router = k.router({
-      stream: k.subscription(async function* () { yield { tick: 1 } }),
+      stream: k.subscription(async function* () {
+        yield { tick: 1 }
+      }),
     })
     const spec = generateOpenAPI(router)
     const op = (spec.paths as any)['/stream'].post
@@ -359,9 +335,7 @@ describe('generateOpenAPI', () => {
 
   it('catch-all route appears with valid path and method in spec', () => {
     const router = k.router({
-      proxy: k
-        .$route({ method: '*', path: '/api/proxy/**' })
-        .$resolve(() => new Response('proxied')),
+      proxy: k.$route({ method: '*', path: '/api/proxy/**' }).$resolve(() => new Response('proxied')),
     })
     const spec = generateOpenAPI(router)
     const paths = spec.paths as Record<string, Record<string, unknown>>

@@ -16,7 +16,7 @@ const getChangelogPosts = createServerFn({ method: 'GET' }).handler(async () => 
       url: p.url,
       title: p.data.title,
       description: p.data.description ?? '',
-      version: (p.data as Record<string, unknown>).version as string ?? p.data.title,
+      version: ((p.data as Record<string, unknown>).version as string) ?? p.data.title,
       date: String((p.data as Record<string, unknown>).date ?? ''),
     }))
     .toSorted((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())

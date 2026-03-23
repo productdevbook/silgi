@@ -65,14 +65,12 @@ describe('handler() — passthrough (wildcard catch-all)', () => {
     })
 
     // Simulate an external handler that reads the body itself (like Better Auth)
-    const externalHandler = k2
-      .$route({ method: '*', path: '/api/auth/**' })
-      .$resolve(async ({ ctx }) => {
-        const body = await (ctx as any).req.json()
-        return new Response(JSON.stringify({ received: body }), {
-          headers: { 'content-type': 'application/json' },
-        })
+    const externalHandler = k2.$route({ method: '*', path: '/api/auth/**' }).$resolve(async ({ ctx }) => {
+      const body = await (ctx as any).req.json()
+      return new Response(JSON.stringify({ received: body }), {
+        headers: { 'content-type': 'application/json' },
       })
+    })
 
     const router = k2.router({ auth: { handler: externalHandler } })
     const handle2 = k2.handler(router)
@@ -93,9 +91,7 @@ describe('handler() — passthrough (wildcard catch-all)', () => {
   it('passthrough route returns Response directly', async () => {
     const k2 = silgi({ context: () => ({}) })
 
-    const proxy = k2
-      .$route({ method: '*', path: '/proxy/**' })
-      .$resolve(() => new Response('proxied', { status: 200 }))
+    const proxy = k2.$route({ method: '*', path: '/proxy/**' }).$resolve(() => new Response('proxied', { status: 200 }))
 
     const router = k2.router({ proxy })
     const handle2 = k2.handler(router)
@@ -110,15 +106,13 @@ describe('handler() — passthrough (wildcard catch-all)', () => {
       context: (req) => ({ req }),
     })
 
-    const externalHandler = k2
-      .$route({ method: '*', path: '/api/ext/**' })
-      .$resolve(async ({ ctx }) => {
-        const body = await (ctx as any).req.json()
-        return new Response(JSON.stringify({ ok: true, name: body.name }), {
-          status: 201,
-          headers: { 'content-type': 'application/json' },
-        })
+    const externalHandler = k2.$route({ method: '*', path: '/api/ext/**' }).$resolve(async ({ ctx }) => {
+      const body = await (ctx as any).req.json()
+      return new Response(JSON.stringify({ ok: true, name: body.name }), {
+        status: 201,
+        headers: { 'content-type': 'application/json' },
       })
+    })
 
     const router = k2.router({ ext: { handler: externalHandler } })
     const handle2 = k2.handler(router, { analytics: true })
@@ -165,14 +159,12 @@ describe('handler() — passthrough (wildcard catch-all)', () => {
       context: (req) => ({ req }),
     })
 
-    const handler = k2
-      .$route({ method: '*', path: '/api/proxy/**' })
-      .$resolve(async ({ ctx }) => {
-        const body = await (ctx as any).req.json()
-        return new Response(JSON.stringify(body), {
-          headers: { 'content-type': 'application/json' },
-        })
+    const handler = k2.$route({ method: '*', path: '/api/proxy/**' }).$resolve(async ({ ctx }) => {
+      const body = await (ctx as any).req.json()
+      return new Response(JSON.stringify(body), {
+        headers: { 'content-type': 'application/json' },
       })
+    })
 
     const router = k2.router({ proxy: { handler } })
     const handle2 = k2.handler(router, { analytics: true })
@@ -196,14 +188,12 @@ describe('handler() — passthrough (wildcard catch-all)', () => {
       context: (req) => ({ req }),
     })
 
-    const handler = k2
-      .$route({ method: '*', path: '/ext/**' })
-      .$resolve(({ ctx }) => {
-        const url = new URL((ctx as any).req.url)
-        return new Response(JSON.stringify({ path: url.pathname }), {
-          headers: { 'content-type': 'application/json' },
-        })
+    const handler = k2.$route({ method: '*', path: '/ext/**' }).$resolve(({ ctx }) => {
+      const url = new URL((ctx as any).req.url)
+      return new Response(JSON.stringify({ path: url.pathname }), {
+        headers: { 'content-type': 'application/json' },
       })
+    })
 
     const router = k2.router({ ext: { handler } })
     const handle2 = k2.handler(router)

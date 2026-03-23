@@ -190,22 +190,20 @@ export function iteratorToEventStream(
       if (options.initialComment !== undefined) {
         controller.enqueue(encodeEventMessage({ comment: options.initialComment }))
       }
-    },
-
-    async pull(controller) {
-      // Set up keepalive
-      clearInterval(keepAliveTimer)
+      // Single long-running keepalive timer — avoids per-pull start/stop race
       keepAliveTimer = setInterval(() => {
         if (!cancelled) controller.enqueue(encodeEventMessage({ comment: 'keepalive' }))
       }, keepAliveMs)
+    },
 
+    async pull(controller) {
       try {
         const result = await iterator.next()
-        clearInterval(keepAliveTimer)
 
         if (cancelled) return
 
         if (result.done) {
+          clearInterval(keepAliveTimer)
           // Stream complete — send done event
           const data = result.value !== undefined ? serialize(result.value) : undefined
           controller.enqueue(encodeEventMessage({ event: 'done', data }))
@@ -237,10 +235,10 @@ export function iteratorToEventStream(
       }
     },
 
-    cancel() {
+    async cancel() {
       cancelled = true
       clearInterval(keepAliveTimer)
-      iterator.return?.()
+      await iterator.return?.()
     },
   })
 
@@ -330,10 +328,10 @@ export function eventStreamToIterator<T = unknown>(
     },
     async () => {
       try {
-        reader.releaseLock()
+        await decodedStream.cancel()
       } catch {}
       try {
-        await decodedStream.cancel()
+        reader.releaseLock()
       } catch {}
     },
   )

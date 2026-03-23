@@ -84,9 +84,12 @@ Pass `signal` or `context` as a second argument to any procedure call:
 const caller = s.createCaller(appRouter)
 
 // Per-call context — useful for testing different auth states
-await caller.users.create({ name: 'Alice' }, {
-  context: { token: 'valid-jwt' },
-})
+await caller.users.create(
+  { name: 'Alice' },
+  {
+    context: { token: 'valid-jwt' },
+  },
+)
 
 // Per-call signal — useful for testing cancellation
 const controller = new AbortController()
@@ -140,18 +143,18 @@ try {
 
 ### `createCaller` options
 
-| Option             | Type                          | Default   | Description                              |
-| ------------------ | ----------------------------- | --------- | ---------------------------------------- |
-| `contextOverride`  | `Record<string, unknown>`     | —         | Override or extend the base context      |
-| `headers`          | `Record<string, string>`      | —         | Mock request headers for context factory |
-| `timeout`          | `number \| null`              | `30000`   | Default timeout in ms (`null` = none)    |
+| Option            | Type                      | Default | Description                              |
+| ----------------- | ------------------------- | ------- | ---------------------------------------- |
+| `contextOverride` | `Record<string, unknown>` | —       | Override or extend the base context      |
+| `headers`         | `Record<string, string>`  | —       | Mock request headers for context factory |
+| `timeout`         | `number \| null`          | `30000` | Default timeout in ms (`null` = none)    |
 
 ### Per-call options (second argument)
 
-| Option    | Type                      | Description                          |
-| --------- | ------------------------- | ------------------------------------ |
-| `signal`  | `AbortSignal`             | AbortSignal for this call            |
-| `context` | `Record<string, unknown>` | Per-call context (merged over base)  |
+| Option    | Type                      | Description                         |
+| --------- | ------------------------- | ----------------------------------- |
+| `signal`  | `AbortSignal`             | AbortSignal for this call           |
+| `context` | `Record<string, unknown>` | Per-call context (merged over base) |
 
 ## How it works
 
@@ -164,7 +167,8 @@ try {
 The only difference from an HTTP request: no serialization, no HTTP headers, no response construction. Everything else — validation, guards, error codes — behaves identically.
 
 <Callout>
-  `createCaller` is the recommended way to test procedures. It runs the full pipeline including guards and validation, catching bugs that unit-testing the resolve function alone would miss.
+  `createCaller` is the recommended way to test procedures. It runs the full pipeline including guards and validation,
+  catching bugs that unit-testing the resolve function alone would miss.
 </Callout>
 
 ## What's next?

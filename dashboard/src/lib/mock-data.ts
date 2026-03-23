@@ -119,7 +119,9 @@ export const mockErrors: ErrorEntry[] = [
 
 export const mockRequests: RequestEntry[] = [
   {
-    id: 1, requestId: "req-1-a3f2c1", sessionId: "ses-1-x7k9m2",
+    id: 1,
+    requestId: 'req-1-a3f2c1',
+    sessionId: 'ses-1-x7k9m2',
     timestamp: timeAgo(2 * SEC),
     durationMs: 4.82,
     method: 'GET',
@@ -130,21 +132,31 @@ export const mockRequests: RequestEntry[] = [
     userAgent: 'Mozilla/5.0',
     status: 200,
     isBatch: false,
-    procedures: [{
-      procedure: 'todos/list',
-      durationMs: 4.82,
-      status: 200,
-      input: undefined,
-      output: null,
-      spans: [
-        { kind: 'cache', name: 'cache.get', durationMs: 0.12, startOffsetMs: 0.1 },
-        { kind: 'db', name: 'db.todos.findMany', durationMs: 3.87, startOffsetMs: 0.3, detail: 'SELECT * FROM todos ORDER BY created_at DESC' },
-        { kind: 'cache', name: 'cache.set', durationMs: 0.41, startOffsetMs: 4.2 },
-      ],
-    }],
+    procedures: [
+      {
+        procedure: 'todos/list',
+        durationMs: 4.82,
+        status: 200,
+        input: undefined,
+        output: null,
+        spans: [
+          { kind: 'cache', name: 'cache.get', durationMs: 0.12, startOffsetMs: 0.1 },
+          {
+            kind: 'db',
+            name: 'db.todos.findMany',
+            durationMs: 3.87,
+            startOffsetMs: 0.3,
+            detail: 'SELECT * FROM todos ORDER BY created_at DESC',
+          },
+          { kind: 'cache', name: 'cache.set', durationMs: 0.41, startOffsetMs: 4.2 },
+        ],
+      },
+    ],
   },
   {
-    id: 2, requestId: "req-2-b7d4e9", sessionId: "ses-1-x7k9m2",
+    id: 2,
+    requestId: 'req-2-b7d4e9',
+    sessionId: 'ses-1-x7k9m2',
     timestamp: timeAgo(3 * SEC),
     durationMs: 18.3,
     method: 'POST',
@@ -155,21 +167,31 @@ export const mockRequests: RequestEntry[] = [
     userAgent: 'Mozilla/5.0',
     status: 200,
     isBatch: false,
-    procedures: [{
-      procedure: 'todos/create',
-      durationMs: 18.3,
-      status: 200,
-      input: { title: 'Buy groceries' },
-      output: { id: 42, title: 'Buy groceries', done: false },
-      spans: [
-        { kind: 'db', name: 'db.todos.create', durationMs: 12.4, startOffsetMs: 0.5, detail: 'INSERT INTO todos (title) VALUES ($1)' },
-        { kind: 'cache', name: 'cache.invalidate', durationMs: 0.8, startOffsetMs: 13.1 },
-        { kind: 'queue', name: 'queue.publish:todo.created', durationMs: 4.1, startOffsetMs: 14.0 },
-      ],
-    }],
+    procedures: [
+      {
+        procedure: 'todos/create',
+        durationMs: 18.3,
+        status: 200,
+        input: { title: 'Buy groceries' },
+        output: { id: 42, title: 'Buy groceries', done: false },
+        spans: [
+          {
+            kind: 'db',
+            name: 'db.todos.create',
+            durationMs: 12.4,
+            startOffsetMs: 0.5,
+            detail: 'INSERT INTO todos (title) VALUES ($1)',
+          },
+          { kind: 'cache', name: 'cache.invalidate', durationMs: 0.8, startOffsetMs: 13.1 },
+          { kind: 'queue', name: 'queue.publish:todo.created', durationMs: 4.1, startOffsetMs: 14.0 },
+        ],
+      },
+    ],
   },
   {
-    id: 3, requestId: "req-3-c1f8a2", sessionId: "ses-2-p4r8w1",
+    id: 3,
+    requestId: 'req-3-c1f8a2',
+    sessionId: 'ses-2-p4r8w1',
     timestamp: timeAgo(5 * SEC),
     durationMs: 24.5,
     method: 'POST',
@@ -189,7 +211,13 @@ export const mockRequests: RequestEntry[] = [
         output: { id: 1, name: 'Alice' },
         spans: [
           { kind: 'cache', name: 'cache.get:session', durationMs: 0.3, startOffsetMs: 0.1 },
-          { kind: 'db', name: 'db.users.findById', durationMs: 1.6, startOffsetMs: 0.5, detail: 'SELECT * FROM users WHERE id = $1' },
+          {
+            kind: 'db',
+            name: 'db.users.findById',
+            durationMs: 1.6,
+            startOffsetMs: 0.5,
+            detail: 'SELECT * FROM users WHERE id = $1',
+          },
         ],
       },
       {
@@ -199,7 +227,13 @@ export const mockRequests: RequestEntry[] = [
         input: undefined,
         output: null,
         spans: [
-          { kind: 'db', name: 'db.todos.findMany', durationMs: 4.8, startOffsetMs: 2.3, detail: 'SELECT * FROM todos WHERE user_id = $1' },
+          {
+            kind: 'db',
+            name: 'db.todos.findMany',
+            durationMs: 4.8,
+            startOffsetMs: 2.3,
+            detail: 'SELECT * FROM todos WHERE user_id = $1',
+          },
         ],
       },
       {
@@ -208,14 +242,14 @@ export const mockRequests: RequestEntry[] = [
         status: 200,
         input: undefined,
         output: { count: 3 },
-        spans: [
-          { kind: 'cache', name: 'cache.get:unread', durationMs: 0.2, startOffsetMs: 7.6 },
-        ],
+        spans: [{ kind: 'cache', name: 'cache.get:unread', durationMs: 0.2, startOffsetMs: 7.6 }],
       },
     ],
   },
   {
-    id: 4, requestId: "req-4-d9e3b7", sessionId: "ses-1-x7k9m2",
+    id: 4,
+    requestId: 'req-4-d9e3b7',
+    sessionId: 'ses-1-x7k9m2',
     timestamp: timeAgo(7 * SEC),
     durationMs: 9.7,
     method: 'POST',
@@ -226,18 +260,32 @@ export const mockRequests: RequestEntry[] = [
     userAgent: 'Mozilla/5.0',
     status: 200,
     isBatch: false,
-    procedures: [{
-      procedure: 'todos/toggle',
-      durationMs: 9.7,
-      status: 200,
-      input: { id: 5 },
-      output: null,
-      spans: [
-        { kind: 'db', name: 'db.todos.findById', durationMs: 2.1, startOffsetMs: 0.2 },
-        { kind: 'db', name: 'db.todos.update', durationMs: 5.8, startOffsetMs: 2.5, detail: 'UPDATE todos SET done = NOT done WHERE id = $1' },
-        { kind: 'cache', name: 'cache.invalidate', durationMs: 0.6, startOffsetMs: 8.5 },
-        { kind: 'http', name: 'http.webhook', durationMs: 0.9, startOffsetMs: 9.2, detail: 'POST https://hooks.example.com/todo-updated' },
-      ],
-    }],
+    procedures: [
+      {
+        procedure: 'todos/toggle',
+        durationMs: 9.7,
+        status: 200,
+        input: { id: 5 },
+        output: null,
+        spans: [
+          { kind: 'db', name: 'db.todos.findById', durationMs: 2.1, startOffsetMs: 0.2 },
+          {
+            kind: 'db',
+            name: 'db.todos.update',
+            durationMs: 5.8,
+            startOffsetMs: 2.5,
+            detail: 'UPDATE todos SET done = NOT done WHERE id = $1',
+          },
+          { kind: 'cache', name: 'cache.invalidate', durationMs: 0.6, startOffsetMs: 8.5 },
+          {
+            kind: 'http',
+            name: 'http.webhook',
+            durationMs: 0.9,
+            startOffsetMs: 9.2,
+            detail: 'POST https://hooks.example.com/todo-updated',
+          },
+        ],
+      },
+    ],
   },
 ]

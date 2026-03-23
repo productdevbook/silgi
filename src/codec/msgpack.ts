@@ -47,7 +47,17 @@ function sanitizeDecoded(value: unknown): unknown {
   if (value instanceof Error) return { message: (value as Error).message }
   if (value instanceof RegExp) return String(value)
   if (Array.isArray(value)) return value.map(sanitizeDecoded)
-  if (value instanceof Date || value instanceof Map || value instanceof Set) return value
+  if (value instanceof Date) return value
+  if (value instanceof Map) {
+    const sanitized = new Map()
+    for (const [k, v] of value) sanitized.set(k, sanitizeDecoded(v))
+    return sanitized
+  }
+  if (value instanceof Set) {
+    const sanitized = new Set()
+    for (const v of value) sanitized.add(sanitizeDecoded(v))
+    return sanitized
+  }
   const result: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(value)) {
     result[k] = sanitizeDecoded(v)

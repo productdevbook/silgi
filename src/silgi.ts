@@ -159,7 +159,7 @@ export interface SilgiInstance<TBaseCtx extends Record<string, unknown>> {
       /** Enable HTTP/2 (requires cert + key for TLS) */
       http2?: { cert: string; key: string }
     },
-  ) => void
+  ) => Promise<void>
 }
 
 // ── Guard Factory ───────────────────────────────────
@@ -267,7 +267,9 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
 
   // Initialize storage lazily (only if configured)
   if (config.storage) {
-    import('./core/storage.ts').then((m) => m.initStorage(config.storage)).catch((e) => console.error('[silgi] Failed to initialize storage:', e))
+    import('./core/storage.ts')
+      .then((m) => m.initStorage(config.storage))
+      .catch((e) => console.error('[silgi] Failed to initialize storage:', e))
   }
 
   const instance: SilgiInstance<TBaseCtx> = {

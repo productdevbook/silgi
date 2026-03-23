@@ -24,7 +24,12 @@ export function SpanWaterfall({ spans, totalMs }: SpanWaterfallProps) {
     <div className='flex flex-col'>
       {/* Header */}
       <div className='grid grid-cols-[2rem_2.5rem_minmax(0,12rem)_1fr_4.5rem_3rem] items-center gap-2 border-b py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground'>
-        <button type='button' onClick={toggleAll} className='cursor-pointer text-left hover:text-foreground' title={allExpanded ? 'Collapse all' : 'Expand all'}>
+        <button
+          type='button'
+          onClick={toggleAll}
+          className='cursor-pointer text-left hover:text-foreground'
+          title={allExpanded ? 'Collapse all' : 'Expand all'}
+        >
           {allExpanded ? '▼' : '▶'}
         </button>
         <span>kind</span>
@@ -110,12 +115,17 @@ export function SpanWaterfall({ spans, totalMs }: SpanWaterfallProps) {
                   {span.startOffsetMs != null && (
                     <span className='text-muted-foreground'>at +{span.startOffsetMs.toFixed(1)}ms</span>
                   )}
-                  <span className='text-muted-foreground'>({totalMs > 0 ? ((span.durationMs / totalMs) * 100).toFixed(0) : 0}% of total)</span>
+                  <span className='text-muted-foreground'>
+                    ({totalMs > 0 ? ((span.durationMs / totalMs) * 100).toFixed(0) : 0}% of total)
+                  </span>
                 </div>
                 {span.attributes && Object.keys(span.attributes).length > 0 && (
                   <div className='mb-2 flex flex-wrap gap-1.5'>
                     {Object.entries(span.attributes).map(([k, v]) => (
-                      <span key={k} className='inline-flex items-center gap-1 rounded bg-muted/40 px-1.5 py-0.5 font-mono text-[9px]'>
+                      <span
+                        key={k}
+                        className='inline-flex items-center gap-1 rounded bg-muted/40 px-1.5 py-0.5 font-mono text-[9px]'
+                      >
                         <span className='text-muted-foreground'>{k}</span>
                         <span className='text-foreground'>{String(v)}</span>
                       </span>
@@ -150,7 +160,9 @@ export function SpanWaterfall({ spans, totalMs }: SpanWaterfallProps) {
                 )}
                 {!span.detail && !span.error && !span.input && !span.output && !span.attributes && (
                   <p className='text-[11px] text-muted-foreground/60'>
-                    No detail captured. Use <code className='rounded bg-muted px-1'>{'ctx.trace(name, fn, { detail: "..." })'}</code> to add query/URL info.
+                    No detail captured. Use{' '}
+                    <code className='rounded bg-muted px-1'>{'ctx.trace(name, fn, { detail: "..." })'}</code> to add
+                    query/URL info.
                   </p>
                 )}
               </div>

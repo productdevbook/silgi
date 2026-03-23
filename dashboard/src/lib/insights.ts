@@ -20,7 +20,6 @@ export interface OverviewInsights {
   procedureCount: number
 }
 
-
 export function getOverviewInsights(data: AnalyticsData | null): OverviewInsights {
   if (!data) {
     return {

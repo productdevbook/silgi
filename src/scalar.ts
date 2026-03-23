@@ -76,13 +76,22 @@ interface JSONSchema {
  */
 function toOpenAPIPath(raw: string): { httpPath: string; pathParams: string[] } {
   const pathParams: string[] = []
-  let httpPath = raw
+  const httpPath = raw
     // Convert :param(regex) → {param}
-    .replace(/:(\w+)\([^)]*\)/g, (_m, name) => { pathParams.push(name); return `{${name}}` })
+    .replace(/:(\w+)\([^)]*\)/g, (_m, name) => {
+      pathParams.push(name)
+      return `{${name}}`
+    })
     // Convert :param? → {param}
-    .replace(/:(\w+)\?/g, (_m, name) => { pathParams.push(name); return `{${name}}` })
+    .replace(/:(\w+)\?/g, (_m, name) => {
+      pathParams.push(name)
+      return `{${name}}`
+    })
     // Convert :param → {param}
-    .replace(/:(\w+)/g, (_m, name) => { pathParams.push(name); return `{${name}}` })
+    .replace(/:(\w+)/g, (_m, name) => {
+      pathParams.push(name)
+      return `{${name}}`
+    })
     // Convert ** wildcard → {path}
     .replace(/\/\*\*$/g, '/{path}')
     .replace(/\/\*\*/g, '/{path}')
@@ -116,7 +125,8 @@ export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}):
     // Description (append WebSocket note if applicable)
     let description = route?.description
     if (route?.ws) {
-      const wsNote = 'Also available over WebSocket (`ws://`). Send `{ id, path: "' + path.join('/') + '", input }` as JSON.'
+      const wsNote =
+        'Also available over WebSocket (`ws://`). Send `{ id, path: "' + path.join('/') + '", input }` as JSON.'
       description = description ? `${description}\n\n${wsNote}` : wsNote
     }
 
@@ -417,7 +427,6 @@ function schemaToJsonSchema(schema: AnySchema): JSONSchema {
   } catch {}
   return {}
 }
-
 
 function objectSchemaToParams(schema: JSONSchema): Record<string, unknown>[] {
   if (schema.type !== 'object' || !schema.properties) return []

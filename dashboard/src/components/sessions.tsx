@@ -154,13 +154,15 @@ export function Sessions({ requests, navigate }: SessionsProps) {
           <TableHeader>
             <TableRow>
               <TableHead className='px-3 py-2 text-[11px]'>Session</TableHead>
-              {([
-                ['time', 'Last seen'],
-                ['requests', 'Requests'],
-                ['errors', 'Errors'],
-                ['duration', 'Total'],
-                ['avg', 'Avg'],
-              ] as const).map(([key, label]) => (
+              {(
+                [
+                  ['time', 'Last seen'],
+                  ['requests', 'Requests'],
+                  ['errors', 'Errors'],
+                  ['duration', 'Total'],
+                  ['avg', 'Avg'],
+                ] as const
+              ).map(([key, label]) => (
                 <TableHead
                   key={key}
                   onClick={() => handleSort(key)}
@@ -200,7 +202,9 @@ export function Sessions({ requests, navigate }: SessionsProps) {
                 <TableCell className='px-3 py-2 text-right text-xs tabular-nums'>{session.requestCount}</TableCell>
                 <TableCell className='px-3 py-2 text-right'>
                   {session.errorCount > 0 ? (
-                    <Badge variant='destructive' className='text-[10px]'>{session.errorCount}</Badge>
+                    <Badge variant='destructive' className='text-[10px]'>
+                      {session.errorCount}
+                    </Badge>
                   ) : (
                     <span className='text-xs text-muted-foreground'>0</span>
                   )}

@@ -1,7 +1,7 @@
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { SearchField } from '@/components/dashboard-shell'
 import { ProcedureTable } from '@/components/procedure-table'
 import { Badge } from '@/components/ui/badge'
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { Skeleton } from '@/components/ui/skeleton'
 import { fmt, fmtMs, fmtUptime } from '@/lib/format'
 import { getOverviewInsights } from '@/lib/insights'
@@ -32,14 +32,15 @@ export function Overview({ data, navigate }: OverviewProps) {
   const insights = useMemo(() => getOverviewInsights(data), [data])
   const [procedureFilter, setProcedureFilter] = useState('')
 
-  const procs = useMemo(() => data ? Object.entries(data.procedures) : [], [data])
+  const procs = useMemo(() => (data ? Object.entries(data.procedures) : []), [data])
 
-  const slowest = useMemo(
-    () => [...procs].toSorted((a, b) => b[1].latency.p95 - a[1].latency.p95).slice(0, 5),
-    [procs],
-  )
+  const slowest = useMemo(() => [...procs].toSorted((a, b) => b[1].latency.p95 - a[1].latency.p95).slice(0, 5), [procs])
   const noisiest = useMemo(
-    () => procs.filter(([, p]) => p.errors > 0).toSorted((a, b) => b[1].errors - a[1].errors).slice(0, 5),
+    () =>
+      procs
+        .filter(([, p]) => p.errors > 0)
+        .toSorted((a, b) => b[1].errors - a[1].errors)
+        .slice(0, 5),
     [procs],
   )
 
@@ -47,7 +48,9 @@ export function Overview({ data, navigate }: OverviewProps) {
     return (
       <div className='p-5'>
         <div className='grid grid-cols-2 gap-6 py-4 xl:grid-cols-6'>
-          {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className='h-12' />)}
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className='h-12' />
+          ))}
         </div>
         <Skeleton className='mt-4 h-24' />
         <div className='mt-4 grid grid-cols-2 gap-4'>
@@ -66,7 +69,12 @@ export function Overview({ data, navigate }: OverviewProps) {
       <div className='grid grid-cols-3 gap-x-0 border-b xl:grid-cols-6'>
         <Stat label='Requests' value={fmt(data.totalRequests)} />
         <Stat label='Throughput' value={`${fmt(data.requestsPerSecond)}/s`} />
-        <Stat label='Errors' value={String(data.totalErrors)} sub={`${data.errorRate.toFixed(1)}%`} danger={data.totalErrors > 0} />
+        <Stat
+          label='Errors'
+          value={String(data.totalErrors)}
+          sub={`${data.errorRate.toFixed(1)}%`}
+          danger={data.totalErrors > 0}
+        />
         <Stat label='Avg latency' value={fmtMs(data.avgLatency)} />
         <Stat label='Uptime' value={fmtUptime(data.uptime)} />
         <Stat
@@ -93,7 +101,9 @@ export function Overview({ data, navigate }: OverviewProps) {
       <div className='grid border-b xl:grid-cols-2'>
         {/* Slowest procedures */}
         <div className='border-b px-5 py-3 xl:border-r xl:border-b-0'>
-          <h3 className='mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground'>Slowest (p95)</h3>
+          <h3 className='mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground'>
+            Slowest (p95)
+          </h3>
           {slowest.length === 0 ? (
             <p className='py-2 text-xs text-muted-foreground'>No data yet</p>
           ) : (
@@ -125,7 +135,9 @@ export function Overview({ data, navigate }: OverviewProps) {
 
         {/* Error hotspots */}
         <div className='px-5 py-3'>
-          <h3 className='mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground'>Error hotspots</h3>
+          <h3 className='mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground'>
+            Error hotspots
+          </h3>
           {noisiest.length === 0 ? (
             <p className='py-2 text-xs text-muted-foreground'>No errors</p>
           ) : (
@@ -137,7 +149,9 @@ export function Overview({ data, navigate }: OverviewProps) {
                   onClick={() => navigate('errors', undefined, { procedure: path })}
                 >
                   <span className='min-w-0 flex-1 truncate font-mono text-[11px] font-semibold'>{path}</span>
-                  <Badge variant='destructive' className='text-[9px]'>{proc.errors}</Badge>
+                  <Badge variant='destructive' className='text-[9px]'>
+                    {proc.errors}
+                  </Badge>
                   <span className='font-mono text-[10px] tabular-nums text-muted-foreground'>
                     {proc.errorRate.toFixed(1)}%
                   </span>
@@ -153,7 +167,12 @@ export function Overview({ data, navigate }: OverviewProps) {
         <div className='flex items-center justify-between gap-3 px-5 pt-4 pb-2'>
           <h3 className='text-[10px] font-semibold uppercase tracking-wider text-muted-foreground'>Procedures</h3>
           <div className='flex items-center gap-3'>
-            <SearchField value={procedureFilter} onChange={(e) => setProcedureFilter(e.target.value)} placeholder='Filter...' className='sm:max-w-48' />
+            <SearchField
+              value={procedureFilter}
+              onChange={(e) => setProcedureFilter(e.target.value)}
+              placeholder='Filter...'
+              className='sm:max-w-48'
+            />
             <span className='text-[10px] tabular-nums text-muted-foreground'>{procedureCount} routes</span>
           </div>
         </div>
@@ -167,16 +186,19 @@ export function Overview({ data, navigate }: OverviewProps) {
 
 function TrafficChart({ timeSeries }: { timeSeries: AnalyticsData['timeSeries'] }) {
   const chartData = useMemo(
-    () => timeSeries.map((t) => ({
-      time: new Date(t.time * 1000).toLocaleTimeString([], TIME_FMT),
-      count: t.count,
-      errors: t.errors,
-    })),
+    () =>
+      timeSeries.map((t) => ({
+        time: new Date(t.time * 1000).toLocaleTimeString([], TIME_FMT),
+        count: t.count,
+        errors: t.errors,
+      })),
     [timeSeries],
   )
 
   if (chartData.length === 0) {
-    return <div className='flex h-24 items-center justify-center text-xs text-muted-foreground'>Waiting for data...</div>
+    return (
+      <div className='flex h-24 items-center justify-center text-xs text-muted-foreground'>Waiting for data...</div>
+    )
   }
 
   return (
@@ -189,7 +211,14 @@ function TrafficChart({ timeSeries }: { timeSeries: AnalyticsData['timeSeries'] 
           </linearGradient>
         </defs>
         <CartesianGrid vertical={false} stroke='var(--color-border)' strokeOpacity={0.3} />
-        <XAxis dataKey='time' tick={{ fontSize: 8 }} tickLine={false} axisLine={false} interval='preserveStartEnd' tickMargin={4} />
+        <XAxis
+          dataKey='time'
+          tick={{ fontSize: 8 }}
+          tickLine={false}
+          axisLine={false}
+          interval='preserveStartEnd'
+          tickMargin={4}
+        />
         <YAxis hide />
         <ChartTooltip content={<ChartTooltipContent />} />
         <Area
@@ -209,14 +238,28 @@ function TrafficChart({ timeSeries }: { timeSeries: AnalyticsData['timeSeries'] 
 
 // ── Shared primitives ──
 
-function Stat({ label, value, sub, danger, className }: {
-  label: string; value: string; sub?: string; danger?: boolean; className?: string
+function Stat({
+  label,
+  value,
+  sub,
+  danger,
+  className,
+}: {
+  label: string
+  value: string
+  sub?: string
+  danger?: boolean
+  className?: string
 }) {
   return (
     <div className='border-r px-4 py-3 last:border-r-0'>
       <div className='text-[10px] font-semibold text-muted-foreground'>{label}</div>
       <div className='mt-0.5 flex items-baseline gap-1.5'>
-        <span className={cn('text-lg font-semibold tabular-nums tracking-tight', danger && 'text-destructive', className)}>{value}</span>
+        <span
+          className={cn('text-lg font-semibold tabular-nums tracking-tight', danger && 'text-destructive', className)}
+        >
+          {value}
+        </span>
         {sub && <span className='text-[11px] text-muted-foreground'>{sub}</span>}
       </div>
     </div>

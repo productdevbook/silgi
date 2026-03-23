@@ -48,8 +48,7 @@ When you define errors via `.$errors()`, the `fail()` function in your resolver 
 `fail()` throws a `SilgiError` internally. It has a return type of `never`, so TypeScript knows that code after `fail()` won't run — no need for `return` after it.
 
 <Callout type='info'>
-  `fail()` is only typed when you use `.$errors()`. Without it, `fail()` still works but accepts any string
-  code.
+  `fail()` is only typed when you use `.$errors()`. Without it, `fail()` still works but accepts any string code.
 </Callout>
 
 ### Status shorthand vs full config

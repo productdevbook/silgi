@@ -34,6 +34,7 @@
 import { defineCachedFunction, setStorage, useStorage as useOcacheStorage } from 'ocache'
 import { hash } from 'ohash'
 
+import { RAW_INPUT } from '../compile.ts'
 import { useStorage as useSilgiStorage } from '../core/storage.ts'
 
 import type { WrapDef } from '../types.ts'
@@ -184,11 +185,12 @@ export function cacheQuery<T = unknown>(options: CacheQueryOptions<T> = {}): Wra
 
   let cacheName = options.name
 
-  // Shared mutable ref — wrap captures `currentNext`, cachedFn calls it
-  let currentNext: (() => Promise<unknown>) | null = null
+  // Per-call next() storage keyed by computed cache key — avoids shared mutable closure race
+  const pendingNextMap = new Map<string, () => Promise<unknown>>()
 
   // Each procedure gets its own cachedFn (lazy init on first call)
   let cachedFn: ReturnType<typeof defineCachedFunction> | null = null
+  let keyFn: (input: unknown) => string
 
   return {
     kind: 'wrap',
@@ -202,40 +204,49 @@ export function cacheQuery<T = unknown>(options: CacheQueryOptions<T> = {}): Wra
         const keySet = new Set<string>()
         cacheKeyRegistry.set(resolvedName, keySet)
 
-        const keyFn = customGetKey
+        keyFn = customGetKey
           ? (input: unknown) => customGetKey(input)
           : (input: unknown) => (input !== undefined && input !== null ? hash(input) : '')
 
         const resolvedBase = options.base ?? '/cache'
 
-        cachedFn = defineCachedFunction(async (_input: unknown) => currentNext!(), {
-          name: resolvedName,
-          group: 'silgi',
-          maxAge,
-          swr,
-          staleMaxAge,
-          base: resolvedBase,
-          integrity: options.integrity,
-          onError: options.onError,
-          validate: options.validate as ((entry: CacheEntry) => boolean) | undefined,
-          transform: options.transform as ((entry: CacheEntry) => unknown) | undefined,
-          shouldBypassCache: options.shouldBypassCache
-            ? (input: unknown) => options.shouldBypassCache!(input)
-            : undefined,
-          shouldInvalidateCache: options.shouldInvalidateCache
-            ? (input: unknown) => options.shouldInvalidateCache!(input)
-            : undefined,
-          getKey: (input: unknown) => {
-            const key = keyFn(input)
-            keySet.add(`${resolvedBase}:silgi:${resolvedName}:${key}.json`)
-            return key
+        cachedFn = defineCachedFunction(
+          async (_input: unknown) => {
+            const key = keyFn(_input)
+            const nextFn = pendingNextMap.get(key)!
+            pendingNextMap.delete(key)
+            return nextFn()
           },
-        })
+          {
+            name: resolvedName,
+            group: 'silgi',
+            maxAge,
+            swr,
+            staleMaxAge,
+            base: resolvedBase,
+            integrity: options.integrity,
+            onError: options.onError,
+            validate: options.validate as ((entry: CacheEntry) => boolean) | undefined,
+            transform: options.transform as ((entry: CacheEntry) => unknown) | undefined,
+            shouldBypassCache: options.shouldBypassCache
+              ? (input: unknown) => options.shouldBypassCache!(input)
+              : undefined,
+            shouldInvalidateCache: options.shouldInvalidateCache
+              ? (input: unknown) => options.shouldInvalidateCache!(input)
+              : undefined,
+            getKey: (input: unknown) => {
+              const key = keyFn(input)
+              keySet.add(`${resolvedBase}:silgi:${resolvedName}:${key}.json`)
+              return key
+            },
+          },
+        )
       }
 
-      // Set the current request's next() before calling cachedFn
-      currentNext = next
-      const input = (ctx as any).__rawInput
+      // Store this request's next() keyed by cache key — safe under concurrency
+      const input = (ctx as any)[RAW_INPUT]
+      const cacheKey = keyFn(input)
+      pendingNextMap.set(cacheKey, next)
       return cachedFn(input)
     },
   }

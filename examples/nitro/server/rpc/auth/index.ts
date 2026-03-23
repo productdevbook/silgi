@@ -13,12 +13,10 @@ export const doLogin = s
     return { token: result.token }
   })
 
-export const doLogout = s
-  .$input(z.object({ token: z.string() }))
-  .$resolve(({ input }) => {
-    logout(input.token)
-    return { ok: true }
-  })
+export const doLogout = s.$input(z.object({ token: z.string() })).$resolve(({ input }) => {
+  logout(input.token)
+  return { ok: true }
+})
 
 export const me = s
   .$input(z.object({ token: z.string() }))

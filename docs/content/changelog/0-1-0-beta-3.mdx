@@ -40,6 +40,7 @@ const listUsers = s.$resolve(async ({ ctx }) => {
 ```
 
 Features:
+
 - `instrumentDrizzle()` — patches Drizzle session methods to intercept all queries
 - `withSilgiCtx()` — bridges request context to the DB layer via AsyncLocalStorage
 - Captures: SQL statement, operation type, table name, duration, errors
@@ -81,6 +82,7 @@ const me = s.$resolve(async ({ ctx }) => {
 ```
 
 Features:
+
 - `silgiTracing()` — Better Auth plugin, auto-traces all HTTP auth routes
 - `instrumentBetterAuth()` — wraps `auth.api.*` methods for programmatic tracing
 - `withSilgiCtx()` — runs a function with silgi context for span collection

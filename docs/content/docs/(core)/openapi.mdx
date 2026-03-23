@@ -19,6 +19,7 @@ s.serve(appRouter, {
 ```
 
 This serves:
+
 - `/openapi.json` — the raw OpenAPI specification
 - `/reference` — interactive API docs powered by [Scalar](https://scalar.com)
 
@@ -46,17 +47,17 @@ const getUser = s
   .$resolve(...)
 ```
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `method` | `string` | `'POST'` | HTTP method (`GET`, `POST`, `PUT`, `DELETE`, etc.) |
-| `path` | `string` | auto from router | Custom URL path (supports `:param`, `:param(regex)`, `**`) |
-| `summary` | `string` | — | Short summary shown in API docs |
-| `description` | `string` | — | Detailed description (supports markdown) |
-| `tags` | `string[]` | auto from router | Tags for grouping operations |
-| `operationId` | `string` | auto from router | Custom operation ID for SDK generation |
-| `deprecated` | `boolean` | — | Mark as deprecated |
-| `successStatus` | `number` | `200` | HTTP status code for success response |
-| `successDescription` | `string` | `'Successful response'` | Description for success response |
+| Option               | Type       | Default                 | Description                                                |
+| -------------------- | ---------- | ----------------------- | ---------------------------------------------------------- |
+| `method`             | `string`   | `'POST'`                | HTTP method (`GET`, `POST`, `PUT`, `DELETE`, etc.)         |
+| `path`               | `string`   | auto from router        | Custom URL path (supports `:param`, `:param(regex)`, `**`) |
+| `summary`            | `string`   | —                       | Short summary shown in API docs                            |
+| `description`        | `string`   | —                       | Detailed description (supports markdown)                   |
+| `tags`               | `string[]` | auto from router        | Tags for grouping operations                               |
+| `operationId`        | `string`   | auto from router        | Custom operation ID for SDK generation                     |
+| `deprecated`         | `boolean`  | —                       | Mark as deprecated                                         |
+| `successStatus`      | `number`   | `200`                   | HTTP status code for success response                      |
+| `successDescription` | `string`   | `'Successful response'` | Description for success response                           |
 
 ## Path parameters
 
@@ -74,6 +75,7 @@ const getUser = s
 ```
 
 Supported patterns:
+
 - `:id` — required path parameter
 - `:id(\\d+)` — parameter with regex constraint
 - `:id?` — optional parameter
@@ -107,21 +109,17 @@ Override security on individual procedures:
 ```ts twoslash
 // @noErrors
 // Public endpoint — no auth required
-const health = s
-  .$route({ security: false })
-  .$resolve(() => ({ status: 'ok' }))
+const health = s.$route({ security: false }).$resolve(() => ({ status: 'ok' }))
 
 // Requires specific scheme
-const admin = s
-  .$route({ security: ['bearerAuth'] })
-  .$resolve(() => ({ secret: true }))
+const admin = s.$route({ security: ['bearerAuth'] }).$resolve(() => ({ secret: true }))
 ```
 
-| Value | Effect |
-|---|---|
-| `false` | Public — `security: []` in spec |
+| Value      | Effect                          |
+| ---------- | ------------------------------- |
+| `false`    | Public — `security: []` in spec |
 | `string[]` | Named security schemes required |
-| not set | Inherits global security |
+| not set    | Inherits global security        |
 
 ## Error responses
 
@@ -202,7 +200,8 @@ s.$route({
 ```
 
 <Callout>
-  The `spec` override is applied last — after all auto-generation is complete. It's the escape hatch for any OpenAPI feature not directly supported.
+  The `spec` override is applied last — after all auto-generation is complete. It's the escape hatch for any OpenAPI
+  feature not directly supported.
 </Callout>
 
 ## Schema conversion

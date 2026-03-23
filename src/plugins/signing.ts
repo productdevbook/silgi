@@ -126,7 +126,13 @@ export async function decrypt(encrypted: string, secret: string): Promise<string
 // ── Base64URL helpers ───────────────────────────────
 
 function base64urlEncode(data: Uint8Array): string {
-  const base64 = btoa(String.fromCharCode(...data))
+  // Chunk to avoid stack overflow for large buffers (>64KB)
+  let binary = ''
+  const chunkSize = 8192
+  for (let i = 0; i < data.length; i += chunkSize) {
+    binary += String.fromCharCode(...data.subarray(i, i + chunkSize))
+  }
+  const base64 = btoa(binary)
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 

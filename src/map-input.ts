@@ -21,6 +21,8 @@
  * ```
  */
 
+import { RAW_INPUT } from './compile.ts'
+
 import type { WrapDef } from './types.ts'
 
 /**
@@ -39,9 +41,9 @@ export function mapInput<TIn = unknown, TOut = unknown>(mapper: (input: TIn) => 
     kind: 'wrap',
     fn: async (ctx, next) => {
       // Access the raw input from context (set by the pipeline)
-      const rawInput = (ctx as any).__rawInput
+      const rawInput = (ctx as any)[RAW_INPUT]
       const mapped = await mapper(rawInput as TIn)
-      ;(ctx as any).__rawInput = mapped
+      ;(ctx as any)[RAW_INPUT] = mapped
       return next()
     },
   }

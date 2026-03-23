@@ -15,13 +15,9 @@ import { withRetry, withCircuitBreaker, withTimeout } from 'silgi/client/plugins
 
 const baseLink = createLink({ url: 'https://api.example.com' })
 
-const link = withRetry(
-  withCircuitBreaker(
-    withTimeout(baseLink, { timeout: 5000 }),
-    { failureThreshold: 5 },
-  ),
-  { maxRetries: 3 },
-)
+const link = withRetry(withCircuitBreaker(withTimeout(baseLink, { timeout: 5000 }), { failureThreshold: 5 }), {
+  maxRetries: 3,
+})
 
 const client = createClient<AppRouter>(link)
 ```
@@ -35,10 +31,10 @@ Automatically retry failed requests with exponential backoff and jitter.
 import { withRetry } from 'silgi/client/plugins'
 
 const link = withRetry(baseLink, {
-  maxRetries: 3,           // default: 3
-  baseDelay: 1000,         // 1s → 2s → 4s (exponential)
-  jitter: true,            // adds 0-25% random jitter (default: true)
-  retryOn: [500, 502, 503, 504],  // status codes to retry on
+  maxRetries: 3, // default: 3
+  baseDelay: 1000, // 1s → 2s → 4s (exponential)
+  jitter: true, // adds 0-25% random jitter (default: true)
+  retryOn: [500, 502, 503, 504], // status codes to retry on
   shouldRetry: (error, attempt) => attempt < 5,
   onRetry: ({ attempt, delay, error, path }) => {
     console.log(`Retry #${attempt} for ${path.join('/')} in ${delay}ms`)
@@ -46,19 +42,20 @@ const link = withRetry(baseLink, {
 })
 ```
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `maxRetries` | `number` | `3` | Maximum retry attempts |
-| `baseDelay` | `number \| (attempt) => number` | `1000` | Base delay in ms. Actual: `baseDelay * 2^attempt + jitter` |
-| `jitter` | `boolean` | `true` | Add 0-25% random delay to prevent thundering herd |
-| `retryOn` | `number[]` | `[408, 429, 500, 502, 503, 504]` | HTTP status codes that trigger retry |
-| `shouldRetry` | `(error, attempt) => boolean` | — | Custom predicate to stop retrying |
-| `onRetry` | `(info) => void` | — | Called before each retry with attempt, delay, error, path |
+| Option        | Type                            | Default                          | Description                                                |
+| ------------- | ------------------------------- | -------------------------------- | ---------------------------------------------------------- |
+| `maxRetries`  | `number`                        | `3`                              | Maximum retry attempts                                     |
+| `baseDelay`   | `number \| (attempt) => number` | `1000`                           | Base delay in ms. Actual: `baseDelay * 2^attempt + jitter` |
+| `jitter`      | `boolean`                       | `true`                           | Add 0-25% random delay to prevent thundering herd          |
+| `retryOn`     | `number[]`                      | `[408, 429, 500, 502, 503, 504]` | HTTP status codes that trigger retry                       |
+| `shouldRetry` | `(error, attempt) => boolean`   | —                                | Custom predicate to stop retrying                          |
+| `onRetry`     | `(info) => void`                | —                                | Called before each retry with attempt, delay, error, path  |
 
 Network errors (no status code) are always retried unless `shouldRetry` returns false.
 
 <Callout>
-  The retry plugin respects `AbortSignal` — if the signal is aborted during a delay wait, the retry is cancelled immediately.
+  The retry plugin respects `AbortSignal` — if the signal is aborted during a delay wait, the retry is cancelled
+  immediately.
 </Callout>
 
 ## Circuit Breaker
@@ -70,8 +67,8 @@ Prevents cascading failures by blocking requests when a service is down.
 import { withCircuitBreaker } from 'silgi/client/plugins'
 
 const link = withCircuitBreaker(baseLink, {
-  failureThreshold: 5,     // open after 5 consecutive failures
-  resetTimeout: 30000,     // try again after 30s
+  failureThreshold: 5, // open after 5 consecutive failures
+  resetTimeout: 30000, // try again after 30s
   onStateChange: (state, { failures }) => {
     console.log(`Circuit: ${state} (${failures} failures)`)
   },
@@ -79,14 +76,14 @@ const link = withCircuitBreaker(baseLink, {
 
 // Check state programmatically
 link.getState() // 'closed' | 'open' | 'half-open'
-link.reset()    // manually close the circuit
+link.reset() // manually close the circuit
 ```
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `failureThreshold` | `number` | `5` | Consecutive failures before opening |
-| `resetTimeout` | `number` | `30000` | Ms to wait before half-open test |
-| `onStateChange` | `(state, info) => void` | — | Called on state transitions |
+| Option             | Type                    | Default | Description                         |
+| ------------------ | ----------------------- | ------- | ----------------------------------- |
+| `failureThreshold` | `number`                | `5`     | Consecutive failures before opening |
+| `resetTimeout`     | `number`                | `30000` | Ms to wait before half-open test    |
+| `onStateChange`    | `(state, info) => void` | —       | Called on state transitions         |
 
 ### State machine
 
@@ -110,8 +107,8 @@ import { withTimeout } from 'silgi/client/plugins'
 const link = withTimeout(baseLink, { timeout: 5000 })
 ```
 
-| Option | Type | Default | Description |
-|---|---|---|---|
+| Option    | Type     | Default | Description   |
+| --------- | -------- | ------- | ------------- |
 | `timeout` | `number` | `30000` | Timeout in ms |
 
 The timeout signal is combined with any existing signal using `AbortSignal.any()` — whichever fires first wins.
@@ -123,14 +120,11 @@ Plugins are pure link wrappers — compose them in any order. The outermost plug
 ```ts twoslash
 // @noErrors
 // Request flow: timeout check → circuit breaker check → retry loop → actual fetch
-const link = withRetry(
-  withCircuitBreaker(
-    withTimeout(baseLink, { timeout: 5000 }),
-  ),
-)
+const link = withRetry(withCircuitBreaker(withTimeout(baseLink, { timeout: 5000 })))
 ```
 
 Recommended order for production:
+
 1. **withRetry** (outermost) — retries the entire inner chain
 2. **withCircuitBreaker** — blocks when service is down
 3. **withTimeout** (innermost) — aborts slow individual requests

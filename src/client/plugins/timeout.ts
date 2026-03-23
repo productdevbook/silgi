@@ -27,9 +27,7 @@ export function withTimeout<TClientContext extends ClientContext>(
       const timeoutSignal = AbortSignal.timeout(timeout)
 
       // Combine with existing signal if present
-      const signal = callOptions.signal
-        ? AbortSignal.any([callOptions.signal, timeoutSignal])
-        : timeoutSignal
+      const signal = callOptions.signal ? AbortSignal.any([callOptions.signal, timeoutSignal]) : timeoutSignal
 
       return link.call(path, input, { ...callOptions, signal })
     },

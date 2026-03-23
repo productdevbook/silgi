@@ -35,10 +35,16 @@ export class MemoryRateLimiter implements RateLimiter {
   #limit: number
   #windowMs: number
   #store = new Map<string, number[]>()
+  #evictTimer: ReturnType<typeof setInterval>
 
   constructor(options: MemoryRateLimiterOptions) {
     this.#limit = options.limit
     this.#windowMs = options.windowMs
+    // Auto-evict stale entries every 2x window to prevent unbounded growth
+    this.#evictTimer = setInterval(() => this.evict(), this.#windowMs * 2)
+    if (typeof this.#evictTimer === 'object' && 'unref' in this.#evictTimer) {
+      ;(this.#evictTimer as NodeJS.Timeout).unref()
+    }
   }
 
   async limit(key: string): Promise<RateLimitResult> {
@@ -65,6 +71,17 @@ export class MemoryRateLimiter implements RateLimiter {
 
     timestamps.push(now)
     return { success: true, limit: this.#limit, remaining: remaining - 1, reset }
+  }
+
+  /** Remove entries with no active timestamps to prevent unbounded Map growth */
+  evict(): void {
+    const now = Date.now()
+    for (const [key, timestamps] of this.#store) {
+      while (timestamps.length > 0 && timestamps[0]! < now - this.#windowMs) {
+        timestamps.shift()
+      }
+      if (timestamps.length === 0) this.#store.delete(key)
+    }
   }
 }
 

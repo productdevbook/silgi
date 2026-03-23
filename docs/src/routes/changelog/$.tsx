@@ -27,7 +27,7 @@ const changelogLoader = createServerFn({ method: 'GET' })
       path: page.path,
       title: page.data.title,
       description: page.data.description ?? '',
-      version: (page.data as Record<string, unknown>).version as string ?? page.data.title,
+      version: ((page.data as Record<string, unknown>).version as string) ?? page.data.title,
       date: String((page.data as Record<string, unknown>).date ?? ''),
     }
   })
@@ -36,7 +36,10 @@ const changelogClientLoader = browserCollections.changelogPosts.createClientLoad
   component({ default: MDX }, props: { title: string; version: string; date: string }) {
     return (
       <article className='mx-auto w-full max-w-3xl px-4 py-16'>
-        <Link to='/changelog' className='mb-8 inline-flex items-center gap-1.5 text-sm text-fd-muted-foreground hover:text-fd-primary'>
+        <Link
+          to='/changelog'
+          className='mb-8 inline-flex items-center gap-1.5 text-sm text-fd-muted-foreground hover:text-fd-primary'
+        >
           <span aria-hidden>←</span> All releases
         </Link>
         <div className='mb-8'>

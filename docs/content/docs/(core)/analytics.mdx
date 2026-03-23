@@ -125,13 +125,13 @@ await ctx.trace('db.users.findMany', () => db.users.findMany(), {
 })
 ```
 
-| Option      | Type                      | Description                                                        |
-| ----------- | ------------------------- | ------------------------------------------------------------------ |
-| `kind`      | `SpanKind`                | Category for color-coding in the dashboard (see below)             |
-| `detail`    | `string`                  | Extra info shown in the expanded span view (SQL query, URL, etc.)  |
-| `input`     | `unknown`                        | Input data captured for this span (shown in expanded detail)       |
-| `output`    | `unknown \| (result) => unknown` | Output data — a value or a function that receives the result       |
-| `procedure` | `{ input?, output? }`            | Set procedure-level input/output (recorded on the HTTP request)    |
+| Option      | Type                             | Description                                                       |
+| ----------- | -------------------------------- | ----------------------------------------------------------------- |
+| `kind`      | `SpanKind`                       | Category for color-coding in the dashboard (see below)            |
+| `detail`    | `string`                         | Extra info shown in the expanded span view (SQL query, URL, etc.) |
+| `input`     | `unknown`                        | Input data captured for this span (shown in expanded detail)      |
+| `output`    | `unknown \| (result) => unknown` | Output data — a value or a function that receives the result      |
+| `procedure` | `{ input?, output? }`            | Set procedure-level input/output (recorded on the HTTP request)   |
 
 The `output` option can be a function to derive the captured value from the trace result, avoiding capturing the full response:
 
@@ -166,15 +166,15 @@ const getUser = s.$input(z.object({ id: z.number() })).$resolve(async ({ input, 
 
 Spans are automatically categorized by their name prefix. You can override this with the `kind` option.
 
-| Kind     | Auto-detected when name contains                                  | Dashboard color |
-| -------- | ----------------------------------------------------------------- | --------------- |
-| `db`     | `db.`, `sql`, `prisma`, `drizzle`, `query`, `mongo`              | Purple          |
-| `http`   | `http.`, `fetch`, `api.`                                         | Blue            |
-| `cache`  | `cache.`, `redis`, `memcache`                                    | Emerald         |
-| `queue`  | `queue`, `publish`, `nats`, `kafka`                               | Amber           |
-| `email`  | `email`, `smtp`, `ses`                                            | Orange          |
-| `ai`     | `ai`, `llm`, `openai`, `gemini`                                  | Cyan            |
-| `custom` | Anything else                                                     | Gray            |
+| Kind     | Auto-detected when name contains                    | Dashboard color |
+| -------- | --------------------------------------------------- | --------------- |
+| `db`     | `db.`, `sql`, `prisma`, `drizzle`, `query`, `mongo` | Purple          |
+| `http`   | `http.`, `fetch`, `api.`                            | Blue            |
+| `cache`  | `cache.`, `redis`, `memcache`                       | Emerald         |
+| `queue`  | `queue`, `publish`, `nats`, `kafka`                 | Amber           |
+| `email`  | `email`, `smtp`, `ses`                              | Orange          |
+| `ai`     | `ai`, `llm`, `openai`, `gemini`                     | Cyan            |
+| `custom` | Anything else                                       | Gray            |
 
 ### Standalone `trace()` helper
 

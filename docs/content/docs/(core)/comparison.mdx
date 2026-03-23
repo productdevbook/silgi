@@ -6,7 +6,10 @@ description: Real performance numbers — Silgi, oRPC, Hono, Elysia, Fastify, Ex
 import { Callout } from 'fumadocs-ui/components/callout'
 
 <Callout>
-  This page exists to help you make an informed decision — not to diminish any project. Every framework listed here is the result of incredible open-source work, and the TypeScript ecosystem is better because all of them exist. We've measured our own weaknesses alongside our strengths, and we encourage you to run these benchmarks yourself. If any number is wrong or unfair, [let us know](https://github.com/productdevbook/silgi/issues).
+  This page exists to help you make an informed decision — not to diminish any project. Every framework listed here is
+  the result of incredible open-source work, and the TypeScript ecosystem is better because all of them exist. We've
+  measured our own weaknesses alongside our strengths, and we encourage you to run these benchmarks yourself. If any
+  number is wrong or unfair, [let us know](https://github.com/productdevbook/silgi/issues).
 </Callout>
 
 All benchmarks: Apple M3 Max, 5000 sequential requests, 500 warmup, 3 rounds median. Response correctness verified. Numbers are real — reproduce them on your hardware.
@@ -15,11 +18,11 @@ All benchmarks: Apple M3 Max, 5000 sequential requests, 500 warmup, 3 rounds med
 
 Simple POST endpoint returning JSON. All frameworks use `Bun.serve()`.
 
-| Framework  | avg     | p50     | p95     | p99     | req/s      |
-| ---------- | ------- | ------- | ------- | ------- | ---------- |
-| Elysia     | 44µs    | 42µs    | 53µs    | 66µs    | 22,865/s   |
-| Hono       | 45µs    | 43µs    | 53µs    | 72µs    | 22,265/s   |
-| Silgi      | 51µs    | 44µs    | 83µs    | 160µs   | 19,634/s   |
+| Framework | avg  | p50  | p95  | p99   | req/s    |
+| --------- | ---- | ---- | ---- | ----- | -------- |
+| Elysia    | 44µs | 42µs | 53µs | 66µs  | 22,865/s |
+| Hono      | 45µs | 43µs | 53µs | 72µs  | 22,265/s |
+| Silgi     | 51µs | 44µs | 83µs | 160µs | 19,634/s |
 
 On Bun all three deliver similar throughput. Silgi has higher tail latency (p95/p99) due to Fetch API overhead.
 
@@ -27,12 +30,12 @@ On Bun all three deliver similar throughput. Silgi has higher tail latency (p95/
 
 Same endpoint. Silgi and Hono use Fetch API adapters (srvx / @hono/node-server). Fastify and Express use native `req`/`res`.
 
-| Framework  | avg     | p50     | p95     | p99     | req/s      |
-| ---------- | ------- | ------- | ------- | ------- | ---------- |
-| Fastify    | 87µs    | 79µs    | 102µs   | 152µs   | 11,435/s   |
-| Hono       | 95µs    | 85µs    | 110µs   | 187µs   | 10,481/s   |
-| Silgi      | 103µs   | 92µs    | 125µs   | 194µs   | 9,742/s    |
-| Express    | 127µs   | 93µs    | 204µs   | 817µs   | 7,863/s    |
+| Framework | avg   | p50  | p95   | p99   | req/s    |
+| --------- | ----- | ---- | ----- | ----- | -------- |
+| Fastify   | 87µs  | 79µs | 102µs | 152µs | 11,435/s |
+| Hono      | 95µs  | 85µs | 110µs | 187µs | 10,481/s |
+| Silgi     | 103µs | 92µs | 125µs | 194µs | 9,742/s  |
+| Express   | 127µs | 93µs | 204µs | 817µs | 7,863/s  |
 
 Silgi uses the Fetch API (`Request`/`Response`) while Fastify uses native Node.js `req`/`res`. This adds ~10µs adapter overhead per request. Hono uses a similar Fetch adapter. The gap closes as middleware complexity grows.
 
@@ -40,37 +43,38 @@ Silgi uses the Fetch API (`Request`/`Response`) while Fastify uses native Node.j
 
 Measures middleware pipeline overhead in isolation — no TCP, no serialization. Only applicable to RPC frameworks with a compiled pipeline.
 
-| Scenario             | Silgi      | oRPC     | H3 v2    |
-| -------------------- | ---------- | -------- | -------- |
-| No middleware        | **111 ns** | 685 ns   | 2,025 ns |
-| Zod validation       | **241 ns** | 804 ns   | 4,214 ns |
-| 3 middleware + Zod   | **297 ns** | 1,718 ns | 3,954 ns |
-| 5 middleware + Zod   | **413 ns** | 2,219 ns | 3,917 ns |
+| Scenario           | Silgi      | oRPC     | H3 v2    |
+| ------------------ | ---------- | -------- | -------- |
+| No middleware      | **111 ns** | 685 ns   | 2,025 ns |
+| Zod validation     | **241 ns** | 804 ns   | 4,214 ns |
+| 3 middleware + Zod | **297 ns** | 1,718 ns | 3,954 ns |
+| 5 middleware + Zod | **413 ns** | 2,219 ns | 3,917 ns |
 
 <Callout>
-  Hono, Elysia, Fastify, and Express are not included — they don't have an equivalent pipeline concept measurable in isolation. Their overhead is in the HTTP benchmarks above.
+  Hono, Elysia, Fastify, and Express are not included — they don't have an equivalent pipeline concept measurable in
+  isolation. Their overhead is in the HTTP benchmarks above.
 </Callout>
 
 ## Tail latency (p99)
 
 RPC over HTTP with Guard + Zod validation.
 
-| Framework  | avg      | p50      | p99       |
-| ---------- | -------- | -------- | --------- |
-| Silgi      | 79µs     | 70µs     | 148µs     |
-| oRPC       | 116µs    | 103µs    | 223µs     |
-| H3 v2      | 96µs     | 82µs     | 236µs     |
+| Framework | avg   | p50   | p99   |
+| --------- | ----- | ----- | ----- |
+| Silgi     | 79µs  | 70µs  | 148µs |
+| oRPC      | 116µs | 103µs | 223µs |
+| H3 v2     | 96µs  | 82µs  | 236µs |
 
 ## Router
 
 JIT-compiled radix tree (Silgi) vs rou3.
 
-| Scenario                | Silgi       | rou3    |
-| ----------------------- | ----------- | ------- |
-| Static `/users/list`    | 3.1 ns      | 3.9 ns  |
-| Param `/users/123`      | 22.0 ns     | 25.6 ns |
-| Wildcard `/files/a/b/c` | 19.2 ns     | 91.3 ns |
-| Miss `/missing/deep`    | 4.5 ns      | 22.3 ns |
+| Scenario                | Silgi   | rou3    |
+| ----------------------- | ------- | ------- |
+| Static `/users/list`    | 3.1 ns  | 3.9 ns  |
+| Param `/users/123`      | 22.0 ns | 25.6 ns |
+| Wildcard `/files/a/b/c` | 19.2 ns | 91.3 ns |
+| Miss `/missing/deep`    | 4.5 ns  | 22.3 ns |
 
 ## Memory
 
@@ -88,11 +92,8 @@ JIT-compiled radix tree (Silgi) vs rou3.
 - Elysia is Bun-only — excluded from Node.js benchmarks.
 
 <Callout>
-  ```bash
-  node --experimental-strip-types bench/http.ts      # HTTP (Node.js)
-  bun bench/http-bun.ts                              # HTTP (Bun)
-  node --experimental-strip-types bench/router.ts    # Router
-  ```
+  ```bash node --experimental-strip-types bench/http.ts # HTTP (Node.js) bun bench/http-bun.ts # HTTP (Bun) node
+  --experimental-strip-types bench/router.ts # Router ```
 </Callout>
 
 ## Choosing the right tool
@@ -114,5 +115,6 @@ Every framework here is well-built and actively maintained.
 **Silgi** — compiled pipelines, single package, built-in analytics, Guard/Wrap model.
 
 <Callout>
-  We respect every project in this space. If you find something wrong, [open an issue](https://github.com/productdevbook/silgi/issues).
+  We respect every project in this space. If you find something wrong, [open an
+  issue](https://github.com/productdevbook/silgi/issues).
 </Callout>

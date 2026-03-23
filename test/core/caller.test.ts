@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { silgi } from '#src/silgi'
-import { SilgiError } from '#src/core/error'
 import { z } from 'zod'
+
+import { SilgiError } from '#src/core/error'
+import { silgi } from '#src/silgi'
 
 describe('createCaller', () => {
   // ── Setup ──
@@ -13,7 +14,14 @@ describe('createCaller', () => {
   }
 
   const s = silgi({
-    context: () => ({ db: { users: [{ id: 1, name: 'Alice' }, { id: 2, name: 'Bob' }] } }),
+    context: () => ({
+      db: {
+        users: [
+          { id: 1, name: 'Alice' },
+          { id: 2, name: 'Bob' },
+        ],
+      },
+    }),
   })
 
   const appRouter = s.router({
@@ -55,9 +63,7 @@ describe('createCaller', () => {
 
     deeply: {
       nested: {
-        procedure: s
-          .$input(z.object({ value: z.string() }))
-          .$resolve(({ input }) => ({ echo: input.value })),
+        procedure: s.$input(z.object({ value: z.string() })).$resolve(({ input }) => ({ echo: input.value })),
       },
     },
   })

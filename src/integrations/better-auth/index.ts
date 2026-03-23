@@ -26,7 +26,6 @@ import type { RequestTrace, SpanKind, TraceSpan } from '../../plugins/analytics.
 // ── Shared context storage (same as drizzle integration) ──
 const ctxStorage = new AsyncLocalStorage<Record<string, unknown>>()
 
-
 // ── Types ────────────────────────────────────────────
 
 export interface SilgiTracingConfig {
@@ -217,7 +216,9 @@ export function silgiTracing(config?: SilgiTracingConfig): any {
               requestMetas.delete(request)
 
               const path = ctx.path || ''
-              const match = meta ? { spanName: meta.spanName, operation: meta.operation, method: meta.method, provider: meta.provider } : matchOperation(path)
+              const match = meta
+                ? { spanName: meta.spanName, operation: meta.operation, method: meta.method, provider: meta.provider }
+                : matchOperation(path)
               const startTime = meta?.startTime ?? performance.now()
               const durationMs = round(performance.now() - startTime)
 
@@ -252,7 +253,7 @@ export function silgiTracing(config?: SilgiTracingConfig): any {
               if (captureInput && ctx.body) span.input = ctx.body
               if (captureOutput && returned && typeof returned === 'object') span.output = returned
               if (!success && returned?.error) {
-                span.error = typeof returned.error === 'string' ? returned.error : returned.error?.message ?? 'error'
+                span.error = typeof returned.error === 'string' ? returned.error : (returned.error?.message ?? 'error')
               }
 
               reqTrace.spans.push(span)
@@ -339,7 +340,10 @@ export function instrumentBetterAuth<T extends Record<string, any>>(auth: T): T 
   // Unknown methods — generic wrapping
   for (const key of Object.keys(api)) {
     if (typeof api[key] === 'function' && !instrumented.has(key) && !key.startsWith('$') && !key.startsWith('_')) {
-      const operation = key.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '')
+      const operation = key
+        .replace(/([A-Z])/g, '_$1')
+        .toLowerCase()
+        .replace(/^_/, '')
       api[key] = wrapApiMethod(api[key], operation)
       instrumented.add(key)
     }
@@ -386,7 +390,8 @@ function wrapApiMethod(
 
       if (result?.error) {
         attributes['auth.success'] = false
-        attributes['auth.error'] = typeof result.error === 'string' ? result.error : result.error?.message ?? 'unknown'
+        attributes['auth.error'] =
+          typeof result.error === 'string' ? result.error : (result.error?.message ?? 'unknown')
       }
 
       reqTrace.spans.push({
