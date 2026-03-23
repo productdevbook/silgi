@@ -314,7 +314,8 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
 
   // ── SEMI-SYNC: no wraps, has validation ────────────
   // Sync-first: validateSchema now returns sync for Zod 4 — avoid async function overhead
-  // try/catch converts sync ValidationError throws to rejected Promises (contract compat)
+  // Outer try/catch covers the sync-guards path only; async-guards path relies on
+  // normal Promise rejection propagation (throws inside .then() become rejections)
   if (wraps.length === 0) {
     return (ctx, rawInput, signal) => {
       try {

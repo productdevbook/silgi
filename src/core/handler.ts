@@ -435,7 +435,7 @@ location.reload();
     // Skip when content-type is non-JSON (msgpack/devalue codecs need handleAsync)
     // Check if request uses JSON body and doesn't need codec response
     const ct = request.headers.get('content-type')
-    const isJsonBody = !ct || ct.charCodeAt(12) === 106 // 'j' in 'application/json'
+    const isJsonBody = !ct || ct.startsWith('application/json')
     const accept = request.headers.get('accept')
     const needsCodecResponse = accept && (accept.includes('msgpack') || accept.includes('x-devalue'))
     if (ctxFactoryIsSync && isJsonBody && !needsCodecResponse && !route.passthrough && !collector) {
@@ -682,9 +682,9 @@ location.reload();
   }
 
   // ── MINIMAL HANDLER: no scalar, no analytics, no hooks ──────────
-  // When all optional features are disabled, return a stripped handler
-  // that eliminates all branch checks per request — on par with Hono.
-  if (!collector && !scalarEnabled && !analyticsEnabled && !hasHooks) {
+  // When all optional features are disabled AND context factory is sync,
+  // return a stripped handler that eliminates branch checks — on par with Hono.
+  if (!collector && !scalarEnabled && !analyticsEnabled && !hasHooks && ctxFactoryIsSync) {
     return function minimalHandler(request: Request): Response | Promise<Response> {
       const url = request.url
       const pathStart = url.indexOf('/', url.indexOf('//') + 2)
@@ -702,7 +702,7 @@ location.reload();
           ? (emptyCtx as Record<string, unknown>)
           : Object.create(null)
 
-        if (!ctxFactoryIsEmpty && ctxFactoryIsSync) {
+        if (!ctxFactoryIsEmpty) {
           const base = contextFactory(request) as Record<string, unknown>
           const keys = Object.keys(base)
           for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = base[keys[i]!]
@@ -722,12 +722,9 @@ location.reload();
 
         try {
           const result = route.handler(ctx, input, request.signal)
-          if (!(result instanceof Promise)) {
-            if (result instanceof Response) return result
-            return new Response(route.stringify(result), { headers: jsonHeaders })
-          }
+          if (!(result instanceof Promise)) return _makeResponse(result, route)
           return result.then(
-            (output) => (output instanceof Response ? output : new Response(route.stringify(output), { headers: jsonHeaders })),
+            (output) => _makeResponse(output, route),
             (error) => _minimalError(error),
           )
         } catch (error) {
@@ -735,12 +732,17 @@ location.reload();
         }
       }
 
+      // Passthrough routes — fall to full handler (body must not be consumed)
+      if (route.passthrough) {
+        return handleAsync(request, url, fullPath.length > 1 ? fullPath.slice(1) : '', qMark, match, route)
+      }
+
       // ── POST — single .then() chain, zero header reads ──
       const ctx: Record<string, unknown> = ctxFactoryIsEmpty && !match.params
         ? (emptyCtx as Record<string, unknown>)
         : Object.create(null)
 
-      if (!ctxFactoryIsEmpty && ctxFactoryIsSync) {
+      if (!ctxFactoryIsEmpty) {
         const base = contextFactory(request) as Record<string, unknown>
         const keys = Object.keys(base)
         for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = base[keys[i]!]
@@ -751,13 +753,8 @@ location.reload();
       return parse.then(
         (rawInput: unknown) => {
           const result = route.handler(ctx, rawInput, request.signal)
-          if (!(result instanceof Promise)) {
-            if (result instanceof Response) return result
-            return new Response(route.stringify(result), { headers: jsonHeaders })
-          }
-          return result.then((output) =>
-            output instanceof Response ? output : new Response(route.stringify(output), { headers: jsonHeaders }),
-          )
+          if (!(result instanceof Promise)) return _makeResponse(result, route)
+          return result.then((output) => _makeResponse(output, route))
         },
         (error: unknown) => _minimalError(error),
       )
