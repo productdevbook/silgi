@@ -1,4 +1,4 @@
-import { ContextPool } from '../compile.ts'
+import { createContext } from '../compile.ts'
 import { compileRouter } from '../compile.ts'
 import { AnalyticsCollector, RequestAccumulator, RequestTrace, analyticsHTML, requestToMarkdown, errorToMarkdown } from '../plugins/analytics.ts'
 import { generateOpenAPI, scalarHTML } from '../scalar.ts'
@@ -94,9 +94,6 @@ export function createFetchHandler(
     compiledRouter = compileRouter(routerDef)
     routerCache.set(routerDef, compiledRouter)
   }
-
-  // Context pool — zero allocation per request
-  const ctxPool = new ContextPool()
 
   // Pre-allocate response headers and reusable context (reused across requests)
   const jsonHeaders = { 'content-type': 'application/json' }
@@ -307,9 +304,7 @@ location.reload();
     // Avoids async/await overhead entirely for simple queries
     const method = request.method
     if (ctxFactoryIsSync && (method === 'GET' || !request.body) && !route.passthrough) {
-      // Ultra-fast: skip pool when context is empty, no params, no analytics
-      const usePool = !ctxFactoryIsEmpty || match.params || collector
-      const ctx = usePool ? ctxPool.borrow() : (emptyCtx as Record<string, unknown>)
+      const ctx = ctxFactoryIsEmpty && !match.params && !collector ? (emptyCtx as Record<string, unknown>) : createContext()
       let t0 = 0
       let reqTrace: RequestTrace | undefined
       let rawInput: unknown
@@ -418,11 +413,8 @@ location.reload();
             })
           })
           .catch((error) => handleError(error, pathname, request, rawInput, reqTrace, t0, accumulator))
-          .finally(() => {
-            if (usePool) ctxPool.release(ctx)
-          })
+          .catch((error) => handleError(error, pathname, request, rawInput, reqTrace, t0, accumulator))
       } catch (error) {
-        if (usePool) ctxPool.release(ctx)
         return handleError(error, pathname, request, rawInput, reqTrace, t0, accumulator)
       }
     }
@@ -436,8 +428,7 @@ location.reload();
     const accept = request.headers.get('accept')
     const needsCodecResponse = accept && (accept.includes('msgpack') || accept.includes('x-devalue'))
     if (ctxFactoryIsSync && isJsonBody && !needsCodecResponse && !route.passthrough && !collector) {
-      const ctx = ctxFactoryIsEmpty && !match.params ? (emptyCtx as Record<string, unknown>) : ctxPool.borrow()
-      const needsRelease = ctx !== emptyCtx
+      const ctx = ctxFactoryIsEmpty && !match.params ? (emptyCtx as Record<string, unknown>) : createContext()
 
       if (!ctxFactoryIsEmpty) {
         const baseCtx = contextFactory(request) as Record<string, unknown>
@@ -464,9 +455,6 @@ location.reload();
           })
         })
         .catch((error: unknown) => handleError(error, pathname, request, undefined, undefined, 0, accumulator) as Response)
-        .finally(() => {
-          if (needsRelease) ctxPool.release(ctx)
-        })
     }
 
     // ── Full async path: POST with body, async context factory, codecs, analytics ──
@@ -495,9 +483,7 @@ location.reload();
     route: import('../compile.ts').CompiledRoute,
     accumulator?: RequestAccumulator,
   ): Promise<Response> {
-    // Skip ctxPool when context is empty, no params, no analytics
-    const usePool = !ctxFactoryIsEmpty || match.params || collector
-    const ctx = usePool ? ctxPool.borrow() : (emptyCtx as Record<string, unknown>)
+    const ctx = ctxFactoryIsEmpty && !match.params && !collector ? (emptyCtx as Record<string, unknown>) : createContext()
     let reqTrace: RequestTrace | undefined
     let rawInput: unknown
     let t0 = 0
@@ -620,8 +606,6 @@ location.reload();
       })
     } catch (error) {
       return handleError(error, pathname, request, rawInput, reqTrace, t0, accumulator) as Response
-    } finally {
-      if (usePool) ctxPool.release(ctx)
     }
   }
 

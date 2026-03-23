@@ -480,44 +480,7 @@ function isProcedureDef(value: unknown): value is ProcedureDef {
   )
 }
 
-// ── CONTEXT POOL ────────────────────────────────────
-
-const POOL_SIZE = 256
-
-/**
- * Pre-allocated context pool — zero allocation on borrow.
- *
- * Each context is a null-prototype object (no prototype chain lookups).
- * After use, all properties are deleted and returned to pool.
- */
-export class ContextPool {
-  #pool: Record<string, unknown>[]
-  #index = 0
-
-  constructor(size = POOL_SIZE) {
-    this.#pool = Array.from({ length: size }, () => Object.create(null))
-  }
-
-  borrow(): Record<string, unknown> {
-    if (this.#index < this.#pool.length) {
-      return this.#pool[this.#index++]!
-    }
-    // Pool exhausted — create new (fallback)
-    return Object.create(null)
-  }
-
-  release(_ctx: Record<string, unknown>): void {
-    // Replace with fresh null-prototype object instead of deleting properties
-    // (delete causes V8 dictionary mode transition, defeating the pool's purpose)
-    if (this.#index > 0) {
-      this.#pool[--this.#index] = Object.create(null)
-    }
-  }
-
-  /** Borrow a context that auto-releases when disposed (Node 24+ / `using` keyword) */
-  borrowDisposable(): Record<string, unknown> & Disposable {
-    const ctx = this.borrow() as Record<string, unknown> & Disposable
-    ctx[Symbol.dispose] = () => this.release(ctx)
-    return ctx
-  }
+/** Create a fresh null-prototype context object (no prototype chain lookups). */
+export function createContext(): Record<string, unknown> {
+  return Object.create(null)
 }
