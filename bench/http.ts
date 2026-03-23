@@ -4,7 +4,11 @@
  * Measures real HTTP round-trip latency (sequential requests).
  * Each framework serves the same simple JSON endpoint.
  *
- * Note: Elysia is excluded — it only runs on Bun, not Node.js.
+ * Methodology:
+ * - Each framework runs individually (start → warmup → measure → stop)
+ * - Proper await on server close before starting next
+ * - Response correctness verified before measuring
+ * - 3 rounds, median result reported
  *
  * Run: node --experimental-strip-types bench/http.ts
  */
@@ -13,24 +17,32 @@ import { Hono } from 'hono'
 import { serve as honoServe } from '@hono/node-server'
 import Fastify from 'fastify'
 import express from 'express'
+import http from 'node:http'
 import { serve as srvxServe } from 'srvx'
 import { silgi } from '../src/silgi.ts'
 
-const REQUESTS = 3000
-const WARMUP = 200
+const REQUESTS = 5000
+const WARMUP = 500
+const ROUNDS = 3
 
 // ── Helpers ──
 
-async function measure(url: string, n: number): Promise<{ avg: number; p50: number; p95: number; p99: number; rps: number }> {
+interface Result {
+  avg: number
+  p50: number
+  p95: number
+  p99: number
+  rps: number
+}
+
+async function measure(url: string, n: number): Promise<Result> {
   const times: number[] = []
 
-  // Warmup
   for (let i = 0; i < WARMUP; i++) {
     const res = await fetch(url, { method: 'POST', body: '{"limit":10}', headers: { 'content-type': 'application/json' } })
     await res.json()
   }
 
-  // Measure
   for (let i = 0; i < n; i++) {
     const start = performance.now()
     const res = await fetch(url, { method: 'POST', body: '{"limit":10}', headers: { 'content-type': 'application/json' } })
@@ -45,23 +57,29 @@ async function measure(url: string, n: number): Promise<{ avg: number; p50: numb
   const p99 = times[Math.floor(times.length * 0.99)]!
   const rps = Math.round(1000 / avg)
 
-  // Convert ms → µs
   return { avg: Math.round(avg * 1000), p50: Math.round(p50 * 1000), p95: Math.round(p95 * 1000), p99: Math.round(p99 * 1000), rps }
 }
 
-function fmt(us: number): string {
-  return `${us}µs`
+async function verify(url: string): Promise<void> {
+  const res = await fetch(url, { method: 'POST', body: '{"limit":3}', headers: { 'content-type': 'application/json' } })
+  if (res.status !== 200) throw new Error(`Expected 200, got ${res.status}`)
+  const body = await res.json() as any
+  if (!body.users || body.users.length !== 3) throw new Error(`Expected 3 users, got ${JSON.stringify(body)}`)
+  if (body.users[0].id !== 1 || body.users[0].name !== 'User 1') throw new Error(`Bad user shape: ${JSON.stringify(body.users[0])}`)
 }
 
-function fmtRps(n: number): string {
-  return `${n.toLocaleString()}/s`
+function fmt(us: number): string { return `${us}µs` }
+function fmtRps(n: number): string { return `${n.toLocaleString()}/s` }
+function median(arr: Result[]): Result {
+  const sorted = [...arr].sort((a, b) => a.avg - b.avg)
+  return sorted[Math.floor(sorted.length / 2)]!
 }
 
 const makeUsers = (limit: number) => Array.from({ length: limit }, (_, i) => ({ id: i + 1, name: `User ${i + 1}` }))
 
-// ── Silgi (via srvx — same adapter as serve()) ──
+// ── Framework runners ──
 
-async function benchSilgi(): Promise<ReturnType<typeof measure>> {
+async function benchSilgi(): Promise<Result> {
   const s = silgi({ context: () => ({}) })
   const router = s.router({
     users: {
@@ -69,76 +87,82 @@ async function benchSilgi(): Promise<ReturnType<typeof measure>> {
     },
   })
   const handler = s.handler(router)
-  const server = await srvxServe({ port: 0, fetch: handler })
+  const server = await srvxServe({ port: 0, hostname: '127.0.0.1', fetch: handler, silent: true })
+  await server.ready()
+  await verify(`${server.url}users/list`)
   const result = await measure(`${server.url}users/list`, REQUESTS)
-  await server.close()
+  await server.close(true)
   return result
 }
 
-// ── Hono ──
-
-async function benchHono(): Promise<ReturnType<typeof measure>> {
+async function benchHono(): Promise<Result> {
   const app = new Hono()
   app.post('/users/list', async (c) => {
     const { limit = 10 } = await c.req.json()
     return c.json({ users: makeUsers(limit) })
   })
-  const server = honoServe({ fetch: app.fetch, port: 0 }) as import('node:http').Server
-  await new Promise<void>((resolve) => setTimeout(resolve, 100))
+  const server = honoServe({ fetch: app.fetch, port: 0 }) as http.Server
+  await new Promise<void>((resolve) => server.once('listening', resolve))
   const port = (server.address() as any).port
-  const result = await measure(`http://localhost:${port}/users/list`, REQUESTS)
-  server.close()
+  const url = `http://127.0.0.1:${port}/users/list`
+  await verify(url)
+  const result = await measure(url, REQUESTS)
+  await new Promise<void>((resolve, reject) => server.close((e) => (e ? reject(e) : resolve())))
   return result
 }
 
-// ── Fastify ──
-
-async function benchFastify(): Promise<ReturnType<typeof measure>> {
+async function benchFastify(): Promise<Result> {
   const app = Fastify()
   app.post('/users/list', async (req) => {
     const { limit = 10 } = req.body as any
     return { users: makeUsers(limit) }
   })
-  await app.listen({ port: 0 })
+  await app.listen({ port: 0, host: '127.0.0.1' })
   const port = (app.server.address() as any).port
-  const result = await measure(`http://localhost:${port}/users/list`, REQUESTS)
+  const url = `http://127.0.0.1:${port}/users/list`
+  await verify(url)
+  const result = await measure(url, REQUESTS)
   await app.close()
   return result
 }
 
-// ── Express ──
-
-async function benchExpress(): Promise<ReturnType<typeof measure>> {
+async function benchExpress(): Promise<Result> {
   const app = express()
   app.use(express.json())
   app.post('/users/list', (req, res) => {
     const { limit = 10 } = req.body
     res.json({ users: makeUsers(limit) })
   })
-  const server = await new Promise<import('node:http').Server>((resolve) => {
-    const s = app.listen(0, () => resolve(s))
+  const server = await new Promise<http.Server>((resolve) => {
+    const s = app.listen(0, '127.0.0.1', () => resolve(s))
   })
   const port = (server.address() as any).port
-  const result = await measure(`http://localhost:${port}/users/list`, REQUESTS)
-  server.close()
+  const url = `http://127.0.0.1:${port}/users/list`
+  await verify(url)
+  const result = await measure(url, REQUESTS)
+  await new Promise<void>((resolve, reject) => server.close((e) => (e ? reject(e) : resolve())))
   return result
 }
 
 // ── Run ──
 
-console.log(`\nHTTP Benchmark — ${REQUESTS} sequential requests (${WARMUP} warmup)\n`)
-
-console.log('### Simple JSON endpoint (POST /users/list)\n')
-console.log('| Framework | avg | p50 | p95 | p99 | req/s |')
-console.log('|---|---|---|---|---|---|')
-
-for (const [name, fn] of [
+const frameworks: [string, () => Promise<Result>][] = [
   ['Silgi', benchSilgi],
   ['Hono', benchHono],
   ['Fastify', benchFastify],
   ['Express', benchExpress],
-] as const) {
-  const r = await (fn as () => Promise<any>)()
+]
+
+console.log(`\nHTTP Benchmark — ${REQUESTS} requests × ${ROUNDS} rounds (${WARMUP} warmup each)\n`)
+console.log('| Framework | avg | p50 | p95 | p99 | req/s |')
+console.log('|---|---|---|---|---|---|')
+
+for (const [name, fn] of frameworks) {
+  const results: Result[] = []
+  for (let round = 0; round < ROUNDS; round++) {
+    results.push(await fn())
+  }
+  const r = median(results)
   console.log(`| ${name} | ${fmt(r.avg)} | ${fmt(r.p50)} | ${fmt(r.p95)} | ${fmt(r.p99)} | ${fmtRps(r.rps)} |`)
 }
 

@@ -1,16 +1,18 @@
 # Benchmarks
 
 > Last updated: **2026-03-24** | Apple M3 Max | Node v24.11.0 | Bun 1.3.11
+>
+> Methodology: 5000 sequential requests, 500 warmup, 3 rounds median. Response correctness verified.
 
 ## HTTP — Bun 1.3.11
 
-Simple POST endpoint returning JSON. 3000 sequential requests, 200 warmup. All frameworks use `Bun.serve()`.
+Simple POST endpoint returning JSON. All frameworks use `Bun.serve()`.
 
 | Framework | avg | p50 | p95 | p99 | req/s |
 |---|---|---|---|---|---|
-| Elysia | **44µs** | **43µs** | 50µs | 58µs | **22,572/s** |
-| Silgi | 46µs | 45µs | 54µs | 65µs | 21,672/s |
-| Hono | 46µs | 45µs | 51µs | 62µs | 21,957/s |
+| Elysia | **44µs** | **42µs** | 53µs | 66µs | **22,865/s** |
+| Hono | 45µs | 43µs | 53µs | 72µs | 22,265/s |
+| Silgi | 51µs | 44µs | 83µs | 160µs | 19,634/s |
 
 ## HTTP — Node.js v24.11.0
 
@@ -18,12 +20,12 @@ Same endpoint. Silgi and Hono use Fetch API adapters (srvx / @hono/node-server).
 
 | Framework | avg | p50 | p95 | p99 | req/s |
 |---|---|---|---|---|---|
-| Fastify | **96µs** | **85µs** | 117µs | 197µs | **10,396/s** |
-| Express | 102µs | 90µs | 130µs | 182µs | 9,811/s |
-| Hono | 116µs | 105µs | 150µs | 190µs | 8,638/s |
-| Silgi | 125µs | 111µs | 180µs | 259µs | 7,993/s |
+| Fastify | **87µs** | **79µs** | 102µs | 152µs | **11,435/s** |
+| Hono | 95µs | 85µs | 110µs | 187µs | 10,481/s |
+| Silgi | 103µs | 92µs | 125µs | 194µs | 9,742/s |
+| Express | 127µs | 93µs | 204µs | 817µs | 7,863/s |
 
-Silgi uses the Fetch API (`Request`/`Response`) while Fastify and Express use native Node.js `req`/`res`. This adds ~20µs fixed adapter overhead per request.
+Silgi uses the Fetch API (`Request`/`Response`) while Fastify and Express use native Node.js `req`/`res`. This adds ~10µs fixed adapter overhead per request.
 
 ## Pipeline Performance (pure execution, no HTTP)
 
