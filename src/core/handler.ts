@@ -173,6 +173,7 @@ location.reload();
   // Runtime detection: Bun's request.json() is native C++ — faster than text() + JSON.parse()
   const isBun = typeof globalThis.Bun !== 'undefined'
 
+
   // Pre-check: is context factory sync? Also detect empty context for zero-copy path.
   let ctxFactoryIsSync = false
   let ctxFactoryIsEmpty = false
@@ -257,34 +258,44 @@ location.reload();
     const qMark = url.indexOf('?', pathStart)
     // Keep leading '/' for router, use +1 slice for readable path comparisons
     const fullPath = qMark === -1 ? url.slice(pathStart) : url.slice(pathStart, qMark)
-    const pathname = fullPath.length > 1 ? fullPath.slice(1) : ''
 
-    // HTTP-level request accumulator — created by wrapper, or fallback here
-    const accumulator: RequestAccumulator | undefined = (request as any).__acc ?? (collector ? new RequestAccumulator(request, collector) : undefined)
+    // Lazy pathname — only computed when scalar/analytics/hooks need it
+    let _pathname: string | undefined
+    const getPathname = () => (_pathname ??= fullPath.length > 1 ? fullPath.slice(1) : '')
+
+    // HTTP-level request accumulator — only when analytics collector exists
+    let accumulator: RequestAccumulator | undefined
+    if (collector) {
+      accumulator = (request as any).__acc ?? new RequestAccumulator(request, collector)
+    }
 
     // Scalar: /openapi.json and /reference
     if (scalarEnabled) {
-      if (pathname === 'openapi.json') {
+      const p = getPathname()
+      if (p === 'openapi.json') {
         return new Response(specJson, { headers: { 'content-type': 'application/json' } })
       }
-      if (pathname === 'reference') {
+      if (p === 'reference') {
         return new Response(specHtml, { headers: { 'content-type': 'text/html' } })
       }
     }
 
     // Analytics: /analytics/* — dashboard SPA + JSON API
-    if (analyticsEnabled && collector && pathname.startsWith('analytics')) {
-      if (analyticsAuth) {
-        const authResult = checkAnalyticsAuth(request, url, analyticsAuth)
-        if (authResult instanceof Promise) {
-          return authResult.then((ok) => {
-            if (!ok) return analyticsAuthResponse(pathname)
-            return serveAnalytics(pathname, collector!)
-          })
+    if (analyticsEnabled && collector) {
+      const p = getPathname()
+      if (p.startsWith('analytics')) {
+        if (analyticsAuth) {
+          const authResult = checkAnalyticsAuth(request, url, analyticsAuth)
+          if (authResult instanceof Promise) {
+            return authResult.then((ok) => {
+              if (!ok) return analyticsAuthResponse(p)
+              return serveAnalytics(p, collector!)
+            })
+          }
+          if (!authResult) return analyticsAuthResponse(p)
         }
-        if (!authResult) return analyticsAuthResponse(pathname)
+        return serveAnalytics(p, collector)
       }
-      return serveAnalytics(pathname, collector)
     }
 
     // Compiled radix router lookup — fullPath already has leading '/'
@@ -293,6 +304,7 @@ location.reload();
       return new Response(notFoundBody, { status: 404, headers: jsonHeaders })
     }
     const route = match.data
+    const pathname = getPathname()
 
     // ── Fast sync path: GET, sync context factory, no body ──
     // Avoids async/await overhead entirely for simple queries
@@ -418,8 +430,63 @@ location.reload();
       }
     }
 
-    // ── Full async path: POST with body, async context factory, codecs ──
+    // ── Fast POST path: sync context, JSON body, no analytics ──
+    // Uses .then() chain instead of async function to avoid Promise wrapper overhead
+    // Skip when content-type is non-JSON (msgpack/devalue codecs need handleAsync)
+    // Check if request uses JSON body and doesn't need codec response
+    const ct = request.headers.get('content-type')
+    const isJsonBody = !ct || ct.charCodeAt(12) === 106 // 'j' in 'application/json'
+    const accept = request.headers.get('accept')
+    const needsCodecResponse = accept && (accept.includes('msgpack') || accept.includes('x-devalue'))
+    if (ctxFactoryIsSync && isJsonBody && !needsCodecResponse && !route.passthrough && !collector) {
+      const ctx = ctxFactoryIsEmpty && !match.params ? (emptyCtx as Record<string, unknown>) : ctxPool.borrow()
+      const needsRelease = ctx !== emptyCtx
+
+      if (!ctxFactoryIsEmpty) {
+        const baseCtx = contextFactory(request) as Record<string, unknown>
+        const keys = Object.keys(baseCtx)
+        for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = baseCtx[keys[i]!]
+      }
+      if (match.params) ctx.params = match.params
+
+      // Body parse → pipeline → response — single .then() chain
+      const bodyParse = isBun ? request.json() : request.text().then((t) => (t ? JSON.parse(t) : undefined))
+
+      return bodyParse
+        .then((rawInput: unknown) => {
+          if (hasHooks) hooks!.callHook('request', { path: pathname, input: rawInput })
+
+          const pipelineResult = route.handler(ctx, rawInput, request.signal)
+          if (!(pipelineResult instanceof Promise)) {
+            if (hasHooks) hooks!.callHook('response', { path: pathname, output: pipelineResult, durationMs: 0 })
+            return _makeResponse(pipelineResult, route)
+          }
+          return pipelineResult.then((output) => {
+            if (hasHooks) hooks!.callHook('response', { path: pathname, output, durationMs: 0 })
+            return _makeResponse(output, route)
+          })
+        })
+        .catch((error: unknown) => handleError(error, pathname, request, undefined, undefined, 0, accumulator) as Response)
+        .finally(() => {
+          if (needsRelease) ctxPool.release(ctx)
+        })
+    }
+
+    // ── Full async path: POST with body, async context factory, codecs, analytics ──
     return handleAsync(request, url, pathname, qMark, match, route, accumulator)
+  }
+
+  /** Shared response builder — avoids code duplication */
+  function _makeResponse(output: unknown, route: import('../compile.ts').CompiledRoute): Response {
+    if (output instanceof Response) return output
+    if (output instanceof ReadableStream)
+      return new Response(output, { headers: { 'content-type': 'application/octet-stream' } })
+    if (output && typeof output === 'object' && Symbol.asyncIterator in (output as object))
+      return new Response(iteratorToEventStream(output as AsyncIterableIterator<unknown>), { headers: sseHeaders })
+    const cacheHeaders = route.cacheControl ? { 'cache-control': route.cacheControl } : undefined
+    return new Response(route.stringify(output), {
+      headers: cacheHeaders ? { ...jsonHeaders, ...cacheHeaders } : jsonHeaders,
+    })
   }
 
   async function handleAsync(
@@ -431,7 +498,9 @@ location.reload();
     route: import('../compile.ts').CompiledRoute,
     accumulator?: RequestAccumulator,
   ): Promise<Response> {
-    const ctx = ctxPool.borrow()
+    // Skip ctxPool when context is empty, no params, no analytics
+    const usePool = !ctxFactoryIsEmpty || match.params || collector
+    const ctx = usePool ? ctxPool.borrow() : (emptyCtx as Record<string, unknown>)
     let reqTrace: RequestTrace | undefined
     let rawInput: unknown
     let t0 = 0
@@ -517,7 +586,6 @@ location.reload();
           collector.record(pathname, durationMs)
           if (accumulator) {
             accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output: null, spans: reqTrace?.spans ?? [] })
-
           }
         }
         return new Response(output, { headers: { 'content-type': 'application/octet-stream' } })
@@ -528,7 +596,6 @@ location.reload();
           collector.record(pathname, durationMs)
           if (accumulator) {
             accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output: null, spans: reqTrace?.spans ?? [] })
-
           }
         }
         return new Response(iteratorToEventStream(output as AsyncIterableIterator<unknown>), { headers: sseHeaders })
@@ -540,7 +607,6 @@ location.reload();
         collector.record(pathname, durationMs)
         if (accumulator) {
           accumulator.addProcedure({ procedure: pathname, durationMs, status: 200, input: rawInput, output, spans: reqTrace?.spans ?? [] })
-
         }
       }
 
@@ -558,7 +624,7 @@ location.reload();
     } catch (error) {
       return handleError(error, pathname, request, rawInput, reqTrace, t0, accumulator) as Response
     } finally {
-      ctxPool.release(ctx)
+      if (usePool) ctxPool.release(ctx)
     }
   }
 
@@ -613,6 +679,100 @@ location.reload();
     }
     const e = error instanceof SilgiError ? error : toSilgiError(error)
     return encodeResponse(e.toJSON(), e.status, fmt)
+  }
+
+  // ── MINIMAL HANDLER: no scalar, no analytics, no hooks ──────────
+  // When all optional features are disabled, return a stripped handler
+  // that eliminates all branch checks per request — on par with Hono.
+  if (!collector && !scalarEnabled && !analyticsEnabled && !hasHooks) {
+    return function minimalHandler(request: Request): Response | Promise<Response> {
+      const url = request.url
+      const pathStart = url.indexOf('/', url.indexOf('//') + 2)
+      const qMark = url.indexOf('?', pathStart)
+      const fullPath = qMark === -1 ? url.slice(pathStart) : url.slice(pathStart, qMark)
+
+      const match = compiledRouter!(request.method, fullPath)
+      if (!match) return new Response(notFoundBody, { status: 404, headers: jsonHeaders })
+
+      const route = match.data
+
+      // ── GET / no body — fully sync ──
+      if (request.method === 'GET' || !request.body) {
+        const ctx: Record<string, unknown> = ctxFactoryIsEmpty && !match.params
+          ? (emptyCtx as Record<string, unknown>)
+          : Object.create(null)
+
+        if (!ctxFactoryIsEmpty && ctxFactoryIsSync) {
+          const base = contextFactory(request) as Record<string, unknown>
+          const keys = Object.keys(base)
+          for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = base[keys[i]!]
+        }
+        if (match.params) ctx.params = match.params
+
+        let input: unknown
+        if (qMark !== -1) {
+          const s = url.slice(qMark + 1)
+          const di = s.indexOf('data=')
+          if (di !== -1) {
+            const vs = di + 5
+            const ve = s.indexOf('&', vs)
+            input = JSON.parse(decodeURIComponent(ve === -1 ? s.slice(vs) : s.slice(vs, ve)))
+          }
+        }
+
+        try {
+          const result = route.handler(ctx, input, request.signal)
+          if (!(result instanceof Promise)) {
+            if (result instanceof Response) return result
+            return new Response(route.stringify(result), { headers: jsonHeaders })
+          }
+          return result.then(
+            (output) => (output instanceof Response ? output : new Response(route.stringify(output), { headers: jsonHeaders })),
+            (error) => _minimalError(error),
+          )
+        } catch (error) {
+          return _minimalError(error)
+        }
+      }
+
+      // ── POST — single .then() chain, zero header reads ──
+      const ctx: Record<string, unknown> = ctxFactoryIsEmpty && !match.params
+        ? (emptyCtx as Record<string, unknown>)
+        : Object.create(null)
+
+      if (!ctxFactoryIsEmpty && ctxFactoryIsSync) {
+        const base = contextFactory(request) as Record<string, unknown>
+        const keys = Object.keys(base)
+        for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = base[keys[i]!]
+      }
+      if (match.params) ctx.params = match.params
+
+      const parse = isBun ? request.json() : request.text().then((t) => (t ? JSON.parse(t) : undefined))
+      return parse.then(
+        (rawInput: unknown) => {
+          const result = route.handler(ctx, rawInput, request.signal)
+          if (!(result instanceof Promise)) {
+            if (result instanceof Response) return result
+            return new Response(route.stringify(result), { headers: jsonHeaders })
+          }
+          return result.then((output) =>
+            output instanceof Response ? output : new Response(route.stringify(output), { headers: jsonHeaders }),
+          )
+        },
+        (error: unknown) => _minimalError(error),
+      )
+    }
+  }
+
+  function _minimalError(error: unknown): Response {
+    if (error instanceof ValidationError) {
+      return new Response(
+        JSON.stringify({ code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } }),
+        { status: 400, headers: jsonHeaders },
+      )
+    }
+    const e = error instanceof SilgiError ? error : toSilgiError(error)
+    return new Response(JSON.stringify(e.toJSON()), { status: e.status, headers: jsonHeaders })
   }
 
   if (!collector) return handleRequest

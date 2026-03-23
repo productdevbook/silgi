@@ -201,6 +201,31 @@ function selectGuardRunner(guards: readonly GuardDef[]): (ctx: Record<string, un
   }
 }
 
+// ── Resolve + output validation helper ──────────────
+
+/** Call resolve, then validate output (sync-first, async fallback) */
+function _resolveWithOutput(
+  resolveFn: Function,
+  input: unknown,
+  ctx: Record<string, unknown>,
+  failFn: (code: string, data?: unknown) => never,
+  signal: AbortSignal,
+  outputSchema: import('./core/schema.ts').AnySchema | null,
+): unknown {
+  const output = resolveFn({
+    input,
+    ctx,
+    fail: failFn,
+    signal,
+    params: (ctx.params ?? {}) as Record<string, string>,
+  })
+  if (!outputSchema) return output
+  if (isThenable(output)) {
+    return (output as Promise<unknown>).then((o) => validateSchema(outputSchema, o))
+  }
+  return validateSchema(outputSchema, output)
+}
+
 // ── Main Compiler ───────────────────────────────────
 
 /**
@@ -288,27 +313,51 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
   }
 
   // ── SEMI-SYNC: no wraps, has validation ────────────
+  // Sync-first: validateSchema now returns sync for Zod 4 — avoid async function overhead
+  // try/catch converts sync ValidationError throws to rejected Promises (contract compat)
   if (wraps.length === 0) {
-    return async (ctx, rawInput, signal) => {
-      const guardResult = runGuards(ctx)
-      if (guardResult) await guardResult
-      const input = inputSchema ? await validateSchema(inputSchema, rawInput ?? {}) : rawInput
-      const output = await resolveFn({
-        input,
-        ctx,
-        fail: failFn,
-        signal,
-        params: (ctx.params ?? {}) as Record<string, string>,
-      })
-      return outputSchema ? await validateSchema(outputSchema, output) : output
+    return (ctx, rawInput, signal) => {
+      try {
+        const guardResult = runGuards(ctx)
+        if (guardResult && isThenable(guardResult)) {
+          // Async guards → fall to async path
+          return (guardResult as Promise<void>).then(() => {
+            const input = inputSchema ? validateSchema(inputSchema, rawInput ?? {}) : rawInput
+            if (isThenable(input)) {
+              return (input as Promise<unknown>).then((resolvedInput) =>
+                _resolveWithOutput(resolveFn, resolvedInput, ctx, failFn, signal, outputSchema),
+              )
+            }
+            return _resolveWithOutput(resolveFn, input, ctx, failFn, signal, outputSchema)
+          })
+        }
+        // Sync guards — try sync validation
+        const input = inputSchema ? validateSchema(inputSchema, rawInput ?? {}) : rawInput
+        if (isThenable(input)) {
+          return (input as Promise<unknown>).then((resolvedInput) =>
+            _resolveWithOutput(resolveFn, resolvedInput, ctx, failFn, signal, outputSchema),
+          )
+        }
+        return _resolveWithOutput(resolveFn, input, ctx, failFn, signal, outputSchema)
+      } catch (e) {
+        return Promise.reject(e)
+      }
     }
   }
 
   // ── WRAP PATH: onion only for wraps ────────────────
+  // Wraps always need async (onion model requires chained next() calls)
   return async (ctx, rawInput, signal) => {
     const guardResult = runGuards(ctx)
-    if (guardResult) await guardResult
-    const input = inputSchema ? await validateSchema(inputSchema, rawInput ?? {}) : rawInput
+    if (guardResult && isThenable(guardResult)) await guardResult
+
+    let input: unknown
+    if (inputSchema) {
+      const validated = validateSchema(inputSchema, rawInput ?? {})
+      input = isThenable(validated) ? await validated : validated
+    } else {
+      input = rawInput
+    }
 
     // Store input on context so wraps (e.g. mapInput) can read/modify it
     ctx.__rawInput = input
@@ -333,7 +382,9 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
     }
 
     const output = await execute()
-    return outputSchema ? await validateSchema(outputSchema, output) : output
+    if (!outputSchema) return output
+    const validated = validateSchema(outputSchema, output)
+    return isThenable(validated) ? await validated : validated
   }
 }
 

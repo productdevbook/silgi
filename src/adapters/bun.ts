@@ -96,6 +96,9 @@ export function silgiBun<TCtx extends Record<string, unknown>>(
     const route = match.data
     const handler = route.handler
     const stringify = route.stringify
+    // Response.json() is Bun-native C++ — faster than new Response(JSON.stringify(...))
+    // Only safe when no custom fast-stringify is compiled (i.e. no output schema)
+    const nativeJson = stringify === JSON.stringify
 
     // ── GET or no body — fully sync ──
     if (request.method === 'GET' || !request.body) {
@@ -124,7 +127,7 @@ export function silgiBun<TCtx extends Record<string, unknown>>(
         if (!(result instanceof Promise)) {
           // Fully sync — fastest path
           if (result instanceof Response) return result
-          return new Response(stringify(result), { headers: JSON_HDR })
+          return nativeJson ? Response.json(result) : new Response(stringify(result), { headers: JSON_HDR })
         }
 
         return result.then((output) => {
@@ -132,7 +135,7 @@ export function silgiBun<TCtx extends Record<string, unknown>>(
           if (output instanceof ReadableStream) return new Response(output, { headers: STREAM_HDR })
           if (output && typeof output === 'object' && Symbol.asyncIterator in (output as object))
             return new Response(iteratorToEventStream(output as AsyncIterableIterator<unknown>), { headers: SSE_HDR })
-          return new Response(stringify(output), { headers: JSON_HDR })
+          return nativeJson ? Response.json(output) : new Response(stringify(output), { headers: JSON_HDR })
         }, _err)
       } catch (error) {
         return _err(error)
@@ -140,13 +143,14 @@ export function silgiBun<TCtx extends Record<string, unknown>>(
     }
 
     // ── POST with body — async/await (JSC optimizes await better than .then) ──
-    return _post(request, match, handler, stringify)
+    return _post(request, match, handler, nativeJson, stringify)
   }
 
   async function _post(
     request: Request,
     match: { params: Record<string, string> | null },
     handler: (ctx: Record<string, unknown>, input: unknown, signal: AbortSignal) => unknown,
+    nativeJson: boolean,
     stringify: (v: unknown) => string,
   ): Promise<Response> {
     const ctx: Record<string, unknown> = Object.create(null)
@@ -167,7 +171,7 @@ export function silgiBun<TCtx extends Record<string, unknown>>(
       if (output instanceof ReadableStream) return new Response(output, { headers: STREAM_HDR })
       if (output && typeof output === 'object' && Symbol.asyncIterator in (output as object))
         return new Response(iteratorToEventStream(output as AsyncIterableIterator<unknown>), { headers: SSE_HDR })
-      return new Response(stringify(output), { headers: JSON_HDR })
+      return nativeJson ? Response.json(output) : new Response(stringify(output), { headers: JSON_HDR })
     } catch (error) {
       return _err(error)
     }

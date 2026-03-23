@@ -19,12 +19,23 @@ export class ValidationError extends Error {
   }
 }
 
-export async function validateSchema(schema: AnySchema, value: unknown): Promise<unknown> {
-  const result = await schema['~standard'].validate(value)
-  if ('issues' in result && result.issues) {
-    throw new ValidationError({ issues: result.issues })
+/** Sync fast-path: Zod 4 validate() returns sync result — avoid Promise allocation */
+export function validateSchema(schema: AnySchema, value: unknown): unknown {
+  const result = schema['~standard'].validate(value)
+  // Sync result (Zod 4, ArkType, Silgi type()) — no Promise overhead
+  if (typeof (result as any)?.then !== 'function') {
+    if ('issues' in (result as any) && (result as any).issues) {
+      throw new ValidationError({ issues: (result as any).issues })
+    }
+    return (result as { value: unknown }).value
   }
-  return (result as { value: unknown }).value
+  // Async fallback (Valibot or custom async schemas)
+  return (result as Promise<any>).then((r: any) => {
+    if ('issues' in r && r.issues) {
+      throw new ValidationError({ issues: r.issues })
+    }
+    return r.value
+  })
 }
 
 export function type<TInput, TOutput = TInput>(

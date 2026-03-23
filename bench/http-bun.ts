@@ -2,14 +2,14 @@
  * HTTP benchmark (Bun) — Silgi vs Elysia vs Hono.
  *
  * Runs on Bun only. Measures real HTTP round-trip latency.
+ * Fair comparison: all frameworks do the same work (parse JSON, create array, return JSON).
  *
  * Run: bun bench/http-bun.ts
  */
 
 import { Hono } from 'hono'
-import { Elysia, t } from 'elysia'
+import { Elysia } from 'elysia'
 import { silgi } from '../src/silgi.ts'
-import { z } from 'zod'
 
 const REQUESTS = 3000
 const WARMUP = 200
@@ -52,9 +52,7 @@ async function benchSilgi(): Promise<ReturnType<typeof measure>> {
   const s = silgi({ context: () => ({}) })
   const router = s.router({
     users: {
-      list: s
-        .$input(z.object({ limit: z.number().optional() }))
-        .$resolve(({ input }) => ({ users: makeUsers(input.limit ?? 10) })),
+      list: s.$resolve(({ input }) => ({ users: makeUsers((input as any)?.limit ?? 10) })),
     },
   })
   const handler = s.handler(router)

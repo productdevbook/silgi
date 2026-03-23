@@ -13,9 +13,8 @@ import { Hono } from 'hono'
 import { serve as honoServe } from '@hono/node-server'
 import Fastify from 'fastify'
 import express from 'express'
-import http from 'node:http'
+import { serve as srvxServe } from 'srvx'
 import { silgi } from '../src/silgi.ts'
-import { z } from 'zod'
 
 const REQUESTS = 3000
 const WARMUP = 200
@@ -58,39 +57,21 @@ function fmtRps(n: number): string {
   return `${n.toLocaleString()}/s`
 }
 
-// ── Silgi ──
+const makeUsers = (limit: number) => Array.from({ length: limit }, (_, i) => ({ id: i + 1, name: `User ${i + 1}` }))
+
+// ── Silgi (via srvx — same adapter as serve()) ──
 
 async function benchSilgi(): Promise<ReturnType<typeof measure>> {
   const s = silgi({ context: () => ({}) })
   const router = s.router({
     users: {
-      list: s
-        .$input(z.object({ limit: z.number().optional() }))
-        .$resolve(({ input }) => ({
-          users: Array.from({ length: input.limit ?? 10 }, (_, i) => ({ id: i + 1, name: `User ${i + 1}` })),
-        })),
+      list: s.$resolve(({ input }) => ({ users: makeUsers((input as any)?.limit ?? 10) })),
     },
   })
   const handler = s.handler(router)
-  const server = http.createServer((req, res) => {
-    const chunks: Buffer[] = []
-    req.on('data', (c) => chunks.push(c))
-    req.on('end', async () => {
-      const body = Buffer.concat(chunks).toString()
-      const request = new Request(`http://localhost${req.url}`, {
-        method: req.method,
-        headers: req.headers as Record<string, string>,
-        body: req.method !== 'GET' ? body : undefined,
-      })
-      const response = await handler(request)
-      res.writeHead(response.status, Object.fromEntries(response.headers))
-      res.end(await response.text())
-    })
-  })
-  await new Promise<void>((resolve) => server.listen(0, resolve))
-  const port = (server.address() as any).port
-  const result = await measure(`http://localhost:${port}/users/list`, REQUESTS)
-  server.close()
+  const server = await srvxServe({ port: 0, fetch: handler })
+  const result = await measure(`${server.url}users/list`, REQUESTS)
+  await server.close()
   return result
 }
 
@@ -100,11 +81,9 @@ async function benchHono(): Promise<ReturnType<typeof measure>> {
   const app = new Hono()
   app.post('/users/list', async (c) => {
     const { limit = 10 } = await c.req.json()
-    return c.json({
-      users: Array.from({ length: limit }, (_, i) => ({ id: i + 1, name: `User ${i + 1}` })),
-    })
+    return c.json({ users: makeUsers(limit) })
   })
-  const server = honoServe({ fetch: app.fetch, port: 0 }) as http.Server
+  const server = honoServe({ fetch: app.fetch, port: 0 }) as import('node:http').Server
   await new Promise<void>((resolve) => setTimeout(resolve, 100))
   const port = (server.address() as any).port
   const result = await measure(`http://localhost:${port}/users/list`, REQUESTS)
@@ -118,9 +97,7 @@ async function benchFastify(): Promise<ReturnType<typeof measure>> {
   const app = Fastify()
   app.post('/users/list', async (req) => {
     const { limit = 10 } = req.body as any
-    return {
-      users: Array.from({ length: limit }, (_, i) => ({ id: i + 1, name: `User ${i + 1}` })),
-    }
+    return { users: makeUsers(limit) }
   })
   await app.listen({ port: 0 })
   const port = (app.server.address() as any).port
@@ -136,11 +113,9 @@ async function benchExpress(): Promise<ReturnType<typeof measure>> {
   app.use(express.json())
   app.post('/users/list', (req, res) => {
     const { limit = 10 } = req.body
-    res.json({
-      users: Array.from({ length: limit }, (_, i) => ({ id: i + 1, name: `User ${i + 1}` })),
-    })
+    res.json({ users: makeUsers(limit) })
   })
-  const server = await new Promise<http.Server>((resolve) => {
+  const server = await new Promise<import('node:http').Server>((resolve) => {
     const s = app.listen(0, () => resolve(s))
   })
   const port = (server.address() as any).port
