@@ -1,6 +1,6 @@
 ---
 title: 0.1.0-beta.5
-description: createCaller for testing, lint fixes, docs tab navigation, blog & changelog pages.
+description: createCaller for testing, OpenAPI overhaul with Standard Schema, per-procedure metadata.
 version: 0.1.0-beta.5
 date: 2026-03-23
 ---
@@ -68,6 +68,57 @@ The only difference: no HTTP serialization, no response headers, no analytics re
 - 21 tests covering: basic calls, nested procedures, input/output validation, typed errors, guards, context override, per-call options, async context, timeout, signal, isolation, proxy safety
 
 See [Testing docs](/docs/testing) for full guide with Vitest examples.
+
+## OpenAPI overhaul
+
+### Standard Schema JSON conversion
+
+Replaced the 150-line hand-rolled Zod introspection (`convertZodDef`, `applyStringChecks`, `applyNumberChecks`) with Standard Schema's `~standard.jsonSchema.input()`. This is a single 15-line function that works with **any** validator implementing Standard Schema v1 — Zod v4, Valibot, ArkType — not just Zod.
+
+All Zod-specific edge case bugs (exclusive bounds, ip v6, nativeEnum, ZodBranded/ZodReadonly/ZodCatch) are now handled correctly by the validator's own JSON Schema implementation.
+
+### Path parameter support
+
+`:param` syntax is now converted to OpenAPI `{param}` syntax with proper `parameters` declarations:
+
+```ts
+const getUser = s
+  .$route({ method: 'GET', path: '/users/:id' })
+  .$input(z.object({ id: z.number() }))
+  .$resolve(...)
+
+// Generated spec: GET /users/{id} with parameters: [{ name: "id", in: "path", required: true }]
+```
+
+Also supports `:param(regex)`, `:param?`, and `**` wildcards.
+
+### Per-procedure OpenAPI metadata
+
+New `Route` options for full control over the generated OpenAPI spec:
+
+```ts
+s.$route({
+  operationId: 'getUserById',        // custom operation ID
+  tags: ['Users', 'Public'],         // custom tags (was silently ignored before)
+  security: false,                    // public endpoint (overrides global auth)
+  security: ['bearerAuth'],           // per-procedure security scheme
+  spec: {                             // raw OpenAPI operation override
+    externalDocs: { url: 'https://docs.example.com' },
+    'x-rate-limit': 100,
+  },
+  spec: (op) => ({ ...op, ... }),     // function override (like oRPC)
+})
+```
+
+### Auto-documented validation errors
+
+Procedures with `$input()` now automatically include a `400 BAD_REQUEST` response in the OpenAPI spec with the validation error schema.
+
+### Error message in spec
+
+`$errors({ CONFLICT: { status: 409, message: 'Already exists' } })` — the `message` field is now included as `default` in the generated error schema.
+
+See [Server docs](/docs/server) for the full `$route()` options reference.
 
 ## Lint fixes
 
