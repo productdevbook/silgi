@@ -114,7 +114,7 @@ export function createFetchHandler(
     specHtml = scalarHTML('/openapi.json', scalarOpts)
   }
 
-  // Analytics (sync init — no race condition, module is pure JS with zero deps)
+  // Analytics (sync init)
   const analyticsEnabled = !!handlerOptions?.analytics
   let collector: AnalyticsCollector | undefined
   let analyticsDashboardHtml: string | undefined
@@ -259,9 +259,7 @@ location.reload();
     // Keep leading '/' for router, use +1 slice for readable path comparisons
     const fullPath = qMark === -1 ? url.slice(pathStart) : url.slice(pathStart, qMark)
 
-    // Lazy pathname — only computed when scalar/analytics/hooks need it
-    let _pathname: string | undefined
-    const getPathname = () => (_pathname ??= fullPath.length > 1 ? fullPath.slice(1) : '')
+    const pathname = fullPath.length > 1 ? fullPath.slice(1) : ''
 
     // HTTP-level request accumulator — only when analytics collector exists
     let accumulator: RequestAccumulator | undefined
@@ -271,30 +269,28 @@ location.reload();
 
     // Scalar: /openapi.json and /reference
     if (scalarEnabled) {
-      const p = getPathname()
-      if (p === 'openapi.json') {
+      if (pathname === 'openapi.json') {
         return new Response(specJson, { headers: { 'content-type': 'application/json' } })
       }
-      if (p === 'reference') {
+      if (pathname === 'reference') {
         return new Response(specHtml, { headers: { 'content-type': 'text/html' } })
       }
     }
 
     // Analytics: /analytics/* — dashboard SPA + JSON API
     if (analyticsEnabled && collector) {
-      const p = getPathname()
-      if (p.startsWith('analytics')) {
+      if (pathname.startsWith('analytics')) {
         if (analyticsAuth) {
           const authResult = checkAnalyticsAuth(request, url, analyticsAuth)
           if (authResult instanceof Promise) {
             return authResult.then((ok) => {
-              if (!ok) return analyticsAuthResponse(p)
-              return serveAnalytics(p, collector!)
+              if (!ok) return analyticsAuthResponse(pathname)
+              return serveAnalytics(pathname, collector!)
             })
           }
-          if (!authResult) return analyticsAuthResponse(p)
+          if (!authResult) return analyticsAuthResponse(pathname)
         }
-        return serveAnalytics(p, collector)
+        return serveAnalytics(pathname, collector)
       }
     }
 
@@ -304,7 +300,6 @@ location.reload();
       return new Response(notFoundBody, { status: 404, headers: jsonHeaders })
     }
     const route = match.data
-    const pathname = getPathname()
 
     // ── Fast sync path: GET, sync context factory, no body ──
     // Avoids async/await overhead entirely for simple queries

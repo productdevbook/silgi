@@ -53,6 +53,9 @@ function noopFail(code: string, data?: unknown): never {
 
 const UNSAFE_KEYS = /* @__PURE__ */ new Set(['__proto__', 'constructor', 'prototype'])
 
+/** Pre-frozen empty params — avoids per-request {} allocation */
+const EMPTY_PARAMS: Record<string, string> = /* @__PURE__ */ Object.freeze(Object.create(null))
+
 /** Apply a single guard result to context — direct property set (326x faster than Object.assign) */
 function applyGuardResult(ctx: Record<string, unknown>, result: unknown): void {
   if (result === null || result === undefined || typeof result !== 'object') return
@@ -217,7 +220,7 @@ function _resolveWithOutput(
     ctx,
     fail: failFn,
     signal,
-    params: (ctx.params ?? {}) as Record<string, string>,
+    params: (ctx.params ?? EMPTY_PARAMS) as Record<string, string>,
   })
   if (!outputSchema) return output
   if (isThenable(output)) {
@@ -282,7 +285,7 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
         ctx: _ctx,
         fail: failFn,
         signal,
-        params: (_ctx.params ?? {}) as Record<string, string>,
+        params: (_ctx.params ?? EMPTY_PARAMS) as Record<string, string>,
       })
   }
 
@@ -297,7 +300,7 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
             ctx,
             fail: failFn,
             signal,
-            params: (ctx.params ?? {}) as Record<string, string>,
+            params: (ctx.params ?? EMPTY_PARAMS) as Record<string, string>,
           }),
         )
       }
@@ -306,7 +309,7 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
         ctx,
         fail: failFn,
         signal,
-        params: (ctx.params ?? {}) as Record<string, string>,
+        params: (ctx.params ?? EMPTY_PARAMS) as Record<string, string>,
       })
       return output
     }
@@ -371,7 +374,7 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
           ctx,
           fail: failFn,
           signal,
-          params: (ctx.params ?? {}) as Record<string, string>,
+          params: (ctx.params ?? EMPTY_PARAMS) as Record<string, string>,
         }),
       )
     }
