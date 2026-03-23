@@ -149,9 +149,20 @@ p99 is **34% lower** than oRPC — compiled pipelines keep tail latency predicta
 | **Silgi** | ~40 bytes  | **1x**    |
 | oRPC      | ~56 bytes  | 1.4x more |
 
-<Callout>
-  Hono, Elysia, Express, and Fastify benchmarks are planned. These frameworks serve different use cases (general HTTP vs RPC), so benchmarks will compare raw request handling rather than RPC pipeline.
-</Callout>
+### HTTP frameworks (simple JSON endpoint)
+
+Simple POST endpoint returning JSON. 3000 sequential requests. No validation, no middleware — pure HTTP overhead.
+
+| Framework  | avg     | p50     | p95     | p99     | req/s     |
+| ---------- | ------- | ------- | ------- | ------- | --------- |
+| Fastify    | 100µs   | 86µs    | 135µs   | 207µs   | 9,956/s   |
+| Express    | 109µs   | 96µs    | 150µs   | 212µs   | 9,165/s   |
+| Hono       | 115µs   | 104µs   | 151µs   | 211µs   | 8,679/s   |
+| Silgi      | 130µs   | 109µs   | 202µs   | 331µs   | 7,672/s   |
+
+Silgi is ~30% slower for simple echo endpoints because it uses the Fetch API (`Request`/`Response`) while Fastify/Express use native Node.js `req`/`res`. This overhead is fixed — it doesn't scale with middleware complexity. With guards + validation, Silgi's compiled pipeline overtakes (see RPC benchmarks above).
+
+<Callout>Silgi is an RPC framework, not an HTTP micro-benchmark champion. The 30µs difference disappears when your procedure does any real work (DB query, API call, etc.).</Callout>
 
 <Callout>Reproduce: `node --experimental-strip-types bench/router.ts`</Callout>
 

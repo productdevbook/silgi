@@ -51,6 +51,9 @@ importers:
         specifier: ^2.0.0-alpha.7
         version: 2.0.0-alpha.7(chokidar@5.0.0)(db0@0.3.4)(ioredis@5.10.1)(lru-cache@11.2.7)(ofetch@2.0.0-alpha.3)
     devDependencies:
+      '@hono/node-server':
+        specifier: ^1.19.11
+        version: 1.19.11(hono@4.12.9)
       '@nuxt/test-utils':
         specifier: ^4.0.0
         version: 4.0.0(crossws@0.4.4(srvx@0.11.12))(magicast@0.5.2)(typescript@5.9.3)(vite@8.0.1(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))(vitest@4.1.0(@opentelemetry/api@1.9.0)(@types/node@25.5.0)(msw@2.12.14(@types/node@25.5.0)(typescript@5.9.3))(vite@8.0.1(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)))
@@ -93,6 +96,9 @@ importers:
       h3:
         specifier: 2.0.1-rc.16
         version: 2.0.1-rc.16(crossws@0.4.4(srvx@0.11.12))
+      hono:
+        specifier: ^4.12.9
+        version: 4.12.9
       ioredis:
         specifier: ^5.10.1
         version: 5.10.1
@@ -5413,6 +5419,10 @@ packages:
     resolution: {integrity: sha512-VJCEvtrezO1IAR+kqEYnxUOoStaQPGrCmX3j4wDTNOcD1uRPFpGlwQUIW8niPuvHXaTUxeOUl5MMDGrl+tmO9A==}
     engines: {node: '>=16.9.0'}
 
+  hono@4.12.9:
+    resolution: {integrity: sha512-wy3T8Zm2bsEvxKZM5w21VdHDDcwVS1yUFFY6i8UobSsKfFceT7TOwhbhfKsDyx7tYQlmRM5FLpIuYvNFyjctiA==}
+    engines: {node: '>=16.9.0'}
+
   hookable@5.5.3:
     resolution: {integrity: sha512-Yc+BQe8SvoXH1643Qez1zqLRmbA5rCL+sSmk6TVos0LWVfNIB7PGncdlId77WzLGSIB5KaWgTaNTs2lNVEI6VQ==}
 
@@ -8748,6 +8758,10 @@ snapshots:
   '@hono/node-server@1.19.11(hono@4.12.8)':
     dependencies:
       hono: 4.12.8
+
+  '@hono/node-server@1.19.11(hono@4.12.9)':
+    dependencies:
+      hono: 4.12.9
 
   '@hugeicons/core-free-icons@4.0.0': {}
 
@@ -13244,6 +13258,8 @@ snapshots:
   highlightjs-curl@1.3.0: {}
 
   hono@4.12.8: {}
+
+  hono@4.12.9: {}
 
   hookable@5.5.3: {}
 

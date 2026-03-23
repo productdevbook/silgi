@@ -231,7 +231,6 @@
     "dev": "vitest",
     "bench": "node --experimental-strip-types bench/update-benchmarks.ts",
     "bench:memory": "node --expose-gc --experimental-strip-types bench/memory.ts",
-
     "bench:bun": "bun test/bun-compat.ts",
     "play": "pnpm build && pnpm --filter silgi-playground dev",
     "lint": "oxlint . && oxfmt --check .",
@@ -259,6 +258,7 @@
     "unstorage": "^2.0.0-alpha.7"
   },
   "devDependencies": {
+    "@hono/node-server": "^1.19.11",
     "@nuxt/test-utils": "^4.0.0",
     "@orpc/client": "^1.13.9",
     "@orpc/contract": "^1.13.9",
@@ -270,10 +270,10 @@
     "@types/ws": "^8.18.1",
     "@typescript/native-preview": "7.0.0-dev.20260316.1",
     "ai": "^6.0.134",
-
     "express": "^5.2.1",
     "fastify": "^5.8.2",
     "h3": "2.0.1-rc.16",
+    "hono": "^4.12.9",
     "ioredis": "^5.10.1",
     "mitata": "^1.0.34",
     "nats": "^2.29.3",
