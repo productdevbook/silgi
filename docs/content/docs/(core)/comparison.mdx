@@ -162,7 +162,19 @@ Simple POST endpoint returning JSON. 3000 sequential requests. No validation, no
 
 Silgi is ~30% slower for simple echo endpoints because it uses the Fetch API (`Request`/`Response`) while Fastify/Express use native Node.js `req`/`res`. This overhead is fixed — it doesn't scale with middleware complexity. With guards + validation, Silgi's compiled pipeline overtakes (see RPC benchmarks above).
 
-<Callout>Silgi is an RPC framework, not an HTTP micro-benchmark champion. The 30µs difference disappears when your procedure does any real work (DB query, API call, etc.).</Callout>
+<Callout>Silgi is an RPC framework, not an HTTP micro-benchmark champion. The overhead difference disappears when your procedure does any real work (DB query, API call, etc.).</Callout>
+
+### Bun runtime (simple JSON endpoint)
+
+Same test on Bun 1.3.11. All frameworks use `Bun.serve()`.
+
+| Framework  | avg     | p50     | p95     | p99     | req/s      |
+| ---------- | ------- | ------- | ------- | ------- | ---------- |
+| Hono       | 46µs    | 45µs    | 53µs    | 64µs    | 21,769/s   |
+| Elysia     | 46µs    | 45µs    | 54µs    | 82µs    | 21,657/s   |
+| Silgi      | 51µs    | 47µs    | 77µs    | 97µs    | 19,499/s   |
+
+On Bun all three are within 10%. Silgi is ~5µs slower due to Fetch API `Response` construction overhead — negligible in practice.
 
 <Callout>Reproduce: `node --experimental-strip-types bench/router.ts`</Callout>
 
