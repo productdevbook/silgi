@@ -13,6 +13,7 @@
 import { createHooks } from 'hookable'
 
 import { createProcedureBuilder } from './builder.ts'
+import { createCaller } from './caller.ts'
 import { compileRouter } from './compile.ts'
 import { createFetchHandler } from './core/handler.ts'
 import { assignPaths, routerCache } from './core/router-utils.ts'
@@ -33,6 +34,7 @@ import type {
   WrapFn,
   ResolveContext,
   RouterDef,
+  InferClient,
 } from './types.ts'
 import type { Hookable } from 'hookable'
 
@@ -128,6 +130,19 @@ export interface SilgiInstance<TBaseCtx extends Record<string, unknown>> {
       analytics?: boolean | AnalyticsOptions
     },
   ) => (request: Request) => Response | Promise<Response>
+
+  /** Create a direct caller — call procedures without HTTP. For testing and server-side usage. */
+  createCaller: <T extends RouterDef>(
+    router: T,
+    options?: {
+      /** Override or extend the base context */
+      contextOverride?: Record<string, unknown>
+      /** Mock request headers */
+      headers?: Record<string, string>
+      /** Default timeout in ms (default: 30000, null = no timeout) */
+      timeout?: number | null
+    },
+  ) => InferClient<T>
 
   /** Create & start a Node.js HTTP server */
   serve: (
@@ -285,6 +300,10 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
       const flat = compileRouter(def)
       routerCache.set(def, flat)
       return def
+    },
+
+    createCaller: (routerDef, options) => {
+      return createCaller(routerDef, contextFactory, options)
     },
 
     handler: (routerDef, options) => {

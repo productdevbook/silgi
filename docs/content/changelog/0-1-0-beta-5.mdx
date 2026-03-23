@@ -1,0 +1,78 @@
+---
+title: 0.1.0-beta.5
+description: createCaller for testing, lint fixes, docs tab navigation, blog & changelog pages.
+version: 0.1.0-beta.5
+date: 2026-03-23
+---
+
+## createCaller — test procedures without HTTP
+
+New `createCaller()` method on the Silgi instance. Call any procedure directly — no server, no HTTP, no serialization. The full compiled pipeline runs (guards, input/output validation, resolve) exactly like a real request.
+
+```ts
+const caller = s.createCaller(appRouter)
+
+const users = await caller.users.list({ limit: 10 })
+const user = await caller.users.get({ id: 1 })
+```
+
+Fully typed — autocomplete works for procedure names, input shapes, and return types via `InferClient<T>`.
+
+### Context override
+
+Inject mock data or bypass auth for testing:
+
+```ts
+const adminCaller = s.createCaller(appRouter, {
+  contextOverride: { user: { id: 1, role: 'admin' } },
+})
+```
+
+### Per-call options
+
+Pass `signal` or `context` as a second argument to any call:
+
+```ts
+await caller.users.create({ name: 'Alice' }, {
+  context: { token: 'valid-jwt' },
+  signal: AbortSignal.timeout(5000),
+})
+```
+
+### Configurable timeout
+
+Default 30s timeout, configurable per-caller or disabled entirely:
+
+```ts
+const caller = s.createCaller(appRouter, { timeout: 5000 })
+const nolimit = s.createCaller(appRouter, { timeout: null })
+```
+
+### What runs in the pipeline
+
+Everything that runs in HTTP also runs in createCaller:
+- Guards (`$use(s.guard(...))`)
+- Input validation (`$input(z.object(...))`)
+- Output validation (`$output(z.object(...))`)
+- Typed errors (`$errors()` + `fail()` → throws `SilgiError`)
+- Route params (parametric routes like `/users/:id`)
+
+The only difference: no HTTP serialization, no response headers, no analytics recording.
+
+### Architecture notes
+
+- Uses the same compiled router cache as `handler()` — compiles once, shared
+- Proxy-based with sub-proxy memoization (`Map<string, any>` per node)
+- Route matching uses method-agnostic fallback (works with GET, POST, PUT, DELETE, any method)
+- Context resolved per-call (not per-caller) for isolation
+- 21 tests covering: basic calls, nested procedures, input/output validation, typed errors, guards, context override, per-call options, async context, timeout, signal, isolation, proxy safety
+
+See [Testing docs](/docs/testing) for full guide with Vitest examples.
+
+## Lint fixes
+
+- Fixed unused private `#t0` field in `RequestAccumulator` (was shadowed by public `t0`)
+- Removed unused `Tooltip` imports from `request-detail-page.tsx`
+- Renamed unused `calls` variable in drizzle test
+
+0 lint errors, 82/82 tests passing.
