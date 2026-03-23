@@ -1,119 +1,28 @@
 ---
 title: Comparison
-description: How Silgi compares to oRPC, tRPC, Hono, Elysia, Express, and Fastify.
+description: Benchmarks and performance comparisons — Silgi, oRPC, Hono, Elysia, Fastify, Express.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
 
-## RPC frameworks
-
-Silgi competes directly with oRPC and tRPC as a type-safe RPC framework.
-
-| Feature                                 | Silgi             | oRPC                 | tRPC               | ts-rest     |
-| --------------------------------------- | ----------------- | -------------------- | ------------------ | ----------- |
-| End-to-end type-safe I/O                | Yes               | Yes                  | Yes                | Yes         |
-| End-to-end type-safe errors             | Yes               | Yes                  | Partial            | Yes         |
-| End-to-end type-safe streaming          | Yes               | Yes                  | Yes                | No          |
-| Single package                          | **1 package**     | 35 packages          | 4+ packages        | 3+ packages |
-| Middleware model                        | **Guard + Wrap**  | Middleware chain     | Middleware chain   | —           |
-| Compiled pipeline                       | **Yes**           | No                   | No                 | No          |
-| Content negotiation                     | **Automatic**     | RPC protocol         | No                 | No          |
-| MessagePack + devalue                   | **Built-in**      | Via RPC protocol     | Via superjson      | No          |
-| WebSocket RPC                           | Yes               | Yes                  | Yes                | No          |
-| Standard Schema                         | Yes               | Yes                  | Yes                | No          |
-| OpenAPI generation                      | Built-in (Scalar) | Plugin               | Via trpc-openapi   | Built-in    |
-| Server Actions (React)                  | Built-in          | Built-in             | Yes                | No          |
-| TanStack Query                          | Built-in          | Built-in             | Built-in           | Partial     |
-| AI SDK integration                      | Built-in          | Built-in             | No                 | No          |
-| Built-in analytics dashboard            | **Yes**           | No                   | No                 | No          |
-| Client retry / circuit breaker          | **Built-in**      | Plugin               | Via retryLink      | No          |
-| createCaller (test without HTTP)        | **Built-in**      | Built-in             | Built-in           | No          |
-| Typed guard errors (auto-merge)         | **Yes**           | No                   | No                 | No          |
-| Response caching (SWR)                  | **Built-in**      | No                   | No                 | No          |
-| HTTP Cache-Control headers              | **Built-in**      | No                   | No                 | No          |
-| Framework adapters                      | **13**            | 17+                  | 4+                 | 2           |
-
-<Callout>This table is maintained honestly. Where a competitor has a feature we don't, it's marked accurately.</Callout>
-
-## HTTP frameworks
-
-Silgi is an RPC framework, not a general HTTP framework. But since it includes `serve()` and `handler()` with routing, it's worth comparing with popular HTTP frameworks.
-
-| Feature                    | Silgi                  | Hono              | Elysia             | Fastify            | Express            |
-| -------------------------- | ---------------------- | ----------------- | ------------------ | ------------------ | ------------------ |
-| **Primary focus**          | Type-safe RPC          | Web framework     | Bun framework      | Node.js framework  | Node.js framework  |
-| **Type safety**            | End-to-end             | Partial (RPC mode)| Partial            | Via plugins        | None               |
-| **Schema validation**      | Standard Schema        | Zod (via plugin)  | TypeBox built-in   | Ajv (JSON Schema)  | None               |
-| **Client generation**      | Automatic (proxy)      | hc client         | Eden treaty        | None               | None               |
-| **OpenAPI**                | Built-in (Scalar)      | Via middleware     | Via plugin         | @fastify/swagger   | Via middleware      |
-| **Runtime**                | Node, Bun, Deno, CF    | Node, Bun, Deno, CF | **Bun only**    | Node only          | Node only          |
-| **Compiled pipelines**     | **Yes**                | No                | **Yes** (Bun JIT)  | No                 | No                 |
-| **WebSocket**              | Built-in               | Via adapter       | Built-in           | @fastify/websocket | Via ws             |
-| **HTTP/2**                 | Built-in               | Via adapter       | No                 | Built-in           | Via spdy           |
-| **Streaming/SSE**          | Built-in               | Built-in          | Built-in           | Via plugin         | Manual             |
-| **Analytics dashboard**    | **Built-in**           | No                | No                 | No                 | No                 |
-| **Binary protocols**       | MessagePack + devalue  | No                | No                 | No                 | No                 |
-| **Batch requests**         | Built-in               | No                | No                 | No                 | No                 |
-
-### When to use what
-
-| If you need... | Use |
-|---|---|
-| Type-safe API with compiled pipelines and analytics | **Silgi** |
-| General-purpose web framework for all runtimes | **Hono** |
-| Maximum Bun performance with elegant API | **Elysia** |
-| Mature Node.js ecosystem with vast plugins | **Fastify** |
-| Legacy compatibility, huge middleware ecosystem | **Express** |
-| Type-safe RPC with the largest community | **tRPC** |
-| Type-safe RPC with most integrations | **oRPC** |
-
-## Architecture
-
-### Guard / Wrap vs middleware chain
-
-Most frameworks have one middleware type. Silgi has two:
-
-- **Guard** — runs before, enriches context. No `next()`. Sync fast-path.
-- **Wrap** — runs before AND after (onion). Has `next()`. For timing, caching, error capture.
-
-```
-Hono/Express:  middleware → middleware → middleware → handler
-Elysia:        beforeHandle → handler → afterHandle
-Fastify:       onRequest → preHandler → handler → onSend
-oRPC/tRPC:     middleware → middleware → handler
-Silgi:         guard → guard → [wrap → [wrap → handler]]
-```
-
-### Compiled pipeline
-
-Silgi compiles the middleware chain once at startup — guards are unrolled (0-4 specialization, no loop), context pool eliminates per-request allocation. Elysia also compiles routes via Bun's JIT, but only runs on Bun. Silgi's compilation works on all runtimes.
-
-### Content negotiation
-
-**Silgi** inspects `Accept` header → responds in JSON, MessagePack, or devalue. Standard HTTP.
-
-**Hono/Express/Fastify** return JSON by default. Content negotiation is manual.
-
-**Elysia** returns JSON by default. TypeBox provides type coercion, not protocol negotiation.
-
 ## Benchmarks
 
-All benchmarks: Apple M3 Max, Node v24.11.0, sequential requests.
+All benchmarks: Apple M3 Max, sequential requests. Numbers are real — reproduce them on your hardware.
 
-### Pipeline performance (no HTTP)
+### RPC pipeline (no HTTP, pure execution)
 
 Raw middleware pipeline overhead — how fast the framework processes a call after TCP is stripped.
 
-| Scenario             | Silgi      | oRPC     | H3 v2    | vs oRPC         | vs H3            |
-| -------------------- | ---------- | -------- | -------- | --------------- | ---------------- |
-| No middleware        | **111 ns** | 685 ns   | 2,025 ns | **6.2x faster** | **18.2x faster** |
-| Zod validation       | **241 ns** | 804 ns   | 4,214 ns | **3.3x faster** | **17.5x faster** |
-| 3 middleware + Zod   | **297 ns** | 1,718 ns | 3,954 ns | **5.8x faster** | **13.3x faster** |
-| 5 middleware + Zod   | **413 ns** | 2,219 ns | 3,917 ns | **5.4x faster** | **9.5x faster**  |
+| Scenario             | Silgi      | oRPC     | H3 v2    |
+| -------------------- | ---------- | -------- | -------- |
+| No middleware        | **111 ns** | 685 ns   | 2,025 ns |
+| Zod validation       | **241 ns** | 804 ns   | 4,214 ns |
+| 3 middleware + Zod   | **297 ns** | 1,718 ns | 3,954 ns |
+| 5 middleware + Zod   | **413 ns** | 2,219 ns | 3,917 ns |
 
-### HTTP performance (real TCP)
+### RPC over HTTP (Node.js v24.11.0)
 
-3000 sequential requests per scenario.
+Real HTTP servers, real TCP connections. 3000 sequential requests.
 
 | Scenario               | Silgi               | oRPC            | H3 v2           |
 | ---------------------- | ------------------- | --------------- | --------------- |
@@ -121,9 +30,7 @@ Raw middleware pipeline overhead — how fast the framework processes a call aft
 | Zod validation         | **86µs** (11,627/s) | 120µs (8,315/s) | 93µs (10,707/s) |
 | Guard + Zod            | **79µs** (12,706/s) | 116µs (8,625/s) | 96µs (10,359/s) |
 
-For simple routes, all three are within 10%. With middleware, Silgi is **1.5x faster than oRPC**.
-
-### Tail latency (p99)
+### Tail latency (p99, Guard + Zod)
 
 | Framework  | avg      | p50      | p99       |
 | ---------- | -------- | -------- | --------- |
@@ -131,27 +38,9 @@ For simple routes, all three are within 10%. With middleware, Silgi is **1.5x fa
 | oRPC       | 116µs    | 103µs    | 223µs     |
 | H3 v2      | 96µs     | 82µs     | 236µs     |
 
-p99 is **34% lower** than oRPC — compiled pipelines keep tail latency predictable.
+### HTTP frameworks — Node.js
 
-### Router performance
-
-| Scenario                | Silgi       | rou3    |                  |
-| ----------------------- | ----------- | ------- | ---------------- |
-| Static `/users/list`    | **3.1 ns**  | 3.9 ns  | **1.23x faster** |
-| Param `/users/123`      | **22.0 ns** | 25.6 ns | **1.16x faster** |
-| Wildcard `/files/a/b/c` | **19.2 ns** | 91.3 ns | **4.75x faster** |
-| Miss `/missing/deep`    | **4.5 ns**  | 22.3 ns | **4.96x faster** |
-
-### Memory
-
-| Framework | Bytes/call | Ratio     |
-| --------- | ---------- | --------- |
-| **Silgi** | ~40 bytes  | **1x**    |
-| oRPC      | ~56 bytes  | 1.4x more |
-
-### HTTP frameworks (simple JSON endpoint)
-
-Simple POST endpoint returning JSON. 3000 sequential requests. No validation, no middleware — pure HTTP overhead.
+Simple POST endpoint returning JSON. 3000 sequential requests. No validation, no middleware.
 
 | Framework  | avg     | p50     | p95     | p99     | req/s     |
 | ---------- | ------- | ------- | ------- | ------- | --------- |
@@ -160,13 +49,11 @@ Simple POST endpoint returning JSON. 3000 sequential requests. No validation, no
 | Hono       | 115µs   | 104µs   | 151µs   | 211µs   | 8,679/s   |
 | Silgi      | 130µs   | 109µs   | 202µs   | 331µs   | 7,672/s   |
 
-Silgi is ~30% slower for simple echo endpoints because it uses the Fetch API (`Request`/`Response`) while Fastify/Express use native Node.js `req`/`res`. This overhead is fixed — it doesn't scale with middleware complexity. With guards + validation, Silgi's compiled pipeline overtakes (see RPC benchmarks above).
+Silgi uses the Fetch API (`Request`/`Response`) while Fastify/Express use native Node.js `req`/`res` — this adds ~30µs fixed overhead that doesn't scale with middleware complexity.
 
-<Callout>Silgi is an RPC framework, not an HTTP micro-benchmark champion. The overhead difference disappears when your procedure does any real work (DB query, API call, etc.).</Callout>
+### HTTP frameworks — Bun 1.3.11
 
-### Bun runtime (simple JSON endpoint)
-
-Same test on Bun 1.3.11. All frameworks use `Bun.serve()`.
+Same endpoint, all frameworks use `Bun.serve()`.
 
 | Framework  | avg     | p50     | p95     | p99     | req/s      |
 | ---------- | ------- | ------- | ------- | ------- | ---------- |
@@ -174,37 +61,62 @@ Same test on Bun 1.3.11. All frameworks use `Bun.serve()`.
 | Elysia     | 46µs    | 45µs    | 54µs    | 82µs    | 21,657/s   |
 | Silgi      | 51µs    | 47µs    | 77µs    | 97µs    | 19,499/s   |
 
-On Bun all three are within 10%. Silgi is ~5µs slower due to Fetch API `Response` construction overhead — negligible in practice.
+On Bun all three are within 10%.
 
-<Callout>Reproduce: `node --experimental-strip-types bench/router.ts`</Callout>
+### Router
+
+JIT-compiled radix tree router vs rou3.
+
+| Scenario                | Silgi       | rou3    |
+| ----------------------- | ----------- | ------- |
+| Static `/users/list`    | **3.1 ns**  | 3.9 ns  |
+| Param `/users/123`      | **22.0 ns** | 25.6 ns |
+| Wildcard `/files/a/b/c` | **19.2 ns** | 91.3 ns |
+| Miss `/missing/deep`    | **4.5 ns**  | 22.3 ns |
+
+### Memory
+
+> 50K calls, 3 guards + Zod validation, `--expose-gc`
+
+| Framework | Bytes/call |
+| --------- | ---------- |
+| Silgi     | ~40 bytes  |
+| oRPC      | ~56 bytes  |
+
+### What the benchmarks don't show
+
+Real-world APIs spend 95%+ of time in DB queries and business logic. Pipeline overhead matters most for high-throughput, low-latency services. All benchmarks are sequential — concurrent load may show different characteristics.
+
+<Callout>
+  Reproduce on your hardware:
+
+  ```bash
+  node --experimental-strip-types bench/router.ts    # Router
+  node --experimental-strip-types bench/http.ts      # HTTP (Node.js)
+  bun bench/http-bun.ts                              # HTTP (Bun)
+  ```
+</Callout>
 
 ## Choosing the right tool
 
-Every framework in this comparison is well-built and actively maintained. The "best" choice depends on what matters most for your project.
+Every framework in this comparison is well-built and actively maintained. The best choice depends on your project.
 
-**Choose oRPC if** you need the broadest ecosystem (35+ packages), Cloudflare Durable Objects support, Angular integration, or prefer a dedicated RPC protocol with native type serialization. oRPC has a larger community and more battle-tested edge cases.
+**oRPC** — broadest ecosystem (35+ packages), Cloudflare Durable Objects, dedicated RPC protocol, largest RPC community after tRPC.
 
-**Choose tRPC if** you want the most mature type-safe RPC with the largest community, extensive tutorials, and proven production track record.
+**tRPC** — most mature type-safe RPC, largest community, extensive tutorials, proven production track record.
 
-**Choose Hono if** you need a lightweight, runtime-agnostic web framework that runs everywhere — Node.js, Bun, Deno, Cloudflare Workers, and more.
+**Hono** — lightweight runtime-agnostic web framework. Node.js, Bun, Deno, Cloudflare Workers.
 
-**Choose Elysia if** you're building on Bun and want the best possible performance with an elegant, TypeBox-powered API.
+**Elysia** — best Bun performance with elegant TypeBox-powered API.
 
-**Choose Fastify if** you need a mature Node.js framework with a vast plugin ecosystem and proven enterprise adoption.
+**Fastify** — mature Node.js framework with vast plugin ecosystem and enterprise adoption.
 
-**Choose Express if** you need maximum compatibility with existing middleware and the widest community support.
+**Express** — maximum middleware compatibility and the widest community.
 
-**Choose Silgi if** you value:
-- Single package with no version coordination
-- Compiled pipelines for predictable low-latency
-- Built-in analytics dashboard with session tracking
-- Guard/Wrap middleware model with typed error auto-merging
-- Client resilience ([retry, circuit breaker, timeout](/docs/client-plugins)) out of the box
-- [Testing without HTTP](/docs/testing) via `createCaller`
-- [Per-procedure OpenAPI metadata](/docs/openapi) with spec override
+**Silgi** — compiled pipelines, single package, built-in analytics, Guard/Wrap model, client resilience, per-procedure OpenAPI.
 
 <Callout>
-  We respect every project in this space. Open source thrives when frameworks learn from each other. If you find something we got wrong in this comparison, [open an issue](https://github.com/productdevbook/silgi/issues) — we'll fix it.
+  We respect every project in this space. Open source thrives when frameworks learn from each other. If you find something we got wrong, [open an issue](https://github.com/productdevbook/silgi/issues).
 </Callout>
 
 ## What's next?
