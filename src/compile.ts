@@ -228,7 +228,9 @@ function _resolveWithOutput(
   return validateSchema(outputSchema, output)
 }
 
-/** Validate input, resolve, validate output — sync-first with rejected Promise fallback */
+/** Validate input, resolve, validate output — sync-first with rejected Promise fallback.
+ *  All sync throws (validation errors, fail() calls, resolver errors) are converted
+ *  to rejected Promises for consistent error handling in .then().catch() chains. */
 function _validateAndResolve(
   inputSchema: import('./core/schema.ts').AnySchema | null,
   outputSchema: import('./core/schema.ts').AnySchema | null,
@@ -238,19 +240,17 @@ function _validateAndResolve(
   failFn: (code: string, data?: unknown) => never,
   signal: AbortSignal,
 ): unknown {
-  let input: unknown
   try {
-    input = inputSchema ? validateSchema(inputSchema, rawInput ?? {}) : rawInput
+    const input = inputSchema ? validateSchema(inputSchema, rawInput ?? {}) : rawInput
+    if (isThenable(input)) {
+      return (input as Promise<unknown>).then(
+        (resolvedInput) => _resolveWithOutput(resolveFn, resolvedInput, ctx, failFn, signal, outputSchema),
+      )
+    }
+    return _resolveWithOutput(resolveFn, input, ctx, failFn, signal, outputSchema)
   } catch (e) {
     return Promise.reject(e)
   }
-  if (isThenable(input)) {
-    return (input as Promise<unknown>).then(
-      (resolvedInput) => _resolveWithOutput(resolveFn, resolvedInput, ctx, failFn, signal, outputSchema),
-      (e) => Promise.reject(e),
-    )
-  }
-  return _resolveWithOutput(resolveFn, input, ctx, failFn, signal, outputSchema)
 }
 
 // ── Main Compiler ───────────────────────────────────
@@ -455,11 +455,14 @@ export function compileRouter(def: Record<string, unknown>): CompiledRouterFn {
   return compileRadixRouter(radix)
 }
 
+const PROCEDURE_TYPES = /* @__PURE__ */ new Set(['query', 'mutation', 'subscription'])
+
 function isProcedureDef(value: unknown): value is ProcedureDef {
   return (
     typeof value === 'object' &&
     value !== null &&
     'type' in value &&
+    PROCEDURE_TYPES.has((value as any).type) &&
     'resolve' in value &&
     typeof (value as ProcedureDef).resolve === 'function'
   )

@@ -95,9 +95,8 @@ export function createFetchHandler(
     routerCache.set(routerDef, compiledRouter)
   }
 
-  // Pre-allocate response headers and reusable context (reused across requests)
+  // Pre-allocate response headers (reused across requests)
   const jsonHeaders = { 'content-type': 'application/json' }
-  const emptyCtx = Object.create(null)
   const sseHeaders = { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' }
   const notFoundBody = JSON.stringify({ code: 'NOT_FOUND', status: 404, message: 'Procedure not found' })
 
@@ -164,10 +163,18 @@ location.reload();
 </body>
 </html>`
 
-  // Pre-check: does the hooks instance actually have registered listeners?
-  // Hookable always creates a non-null object, but we only need callHook when
-  // at least one hook is registered. This enables minimalHandler activation.
-  const hasHooks = !!(hooks as any)?._hooks && Object.keys((hooks as any)._hooks).some((k) => (hooks as any)._hooks[k]?.length > 0)
+  // Live check: does the hooks instance have registered listeners?
+  // Checked per-request so hooks added after first request still work.
+  // Also used at init time for minimalHandler activation.
+  const _hooksObj = (hooks as any)?._hooks
+  function hasActiveHooks(): boolean {
+    if (!_hooksObj) return false
+    for (const k in _hooksObj) {
+      if (_hooksObj[k]?.length > 0) return true
+    }
+    return false
+  }
+  const hasHooksAtInit = hasActiveHooks()
 
   // Runtime detection: Bun's request.json() is native C++ — faster than text() + JSON.parse()
   const isBun = typeof globalThis.Bun !== 'undefined'
@@ -304,7 +311,7 @@ location.reload();
     // Avoids async/await overhead entirely for simple queries
     const method = request.method
     if (ctxFactoryIsSync && (method === 'GET' || !request.body) && !route.passthrough) {
-      const ctx = ctxFactoryIsEmpty && !match.params && !collector ? (emptyCtx as Record<string, unknown>) : createContext()
+      const ctx = createContext()
       let t0 = 0
       let reqTrace: RequestTrace | undefined
       let rawInput: unknown
@@ -334,7 +341,7 @@ location.reload();
           }
         }
 
-        if (hasHooks) hooks!.callHook('request', { path: pathname, input: rawInput })
+        if (hasActiveHooks()) hooks!.callHook('request', { path: pathname, input: rawInput })
 
         t0 = collector ? performance.now() : 0
         const pipelineResult = route.handler(ctx, rawInput, request.signal)
@@ -342,9 +349,9 @@ location.reload();
         // Sync pipeline result — fully synchronous response
         if (!(pipelineResult instanceof Promise)) {
           const output = pipelineResult
-          if (hasHooks || collector) {
+          if (hasActiveHooks() || collector) {
             const durationMs = collector ? round(performance.now() - t0) : 0
-            if (hasHooks) hooks!.callHook('response', { path: pathname, output, durationMs })
+            if (hasActiveHooks()) hooks!.callHook('response', { path: pathname, output, durationMs })
             if (collector) {
               collector.record(pathname, durationMs)
               if (accumulator) {
@@ -391,7 +398,7 @@ location.reload();
         return pipelineResult
           .then((output) => {
             const durationMs = collector ? round(performance.now() - t0) : 0
-            if (hasHooks) hooks!.callHook('response', { path: pathname, output, durationMs })
+            if (hasActiveHooks()) hooks!.callHook('response', { path: pathname, output, durationMs })
             if (collector) {
               collector.record(pathname, durationMs)
               if (accumulator) {
@@ -428,7 +435,7 @@ location.reload();
     const accept = request.headers.get('accept')
     const needsCodecResponse = accept && (accept.includes('msgpack') || accept.includes('x-devalue'))
     if (ctxFactoryIsSync && isJsonBody && !needsCodecResponse && !route.passthrough && !collector) {
-      const ctx = ctxFactoryIsEmpty && !match.params ? (emptyCtx as Record<string, unknown>) : createContext()
+      const ctx = createContext()
 
       if (!ctxFactoryIsEmpty) {
         const baseCtx = contextFactory(request) as Record<string, unknown>
@@ -442,15 +449,15 @@ location.reload();
 
       return bodyParse
         .then((rawInput: unknown) => {
-          if (hasHooks) hooks!.callHook('request', { path: pathname, input: rawInput })
+          if (hasActiveHooks()) hooks!.callHook('request', { path: pathname, input: rawInput })
 
           const pipelineResult = route.handler(ctx, rawInput, request.signal)
           if (!(pipelineResult instanceof Promise)) {
-            if (hasHooks) hooks!.callHook('response', { path: pathname, output: pipelineResult, durationMs: 0 })
+            if (hasActiveHooks()) hooks!.callHook('response', { path: pathname, output: pipelineResult, durationMs: 0 })
             return _makeResponse(pipelineResult, route)
           }
           return pipelineResult.then((output) => {
-            if (hasHooks) hooks!.callHook('response', { path: pathname, output, durationMs: 0 })
+            if (hasActiveHooks()) hooks!.callHook('response', { path: pathname, output, durationMs: 0 })
             return _makeResponse(output, route)
           })
         })
@@ -483,7 +490,7 @@ location.reload();
     route: import('../compile.ts').CompiledRoute,
     accumulator?: RequestAccumulator,
   ): Promise<Response> {
-    const ctx = ctxFactoryIsEmpty && !match.params && !collector ? (emptyCtx as Record<string, unknown>) : createContext()
+    const ctx = createContext()
     let reqTrace: RequestTrace | undefined
     let rawInput: unknown
     let t0 = 0
@@ -544,16 +551,16 @@ location.reload();
         }
       }
 
-      if (hasHooks) hooks!.callHook('request', { path: pathname, input: rawInput })
+      if (hasActiveHooks()) hooks!.callHook('request', { path: pathname, input: rawInput })
 
       t0 = collector ? performance.now() : 0
       const pipelineResult = route.handler(ctx, rawInput, request.signal)
       const output = pipelineResult instanceof Promise ? await pipelineResult : pipelineResult
 
       if (output instanceof Response) {
-        if (hasHooks || collector) {
+        if (hasActiveHooks() || collector) {
           const durationMs = collector ? round(performance.now() - t0) : 0
-          if (hasHooks) hooks!.callHook('response', { path: pathname, output: null, durationMs })
+          if (hasActiveHooks()) hooks!.callHook('response', { path: pathname, output: null, durationMs })
           if (collector) {
             collector.record(pathname, durationMs)
             if (accumulator) {
@@ -585,7 +592,7 @@ location.reload();
       }
 
       const durationMs = collector ? round(performance.now() - t0) : 0
-      if (hasHooks) hooks!.callHook('response', { path: pathname, output, durationMs })
+      if (hasActiveHooks()) hooks!.callHook('response', { path: pathname, output, durationMs })
       if (collector) {
         collector.record(pathname, durationMs)
         if (accumulator) {
@@ -618,7 +625,7 @@ location.reload();
     t0: number,
     accumulator?: RequestAccumulator,
   ): Response | Promise<Response> {
-    if (hasHooks) hooks!.callHook('error', { path: pathname, error })
+    if (hasActiveHooks()) hooks!.callHook('error', { path: pathname, error })
     if (collector) {
       const durationMs = t0 ? round(performance.now() - t0) : 0
       const errorMsg = error instanceof Error ? error.message : String(error)
@@ -667,7 +674,7 @@ location.reload();
   // return a stripped handler that eliminates per-request branch checks.
   // Supports: JSON, msgpack, devalue codecs, streaming, SSE, passthrough,
   // cache-control headers, and proper error formatting.
-  if (!collector && !scalarEnabled && !analyticsEnabled && !hasHooks && ctxFactoryIsSync) {
+  if (!collector && !scalarEnabled && !analyticsEnabled && !hasHooksAtInit && ctxFactoryIsSync) {
     return function minimalHandler(request: Request): Response | Promise<Response> {
       const url = request.url
       const pathStart = url.indexOf('/', url.indexOf('//') + 2)
@@ -681,9 +688,7 @@ location.reload();
 
       // ── GET / no body — fully sync ──
       if (request.method === 'GET' || !request.body) {
-        const ctx: Record<string, unknown> = ctxFactoryIsEmpty && !match.params
-          ? (emptyCtx as Record<string, unknown>)
-          : Object.create(null)
+        const ctx: Record<string, unknown> = Object.create(null)
 
         if (!ctxFactoryIsEmpty) {
           const base = contextFactory(request) as Record<string, unknown>
@@ -722,9 +727,7 @@ location.reload();
       }
 
       // ── POST — parse body with codec support ──
-      const ctx: Record<string, unknown> = ctxFactoryIsEmpty && !match.params
-        ? (emptyCtx as Record<string, unknown>)
-        : Object.create(null)
+      const ctx: Record<string, unknown> = Object.create(null)
 
       if (!ctxFactoryIsEmpty) {
         const base = contextFactory(request) as Record<string, unknown>

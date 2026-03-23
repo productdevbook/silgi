@@ -164,11 +164,12 @@ function buildUnrolledObjectFn(
   const fns = props.map((p) => p.stringify)
   const keys = props.map((p) => p.key)
 
-  // Build concatenation expression: '{"key0":' + f[0](o[k[0]]) + ',"key1":' + f[1](o[k[1]]) + '}'
+  // Build concatenation expression using JSON.stringify for JS-safe string literals
+  // (handles single quotes, backslashes, and unicode in property keys)
   let expr = `return '{'`
   for (let i = 0; i < props.length; i++) {
     const sep = i > 0 ? ',' : ''
-    expr += `+'${sep}${props[i]!.jsonKey}'+f[${i}](o[k[${i}]])`
+    expr += `+${JSON.stringify(sep + props[i]!.jsonKey)}+f[${i}](o[k[${i}]])`
   }
   expr += `+'}'`
 
