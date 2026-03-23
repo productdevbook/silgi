@@ -4,6 +4,8 @@
   "icon": "Plug",
   "root": true,
   "pages": [
+    "index",
+    "---",
     "nitro",
     "nuxt",
     "nextjs",

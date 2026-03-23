@@ -4,6 +4,8 @@
   "icon": "Library",
   "root": true,
   "pages": [
+    "index",
+    "---",
     "drizzle",
     "better-auth",
     "---",
