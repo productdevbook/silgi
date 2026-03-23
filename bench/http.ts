@@ -4,6 +4,8 @@
  * Measures real HTTP round-trip latency (sequential requests).
  * Each framework serves the same simple JSON endpoint.
  *
+ * Note: Elysia is excluded — it only runs on Bun, not Node.js.
+ *
  * Run: node --experimental-strip-types bench/http.ts
  */
 
