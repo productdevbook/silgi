@@ -15,6 +15,7 @@
     "errors",
     "---",
     "server",
+    "openapi",
     "client",
     "client-plugins",
     "testing",
