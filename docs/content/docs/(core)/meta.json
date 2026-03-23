@@ -1,0 +1,27 @@
+{
+  "title": "Silgi",
+  "description": "The RPC framework",
+  "icon": "Zap",
+  "root": true,
+  "pages": [
+    "index",
+    "getting-started",
+    "comparison",
+    "examples",
+    "---",
+    "concepts",
+    "procedures",
+    "middleware",
+    "errors",
+    "---",
+    "server",
+    "client",
+    "analytics",
+    "---",
+    "protocols",
+    "---",
+    "best-practices",
+    "advanced",
+    "migrations"
+  ]
+}

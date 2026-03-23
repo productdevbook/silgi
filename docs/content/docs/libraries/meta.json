@@ -1,0 +1,18 @@
+{
+  "title": "Libraries",
+  "description": "Database, auth & more",
+  "icon": "Library",
+  "root": true,
+  "pages": [
+    "drizzle",
+    "better-auth",
+    "---",
+    "ai-sdk",
+    "tanstack-query",
+    "react",
+    "---",
+    "openapi-client",
+    "broker",
+    "trpc"
+  ]
+}

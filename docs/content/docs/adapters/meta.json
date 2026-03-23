@@ -1,0 +1,21 @@
+{
+  "title": "Adapters",
+  "description": "Framework integrations",
+  "icon": "Plug",
+  "root": true,
+  "pages": [
+    "nitro",
+    "nuxt",
+    "nextjs",
+    "fastify",
+    "express",
+    "sveltekit",
+    "remix",
+    "astro",
+    "solidstart",
+    "nestjs",
+    "aws-lambda",
+    "message-port",
+    "peer"
+  ]
+}

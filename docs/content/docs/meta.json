@@ -1,27 +1,3 @@
 {
-  "title": "Documentation",
-  "pages": [
-    "index",
-    "getting-started",
-    "comparison",
-    "examples",
-    "---",
-    "concepts",
-    "procedures",
-    "middleware",
-    "errors",
-    "---",
-    "server",
-    "client",
-    "analytics",
-    "---",
-    "protocols",
-    "plugins",
-    "integrations",
-    "---",
-    "best-practices",
-    "advanced",
-    "migrations",
-    "changelog"
-  ]
+  "pages": ["(core)", "adapters", "plugins", "libraries"]
 }
