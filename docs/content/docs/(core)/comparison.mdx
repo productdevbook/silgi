@@ -1,46 +1,15 @@
 ---
-title: Comparison
-description: Benchmarks and performance comparisons — Silgi, oRPC, Hono, Elysia, Fastify, Express.
+title: Benchmarks
+description: Real performance numbers — Silgi, oRPC, Hono, Elysia, Fastify, Express.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
 
-## Benchmarks
-
 All benchmarks: Apple M3 Max, sequential requests. Numbers are real — reproduce them on your hardware.
 
-### RPC pipeline (no HTTP, pure execution)
+## HTTP — Node.js v24.11.0
 
-Raw middleware pipeline overhead — how fast the framework processes a call after TCP is stripped.
-
-| Scenario             | Silgi      | oRPC     | H3 v2    |
-| -------------------- | ---------- | -------- | -------- |
-| No middleware        | **111 ns** | 685 ns   | 2,025 ns |
-| Zod validation       | **241 ns** | 804 ns   | 4,214 ns |
-| 3 middleware + Zod   | **297 ns** | 1,718 ns | 3,954 ns |
-| 5 middleware + Zod   | **413 ns** | 2,219 ns | 3,917 ns |
-
-### RPC over HTTP (Node.js v24.11.0)
-
-Real HTTP servers, real TCP connections. 3000 sequential requests.
-
-| Scenario               | Silgi               | oRPC            | H3 v2           |
-| ---------------------- | ------------------- | --------------- | --------------- |
-| Simple (no middleware) | **79µs** (12,592/s) | 83µs (12,048/s) | 78µs (12,753/s) |
-| Zod validation         | **86µs** (11,627/s) | 120µs (8,315/s) | 93µs (10,707/s) |
-| Guard + Zod            | **79µs** (12,706/s) | 116µs (8,625/s) | 96µs (10,359/s) |
-
-### Tail latency (p99, Guard + Zod)
-
-| Framework  | avg      | p50      | p99       |
-| ---------- | -------- | -------- | --------- |
-| **Silgi**  | **79µs** | **70µs** | **148µs** |
-| oRPC       | 116µs    | 103µs    | 223µs     |
-| H3 v2      | 96µs     | 82µs     | 236µs     |
-
-### HTTP frameworks — Node.js
-
-Simple POST endpoint returning JSON. 3000 sequential requests. No validation, no middleware.
+Simple POST endpoint returning JSON. 3000 sequential requests, 200 warmup. No validation, no middleware.
 
 | Framework  | avg     | p50     | p95     | p99     | req/s     |
 | ---------- | ------- | ------- | ------- | ------- | --------- |
@@ -49,9 +18,9 @@ Simple POST endpoint returning JSON. 3000 sequential requests. No validation, no
 | Hono       | 115µs   | 104µs   | 151µs   | 211µs   | 8,679/s   |
 | Silgi      | 130µs   | 109µs   | 202µs   | 331µs   | 7,672/s   |
 
-Silgi uses the Fetch API (`Request`/`Response`) while Fastify/Express use native Node.js `req`/`res` — this adds ~30µs fixed overhead that doesn't scale with middleware complexity.
+Silgi uses the Fetch API (`Request`/`Response`) while Fastify and Express use native Node.js `req`/`res`. This adds ~30µs fixed overhead per request. The gap closes as middleware complexity grows.
 
-### HTTP frameworks — Bun 1.3.11
+## HTTP — Bun 1.3.11
 
 Same endpoint, all frameworks use `Bun.serve()`.
 
@@ -63,33 +32,58 @@ Same endpoint, all frameworks use `Bun.serve()`.
 
 On Bun all three are within 10%.
 
-### Router
+## RPC pipeline (no HTTP)
 
-JIT-compiled radix tree router vs rou3.
+Measures middleware pipeline overhead in isolation — no TCP, no serialization. Only applicable to RPC frameworks with a compiled pipeline.
+
+| Scenario             | Silgi      | oRPC     | H3 v2    |
+| -------------------- | ---------- | -------- | -------- |
+| No middleware        | **111 ns** | 685 ns   | 2,025 ns |
+| Zod validation       | **241 ns** | 804 ns   | 4,214 ns |
+| 3 middleware + Zod   | **297 ns** | 1,718 ns | 3,954 ns |
+| 5 middleware + Zod   | **413 ns** | 2,219 ns | 3,917 ns |
+
+<Callout>
+  Hono, Elysia, Fastify, and Express are not included — they don't have an equivalent pipeline concept measurable in isolation. Their overhead is in the HTTP benchmarks above.
+</Callout>
+
+## Tail latency (p99)
+
+RPC over HTTP with Guard + Zod validation.
+
+| Framework  | avg      | p50      | p99       |
+| ---------- | -------- | -------- | --------- |
+| Silgi      | 79µs     | 70µs     | 148µs     |
+| oRPC       | 116µs    | 103µs    | 223µs     |
+| H3 v2      | 96µs     | 82µs     | 236µs     |
+
+## Router
+
+JIT-compiled radix tree (Silgi) vs rou3.
 
 | Scenario                | Silgi       | rou3    |
 | ----------------------- | ----------- | ------- |
-| Static `/users/list`    | **3.1 ns**  | 3.9 ns  |
-| Param `/users/123`      | **22.0 ns** | 25.6 ns |
-| Wildcard `/files/a/b/c` | **19.2 ns** | 91.3 ns |
-| Miss `/missing/deep`    | **4.5 ns**  | 22.3 ns |
+| Static `/users/list`    | 3.1 ns      | 3.9 ns  |
+| Param `/users/123`      | 22.0 ns     | 25.6 ns |
+| Wildcard `/files/a/b/c` | 19.2 ns     | 91.3 ns |
+| Miss `/missing/deep`    | 4.5 ns      | 22.3 ns |
 
-### Memory
+## Memory
 
-> 50K calls, 3 guards + Zod validation, `--expose-gc`
+> 50K calls, 3 guards + Zod, `--expose-gc`
 
 | Framework | Bytes/call |
 | --------- | ---------- |
 | Silgi     | ~40 bytes  |
 | oRPC      | ~56 bytes  |
 
-### What the benchmarks don't show
+## Notes
 
-Real-world APIs spend 95%+ of time in DB queries and business logic. Pipeline overhead matters most for high-throughput, low-latency services. All benchmarks are sequential — concurrent load may show different characteristics.
+- Real-world APIs spend 95%+ of time in DB queries. Framework overhead matters for high-throughput services.
+- All benchmarks are sequential. Concurrent load may differ.
+- Elysia is Bun-only — excluded from Node.js benchmarks.
 
 <Callout>
-  Reproduce on your hardware:
-
   ```bash
   node --experimental-strip-types bench/router.ts    # Router
   node --experimental-strip-types bench/http.ts      # HTTP (Node.js)
@@ -99,27 +93,22 @@ Real-world APIs spend 95%+ of time in DB queries and business logic. Pipeline ov
 
 ## Choosing the right tool
 
-Every framework in this comparison is well-built and actively maintained. The best choice depends on your project.
+Every framework here is well-built and actively maintained.
 
-**oRPC** — broadest ecosystem (35+ packages), Cloudflare Durable Objects, dedicated RPC protocol, largest RPC community after tRPC.
+**oRPC** — broadest RPC ecosystem, Cloudflare Durable Objects, dedicated RPC protocol.
 
-**tRPC** — most mature type-safe RPC, largest community, extensive tutorials, proven production track record.
+**tRPC** — most mature type-safe RPC, largest community, proven track record.
 
-**Hono** — lightweight runtime-agnostic web framework. Node.js, Bun, Deno, Cloudflare Workers.
+**Hono** — lightweight, runs everywhere: Node.js, Bun, Deno, Cloudflare Workers.
 
-**Elysia** — best Bun performance with elegant TypeBox-powered API.
+**Elysia** — best Bun performance, elegant TypeBox API.
 
-**Fastify** — mature Node.js framework with vast plugin ecosystem and enterprise adoption.
+**Fastify** — mature Node.js, vast plugin ecosystem.
 
-**Express** — maximum middleware compatibility and the widest community.
+**Express** — maximum middleware compatibility, widest community.
 
-**Silgi** — compiled pipelines, single package, built-in analytics, Guard/Wrap model, client resilience, per-procedure OpenAPI.
+**Silgi** — compiled pipelines, single package, built-in analytics, Guard/Wrap model.
 
 <Callout>
-  We respect every project in this space. Open source thrives when frameworks learn from each other. If you find something we got wrong, [open an issue](https://github.com/productdevbook/silgi/issues).
+  We respect every project in this space. If you find something wrong, [open an issue](https://github.com/productdevbook/silgi/issues).
 </Callout>
-
-## What's next?
-
-- [Getting Started](/docs/getting-started) — build your first Silgi API
-- [Examples](/docs/examples) — download and run in one command
