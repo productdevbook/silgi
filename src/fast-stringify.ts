@@ -157,18 +157,23 @@ function compileObject(def: any): FastStringify | undefined {
 function buildUnrolledObjectFn(
   props: Array<{ key: string; jsonKey: string; stringify: FastStringify }>,
 ): FastStringify {
-  // Build a single concatenation expression
-  // For { id: number, name: string }:
-  // (obj) => '{"id":' + obj.id + ',"name":"' + escape(obj.name) + '"}'
-  return (obj: any) => {
-    let s = '{'
-    for (let i = 0; i < props.length; i++) {
-      const p = props[i]!
-      if (i > 0) s += ','
-      s += p.jsonKey + p.stringify(obj[p.key])
-    }
-    return s + '}'
+  // True unrolling via code generation — no loop at runtime.
+  // For { id: number, name: string } generates:
+  //   (obj) => '{"id":' + s0(obj.id) + ',"name":' + s1(obj.name) + '}'
+  // where s0, s1 are pre-compiled stringifiers passed via closure.
+  const fns = props.map((p) => p.stringify)
+  const keys = props.map((p) => p.key)
+
+  // Build concatenation expression: '{"key0":' + f[0](o[k[0]]) + ',"key1":' + f[1](o[k[1]]) + '}'
+  let expr = `return '{'`
+  for (let i = 0; i < props.length; i++) {
+    const sep = i > 0 ? ',' : ''
+    expr += `+'${sep}${props[i]!.jsonKey}'+f[${i}](o[k[${i}]])`
   }
+  expr += `+'}'`
+
+  // eslint-disable-next-line no-new-func -- JIT-compiled stringify, runs at init time
+  return new Function('f', 'k', `return function(o){${expr}}`) (fns, keys) as FastStringify
 }
 
 // ── String escaping ─────────────────────────────────

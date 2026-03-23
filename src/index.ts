@@ -86,7 +86,7 @@ export type { LifecycleHooks } from './lifecycle.ts'
 export { mapInput } from './map-input.ts'
 
 // ── Advanced ────────────────────────────────────────
-export { compileProcedure, compileRouter, ContextPool } from './compile.ts'
+export { compileProcedure, compileRouter, createContext } from './compile.ts'
 export { AsyncIteratorClass, mapAsyncIterator } from './core/iterator.ts'
 
 // ── Lazy Loading ────────────────────────────────────

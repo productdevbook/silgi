@@ -12,7 +12,6 @@
  * Benchmark target: 5-8x faster than oRPC
  */
 
-import { analyzeHandler } from './analyze.ts'
 import { SilgiError } from './core/error.ts'
 import { validateSchema } from './core/schema.ts'
 import { compileStringify } from './fast-stringify.ts'
@@ -229,6 +228,31 @@ function _resolveWithOutput(
   return validateSchema(outputSchema, output)
 }
 
+/** Validate input, resolve, validate output — sync-first with rejected Promise fallback */
+function _validateAndResolve(
+  inputSchema: import('./core/schema.ts').AnySchema | null,
+  outputSchema: import('./core/schema.ts').AnySchema | null,
+  resolveFn: Function,
+  rawInput: unknown,
+  ctx: Record<string, unknown>,
+  failFn: (code: string, data?: unknown) => never,
+  signal: AbortSignal,
+): unknown {
+  let input: unknown
+  try {
+    input = inputSchema ? validateSchema(inputSchema, rawInput ?? {}) : rawInput
+  } catch (e) {
+    return Promise.reject(e)
+  }
+  if (isThenable(input)) {
+    return (input as Promise<unknown>).then(
+      (resolvedInput) => _resolveWithOutput(resolveFn, resolvedInput, ctx, failFn, signal, outputSchema),
+      (e) => Promise.reject(e),
+    )
+  }
+  return _resolveWithOutput(resolveFn, input, ctx, failFn, signal, outputSchema)
+}
+
 // ── Main Compiler ───────────────────────────────────
 
 /**
@@ -262,34 +286,14 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
     }
   }
 
-  // Sucrose-style analysis: skip fail/signal allocation if handler doesn't use them
-  const analysis = analyzeHandler(resolveFn)
-  const failFn = analysis.usesFail && mergedErrors ? createFail(mergedErrors) : analysis.usesFail ? noopFail : noopFail // always provide fail (safe fallback), but skip createFail overhead when unused
+  // Pre-compute fail function — use typed errors when defined, noop otherwise
+  const failFn = mergedErrors ? createFail(mergedErrors) : noopFail
 
   // Pre-select the optimal guard runner (compiled once, used per-request)
   const runGuards = selectGuardRunner(guards)
 
-  // ── ULTRA-FAST: no guards, no wraps, no validation, no ctx/fail usage ──
-  // Handler only uses input or nothing — skip everything
-  if (
-    guards.length === 0 &&
-    wraps.length === 0 &&
-    !inputSchema &&
-    !outputSchema &&
-    !analysis.usesContext &&
-    !analysis.usesFail
-  ) {
-    return (_ctx, rawInput, signal) =>
-      resolveFn({
-        input: rawInput,
-        ctx: _ctx,
-        fail: failFn,
-        signal,
-        params: (_ctx.params ?? EMPTY_PARAMS) as Record<string, string>,
-      })
-  }
-
-  // ── SYNC FAST PATH: no wraps, no validation, all sync guards ──
+  // ── SYNC FAST PATH: no wraps, no validation ──
+  // Handles 0-guard (noop runGuards0) through 4-guard (unrolled) cases
   if (wraps.length === 0 && !inputSchema && !outputSchema) {
     return (ctx, rawInput, signal) => {
       const guardResult = runGuards(ctx)
@@ -316,36 +320,17 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
   }
 
   // ── SEMI-SYNC: no wraps, has validation ────────────
-  // Sync-first: validateSchema now returns sync for Zod 4 — avoid async function overhead
-  // Outer try/catch covers the sync-guards path only; async-guards path relies on
-  // normal Promise rejection propagation (throws inside .then() become rejections)
+  // Sync-first: validateSchema returns sync for Zod 4. No try/catch in hot path —
+  // validation throws are converted to rejected Promises via _safeValidate wrapper.
   if (wraps.length === 0) {
     return (ctx, rawInput, signal) => {
-      try {
-        const guardResult = runGuards(ctx)
-        if (guardResult && isThenable(guardResult)) {
-          // Async guards → fall to async path
-          return (guardResult as Promise<void>).then(() => {
-            const input = inputSchema ? validateSchema(inputSchema, rawInput ?? {}) : rawInput
-            if (isThenable(input)) {
-              return (input as Promise<unknown>).then((resolvedInput) =>
-                _resolveWithOutput(resolveFn, resolvedInput, ctx, failFn, signal, outputSchema),
-              )
-            }
-            return _resolveWithOutput(resolveFn, input, ctx, failFn, signal, outputSchema)
-          })
-        }
-        // Sync guards — try sync validation
-        const input = inputSchema ? validateSchema(inputSchema, rawInput ?? {}) : rawInput
-        if (isThenable(input)) {
-          return (input as Promise<unknown>).then((resolvedInput) =>
-            _resolveWithOutput(resolveFn, resolvedInput, ctx, failFn, signal, outputSchema),
-          )
-        }
-        return _resolveWithOutput(resolveFn, input, ctx, failFn, signal, outputSchema)
-      } catch (e) {
-        return Promise.reject(e)
+      const guardResult = runGuards(ctx)
+      if (guardResult && isThenable(guardResult)) {
+        return (guardResult as Promise<void>).then(() =>
+          _validateAndResolve(inputSchema, outputSchema, resolveFn, rawInput, ctx, failFn, signal),
+        )
       }
+      return _validateAndResolve(inputSchema, outputSchema, resolveFn, rawInput, ctx, failFn, signal)
     }
   }
 
