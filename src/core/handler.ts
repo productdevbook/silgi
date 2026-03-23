@@ -167,8 +167,10 @@ location.reload();
 </body>
 </html>`
 
-  // Pre-check: are hooks actually wired? Skip callHook overhead when nothing listens.
-  const hasHooks = !!hooks
+  // Pre-check: does the hooks instance actually have registered listeners?
+  // Hookable always creates a non-null object, but we only need callHook when
+  // at least one hook is registered. This enables minimalHandler activation.
+  const hasHooks = !!(hooks as any)?._hooks && Object.keys((hooks as any)._hooks).some((k) => (hooks as any)._hooks[k]?.length > 0)
 
   // Runtime detection: Bun's request.json() is native C++ — faster than text() + JSON.parse()
   const isBun = typeof globalThis.Bun !== 'undefined'
@@ -678,7 +680,9 @@ location.reload();
 
   // ── MINIMAL HANDLER: no scalar, no analytics, no hooks ──────────
   // When all optional features are disabled AND context factory is sync,
-  // return a stripped handler that eliminates branch checks — on par with Hono.
+  // return a stripped handler that eliminates per-request branch checks.
+  // Supports: JSON, msgpack, devalue codecs, streaming, SSE, passthrough,
+  // cache-control headers, and proper error formatting.
   if (!collector && !scalarEnabled && !analyticsEnabled && !hasHooks && ctxFactoryIsSync) {
     return function minimalHandler(request: Request): Response | Promise<Response> {
       const url = request.url
@@ -704,35 +708,36 @@ location.reload();
         }
         if (match.params) ctx.params = match.params
 
-        let input: unknown
-        if (qMark !== -1) {
-          const s = url.slice(qMark + 1)
-          const di = s.indexOf('data=')
-          if (di !== -1) {
-            const vs = di + 5
-            const ve = s.indexOf('&', vs)
-            input = JSON.parse(decodeURIComponent(ve === -1 ? s.slice(vs) : s.slice(vs, ve)))
-          }
-        }
-
         try {
+          let input: unknown
+          if (qMark !== -1) {
+            const s = url.slice(qMark + 1)
+            const di = s.indexOf('data=')
+            if (di !== -1) {
+              const vs = di + 5
+              const ve = s.indexOf('&', vs)
+              input = JSON.parse(decodeURIComponent(ve === -1 ? s.slice(vs) : s.slice(vs, ve)))
+            }
+          }
+
           const result = route.handler(ctx, input, request.signal)
-          if (!(result instanceof Promise)) return _makeResponse(result, route)
+          if (!(result instanceof Promise)) return _minimalResponse(result, route, request)
           return result.then(
-            (output) => _makeResponse(output, route),
-            (error) => _minimalError(error),
+            (output) => _minimalResponse(output, route, request),
+            (error) => _minimalError(error, request),
           )
         } catch (error) {
-          return _minimalError(error)
+          return _minimalError(error, request)
         }
       }
 
       // Passthrough routes — fall to full handler (body must not be consumed)
       if (route.passthrough) {
-        return handleAsync(request, url, fullPath.length > 1 ? fullPath.slice(1) : '', qMark, match, route)
+        const pathname = fullPath.length > 1 ? fullPath.slice(1) : ''
+        return handleAsync(request, url, pathname, qMark, match, route)
       }
 
-      // ── POST — single .then() chain, zero header reads ──
+      // ── POST — parse body with codec support ──
       const ctx: Record<string, unknown> = ctxFactoryIsEmpty && !match.params
         ? (emptyCtx as Record<string, unknown>)
         : Object.create(null)
@@ -744,27 +749,75 @@ location.reload();
       }
       if (match.params) ctx.params = match.params
 
-      const parse = isBun ? request.json() : request.text().then((t) => (t ? JSON.parse(t) : undefined))
-      return parse.then(
-        (rawInput: unknown) => {
+      // Body parsing with codec detection
+      const ct = request.headers.get('content-type')
+      let bodyPromise: Promise<unknown>
+      if (ct && !ct.startsWith('application/json')) {
+        if (ct.includes('msgpack')) {
+          bodyPromise = (async () => {
+            _msgpack ??= await import('../codec/msgpack.ts')
+            const buf = new Uint8Array(await request.arrayBuffer())
+            return buf.length > 0 ? _msgpack.decode(buf) : undefined
+          })()
+        } else if (ct.includes('x-devalue')) {
+          bodyPromise = (async () => {
+            _devalue ??= await import('../codec/devalue.ts')
+            const text = await request.text()
+            return text ? _devalue.decode(text) : undefined
+          })()
+        } else {
+          bodyPromise = isBun ? request.json() : request.text().then((t) => (t ? JSON.parse(t) : undefined))
+        }
+      } else {
+        bodyPromise = isBun ? request.json() : request.text().then((t) => (t ? JSON.parse(t) : undefined))
+      }
+
+      return bodyPromise
+        .then((rawInput: unknown) => {
           const result = route.handler(ctx, rawInput, request.signal)
-          if (!(result instanceof Promise)) return _makeResponse(result, route)
-          return result.then((output) => _makeResponse(output, route))
-        },
-        (error: unknown) => _minimalError(error),
-      )
+          if (!(result instanceof Promise)) return _minimalResponse(result, route, request)
+          return result.then((output) => _minimalResponse(output, route, request))
+        })
+        .catch((error: unknown) => _minimalError(error, request))
     }
   }
 
-  function _minimalError(error: unknown): Response {
+  /** Response builder for minimalHandler — includes codec negotiation */
+  function _minimalResponse(output: unknown, route: import('../compile.ts').CompiledRoute, request: Request): Response | Promise<Response> {
+    if (output instanceof Response) return output
+    if (output instanceof ReadableStream)
+      return new Response(output, { headers: { 'content-type': 'application/octet-stream' } })
+    if (output && typeof output === 'object' && Symbol.asyncIterator in (output as object))
+      return new Response(iteratorToEventStream(output as AsyncIterableIterator<unknown>), { headers: sseHeaders })
+
+    // Content negotiation — check Accept header for codec response format
+    const accept = request.headers.get('accept')
+    if (accept && (accept.includes('msgpack') || accept.includes('x-devalue'))) {
+      const fmt: ResponseFormat = accept.includes('msgpack') ? 'msgpack' : 'devalue'
+      const cacheHeaders = route.cacheControl ? { 'cache-control': route.cacheControl } : undefined
+      return encodeResponse(output, 200, fmt, route.stringify, cacheHeaders)
+    }
+
+    const cacheHeaders = route.cacheControl ? { 'cache-control': route.cacheControl } : undefined
+    return new Response(route.stringify(output), {
+      headers: cacheHeaders ? { ...jsonHeaders, ...cacheHeaders } : jsonHeaders,
+    })
+  }
+
+  /** Error handler for minimalHandler — codec-aware error formatting */
+  function _minimalError(error: unknown, request: Request): Response | Promise<Response> {
+    const accept = request.headers.get('accept')
+    const fmt: ResponseFormat = accept?.includes('msgpack')
+      ? 'msgpack'
+      : accept?.includes('x-devalue')
+        ? 'devalue'
+        : 'json'
     if (error instanceof ValidationError) {
-      return new Response(
-        JSON.stringify({ code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } }),
-        { status: 400, headers: jsonHeaders },
-      )
+      const errBody = { code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } }
+      return encodeResponse(errBody, 400, fmt)
     }
     const e = error instanceof SilgiError ? error : toSilgiError(error)
-    return new Response(JSON.stringify(e.toJSON()), { status: e.status, headers: jsonHeaders })
+    return encodeResponse(e.toJSON(), e.status, fmt)
   }
 
   if (!collector) return handleRequest
