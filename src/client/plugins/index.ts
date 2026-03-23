@@ -1,4 +1,6 @@
 export { withRetry, type RetryOptions } from './retry.ts'
+export { withCircuitBreaker, CircuitBreakerOpenError, type CircuitBreakerOptions, type CircuitState } from './circuit-breaker.ts'
+export { withTimeout, type TimeoutOptions } from './timeout.ts'
 export { BatchLink, type BatchLinkOptions } from './batch.ts'
 export { withDedupe, type DedupeOptions } from './dedupe.ts'
 export { withCSRF, type CSRFLinkOptions } from './csrf.ts'
