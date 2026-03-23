@@ -175,6 +175,188 @@ describe('generateOpenAPI', () => {
     }
   })
 
+  // ── Path parameter conversion ──
+
+  it('converts :param to {param} and declares path parameters', () => {
+    const router = k.router({
+      users: {
+        get: k
+          .$route({ method: 'GET', path: '/users/:id' })
+          .$input(z.object({ id: z.number() }))
+          .$resolve(({ input }) => ({ id: input.id })),
+      },
+    })
+    const spec = generateOpenAPI(router)
+    const paths = spec.paths as any
+    expect(paths['/users/{id}']).toBeDefined()
+    expect(paths['/users/:id']).toBeUndefined()
+    const getOp = paths['/users/{id}'].get
+    const pathParam = getOp.parameters?.find((p: any) => p.in === 'path' && p.name === 'id')
+    expect(pathParam).toBeDefined()
+    expect(pathParam.required).toBe(true)
+  })
+
+  it('converts :param(regex) to {param}', () => {
+    const router = k.router({
+      items: k
+        .$route({ method: 'GET', path: '/items/:id(\\d+)' })
+        .$resolve(() => ({})),
+    })
+    const spec = generateOpenAPI(router)
+    expect((spec.paths as any)['/items/{id}']).toBeDefined()
+  })
+
+  it('declares {path} parameter for ** wildcard', () => {
+    const router = k.router({
+      files: k
+        .$route({ method: 'GET', path: '/files/**' })
+        .$resolve(() => new Response('ok')),
+    })
+    const spec = generateOpenAPI(router)
+    const getOp = (spec.paths as any)['/files/{path}'].get
+    const pathParam = getOp.parameters?.find((p: any) => p.in === 'path' && p.name === 'path')
+    expect(pathParam).toBeDefined()
+  })
+
+  // ── Tags ──
+
+  it('uses Route.tags when provided', () => {
+    const router = k.router({
+      users: {
+        list: k
+          .$route({ tags: ['Users', 'Public'] })
+          .$resolve(() => []),
+      },
+    })
+    const spec = generateOpenAPI(router)
+    const op = (spec.paths as any)['/users/list'].post
+    expect(op.tags).toEqual(['Users', 'Public'])
+  })
+
+  it('auto-generates tag from first path segment when no Route.tags', () => {
+    const router = k.router({
+      users: {
+        list: k.$resolve(() => []),
+      },
+    })
+    const spec = generateOpenAPI(router)
+    const op = (spec.paths as any)['/users/list'].post
+    expect(op.tags).toEqual(['users'])
+  })
+
+  // ── operationId ──
+
+  it('uses custom operationId from Route', () => {
+    const router = k.router({
+      users: {
+        list: k
+          .$route({ operationId: 'listAllUsers' })
+          .$resolve(() => []),
+      },
+    })
+    const spec = generateOpenAPI(router)
+    const op = (spec.paths as any)['/users/list'].post
+    expect(op.operationId).toBe('listAllUsers')
+  })
+
+  // ── Security ──
+
+  it('marks procedure as public with security: false', () => {
+    const router = k.router({
+      public: k
+        .$route({ security: false })
+        .$resolve(() => ({ ok: true })),
+    })
+    const spec = generateOpenAPI(router, { security: { type: 'http', scheme: 'bearer' } })
+    const op = (spec.paths as any)['/public'].post
+    expect(op.security).toEqual([])
+  })
+
+  it('uses per-procedure security schemes', () => {
+    const router = k.router({
+      admin: k
+        .$route({ security: ['bearerAuth', 'apiKey'] })
+        .$resolve(() => ({ ok: true })),
+    })
+    const spec = generateOpenAPI(router)
+    const op = (spec.paths as any)['/admin'].post
+    expect(op.security).toEqual([{ bearerAuth: [] }, { apiKey: [] }])
+  })
+
+  // ── Auto 400 BAD_REQUEST ──
+
+  it('auto-documents 400 for procedures with input', () => {
+    const router = k.router({
+      create: k
+        .$input(z.object({ name: z.string() }))
+        .$resolve(({ input }) => input),
+    })
+    const spec = generateOpenAPI(router)
+    const op = (spec.paths as any)['/create'].post
+    expect(op.responses['400']).toBeDefined()
+    expect(op.responses['400'].description).toContain('BAD_REQUEST')
+  })
+
+  it('does not auto-document 400 for procedures without input', () => {
+    const router = k.router({
+      health: k.$resolve(() => ({ ok: true })),
+    })
+    const spec = generateOpenAPI(router)
+    const op = (spec.paths as any)['/health'].post
+    expect(op.responses['400']).toBeUndefined()
+  })
+
+  // ── spec override ──
+
+  it('merges spec object override', () => {
+    const router = k.router({
+      docs: k
+        .$route({ spec: { externalDocs: { url: 'https://example.com' }, 'x-custom': true } })
+        .$resolve(() => ({})),
+    })
+    const spec = generateOpenAPI(router)
+    const op = (spec.paths as any)['/docs'].post
+    expect(op.externalDocs).toEqual({ url: 'https://example.com' })
+    expect(op['x-custom']).toBe(true)
+  })
+
+  it('applies spec function override', () => {
+    const router = k.router({
+      custom: k
+        .$route({ spec: (op) => ({ ...op, 'x-rate-limit': 100 }) })
+        .$resolve(() => ({})),
+    })
+    const spec = generateOpenAPI(router)
+    const op = (spec.paths as any)['/custom'].post
+    expect(op['x-rate-limit']).toBe(100)
+  })
+
+  // ── Error message ──
+
+  it('includes error message as default in spec', () => {
+    const router = k.router({
+      fail: k
+        .$errors({ CONFLICT: { status: 409, message: 'Already exists' } })
+        .$resolve(() => ({})),
+    })
+    const spec = generateOpenAPI(router)
+    const op = (spec.paths as any)['/fail'].post
+    const schema = op.responses['409'].content['application/json'].schema
+    expect(schema.properties.message.default).toBe('Already exists')
+  })
+
+  // ── Subscription output schema ──
+
+  it('subscription uses text/event-stream content type', () => {
+    const router = k.router({
+      stream: k.subscription(async function* () { yield { tick: 1 } }),
+    })
+    const spec = generateOpenAPI(router)
+    const op = (spec.paths as any)['/stream'].post
+    expect(op.responses['200'].content['text/event-stream']).toBeDefined()
+    expect(op.responses['200'].description).toBe('SSE event stream')
+  })
+
   it('catch-all route appears with valid path and method in spec', () => {
     const router = k.router({
       proxy: k

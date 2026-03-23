@@ -70,6 +70,26 @@ interface JSONSchema {
 /**
  * Generate OpenAPI 3.1.0 document from a v2 RouterDef.
  */
+/**
+ * Convert `:param` and `:param(regex)` to OpenAPI `{param}` syntax.
+ * Returns the converted path and an array of extracted param names.
+ */
+function toOpenAPIPath(raw: string): { httpPath: string; pathParams: string[] } {
+  const pathParams: string[] = []
+  let httpPath = raw
+    // Convert :param(regex) → {param}
+    .replace(/:(\w+)\([^)]*\)/g, (_m, name) => { pathParams.push(name); return `{${name}}` })
+    // Convert :param? → {param}
+    .replace(/:(\w+)\?/g, (_m, name) => { pathParams.push(name); return `{${name}}` })
+    // Convert :param → {param}
+    .replace(/:(\w+)/g, (_m, name) => { pathParams.push(name); return `{${name}}` })
+    // Convert ** wildcard → {path}
+    .replace(/\/\*\*$/g, '/{path}')
+    .replace(/\/\*\*/g, '/{path}')
+  if (httpPath.includes('{path}') && !pathParams.includes('path')) pathParams.push('path')
+  return { httpPath, pathParams }
+}
+
 export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}): Record<string, unknown> {
   const paths: Record<string, Record<string, unknown>> = {}
   const tags = new Map<string, { description?: string }>()
@@ -77,33 +97,32 @@ export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}):
   collectProcedures(router, [], (path, proc) => {
     const route = proc.route as Route | null
     const rawPath = route?.path ?? '/' + path.join('/')
-    // Convert wildcard ** to OpenAPI path parameter syntax
-    const httpPath = rawPath.replace(/\/\*\*$/, '/{path}').replace(/\/\*\*/g, '/{path}')
+    const { httpPath, pathParams } = toOpenAPIPath(rawPath)
     const rawMethod = route?.method?.toLowerCase() ?? 'post'
-    // method: '*' → expand to all standard methods, otherwise use as-is
     const validMethods = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']
     const methods = rawMethod === '*' ? validMethods : [rawMethod]
-    const operationId = path.join('_')
 
-    // Collect tags from first path segment
-    if (path.length > 1) {
-      const tagName = path[0]!
-      if (!tags.has(tagName)) {
-        tags.set(tagName, {})
+    // operationId: user override > auto-generated from path
+    const baseOperationId = route?.operationId ?? path.join('_')
+
+    // Tags: user override > auto-generated from first path segment
+    const opTags = route?.tags ?? (path.length > 1 ? [path[0]!] : undefined)
+    if (opTags) {
+      for (const t of opTags) {
+        if (!tags.has(t)) tags.set(t, {})
       }
     }
 
-    // Append WebSocket note to description for ws-enabled procedures
+    // Description (append WebSocket note if applicable)
     let description = route?.description
     if (route?.ws) {
-      const wsNote =
-        'Also available over WebSocket (`ws://`). Send `{ id, path: "' + path.join('/') + '", input }` as JSON.'
+      const wsNote = 'Also available over WebSocket (`ws://`). Send `{ id, path: "' + path.join('/') + '", input }` as JSON.'
       description = description ? `${description}\n\n${wsNote}` : wsNote
     }
 
     const operation: Record<string, unknown> = {
-      operationId,
-      tags: path.length > 1 ? [path[0]] : undefined,
+      operationId: baseOperationId,
+      tags: opTags,
       summary: route?.summary,
       description,
       deprecated: route?.deprecated || undefined,
@@ -114,20 +133,25 @@ export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}):
     if (!operation.summary) delete operation.summary
     if (!operation.description) delete operation.description
     if (!operation.deprecated) delete operation.deprecated
+    if (!operation.tags) delete operation.tags
 
-    // Security (apply globally if configured)
-    if (options.security) {
+    // Security: per-procedure override > global
+    if (route?.security === false) {
+      operation.security = [] // public — no auth
+    } else if (route?.security) {
+      operation.security = route.security.map((s) => ({ [s]: [] }))
+    } else if (options.security) {
       operation.security = [{ auth: [] }]
     }
 
-    // Input → request body or query params (built per-method below)
-    const inputSchema = proc.input ? zodToJsonSchema(proc.input) : null
+    // Input schema
+    const inputSchema = proc.input ? schemaToJsonSchema(proc.input) : null
 
-    // Output → success response
+    // Output
     const successStatus = route?.successStatus ?? 200
     const successDesc = route?.successDescription ?? 'Successful response'
 
-    // Errors → error responses (merge guard errors + procedure errors)
+    // Errors (merge guard errors + procedure errors)
     const guards = (proc.use ?? []).filter((m: any) => m.kind === 'guard' && m.errors)
     let allErrors = proc.errors ? { ...proc.errors } : null
     for (const guard of guards) {
@@ -138,45 +162,80 @@ export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}):
     paths[httpPath] ??= {}
 
     for (const method of methods) {
-      const op = { ...operation, responses: {} }
+      const op = { ...operation, responses: {} as Record<string, unknown> }
+      if (methods.length > 1) op.operationId = `${baseOperationId}_${method}`
 
-      if (methods.length > 1) {
-        op.operationId = `${operationId}_${method}`
+      // Path parameters
+      const params: Record<string, unknown>[] = []
+      for (const p of pathParams) {
+        params.push({ name: p, in: 'path', required: true, schema: { type: 'string' } })
       }
 
+      // Input → query params (GET) or request body (POST/PUT/etc.)
       if (inputSchema) {
         if (method === 'get') {
-          op.parameters = objectSchemaToParams(inputSchema)
+          params.push(...objectSchemaToParams(inputSchema))
         } else {
           op.requestBody = {
             required: true,
-            content: {
-              'application/json': { schema: inputSchema },
-            },
+            content: { 'application/json': { schema: inputSchema } },
           }
         }
       }
 
-      if (proc.output) {
-        const schema = zodToJsonSchema(proc.output)
-        ;(op.responses as any)[String(successStatus)] = {
-          description: successDesc,
+      if (params.length > 0) op.parameters = params
+
+      // Success response
+      if (proc.type === 'subscription') {
+        const outputSchema = proc.output ? schemaToJsonSchema(proc.output) : { type: 'string' }
+        op.responses[String(successStatus)] = {
+          description: 'SSE event stream',
           content: {
-            'application/json': { schema },
+            'text/event-stream': {
+              schema: { type: 'string', description: `Each line: data: ${JSON.stringify(outputSchema)}` },
+            },
           },
         }
+      } else if (proc.output) {
+        op.responses[String(successStatus)] = {
+          description: successDesc,
+          content: { 'application/json': { schema: schemaToJsonSchema(proc.output) } },
+        }
       } else {
-        ;(op.responses as any)[String(successStatus)] = { description: successDesc }
+        op.responses[String(successStatus)] = { description: successDesc }
       }
 
+      // Auto-document 400 BAD_REQUEST for procedures with input validation
+      if (proc.input) {
+        op.responses['400'] = {
+          description: 'BAD_REQUEST — input validation failed',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  code: { const: 'BAD_REQUEST', type: 'string' },
+                  status: { const: 400, type: 'integer' },
+                  message: { type: 'string' },
+                  data: { type: 'object', properties: { issues: { type: 'array' } } },
+                },
+                required: ['code', 'status', 'message'],
+              },
+            },
+          },
+        }
+      }
+
+      // Typed error responses
       if (allErrors) {
-        const byStatus = new Map<number, { code: string; schema?: JSONSchema }[]>()
+        const byStatus = new Map<number, { code: string; message?: string; schema?: JSONSchema }[]>()
         for (const [code, def] of Object.entries(allErrors)) {
           const status = typeof def === 'number' ? def : def.status
           if (!byStatus.has(status)) byStatus.set(status, [])
-          const entry: { code: string; schema?: JSONSchema } = { code }
-          if (typeof def === 'object' && def.data) {
-            entry.schema = zodToJsonSchema(def.data)
+          const entry: { code: string; message?: string; schema?: JSONSchema } = { code }
+          if (typeof def === 'object') {
+            if (def.message) entry.message = def.message
+            if (def.data) entry.schema = schemaToJsonSchema(def.data)
           }
           byStatus.get(status)!.push(entry)
         }
@@ -188,7 +247,7 @@ export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}):
               properties: {
                 code: { const: e.code, type: 'string' },
                 status: { const: status, type: 'integer' },
-                message: { type: 'string' },
+                message: { type: 'string', ...(e.message ? { default: e.message } : {}) },
               },
               required: ['code', 'status', 'message'],
             }
@@ -199,7 +258,7 @@ export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}):
             return s
           })
 
-          ;(op.responses as any)[String(status)] = {
+          op.responses[String(status)] = {
             description: errors.map((e) => e.code).join(' | '),
             content: {
               'application/json': {
@@ -210,15 +269,17 @@ export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}):
         }
       }
 
-      // Subscription
-      if (proc.type === 'subscription') {
-        ;(op.responses as any)[String(successStatus)] = {
-          description: 'SSE event stream',
-          content: { 'text/event-stream': { schema: { type: 'string' } } },
+      // Apply spec override (oRPC-style)
+      let finalOp = op as Record<string, unknown>
+      if (route?.spec) {
+        if (typeof route.spec === 'function') {
+          finalOp = route.spec(finalOp)
+        } else {
+          finalOp = { ...finalOp, ...route.spec }
         }
       }
 
-      paths[httpPath]![method] = op
+      paths[httpPath]![method] = finalOp
     }
   })
 
@@ -335,154 +396,23 @@ function collectProcedures(node: unknown, path: string[], cb: (path: string[], p
 }
 
 /**
- * Convert a Zod / Standard Schema to JSON Schema.
+ * Convert a Standard Schema to JSON Schema via `~standard.jsonSchema.input()`.
+ *
+ * Works with Zod v4, Valibot, ArkType — any validator implementing Standard Schema v1.
  */
-function zodToJsonSchema(schema: AnySchema): JSONSchema {
-  const zod = (schema as any)._zod ?? (schema as any)._def
-  if (!zod) return {}
-  const def = zod.def ?? zod
-  return convertZodDef(def)
+function schemaToJsonSchema(schema: AnySchema): JSONSchema {
+  const std = (schema as any)['~standard']
+  if (!std?.jsonSchema?.input) return {}
+  try {
+    const result = std.jsonSchema.input({ target: 'draft-2020-12' })
+    if (result && typeof result === 'object') {
+      const { $schema, ...rest } = result as Record<string, unknown>
+      return rest as JSONSchema
+    }
+  } catch {}
+  return {}
 }
 
-function convertZodDef(def: any): JSONSchema {
-  if (!def) return {}
-  const type = def.type ?? def.typeName
-
-  switch (type) {
-    case 'string':
-      return applyStringChecks({ type: 'string' }, def.checks)
-    case 'number':
-    case 'float':
-      return applyNumberChecks({ type: 'number' }, def.checks)
-    case 'int':
-      return applyNumberChecks({ type: 'integer' }, def.checks)
-    case 'boolean':
-      return { type: 'boolean' }
-    case 'bigint':
-      return { type: 'integer', format: 'int64' }
-    case 'date':
-      return { type: 'string', format: 'date-time' }
-    case 'object': {
-      const schema: JSONSchema = { type: 'object', properties: {}, required: [] }
-      if (def.shape) {
-        for (const [key, fieldSchema] of Object.entries(def.shape)) {
-          schema.properties![key] = zodToJsonSchema(fieldSchema as AnySchema)
-          const fz = (fieldSchema as any)?._zod?.def ?? (fieldSchema as any)?._def
-          const isOptional = fz?.type === 'optional' || fz?.typeName === 'ZodOptional' || fz?.optional
-          if (!isOptional) schema.required!.push(key)
-        }
-      }
-      if (!schema.required!.length) delete schema.required
-      if (def.description) schema.description = def.description
-      return schema
-    }
-    case 'array':
-      return {
-        type: 'array',
-        ...(def.element ? { items: zodToJsonSchema(def.element) } : {}),
-      }
-    case 'tuple':
-      return {
-        type: 'array',
-        prefixItems: (def.items ?? []).map((item: any) => zodToJsonSchema(item)),
-      }
-    case 'record':
-      return {
-        type: 'object',
-        additionalProperties: def.valueType ? zodToJsonSchema(def.valueType) : true,
-      }
-    case 'map':
-      return { type: 'object', description: 'Map (serialized as object)' }
-    case 'set':
-      return {
-        type: 'array',
-        uniqueItems: true,
-        ...(def.valueType ? { items: zodToJsonSchema(def.valueType) } : {}),
-      }
-    case 'optional':
-      return zodToJsonSchema(def.innerType ?? def.inner)
-    case 'nullable': {
-      const inner = zodToJsonSchema(def.innerType ?? def.inner)
-      return { anyOf: [inner, { type: 'null' }] }
-    }
-    case 'default': {
-      const inner = zodToJsonSchema(def.innerType ?? def.inner)
-      const defaultVal = typeof def.defaultValue === 'function' ? def.defaultValue() : def.default
-      return { ...inner, default: defaultVal }
-    }
-    case 'enum':
-      return { type: 'string', enum: def.values ?? def.entries }
-    case 'nativeEnum':
-      return { enum: Object.values(def.values ?? {}).filter((v: any) => typeof v !== 'number' || !def.values[v]) }
-    case 'literal':
-      return { const: def.value }
-    case 'union':
-      return { anyOf: (def.options ?? def.members ?? []).map((o: any) => zodToJsonSchema(o)) }
-    case 'discriminatedUnion':
-      return { oneOf: (def.options ?? []).map((o: any) => zodToJsonSchema(o)) }
-    case 'intersection': {
-      const left = zodToJsonSchema(def.left)
-      const right = zodToJsonSchema(def.right)
-      return { allOf: [left, right] }
-    }
-    case 'pipe':
-    case 'transform':
-      return zodToJsonSchema(def.in ?? def.innerType ?? def.input)
-    case 'lazy':
-      return def.getter ? zodToJsonSchema(def.getter()) : {}
-    case 'any':
-    case 'unknown':
-      return {}
-    case 'void':
-    case 'undefined':
-      return { type: 'null' }
-    case 'never':
-      return { not: {} }
-    case 'null':
-      return { type: 'null' }
-    default:
-      return {}
-  }
-}
-
-function applyStringChecks(schema: JSONSchema, checks?: any[]): JSONSchema {
-  if (!checks) return schema
-  for (const c of checks) {
-    const k = c.kind ?? c.type
-    if (k === 'min' || k === 'min_length') schema.minLength = c.value ?? c.minimum
-    if (k === 'max' || k === 'max_length') schema.maxLength = c.value ?? c.maximum
-    if (k === 'length') {
-      schema.minLength = c.value
-      schema.maxLength = c.value
-    }
-    if (k === 'email' || c.format === 'email') schema.format = 'email'
-    if (k === 'url') schema.format = 'uri'
-    if (k === 'uuid') schema.format = 'uuid'
-    if (k === 'cuid') schema.format = 'cuid'
-    if (k === 'ulid') schema.format = 'ulid'
-    if (k === 'datetime' || k === 'iso_datetime') schema.format = 'date-time'
-    if (k === 'ip') schema.format = 'ipv4'
-    if (k === 'regex') schema.pattern = String(c.value ?? c.regex)
-    if (k === 'includes') schema.pattern = c.value
-    if (k === 'startsWith') schema.pattern = `^${c.value}`
-    if (k === 'endsWith') schema.pattern = `${c.value}$`
-  }
-  return schema
-}
-
-function applyNumberChecks(schema: JSONSchema, checks?: any[]): JSONSchema {
-  if (!checks) return schema
-  for (const c of checks) {
-    const k = c.kind ?? c.type
-    if (k === 'min' || k === 'minimum' || k === 'gte') schema.minimum = c.value ?? c.minimum
-    if (k === 'max' || k === 'maximum' || k === 'lte') schema.maximum = c.value ?? c.maximum
-    if (k === 'int') schema.type = 'integer'
-    if (k === 'positive') schema.minimum = 0
-    if (k === 'negative') schema.maximum = 0
-    if (k === 'multipleOf') schema.multipleOf = c.value
-  }
-  return schema
-}
 
 function objectSchemaToParams(schema: JSONSchema): Record<string, unknown>[] {
   if (schema.type !== 'object' || !schema.properties) return []

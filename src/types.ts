@@ -7,16 +7,39 @@
 
 import type { AnySchema, InferSchemaInput } from './core/schema.ts'
 
-/** HTTP route metadata */
+/** HTTP route metadata + OpenAPI operation metadata */
 export interface Route {
   method?: string
   path?: string
+  /** Short summary of the operation (OpenAPI `summary`) */
   summary?: string
+  /** Detailed description of the operation (OpenAPI `description`, supports markdown) */
   description?: string
+  /** Tags for grouping operations in API docs */
   tags?: string[]
+  /** Mark operation as deprecated in API docs */
   deprecated?: boolean
+  /** Custom operationId (default: router path joined with `_`) */
+  operationId?: string
+  /** HTTP status code for successful responses (default: 200) */
   successStatus?: number
+  /** Description for the success response in API docs */
   successDescription?: string
+  /**
+   * Per-procedure security override.
+   * - `false` — public endpoint (no auth), overrides global security
+   * - `string[]` — named security scheme(s) required
+   */
+  security?: false | string[]
+  /**
+   * Override or extend the auto-generated OpenAPI operation object.
+   * - Object: merged over the generated operation
+   * - Function: receives the generated operation, returns the final one
+   *
+   * Use this for any OpenAPI metadata not covered by other Route fields
+   * (e.g. `externalDocs`, `x-` extensions, custom `parameters`).
+   */
+  spec?: Record<string, unknown> | ((operation: Record<string, unknown>) => Record<string, unknown>)
   /**
    * Cache-Control header for query responses.
    *
