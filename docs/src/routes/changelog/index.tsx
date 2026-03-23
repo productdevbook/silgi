@@ -19,7 +19,7 @@ const getChangelogPosts = createServerFn({ method: 'GET' }).handler(async () => 
       version: (p.data as Record<string, unknown>).version as string ?? p.data.title,
       date: String((p.data as Record<string, unknown>).date ?? ''),
     }))
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .toSorted((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 })
 
 function ChangelogIndex() {

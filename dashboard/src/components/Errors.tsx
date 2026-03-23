@@ -90,8 +90,8 @@ export function Errors({ errors, navigate, initialProcedure }: ErrorsProps) {
       else clientCount++
     }
     return {
-      byCodes: [...byCodes].sort((a, b) => b[1] - a[1]),
-      byProc: [...byProc].sort((a, b) => b[1] - a[1]),
+      byCodes: [...byCodes].toSorted((a, b) => b[1] - a[1]),
+      byProc: [...byProc].toSorted((a, b) => b[1] - a[1]),
       clientCount,
       serverCount,
       tracedCount: errors.filter((e) => e.spans.length > 0).length,

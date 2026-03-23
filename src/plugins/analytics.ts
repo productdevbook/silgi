@@ -469,7 +469,7 @@ export class RequestAccumulator {
   readonly sessionId: string
   /** True if a new session cookie needs to be set. */
   readonly isNewSession: boolean
-  #t0: number
+  t0: number
   #request: Request
   #procedures: ProcedureCall[] = []
   #collector: AnalyticsCollector

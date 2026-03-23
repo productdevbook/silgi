@@ -19,7 +19,7 @@ const getBlogPosts = createServerFn({ method: 'GET' }).handler(async () => {
       author: (p.data as Record<string, unknown>).author as string ?? 'Silgi Team',
       date: String((p.data as Record<string, unknown>).date ?? ''),
     }))
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .toSorted((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 })
 
 function BlogIndex() {

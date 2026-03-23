@@ -263,7 +263,7 @@ describe('instrumentDrizzle', () => {
   })
 
   it('error spans include stack trace', async () => {
-    const calls: { method: string; args: unknown[] }[] = []
+    const _calls: { method: string; args: unknown[] }[] = []
     const db = {
       session: {
         prepareQuery(...args: any[]) {

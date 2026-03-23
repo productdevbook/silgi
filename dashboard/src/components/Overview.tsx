@@ -35,11 +35,11 @@ export function Overview({ data, navigate }: OverviewProps) {
   const procs = useMemo(() => data ? Object.entries(data.procedures) : [], [data])
 
   const slowest = useMemo(
-    () => [...procs].sort((a, b) => b[1].latency.p95 - a[1].latency.p95).slice(0, 5),
+    () => [...procs].toSorted((a, b) => b[1].latency.p95 - a[1].latency.p95).slice(0, 5),
     [procs],
   )
   const noisiest = useMemo(
-    () => procs.filter(([, p]) => p.errors > 0).sort((a, b) => b[1].errors - a[1].errors).slice(0, 5),
+    () => procs.filter(([, p]) => p.errors > 0).toSorted((a, b) => b[1].errors - a[1].errors).slice(0, 5),
     [procs],
   )
 

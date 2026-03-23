@@ -1,7 +1,6 @@
 import { SpanWaterfall } from '@/components/span-waterfall'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useCopy } from '@/hooks'
 import { fmtMs, fmtTime } from '@/lib/format'
 import { requestTimingMarkdown, requestToMarkdown, requestToRedactedJson } from '@/lib/markdown'

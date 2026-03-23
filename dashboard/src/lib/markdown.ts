@@ -211,7 +211,7 @@ export function requestToRedactedJson(entry: RequestEntry): string {
 
 export function sessionToMarkdown(requests: RequestEntry[], sessionId: string): string {
   const lines: string[] = []
-  const sorted = [...requests].sort((a, b) => a.timestamp - b.timestamp)
+  const sorted = [...requests].toSorted((a, b) => a.timestamp - b.timestamp)
   const first = sorted[0]!
   const last = sorted[sorted.length - 1]!
   const totalMs = requests.reduce((sum, r) => sum + r.durationMs, 0)

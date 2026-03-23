@@ -53,7 +53,7 @@ export function Sessions({ requests, navigate }: SessionsProps) {
 
     let result: SessionSummary[] = []
     for (const [sessionId, reqs] of bySession) {
-      const sorted = reqs.sort((a, b) => a.timestamp - b.timestamp)
+      const sorted = reqs.toSorted((a, b) => a.timestamp - b.timestamp)
       const totalMs = reqs.reduce((sum, r) => sum + r.durationMs, 0)
       const errorCount = reqs.filter((r) => r.status >= 400).length
       const procedures = [...new Set(reqs.flatMap((r) => r.procedures.map((p) => p.procedure)))]

@@ -42,7 +42,7 @@ export function SessionDetailPage({ requests, sessionId, navigate }: SessionDeta
     () => requests.filter((r) => r.sessionId === sessionId).sort((a, b) => b.timestamp - a.timestamp),
     [requests, sessionId],
   )
-  const chronological = useMemo(() => [...sessionRequests].reverse(), [sessionRequests])
+  const chronological = useMemo(() => [...sessionRequests].toReversed(), [sessionRequests])
 
   if (sessionRequests.length === 0) {
     return (
@@ -58,7 +58,7 @@ export function SessionDetailPage({ requests, sessionId, navigate }: SessionDeta
   const totalMs = sessionRequests.reduce((sum, r) => sum + r.durationMs, 0)
   const errorCount = sessionRequests.filter((r) => r.status >= 400).length
   const allSpans = sessionRequests.flatMap((r) => r.procedures.flatMap((p) => p.spans))
-  const uniqueProcedures = [...new Set(sessionRequests.flatMap((r) => r.procedures.map((p) => p.procedure)))].sort()
+  const uniqueProcedures = [...new Set(sessionRequests.flatMap((r) => r.procedures.map((p) => p.procedure)))].toSorted()
   const maxDuration = Math.max(...sessionRequests.map((r) => r.durationMs), 0.1)
 
   const byKind = new Map<string, number>()
@@ -290,7 +290,7 @@ function SessionInfoPanel({ sessionId, first, last, wallClockMs, totalMs, sessio
 
       <PanelSection label='Status'>
         <div className='flex flex-wrap gap-1.5'>
-          {[...byStatus].sort((a, b) => a[0].localeCompare(b[0])).map(([bucket, count]) => (
+          {[...byStatus].toSorted((a, b) => a[0].localeCompare(b[0])).map(([bucket, count]) => (
             <Badge key={bucket} variant={bucket === '4xx' || bucket === '5xx' ? 'destructive' : 'secondary'} className='text-[10px]'>
               {bucket} <span className='ml-1 opacity-70'>{count}</span>
             </Badge>
