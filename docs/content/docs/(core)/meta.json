@@ -16,6 +16,7 @@
     "---",
     "server",
     "client",
+    "client-plugins",
     "testing",
     "analytics",
     "---",
