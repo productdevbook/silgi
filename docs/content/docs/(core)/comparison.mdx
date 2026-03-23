@@ -178,26 +178,34 @@ On Bun all three are within 10%. Silgi is ~5µs slower due to Fetch API `Respons
 
 <Callout>Reproduce: `node --experimental-strip-types bench/router.ts`</Callout>
 
-## Where oRPC is ahead
+## Choosing the right tool
 
-- **Ecosystem breadth** — 35 packages with more niche integrations
-- **Cloudflare Durable Objects** — Hibernation + Durable Iterator
-- **RPC protocol** — Native type serialization without header negotiation
-- **Community size** — Larger user base, more battle-tested
-- **Angular support** — TanStack Query for Angular
+Every framework in this comparison is well-built and actively maintained. The "best" choice depends on what matters most for your project.
 
-## Where Silgi is ahead
+**Choose oRPC if** you need the broadest ecosystem (35+ packages), Cloudflare Durable Objects support, Angular integration, or prefer a dedicated RPC protocol with native type serialization. oRPC has a larger community and more battle-tested edge cases.
 
-- **Single package** — one install, no version coordination
-- **Compiled pipeline** — 3-6x faster than oRPC, 34% lower p99
-- **Guard / Wrap model** — clearer separation of concerns
-- **Typed guard errors** — auto-merge into procedures and OpenAPI spec
-- **Built-in analytics** — live dashboard with session tracking and span tracing
-- **Client resilience** — [retry, circuit breaker, timeout](/docs/client-plugins) built-in
-- **createCaller** — [test without HTTP](/docs/testing), full pipeline execution
-- **OpenAPI per-procedure** — [operationId, security, spec override](/docs/openapi)
-- **Response caching** — `cacheQuery()` with TTL, SWR, pluggable backends
-- **Content negotiation** — standard HTTP, works with any client
+**Choose tRPC if** you want the most mature type-safe RPC with the largest community, extensive tutorials, and proven production track record.
+
+**Choose Hono if** you need a lightweight, runtime-agnostic web framework that runs everywhere — Node.js, Bun, Deno, Cloudflare Workers, and more.
+
+**Choose Elysia if** you're building on Bun and want the best possible performance with an elegant, TypeBox-powered API.
+
+**Choose Fastify if** you need a mature Node.js framework with a vast plugin ecosystem and proven enterprise adoption.
+
+**Choose Express if** you need maximum compatibility with existing middleware and the widest community support.
+
+**Choose Silgi if** you value:
+- Single package with no version coordination
+- Compiled pipelines for predictable low-latency
+- Built-in analytics dashboard with session tracking
+- Guard/Wrap middleware model with typed error auto-merging
+- Client resilience ([retry, circuit breaker, timeout](/docs/client-plugins)) out of the box
+- [Testing without HTTP](/docs/testing) via `createCaller`
+- [Per-procedure OpenAPI metadata](/docs/openapi) with spec override
+
+<Callout>
+  We respect every project in this space. Open source thrives when frameworks learn from each other. If you find something we got wrong in this comparison, [open an issue](https://github.com/productdevbook/silgi/issues) — we'll fix it.
+</Callout>
 
 ## What's next?
 
