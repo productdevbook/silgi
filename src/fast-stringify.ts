@@ -97,7 +97,7 @@ function compileType(def: any): FastStringify | undefined {
 }
 
 function compileObject(def: any): FastStringify | undefined {
-  const shape = def.shape ?? (typeof def.shape === 'function' ? def.shape() : undefined)
+  const shape = typeof def.shape === 'function' ? def.shape() : def.shape
   if (!shape) return undefined
 
   const entries = Object.entries(shape)

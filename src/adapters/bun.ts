@@ -100,8 +100,8 @@ export function silgiBun<TCtx extends Record<string, unknown>>(
     // Only safe when no custom fast-stringify is compiled (i.e. no output schema)
     const nativeJson = stringify === JSON.stringify
 
-    // ── GET or no body — fully sync ──
-    if (request.method === 'GET' || !request.body) {
+    // ── GET or no body — sync only when context factory is sync ──
+    if (ctxIsSync && (request.method === 'GET' || !request.body)) {
       const ctx: Record<string, unknown> = Object.create(null)
       try {
         if (!ctxIsEmpty && ctxFactory) {

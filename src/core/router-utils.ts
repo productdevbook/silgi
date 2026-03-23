@@ -24,7 +24,9 @@ export function assignPaths(def: RouterDef, prefix: string[] = []): void {
     const currentPath = [...prefix, key]
     if (isProcedureDef(value)) {
       if (!value.route) {
-        ;(value as any).route = { path: '/' + currentPath.join('/') }
+        // Clone procedure to avoid mutating shared instances across routers
+        const cloned = { ...value, route: { path: '/' + currentPath.join('/') } }
+        ;(def as any)[key] = cloned
       }
     } else if (typeof value === 'object' && value !== null) {
       assignPaths(value as RouterDef, currentPath)

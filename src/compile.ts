@@ -293,44 +293,51 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
   const runGuards = selectGuardRunner(guards)
 
   // ── SYNC FAST PATH: no wraps, no validation ──
-  // Handles 0-guard (noop runGuards0) through 4-guard (unrolled) cases
+  // try/catch converts sync throws (guard errors, fail() calls, resolver errors)
+  // to rejected Promises for consistent error handling across all paths.
   if (wraps.length === 0 && !inputSchema && !outputSchema) {
     return (ctx, rawInput, signal) => {
-      const guardResult = runGuards(ctx)
-      if (guardResult && isThenable(guardResult)) {
-        return (guardResult as Promise<void>).then(() =>
-          resolveFn({
-            input: rawInput,
-            ctx,
-            fail: failFn,
-            signal,
-            params: (ctx.params ?? EMPTY_PARAMS) as Record<string, string>,
-          }),
-        )
+      try {
+        const guardResult = runGuards(ctx)
+        if (guardResult && isThenable(guardResult)) {
+          return (guardResult as Promise<void>).then(() =>
+            resolveFn({
+              input: rawInput,
+              ctx,
+              fail: failFn,
+              signal,
+              params: (ctx.params ?? EMPTY_PARAMS) as Record<string, string>,
+            }),
+          )
+        }
+        return resolveFn({
+          input: rawInput,
+          ctx,
+          fail: failFn,
+          signal,
+          params: (ctx.params ?? EMPTY_PARAMS) as Record<string, string>,
+        })
+      } catch (e) {
+        return Promise.reject(e)
       }
-      const output = resolveFn({
-        input: rawInput,
-        ctx,
-        fail: failFn,
-        signal,
-        params: (ctx.params ?? EMPTY_PARAMS) as Record<string, string>,
-      })
-      return output
     }
   }
 
   // ── SEMI-SYNC: no wraps, has validation ────────────
-  // Sync-first: validateSchema returns sync for Zod 4. No try/catch in hot path —
-  // validation throws are converted to rejected Promises via _safeValidate wrapper.
+  // All sync throws (guards, validation, resolve) converted to rejected Promises.
   if (wraps.length === 0) {
     return (ctx, rawInput, signal) => {
-      const guardResult = runGuards(ctx)
-      if (guardResult && isThenable(guardResult)) {
-        return (guardResult as Promise<void>).then(() =>
-          _validateAndResolve(inputSchema, outputSchema, resolveFn, rawInput, ctx, failFn, signal),
-        )
+      try {
+        const guardResult = runGuards(ctx)
+        if (guardResult && isThenable(guardResult)) {
+          return (guardResult as Promise<void>).then(() =>
+            _validateAndResolve(inputSchema, outputSchema, resolveFn, rawInput, ctx, failFn, signal),
+          )
+        }
+        return _validateAndResolve(inputSchema, outputSchema, resolveFn, rawInput, ctx, failFn, signal)
+      } catch (e) {
+        return Promise.reject(e)
       }
-      return _validateAndResolve(inputSchema, outputSchema, resolveFn, rawInput, ctx, failFn, signal)
     }
   }
 

@@ -35,7 +35,7 @@ pnpm bench:memory   # Memory profiling (--expose-gc)
 
 - **silgi.ts** — Factory function. Creates typed instance with `query()`, `mutation()`, `guard()`, `wrap()`, `router()`, `handler()`, `serve()`
 - **compile.ts** — Pipeline compiler. Unrolls 0-4 guards into specialized code paths (no loop), uses ContextPool for zero per-request allocation, compiles router into flat Map for O(1) lookup
-- **types.ts** — `ProcedureDef` (fixed 7-property shape for V8 hidden class alignment), `RouterDef`, type inference helpers (`InferContextFromUse`, `InferSchemaInput`, `InferSchemaOutput`, `InferClient`)
+- **types.ts** — `ProcedureDef` (fixed 8-property shape for V8 hidden class alignment), `RouterDef`, type inference helpers (`InferContextFromUse`, `InferSchemaInput`, `InferSchemaOutput`, `InferClient`)
 - **core/error.ts** — `SilgiError` with cross-realm instanceof via global WeakSet registry. Error codes are UPPER_SNAKE_CASE
 - **core/schema.ts** — Standard Schema v1 bridge (Zod, Valibot, ArkType). Generic `validateSchema()` function
 - **core/sse.ts** — Server-Sent Events / streaming support

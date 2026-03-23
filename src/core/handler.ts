@@ -188,7 +188,7 @@ location.reload();
     if (testResult instanceof Promise) {
       testResult.then((r) => {
         ctxFactoryIsEmpty = Object.keys(r).length === 0
-      })
+      }).catch(() => { /* probe failure is non-fatal — assume non-empty */ })
     } else {
       ctxFactoryIsSync = true
       ctxFactoryIsEmpty = Object.keys(testResult).length === 0
@@ -419,7 +419,6 @@ location.reload();
               headers: cacheHeaders ? { ...jsonHeaders, ...cacheHeaders } : jsonHeaders,
             })
           })
-          .catch((error) => handleError(error, pathname, request, rawInput, reqTrace, t0, accumulator))
           .catch((error) => handleError(error, pathname, request, rawInput, reqTrace, t0, accumulator))
       } catch (error) {
         return handleError(error, pathname, request, rawInput, reqTrace, t0, accumulator)
@@ -709,11 +708,21 @@ location.reload();
             }
           }
 
+          if (hasActiveHooks()) hooks!.callHook('request', { path: fullPath.slice(1), input })
           const result = route.handler(ctx, input, request.signal)
-          if (!(result instanceof Promise)) return _minimalResponse(result, route, request)
+          if (!(result instanceof Promise)) {
+            if (hasActiveHooks()) hooks!.callHook('response', { path: fullPath.slice(1), output: result, durationMs: 0 })
+            return _minimalResponse(result, route, request)
+          }
           return result.then(
-            (output) => _minimalResponse(output, route, request),
-            (error) => _minimalError(error, request),
+            (output) => {
+              if (hasActiveHooks()) hooks!.callHook('response', { path: fullPath.slice(1), output, durationMs: 0 })
+              return _minimalResponse(output, route, request)
+            },
+            (error) => {
+              if (hasActiveHooks()) hooks!.callHook('error', { path: fullPath.slice(1), error })
+              return _minimalError(error, request)
+            },
           )
         } catch (error) {
           return _minimalError(error, request)
@@ -759,13 +768,24 @@ location.reload();
         bodyPromise = isBun ? request.json() : request.text().then((t) => (t ? JSON.parse(t) : undefined))
       }
 
+      const _path = fullPath.slice(1)
       return bodyPromise
         .then((rawInput: unknown) => {
+          if (hasActiveHooks()) hooks!.callHook('request', { path: _path, input: rawInput })
           const result = route.handler(ctx, rawInput, request.signal)
-          if (!(result instanceof Promise)) return _minimalResponse(result, route, request)
-          return result.then((output) => _minimalResponse(output, route, request))
+          if (!(result instanceof Promise)) {
+            if (hasActiveHooks()) hooks!.callHook('response', { path: _path, output: result, durationMs: 0 })
+            return _minimalResponse(result, route, request)
+          }
+          return result.then((output) => {
+            if (hasActiveHooks()) hooks!.callHook('response', { path: _path, output, durationMs: 0 })
+            return _minimalResponse(output, route, request)
+          })
         })
-        .catch((error: unknown) => _minimalError(error, request))
+        .catch((error: unknown) => {
+          if (hasActiveHooks()) hooks!.callHook('error', { path: _path, error })
+          return _minimalError(error, request)
+        })
     }
   }
 
@@ -819,12 +839,14 @@ location.reload();
     const result = handleRequest(request)
 
     function injectHeaders(res: Response): Response {
-      res.headers.set('x-request-id', acc.requestId)
+      // Create new Response to avoid mutating immutable headers (Workers/Deno/Bun throw TypeError)
+      const headers = new Headers(res.headers)
+      headers.set('x-request-id', acc.requestId)
       const cookie = acc.getSessionCookie()
-      if (cookie) res.headers.append('set-cookie', cookie)
-      // Flush AFTER response headers are finalized — captures actual response headers
-      acc.flushWithResponse(res)
-      return res
+      if (cookie) headers.append('set-cookie', cookie)
+      const injected = new Response(res.body, { status: res.status, statusText: res.statusText, headers })
+      acc.flushWithResponse(injected)
+      return injected
     }
 
     if (result instanceof Promise) return result.then(injectHeaders)
