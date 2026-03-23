@@ -1,6 +1,29 @@
 # Benchmarks
 
-> Last updated: **2026-03-20** | Apple M3 Max | Node v24.11.0
+> Last updated: **2026-03-24** | Apple M3 Max | Node v24.11.0 | Bun 1.3.11
+
+## HTTP — Bun 1.3.11
+
+Simple POST endpoint returning JSON. 3000 sequential requests, 200 warmup. All frameworks use `Bun.serve()`.
+
+| Framework | avg | p50 | p95 | p99 | req/s |
+|---|---|---|---|---|---|
+| Elysia | **44µs** | **43µs** | 50µs | 58µs | **22,572/s** |
+| Silgi | 46µs | 45µs | 54µs | 65µs | 21,672/s |
+| Hono | 46µs | 45µs | 51µs | 62µs | 21,957/s |
+
+## HTTP — Node.js v24.11.0
+
+Same endpoint. Silgi and Hono use Fetch API adapters (srvx / @hono/node-server). Fastify and Express use native `req`/`res`.
+
+| Framework | avg | p50 | p95 | p99 | req/s |
+|---|---|---|---|---|---|
+| Fastify | **96µs** | **85µs** | 117µs | 197µs | **10,396/s** |
+| Express | 102µs | 90µs | 130µs | 182µs | 9,811/s |
+| Hono | 116µs | 105µs | 150µs | 190µs | 8,638/s |
+| Silgi | 125µs | 111µs | 180µs | 259µs | 7,993/s |
+
+Silgi uses the Fetch API (`Request`/`Response`) while Fastify and Express use native Node.js `req`/`res`. This adds ~20µs fixed adapter overhead per request.
 
 ## Pipeline Performance (pure execution, no HTTP)
 
@@ -10,31 +33,6 @@
 | Zod input validation | **241 ns** | 804 ns | 4,214 ns | **3.3x** | **17.5x** |
 | 3 middleware + Zod | **297 ns** | 1,718 ns | 3,954 ns | **5.8x** | **13.3x** |
 | 5 middleware + Zod | **413 ns** | 2,219 ns | 3,917 ns | **5.4x** | **9.5x** |
-
-## HTTP Performance (Silgi vs oRPC vs H3)
-
-3000 sequential requests per scenario.
-
-| Scenario | Silgi | oRPC | H3 v2 |
-|---|---|---|---|
-| Simple (no mw) | **79µs** (12,592/s) | 83µs (12,048/s) | 78µs (12,753/s) |
-| Zod validation | **86µs** (11,627/s) | 120µs (8,315/s) | 93µs (10,707/s) |
-| Guard + Zod | **79µs** (12,706/s) | 116µs (8,625/s) | 96µs (10,359/s) |
-
-### Comparison
-
-| | Simple | Zod | Guard + Zod |
-|---|---|---|---|
-| Silgi vs oRPC | ~tied | **1.4x faster** | **1.5x faster** |
-| Silgi vs H3 | ~tied | **1.1x faster** | **1.2x faster** |
-
-### Tail Latency (p99, Guard + Zod)
-
-| Framework | avg | p50 | p99 |
-|---|---|---|---|
-| **Silgi** | **79µs** | **70µs** | **148µs** |
-| oRPC | 116µs | 103µs | 223µs |
-| H3 v2 | 96µs | 82µs | 236µs |
 
 ## Router Performance (Silgi compiled vs rou3)
 
@@ -58,5 +56,7 @@
 ## How to run
 
 ```sh
+node --experimental-strip-types bench/http.ts       # HTTP (Node.js)
+bun bench/http-bun.ts                               # HTTP (Bun)
 node --experimental-strip-types bench/router.ts     # Router: Silgi vs rou3
 ```

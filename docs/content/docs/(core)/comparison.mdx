@@ -11,30 +11,30 @@ import { Callout } from 'fumadocs-ui/components/callout'
 
 All benchmarks: Apple M3 Max, sequential requests. Numbers are real — reproduce them on your hardware.
 
-## HTTP — Node.js v24.11.0
-
-Simple POST endpoint returning JSON. 3000 sequential requests, 200 warmup. No validation, no middleware.
-
-| Framework  | avg     | p50     | p95     | p99     | req/s     |
-| ---------- | ------- | ------- | ------- | ------- | --------- |
-| Fastify    | 100µs   | 86µs    | 135µs   | 207µs   | 9,956/s   |
-| Express    | 109µs   | 96µs    | 150µs   | 212µs   | 9,165/s   |
-| Hono       | 115µs   | 104µs   | 151µs   | 211µs   | 8,679/s   |
-| Silgi      | 130µs   | 109µs   | 202µs   | 331µs   | 7,672/s   |
-
-Silgi uses the Fetch API (`Request`/`Response`) while Fastify and Express use native Node.js `req`/`res`. This adds ~30µs fixed overhead per request. The gap closes as middleware complexity grows.
-
 ## HTTP — Bun 1.3.11
 
-Same endpoint, all frameworks use `Bun.serve()`.
+Simple POST endpoint returning JSON. 3000 sequential requests, 200 warmup. All frameworks use `Bun.serve()`.
 
 | Framework  | avg     | p50     | p95     | p99     | req/s      |
 | ---------- | ------- | ------- | ------- | ------- | ---------- |
-| Hono       | 46µs    | 45µs    | 53µs    | 64µs    | 21,769/s   |
-| Elysia     | 46µs    | 45µs    | 54µs    | 82µs    | 21,657/s   |
-| Silgi      | 51µs    | 47µs    | 77µs    | 97µs    | 19,499/s   |
+| Elysia     | 44µs    | 43µs    | 50µs    | 58µs    | 22,572/s   |
+| Silgi      | 46µs    | 45µs    | 54µs    | 65µs    | 21,672/s   |
+| Hono       | 46µs    | 45µs    | 51µs    | 62µs    | 21,957/s   |
 
-On Bun all three are within 10%.
+On Bun all three are within noise — Silgi, Hono, and Elysia deliver the same throughput.
+
+## HTTP — Node.js v24.11.0
+
+Same endpoint. Silgi and Hono use Fetch API adapters (srvx / @hono/node-server). Fastify and Express use native `req`/`res`.
+
+| Framework  | avg     | p50     | p95     | p99     | req/s      |
+| ---------- | ------- | ------- | ------- | ------- | ---------- |
+| Fastify    | 96µs    | 85µs    | 117µs   | 197µs   | 10,396/s   |
+| Express    | 102µs   | 90µs    | 130µs   | 182µs   | 9,811/s    |
+| Hono       | 116µs   | 105µs   | 150µs   | 190µs   | 8,638/s    |
+| Silgi      | 125µs   | 111µs   | 180µs   | 259µs   | 7,993/s    |
+
+Silgi uses the Fetch API (`Request`/`Response`) while Fastify and Express use native Node.js `req`/`res`. This adds ~20µs fixed adapter overhead per request. The gap closes as middleware complexity grows.
 
 ## RPC pipeline (no HTTP)
 
@@ -89,9 +89,9 @@ JIT-compiled radix tree (Silgi) vs rou3.
 
 <Callout>
   ```bash
-  node --experimental-strip-types bench/router.ts    # Router
   node --experimental-strip-types bench/http.ts      # HTTP (Node.js)
   bun bench/http-bun.ts                              # HTTP (Bun)
+  node --experimental-strip-types bench/router.ts    # Router
   ```
 </Callout>
 
