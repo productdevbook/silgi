@@ -1,4 +1,4 @@
-import { createContext } from '../compile.ts'
+import { createContext, releaseContext } from '../compile.ts'
 import { compileRouter } from '../compile.ts'
 import {
   AnalyticsCollector,
@@ -174,15 +174,36 @@ location.reload();
 </html>`
 
   // Live check: does the hooks instance have registered listeners?
-  // Checked per-request so hooks added after first request still work.
-  // Also used at init time for minimalHandler activation.
+  // Cached flag updated on hook registration/removal — avoids per-request for..in loop.
   const _hooksObj = (hooks as any)?._hooks
-  function hasActiveHooks(): boolean {
-    if (!_hooksObj) return false
+  let _hasHooks = false
+  function _recomputeHooks(): void {
+    if (!_hooksObj) return
     for (const k in _hooksObj) {
-      if (_hooksObj[k]?.length > 0) return true
+      if (_hooksObj[k]?.length > 0) {
+        _hasHooks = true
+        return
+      }
     }
-    return false
+    _hasHooks = false
+  }
+  _recomputeHooks()
+  // Re-evaluate when hooks change (hookable fires afterEach)
+  if (hooks) {
+    const origHook = hooks.hook.bind(hooks)
+    const origRemove = hooks.removeHook.bind(hooks)
+    hooks.hook = ((name: any, fn: any) => {
+      const r = origHook(name, fn)
+      _hasHooks = true
+      return r
+    }) as any
+    hooks.removeHook = ((name: any, fn: any) => {
+      origRemove(name, fn)
+      _recomputeHooks()
+    }) as any
+  }
+  function hasActiveHooks(): boolean {
+    return _hasHooks
   }
 
   /** Fire-and-forget hook call — swallows both sync throws and async rejections.
@@ -434,6 +455,7 @@ location.reload();
 
           // JSON fast path — skip content negotiation for most requests
           const cacheHeaders = route.cacheControl ? { 'cache-control': route.cacheControl } : undefined
+          releaseContext(ctx)
           return new Response(route.stringify(output), {
             headers: cacheHeaders ? { ...jsonHeaders, ...cacheHeaders } : jsonHeaders,
           })
@@ -443,7 +465,7 @@ location.reload();
         return pipelineResult
           .then((output) => {
             const durationMs = collector ? round(performance.now() - t0) : 0
-            if (hasActiveHooks()) safeCallHook('response', { path: pathname, output, durationMs })
+            if (_hasHooks) safeCallHook('response', { path: pathname, output, durationMs })
             if (collector) {
               collector.record(pathname, durationMs)
               if (accumulator) {
@@ -457,6 +479,7 @@ location.reload();
                 })
               }
             }
+            releaseContext(ctx)
             if (output instanceof Response) return output
             if (output instanceof ReadableStream)
               return new Response(output, { headers: { 'content-type': 'application/octet-stream' } })
@@ -470,8 +493,12 @@ location.reload();
               headers: cacheHeaders ? { ...jsonHeaders, ...cacheHeaders } : jsonHeaders,
             })
           })
-          .catch((error) => handleError(error, pathname, request, rawInput, reqTrace, t0, accumulator))
+          .catch((error) => {
+            releaseContext(ctx)
+            return handleError(error, pathname, request, rawInput, reqTrace, t0, accumulator)
+          })
       } catch (error) {
+        releaseContext(ctx)
         return handleError(error, pathname, request, rawInput, reqTrace, t0, accumulator)
       }
     }
@@ -499,21 +526,24 @@ location.reload();
 
       return bodyParse
         .then((rawInput: unknown) => {
-          if (hasActiveHooks()) safeCallHook('request', { path: pathname, input: rawInput })
+          if (_hasHooks) safeCallHook('request', { path: pathname, input: rawInput })
 
           const pipelineResult = route.handler(ctx, rawInput, request.signal)
           if (!(pipelineResult instanceof Promise)) {
-            if (hasActiveHooks()) safeCallHook('response', { path: pathname, output: pipelineResult, durationMs: 0 })
+            if (_hasHooks) safeCallHook('response', { path: pathname, output: pipelineResult, durationMs: 0 })
+            releaseContext(ctx)
             return _makeResponse(pipelineResult, route)
           }
           return pipelineResult.then((output) => {
-            if (hasActiveHooks()) safeCallHook('response', { path: pathname, output, durationMs: 0 })
+            if (_hasHooks) safeCallHook('response', { path: pathname, output, durationMs: 0 })
+            releaseContext(ctx)
             return _makeResponse(output, route)
           })
         })
-        .catch(
-          (error: unknown) => handleError(error, pathname, request, undefined, undefined, 0, accumulator) as Response,
-        )
+        .catch((error: unknown) => {
+          releaseContext(ctx)
+          return handleError(error, pathname, request, undefined, undefined, 0, accumulator) as Response
+        })
     }
 
     // ── Full async path: POST with body, async context factory, codecs, analytics ──
@@ -688,10 +718,12 @@ location.reload();
       }
 
       const cacheHeaders = route.cacheControl ? { 'cache-control': route.cacheControl } : undefined
+      releaseContext(ctx)
       return new Response(route.stringify(output), {
         headers: cacheHeaders ? { ...jsonHeaders, ...cacheHeaders } : jsonHeaders,
       })
     } catch (error) {
+      releaseContext(ctx)
       return handleError(error, pathname, request, rawInput, reqTrace, t0, accumulator) as Response
     }
   }

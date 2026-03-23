@@ -305,12 +305,13 @@ async function runHTTPBenchmarks(): Promise<HTTPResult[]> {
     const u = req.url ?? '/'
     const q = u.indexOf('?')
     const p = q === -1 ? u.slice(1) : u.slice(1, q)
-    const route = flat.get(p)
-    if (!route) {
+    const match = flat('', '/' + p)
+    if (!match) {
       res.writeHead(404)
       res.end()
       return
     }
+    const route = match.data
 
     const cl = req.headers['content-length']
     if (!cl || cl === '0' || req.method === 'GET' || req.method === 'HEAD') {
@@ -467,12 +468,13 @@ async function runH2Benchmarks(): Promise<H2Result[]> {
 
   function handler(req: any, res: any) {
     const u = (req.url ?? req.headers?.[':path'] ?? '/').replace(/^\//, '')
-    const route = flat.get(u)
-    if (!route) {
+    const match = flat('', '/' + u)
+    if (!match) {
       res.writeHead(404)
       res.end()
       return
     }
+    const route = match.data
     const ctx: Record<string, unknown> = Object.create(null)
     const cl = req.headers['content-length']
     if (!cl || cl === '0') {

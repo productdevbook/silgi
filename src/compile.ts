@@ -478,7 +478,22 @@ function isProcedureDef(value: unknown): value is ProcedureDef {
   )
 }
 
-/** Create a fresh null-prototype context object (no prototype chain lookups). */
+/** Pool of pre-allocated null-prototype context objects — eliminates per-request GC pressure. */
+const CTX_POOL: Record<string, unknown>[] = []
+const CTX_POOL_MAX = 128
+
+/** Acquire a context object from the pool (or create one). */
 export function createContext(): Record<string, unknown> {
-  return Object.create(null)
+  return CTX_POOL.length > 0 ? CTX_POOL.pop()! : Object.create(null)
+}
+
+/** Return a context object to the pool after request completes. */
+export function releaseContext(ctx: Record<string, unknown>): void {
+  // Wipe all properties — cheaper than Object.create(null) in V8
+  const keys = Object.keys(ctx)
+  for (let i = 0; i < keys.length; i++) delete ctx[keys[i]!]
+  // Also delete any symbol properties (RAW_INPUT etc.)
+  const syms = Object.getOwnPropertySymbols(ctx)
+  for (let i = 0; i < syms.length; i++) delete (ctx as any)[syms[i]!]
+  if (CTX_POOL.length < CTX_POOL_MAX) CTX_POOL.push(ctx)
 }
