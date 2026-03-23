@@ -106,14 +106,15 @@ export async function parseMultipart(request: Request): Promise<{
   const fields: Record<string, string> = {}
 
   for (const [key, value] of formData.entries()) {
-    if (value instanceof File) {
+    if (typeof value !== 'string') {
+      const file = value as unknown as { name: string; size: number; type: string; arrayBuffer(): Promise<ArrayBuffer>; text(): Promise<string>; stream(): ReadableStream }
       files.push({
-        name: value.name,
-        size: value.size,
-        type: value.type,
-        arrayBuffer: () => value.arrayBuffer(),
-        text: () => value.text(),
-        stream: () => value.stream(),
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        arrayBuffer: () => file.arrayBuffer(),
+        text: () => file.text(),
+        stream: () => file.stream(),
       })
     } else {
       fields[key] = value

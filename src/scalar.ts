@@ -162,7 +162,12 @@ export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}):
     paths[httpPath] ??= {}
 
     for (const method of methods) {
-      const op = { ...operation, responses: {} as Record<string, unknown> }
+      const op = { ...operation, responses: {} as Record<string, unknown> } as typeof operation & {
+        operationId?: string
+        requestBody?: unknown
+        parameters?: unknown[]
+        responses: Record<string, unknown>
+      }
       if (methods.length > 1) op.operationId = `${baseOperationId}_${method}`
 
       // Path parameters

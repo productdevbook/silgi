@@ -246,7 +246,7 @@ function isFrameworkError(error: unknown): boolean {
 function defaultFormDataParser(formData: FormData): Record<string, unknown> {
   const result: Record<string, unknown> = {}
   for (const [key, value] of formData.entries()) {
-    const v = value instanceof File && value.size === 0 ? undefined : value
+    const v = typeof value === 'object' && 'size' in value && (value as any).size === 0 ? undefined : value
     setNestedValue(result, key, v)
   }
   return result

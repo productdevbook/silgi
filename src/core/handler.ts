@@ -494,7 +494,7 @@ location.reload();
     url: string,
     pathname: string,
     qMark: number,
-    match: NonNullable<ReturnType<typeof compiledRouter>>,
+    match: NonNullable<ReturnType<NonNullable<typeof compiledRouter>>>,
     route: import('../compile.ts').CompiledRoute,
     accumulator?: RequestAccumulator,
   ): Promise<Response> {

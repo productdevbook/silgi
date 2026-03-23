@@ -148,7 +148,7 @@ export function silgiBun<TCtx extends Record<string, unknown>>(
 
   async function _post(
     request: Request,
-    match: { params: Record<string, string> | null },
+    match: { params?: Record<string, string> },
     handler: (ctx: Record<string, unknown>, input: unknown, signal: AbortSignal) => unknown,
     nativeJson: boolean,
     stringify: (v: unknown) => string,
