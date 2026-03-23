@@ -1,94 +1,67 @@
 ---
 title: Integrations
-description: Use Silgi with Fastify, H3, Express, Remix, Astro, SolidStart, MessagePort, OpenAPI, and more.
+description: Framework adapters and library integrations for Silgi.
 ---
 
 import { Cards, Card } from 'fumadocs-ui/components/card'
 
 Silgi integrates with the tools you already use. Each integration is a separate subpath import — you only ship what you actually import.
 
+## Framework adapters
+
+Mount Silgi into an existing framework or deploy to a specific platform.
+
 <Cards>
-  <Card
-    title='Fastify'
-    description='Mount Silgi as a Fastify plugin alongside existing REST routes.'
-    href='/docs/integrations/fastify'
-  />
-  <Card title='H3' description='Use Silgi with H3 v2, Nitro, and Nuxt server routes.' href='/docs/integrations/h3' />
-  <Card
-    title='Nitro'
-    description='Modular server entry with Nitro v3 — analytics, tracing, and typed procedures.'
-    href='/docs/integrations/nitro'
-  />
-  <Card
-    title='Nuxt'
-    description='Nuxt 4 with typed client composable, Vue pages, analytics, and WebSocket support.'
-    href='/docs/integrations/nuxt'
-  />
-  <Card
-    title='Express'
-    description='Mount Silgi as Express middleware alongside existing REST routes.'
-    href='/docs/integrations/express'
-  />
-  <Card
-    title='Remix'
-    description='Catch-all splat route with action and loader exports.'
-    href='/docs/integrations/remix'
-  />
+  <Card title='Nitro' description='Modular server entry with Nitro v3 — analytics, tracing, and typed procedures.' href='/docs/integrations/nitro' />
+  <Card title='Nuxt' description='Nuxt 4 with typed client composable, Vue pages, analytics, and WebSocket support.' href='/docs/integrations/nuxt' />
+  <Card title='Next.js' description='App Router with server actions, TanStack Query, and SSR prefetching.' href='/docs/integrations/nextjs' />
+  <Card title='Fastify' description='Mount Silgi as a Fastify plugin alongside existing REST routes.' href='/docs/integrations/fastify' />
+  <Card title='Express' description='Mount Silgi as Express middleware alongside existing REST routes.' href='/docs/integrations/express' />
+  <Card title='SvelteKit' description='Server-side API routes with catch-all endpoint.' href='/docs/integrations/sveltekit' />
+  <Card title='Remix' description='Catch-all splat route with action and loader exports.' href='/docs/integrations/remix' />
   <Card title='Astro' description='Server-side API routes with catch-all endpoint.' href='/docs/integrations/astro' />
-  <Card
-    title='SolidStart'
-    description='File-based API routes with catch-all endpoint.'
-    href='/docs/integrations/solidstart'
-  />
-  <Card
-    title='AWS Lambda'
-    description='Deploy Silgi as a serverless Lambda function — API Gateway v1 and v2.'
-    href='/docs/integrations/aws-lambda'
-  />
-  <Card
-    title='Message Port'
-    description='Run Silgi over MessagePort — Electron, browser extensions, Web Workers.'
-    href='/docs/integrations/message-port'
-  />
-  <Card
-    title='OpenAPI Client'
-    description='Consume any OpenAPI endpoint as a typed Silgi client.'
-    href='/docs/integrations/openapi-client'
-  />
-  <Card
-    title='React Server Actions'
-    description='Call procedures as server actions with [error, data] tuples. Works with Next.js and TanStack Start.'
-    href='/docs/integrations/react'
-  />
-  <Card
-    title='TanStack Query'
-    description='Generate type-safe queryOptions and mutationOptions for React, Vue, Solid, and Svelte.'
-    href='/docs/integrations/tanstack-query'
-  />
-  <Card
-    title='AI SDK'
-    description='Turn your API procedures into AI tools — LLMs call your API through function calling.'
-    href='/docs/integrations/ai-sdk'
-  />
+  <Card title='SolidStart' description='File-based API routes with catch-all endpoint.' href='/docs/integrations/solidstart' />
+  <Card title='NestJS' description='Module-based integration with NestJS controllers.' href='/docs/integrations/nestjs' />
+  <Card title='AWS Lambda' description='Deploy Silgi as a serverless Lambda function — API Gateway v1 and v2.' href='/docs/integrations/aws-lambda' />
+  <Card title='Message Port' description='Run Silgi over MessagePort — Electron, browser extensions, Web Workers.' href='/docs/integrations/message-port' />
+  <Card title='Peer' description='Peer-to-peer RPC over WebRTC data channels.' href='/docs/integrations/peer' />
+</Cards>
+
+## Library integrations
+
+Connect Silgi with databases, auth, AI, and client-side query libraries.
+
+<Cards>
+  <Card title='Drizzle ORM' description='Type-safe database queries with automatic tracing and analytics.' href='/docs/integrations/drizzle' />
+  <Card title='Better Auth' description='Authentication with session management and route protection.' href='/docs/integrations/better-auth' />
+  <Card title='AI SDK' description='Turn your API procedures into AI tools — LLMs call your API through function calling.' href='/docs/integrations/ai-sdk' />
+  <Card title='TanStack Query' description='Generate type-safe queryOptions and mutationOptions for React, Vue, Solid, and Svelte.' href='/docs/integrations/tanstack-query' />
+  <Card title='React Server Actions' description='Call procedures as server actions with [error, data] tuples. Works with Next.js and TanStack Start.' href='/docs/integrations/react' />
+  <Card title='OpenAPI Client' description='Consume any OpenAPI endpoint as a typed Silgi client.' href='/docs/integrations/openapi-client' />
+  <Card title='Broker' description='Distributed RPC over NATS or Redis — run procedures across services.' href='/docs/integrations/broker' />
+  <Card title='tRPC Interop' description='Gradual migration from tRPC — use both side by side.' href='/docs/integrations/trpc' />
 </Cards>
 
 ## Which integration do I need?
 
 | Scenario                                      | Integration                                         |
 | --------------------------------------------- | --------------------------------------------------- |
-| You have an existing Fastify app              | [Fastify](/docs/integrations/fastify)               |
-| You use H3 directly                           | [H3](/docs/integrations/h3)                         |
 | You use Nitro v3                               | [Nitro](/docs/integrations/nitro)                   |
 | You use Nuxt 4                                 | [Nuxt](/docs/integrations/nuxt)                     |
-| You have an existing Express app              | [Express](/docs/integrations/express)               |
-| You use Remix                                 | [Remix](/docs/integrations/remix)                   |
-| You use Astro                                 | [Astro](/docs/integrations/astro)                   |
-| You use SolidStart                            | [SolidStart](/docs/integrations/solidstart)         |
-| Deploying to AWS Lambda                       | [AWS Lambda](/docs/integrations/aws-lambda)         |
-| Electron, Web Workers, browser extensions     | [Message Port](/docs/integrations/message-port)     |
-| Consuming an external OpenAPI service         | [OpenAPI Client](/docs/integrations/openapi-client) |
-| Next.js or TanStack Start with server actions | [React](/docs/integrations/react)                   |
-| React Query (or Vue/Solid/Svelte Query)       | [TanStack Query](/docs/integrations/tanstack-query) |
-| LLMs calling your API as tools                | [AI SDK](/docs/integrations/ai-sdk)                 |
+| You use Next.js                                | [Next.js](/docs/integrations/nextjs)                |
+| You have an existing Fastify app               | [Fastify](/docs/integrations/fastify)               |
+| You have an existing Express app               | [Express](/docs/integrations/express)               |
+| You use SvelteKit                              | [SvelteKit](/docs/integrations/sveltekit)           |
+| You use Remix                                  | [Remix](/docs/integrations/remix)                   |
+| You use Astro                                  | [Astro](/docs/integrations/astro)                   |
+| You use SolidStart                             | [SolidStart](/docs/integrations/solidstart)         |
+| Deploying to AWS Lambda                        | [AWS Lambda](/docs/integrations/aws-lambda)         |
+| Electron, Web Workers, browser extensions      | [Message Port](/docs/integrations/message-port)     |
+| Database with Drizzle ORM                      | [Drizzle](/docs/integrations/drizzle)               |
+| Authentication with Better Auth                | [Better Auth](/docs/integrations/better-auth)       |
+| LLMs calling your API as tools                 | [AI SDK](/docs/integrations/ai-sdk)                 |
+| React Query (or Vue/Solid/Svelte Query)        | [TanStack Query](/docs/integrations/tanstack-query) |
+| Next.js or TanStack Start with server actions  | [React](/docs/integrations/react)                   |
+| Consuming an external OpenAPI service          | [OpenAPI Client](/docs/integrations/openapi-client) |
 
 For standalone servers (no existing framework), you don't need any integration — just use `s.serve()` or `s.handler()` from the [Server](/docs/server) page.
