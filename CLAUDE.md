@@ -154,3 +154,29 @@ When showing package install commands, always provide all three package managers
 - Tables for options/config — columns: name, type/value, description
 - `<Callout>` for gotchas, prerequisites, and tips — not for normal content
 - Don't repeat information that's on another page — link to it instead
+
+## Changelog (docs/content/changelog/)
+
+Each release gets its own MDX file at `docs/content/changelog/{version}.mdx` (e.g. `0-1-0-beta-3.mdx`).
+
+### Frontmatter
+
+```yaml
+---
+title: 0.1.0-beta.3
+description: One-line summary of the release.
+version: 0.1.0-beta.3
+date: 2026-03-22
+---
+```
+
+### Writing rules
+
+- **Read the actual source code** before writing examples — never guess API signatures. Check `src/` for the real function names, parameters, and return types.
+- **Show real working code** — import paths must match `package.json` exports (e.g. `silgi/drizzle`, `silgi/better-auth`). Copy from `@example` JSDoc in the source if available.
+- **Link to docs pages** — every feature mention should link to its docs page (e.g. `[Drizzle integration docs](/docs/libraries/drizzle)`)
+- **List concrete features** — don't just say "new integration", list what it actually does (auto-tracing, specific functions exported, what shows in the dashboard)
+- **Include dashboard impact** — if a feature affects the analytics dashboard, describe what the user will see (e.g. "Dashboard shows: `auth.signin.email (4.2ms)`")
+- **Group by impact** — major features first with code examples, then smaller changes as bullet lists
+- **Don't repeat docs content** — changelog shows what changed and why, docs explain how to use it. Link, don't duplicate.
+- **Security fixes get their own section** with clear before/after description

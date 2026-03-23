@@ -52,9 +52,16 @@ The site header now includes icon-labeled links:
 
 The Elysia adapter has been removed entirely — Elysia is a direct competitor, not an integration target. Removed: adapter source, tests, example project, documentation page, benchmark files, package.json export and dependency.
 
+## Library integrations section
+
+[Drizzle ORM](/docs/libraries/drizzle) and [Better Auth](/docs/libraries/better-auth) integrations (introduced in beta.3) now have their own dedicated section in the docs under **Libraries**. Each has an overview card with description and direct link.
+
+All library integrations are accessible from the [Libraries overview](/docs/libraries) page.
+
 ## Other changes
 
 - Nuxt and Nitro docs completely rewritten with modular project structure examples
 - Integrations index split into "Framework Adapters" and "Library Integrations" sections
+- Each docs section (Adapters, Plugins, Libraries) has an Overview index page with card grid
 - Deploy Dockerfile switched to `--no-frozen-lockfile` (workspace packages excluded from rsync)
 - Lockfile regenerated after dependency changes

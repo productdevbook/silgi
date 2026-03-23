@@ -15,7 +15,79 @@ All pages now share the same UX pattern: full-width list on the left, detail pan
 - **Requests** — Recharts overview bar chart, inline waterfall bars, right panel with span waterfall + I/O
 - **Errors** — stat strip with error codes + top procedures, right panel with stack trace + headers
 - **Sessions** — Recharts overview bar chart, right panel switches between session summary and request detail
-- **Session detail** — timing donut chart, procedure stats, status breakdown
+- **Session detail** — timing donut chart (Recharts PieChart), procedure stats, status breakdown
+
+See [Analytics](/docs/analytics) for full documentation.
+
+## Drizzle ORM integration
+
+New tracing integration for [Drizzle ORM](https://orm.drizzle.team). Instrument your Drizzle instance once and all queries are automatically traced in the analytics dashboard — no manual `trace()` calls needed.
+
+```ts
+import { instrumentDrizzle, withSilgiCtx } from 'silgi/drizzle'
+
+const db = instrumentDrizzle(drizzle(url, { schema }), {
+  dbName: 'myapp',
+  peerName: 'db.example.com',
+  peerPort: 5432,
+})
+
+// In a silgi procedure:
+const listUsers = s.$resolve(async ({ ctx }) => {
+  return withSilgiCtx(ctx, () => db.select().from(users))
+  // Dashboard shows: db.statement (2.4ms) with full SQL detail
+})
+```
+
+Features:
+- `instrumentDrizzle()` — patches Drizzle session methods to intercept all queries
+- `withSilgiCtx()` — bridges request context to the DB layer via AsyncLocalStorage
+- Captures: SQL statement, operation type, table name, duration, errors
+- Works with all Drizzle drivers (PostgreSQL, MySQL, SQLite, Turso)
+- Instance patching, not prototype — idempotent and safe
+- Supports transactions (re-instruments per transaction)
+
+See [Drizzle integration docs](/docs/libraries/drizzle) for setup and examples.
+
+## Better Auth integration
+
+New tracing integration for [Better Auth](https://www.better-auth.com). All auth operations (sign-in, sign-up, OAuth, session management) are automatically traced in the analytics dashboard.
+
+### Plugin approach — auto-trace HTTP auth routes
+
+```ts
+import { silgiTracing } from 'silgi/better-auth'
+
+const auth = betterAuth({
+  plugins: [
+    silgiTracing(), // auto-traces all auth operations
+  ],
+})
+```
+
+### Programmatic approach — trace `auth.api.*` calls
+
+```ts
+import { instrumentBetterAuth, withSilgiCtx } from 'silgi/better-auth'
+
+const auth = instrumentBetterAuth(betterAuth({ ... }))
+
+// In a silgi procedure:
+const me = s.$resolve(async ({ ctx }) => {
+  return withSilgiCtx(ctx, () =>
+    auth.api.getSession({ headers: ctx.headers })
+  )
+})
+```
+
+Features:
+- `silgiTracing()` — Better Auth plugin, auto-traces all HTTP auth routes
+- `instrumentBetterAuth()` — wraps `auth.api.*` methods for programmatic tracing
+- `withSilgiCtx()` — runs a function with silgi context for span collection
+- Captures: operation type, auth method, provider, user/session IDs, errors
+- Dashboard shows: `auth.signin.email (4.2ms)`, `auth.oauth.callback.github (120ms)`, etc.
+
+See [Better Auth integration docs](/docs/libraries/better-auth) for setup and examples.
 
 ## Span input/output capture
 
@@ -40,11 +112,7 @@ ctx.trace('db.query', () => query(), {
 })
 ```
 
-## New integrations
-
-- **Drizzle ORM** — type-safe database queries with automatic tracing
-- **Better Auth** — authentication with session management and route protection
-- **Nuxt** — dedicated docs page with typed client composable, project structure, binary protocols
+See [Analytics span options](/docs/analytics#span-options) for full API reference.
 
 ## Coexisting routes
 
@@ -60,29 +128,31 @@ export default {
 }
 ```
 
+See [Nitro coexisting routes](/docs/adapters/nitro#coexisting-with-existing-routes) for details.
+
 ## Response headers captured
 
-Analytics now captures actual response headers (content-type, cache-control, x-request-id) by deferring the flush to after the Response is constructed.
+Analytics now captures actual response headers (content-type, cache-control, x-request-id) by deferring the flush to after the Response is constructed. Response headers are visible in the request detail page in the dashboard.
 
 ## Error to request cross-reference
 
-Errors now include a `requestId` field linking back to the HTTP request. The dashboard shows a clickable badge to navigate from error to request.
+Errors now include a `requestId` field linking back to the HTTP request. The dashboard shows a clickable badge to navigate from error to the request that caused it.
 
 ## Streaming analytics
 
-ReadableStream and SSE responses are now recorded in analytics. Previously they were invisible.
+ReadableStream and SSE (AsyncIterableIterator) responses are now recorded in analytics. Previously they were invisible — the handler returned before `record()` was called.
 
 ## Security fixes
 
-- Session cookie now has `HttpOnly` flag
-- `requestToRedactedJson` now actually redacts sensitive headers
-- `sessionToRedactedJson` redacts headers
+- Session cookie now has `HttpOnly` flag (prevents XSS session theft)
+- `requestToRedactedJson` now actually redacts sensitive headers (authorization, cookie, x-api-key)
+- `sessionToRedactedJson` redacts headers (was passing raw data)
 
 ## Other changes
 
-- Slow request threshold: 10ms to 100ms
-- Sync fast-path error now correctly captures input and spans
-- Removed Elysia integration
-- Docs: analytics moved from plugins to top-level
-- Docs: integrations split into Framework Adapters and Library Integrations
-- Docs: examples URLs fixed to productdevbook/silgi
+- Slow request threshold increased from 10ms to 100ms
+- Sync fast-path error now correctly captures input and spans (was `undefined`)
+- Nuxt integration: [dedicated docs page](/docs/adapters/nuxt) with typed client composable, project structure, binary protocols
+- Nitro integration: [rewritten docs](/docs/adapters/nitro) with modular structure and tracing examples
+- Docs: analytics moved from plugins section to top-level (it's a built-in feature, not a plugin)
+- Docs: examples URLs fixed (`pebblely/silgi` → `productdevbook/silgi`)
