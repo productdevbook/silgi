@@ -1,5 +1,5 @@
 /**
- * HTTP benchmark — Silgi vs Hono vs Fastify vs Express.
+ * HTTP benchmark — Silgi vs Hono vs Express.
  *
  * Measures real HTTP round-trip latency (sequential requests).
  * Each framework serves the same simple JSON endpoint.
@@ -17,7 +17,6 @@ import http from 'node:http'
 
 import { serve as honoServe } from '@hono/node-server'
 import express from 'express'
-import Fastify from 'fastify'
 import { Hono } from 'hono'
 import { serve as srvxServe } from 'srvx'
 
@@ -132,21 +131,6 @@ async function benchHono(): Promise<Result> {
   return result
 }
 
-async function benchFastify(): Promise<Result> {
-  const app = Fastify()
-  app.post('/users/list', async (req) => {
-    const { limit = 10 } = req.body as any
-    return { users: makeUsers(limit) }
-  })
-  await app.listen({ port: 0, host: '127.0.0.1' })
-  const port = (app.server.address() as any).port
-  const url = `http://127.0.0.1:${port}/users/list`
-  await verify(url)
-  const result = await measure(url, REQUESTS)
-  await app.close()
-  return result
-}
-
 async function benchExpress(): Promise<Result> {
   const app = express()
   app.use(express.json())
@@ -170,7 +154,6 @@ async function benchExpress(): Promise<Result> {
 const frameworks: [string, () => Promise<Result>][] = [
   ['Silgi', benchSilgi],
   ['Hono', benchHono],
-  ['Fastify', benchFastify],
   ['Express', benchExpress],
 ]
 

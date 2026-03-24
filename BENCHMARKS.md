@@ -17,10 +17,10 @@ Measures raw middleware pipeline overhead — Silgi vs oRPC vs H3 v2.
 
 | Scenario | Silgi | oRPC | H3 v2 | vs oRPC | vs H3 |
 |---|---|---|---|---|---|
-| No middleware | **118 ns** | 696 ns | 2055 ns | **5.9x** | **17.4x** |
-| Zod input validation | **126 ns** | 822 ns | 4294 ns | **6.5x** | **34.2x** |
-| 3 middleware + Zod | **182 ns** | 1718 ns | 3977 ns | **9.4x** | **21.8x** |
-| 5 middleware + Zod | **338 ns** | 2227 ns | 3872 ns | **6.6x** | **11.5x** |
+| No middleware | **100 ns** | 654 ns | 2132 ns | **6.6x** | **21.4x** |
+| Zod input validation | **127 ns** | 807 ns | 4340 ns | **6.3x** | **34.1x** |
+| 3 middleware + Zod | **180 ns** | 1716 ns | 3849 ns | **9.5x** | **21.4x** |
+| 5 middleware + Zod | **342 ns** | 2264 ns | 4047 ns | **6.6x** | **11.8x** |
 
 ## HTTP/1.1 Performance (full request/response over TCP)
 
@@ -28,9 +28,9 @@ Real-world latency — 3000 sequential requests per scenario.
 
 | Scenario | Silgi | H3 v2 | oRPC | vs H3 | vs oRPC |
 |---|---|---|---|---|---|
-| Simple (no mw, no validation) | **73µs** (13773/s) | 80µs (12456/s) | 72µs (13883/s) | **1.1x faster** | ~tied |
-| Zod input validation | **84µs** (11844/s) | 91µs (11000/s) | 106µs (9458/s) | **1.1x faster** | **1.3x faster** |
-| Guard + Zod validation | **74µs** (13540/s) | 89µs (11222/s) | 110µs (9072/s) | **1.2x faster** | **1.5x faster** |
+| Simple (no mw, no validation) | **75µs** (13327/s) | 80µs (12444/s) | 74µs (13576/s) | **1.1x faster** | ~tied |
+| Zod input validation | **88µs** (11372/s) | 100µs (10011/s) | 114µs (8804/s) | **1.1x faster** | **1.3x faster** |
+| Guard + Zod validation | **77µs** (12921/s) | 91µs (11029/s) | 115µs (8691/s) | **1.2x faster** | **1.5x faster** |
 
 ## HTTP/2 vs HTTP/1.1
 
@@ -38,7 +38,7 @@ Same Silgi server, comparing protocols. HTTP/2 uses TLS.
 
 | Scenario | HTTP/1.1 | HTTP/2 | Improvement |
 |---|---|---|---|
-| Simple query | 64µs | 83µs | 30% slower |
+| Simple query | 64µs | 106µs | 66% slower |
 
 ## WebSocket Performance (persistent connection)
 
@@ -46,7 +46,7 @@ WebSocket RPC latency — Silgi vs oRPC vs H3 v2, 2000 sequential messages.
 
 | Scenario | Silgi | oRPC | H3 v2 | vs oRPC | vs H3 |
 |---|---|---|---|---|---|
-| Simple query (persistent conn) | **37µs** | 40µs | 33µs | 1.1x faster | 1.1x slower |
+| Simple query (persistent conn) | **44µs** | 45µs | 81µs | ~tied | 1.8x faster |
 
 ## Memory Usage (per call)
 
