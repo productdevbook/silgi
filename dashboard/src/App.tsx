@@ -1,6 +1,6 @@
 import { AppSidebar } from '@/components/app-sidebar'
 import { ErrorDetailPage } from '@/components/error-detail-page'
-import { Errors } from '@/components/errors'
+import { Errors } from '@/components/Errors'
 import { Overview } from '@/components/overview'
 import { RequestDetailPage } from '@/components/request-detail-page'
 import { Requests } from '@/components/requests'
