@@ -6,8 +6,8 @@
  * - error: an error event with data
  * - done: the return value (stream complete)
  *
- * Event metadata (id, retry) can be attached to values
- * transparently via a Proxy-based symbol injection.
+ * Event metadata (id, retry) can be attached to object values
+ * via withEventMeta() using a WeakMap side-channel.
  */
 
 import { AsyncIteratorClass } from './iterator.ts'

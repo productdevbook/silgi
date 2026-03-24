@@ -1,7 +1,7 @@
 /**
- * Silgi — The fastest end-to-end type-safe RPC framework.
+ * Silgi — End-to-end type-safe RPC framework for TypeScript.
  *
- * 5x faster than oRPC. 6x less memory. Single package.
+ * Compiled pipelines, single package, every runtime.
  *
  * @example
  * ```ts

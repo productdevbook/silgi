@@ -284,7 +284,7 @@ export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}):
         }
       }
 
-      // Apply spec override (oRPC-style)
+      // Apply user-defined spec override
       let finalOp = op as Record<string, unknown>
       if (route?.spec) {
         if (typeof route.spec === 'function') {
