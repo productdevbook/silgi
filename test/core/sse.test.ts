@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { encodeEventMessage, EventDecoder, withEventMeta, getEventMeta } from '#src/core/sse.ts'
+import { encodeEventMessage, EventDecoder, withEventMeta, getEventMeta, unwrapEventValue } from '#src/core/sse.ts'
 
 describe('encodeEventMessage', () => {
   it('encodes a simple data message', () => {
@@ -121,18 +121,17 @@ describe('withEventMeta / getEventMeta', () => {
     expect(meta).toEqual({ id: '123', retry: 5000 })
   })
 
-  it('returns original value for primitives and allows meta retrieval', () => {
+  it('boxes primitives and allows meta retrieval via unwrap', () => {
     const num = withEventMeta(42, { id: '1' })
-    expect(num).toBe(42)
-    expect(getEventMeta(42)).toEqual({ id: '1' })
-    // One-shot: meta is consumed after first read
-    expect(getEventMeta(42)).toBeUndefined()
+    // Primitives are boxed — use unwrapEventValue to get the original
+    expect(unwrapEventValue(num)).toBe(42)
+    expect(getEventMeta(num)).toEqual({ id: '1' })
 
     const str = withEventMeta('str', { id: '2' })
-    expect(str).toBe('str')
-    expect(getEventMeta('str')).toEqual({ id: '2' })
+    expect(unwrapEventValue(str)).toBe('str')
+    expect(getEventMeta(str)).toEqual({ id: '2' })
 
-    // null is not stored (not a useful primitive for metadata)
+    // null is returned as-is
     expect(withEventMeta(null, { id: '1' })).toBe(null)
   })
 

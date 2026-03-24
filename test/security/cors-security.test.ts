@@ -17,6 +17,6 @@ describe('CORS — security', () => {
   it('does not reflect disallowed origin from array', () => {
     const headers = corsHeaders({ origin: ['https://a.com', 'https://b.com'] }, 'https://evil.com')
     // Must not return any valid origin for disallowed requesters
-    expect(headers['access-control-allow-origin']).toBe('')
+    expect(headers['access-control-allow-origin']).toBeUndefined()
   })
 })

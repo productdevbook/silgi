@@ -21,46 +21,40 @@ export interface EventMeta {
   retry?: number
 }
 
-// Map for primitive event metadata — stored alongside the value in SSE encoding
-const _primitiveMeta = new Map<unknown, EventMeta>()
-
 /**
  * Attach SSE metadata (id, retry) to a value transparently.
- * Uses a Proxy for objects. For primitives, stores metadata in a side-channel Map
- * that is checked during SSE encoding via `getEventMeta`.
  *
- * Note: For primitives, the metadata is stored in a global Map keyed by value.
- * This means primitives with the same value share metadata. The Map is cleaned
- * up during `getEventMeta` reads to prevent memory leaks.
+ * For objects, uses a symbol property (zero overhead).
+ * For primitives, boxes them in a wrapper object that serializes correctly.
  */
 export function withEventMeta<T>(value: T, meta: EventMeta): T {
-  if (value === null) return value
+  if (value === null || value === undefined) return value
   if (typeof value !== 'object') {
-    _primitiveMeta.set(value, meta)
-    return value
+    // Box primitive with metadata — avoids global side-channel Map
+    return { __value: value, [EVENT_META_SYMBOL]: meta } as unknown as T
   }
-  return new Proxy(value, {
-    get(target, prop, receiver) {
-      if (prop === EVENT_META_SYMBOL) return meta
-      return Reflect.get(target, prop, receiver)
-    },
-  }) as T
+  // For objects, attach metadata directly via symbol (no Proxy needed, no perf cost)
+  ;(value as Record<symbol, EventMeta>)[EVENT_META_SYMBOL] = meta
+  return value
 }
 
 /**
  * Read SSE metadata from a value.
  */
 export function getEventMeta(value: unknown): EventMeta | undefined {
-  // Check primitive metadata map first
-  if (_primitiveMeta.size > 0) {
-    const primMeta = _primitiveMeta.get(value)
-    if (primMeta) {
-      _primitiveMeta.delete(value) // one-shot: clean up after read
-      return primMeta
-    }
-  }
   if (typeof value !== 'object' || value === null) return undefined
   return (value as Record<symbol, EventMeta>)[EVENT_META_SYMBOL]
+}
+
+/**
+ * Unwrap a boxed primitive value (created by withEventMeta for primitives).
+ * Returns the original value if not boxed.
+ */
+export function unwrapEventValue(value: unknown): unknown {
+  if (typeof value === 'object' && value !== null && '__value' in value && EVENT_META_SYMBOL in value) {
+    return (value as { __value: unknown }).__value
+  }
+  return value
 }
 
 // === SSE Message Types ===
@@ -233,9 +227,10 @@ export function iteratorToEventStream(
 
         // Regular value — send message event
         const meta = getEventMeta(result.value)
+        const rawValue = unwrapEventValue(result.value)
         const msg: EventMessage = {
           event: 'message',
-          data: serialize(result.value),
+          data: serialize(rawValue),
           id: meta?.id,
           retry: meta?.retry,
         }

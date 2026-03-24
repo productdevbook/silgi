@@ -52,12 +52,12 @@ function requestHandler(req: any, res: any) {
       const result = route.handler(ctx, {}, new AbortController().signal)
       if (result instanceof Promise) {
         result.then((output) => {
-          const body = route.stringify(output)
+          const body = JSON.stringify(output)
           res.writeHead(200, { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) })
           res.end(body)
         })
       } else {
-        const body = route.stringify(result)
+        const body = JSON.stringify(result)
         res.writeHead(200, { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) })
         res.end(body)
       }
@@ -80,12 +80,12 @@ function requestHandler(req: any, res: any) {
       const result = route.handler(ctx, input ?? {}, new AbortController().signal)
       if (result instanceof Promise) {
         result.then((output) => {
-          const b = route.stringify(output)
+          const b = JSON.stringify(output)
           res.writeHead(200, { 'content-type': 'application/json', 'content-length': Buffer.byteLength(b) })
           res.end(b)
         })
       } else {
-        const b = route.stringify(result)
+        const b = JSON.stringify(result)
         res.writeHead(200, { 'content-type': 'application/json', 'content-length': Buffer.byteLength(b) })
         res.end(b)
       }

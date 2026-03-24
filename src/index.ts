@@ -71,7 +71,7 @@ export { type, validateSchema, ValidationError } from './core/schema.ts'
 export type { Schema, AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
 
 // ── SSE/Streaming ───────────────────────────────────
-export { withEventMeta, getEventMeta } from './core/sse.ts'
+export { withEventMeta, getEventMeta, unwrapEventValue } from './core/sse.ts'
 export type { EventMeta } from './core/sse.ts'
 
 // ── Callable ───────────────────────────────────────

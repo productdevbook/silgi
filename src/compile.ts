@@ -14,8 +14,6 @@
 
 import { SilgiError } from './core/error.ts'
 import { validateSchema } from './core/schema.ts'
-import { compileStringify } from './fast-stringify.ts'
-
 import type { ProcedureDef, GuardDef, WrapDef, ErrorDef } from './types.ts'
 
 /** Internal symbol for pipeline raw input — prevents collision with user context keys */
@@ -58,15 +56,35 @@ const UNSAFE_KEYS = /* @__PURE__ */ new Set(['__proto__', 'constructor', 'protot
 /** Pre-frozen empty params — avoids per-request {} allocation */
 const EMPTY_PARAMS: Record<string, string> = /* @__PURE__ */ Object.freeze(Object.create(null))
 
-/** Apply a single guard result to context — direct property set (326x faster than Object.assign) */
+/** Sanitize a value to prevent prototype pollution from nested __proto__ keys */
+function sanitizeValue(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null) return value
+  // Only sanitize plain objects — class instances, arrays, etc. are safe
+  const proto = Object.getPrototypeOf(value)
+  if (proto !== Object.prototype && proto !== null) return value
+  if (Array.isArray(value)) return value
+
+  const obj = value as Record<string, unknown>
+  if (!Object.prototype.hasOwnProperty.call(obj, '__proto__')) return value
+
+  // Has __proto__ key — create a clean copy without it
+  const clean: Record<string, unknown> = Object.create(null)
+  const keys = Object.keys(obj)
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i]!
+    if (k !== '__proto__') clean[k] = obj[k]
+  }
+  return clean
+}
+
+/** Apply a single guard result to context — direct property set */
 function applyGuardResult(ctx: Record<string, unknown>, result: unknown): void {
   if (result === null || result === undefined || typeof result !== 'object') return
-  // Support both plain objects and class instances (preserves getters via enumerable keys)
   const keys = Object.keys(result)
   for (let i = 0; i < keys.length; i++) {
     const k = keys[i]!
     if (UNSAFE_KEYS.has(k)) continue
-    ctx[k] = (result as Record<string, unknown>)[k]
+    ctx[k] = sanitizeValue((result as Record<string, unknown>)[k])
   }
 }
 
@@ -399,7 +417,6 @@ import type { MatchedRoute } from './route/types.ts'
 
 export interface CompiledRoute {
   handler: CompiledHandler
-  stringify: (value: unknown) => string
   /** Pre-computed Cache-Control header value, or undefined if no caching */
   cacheControl?: string
   /** Procedure is accessible over WebSocket */
@@ -443,7 +460,6 @@ export function compileRouter(def: Record<string, unknown>): CompiledRouterFn {
 
       const compiled: CompiledRoute = {
         handler: compileProcedure(proc),
-        stringify: compileStringify(proc.output),
         cacheControl,
         ws: route?.ws ?? undefined,
         passthrough: routePath.includes('**') || undefined,

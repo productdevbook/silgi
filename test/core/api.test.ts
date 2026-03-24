@@ -260,18 +260,23 @@ describe('input/output validation', () => {
 // ── Router Tests ────────────────────────────────────
 
 describe('router()', () => {
-  it('auto-assigns paths', () => {
-    const router = k.router({
+  it('auto-assigns paths and compiles router', async () => {
+    const routerDef = {
       health: k.$resolve(async () => 'ok'),
       users: {
         list: k.$resolve(async () => []),
         create: k.$resolve(async () => ({})),
       },
-    })
+    }
+    const router = k.router(routerDef)
 
-    expect((router.health as any).route.path).toBe('/health')
-    expect((router.users.list as any).route.path).toBe('/users/list')
-    expect((router.users.create as any).route.path).toBe('/users/create')
+    // Router should not mutate the original definition
+    expect((routerDef.health as any).route).toBeNull()
+
+    // Verify the router compiles and procedures are callable via caller
+    const caller = k.createCaller(router)
+    expect(await caller.health()).toBe('ok')
+    expect(await caller.users.list()).toEqual([])
   })
 })
 

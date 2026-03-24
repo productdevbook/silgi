@@ -11,7 +11,7 @@
  */
 
 import { encode as msgpackEncode, decode as msgpackDecode } from './codec/msgpack.ts'
-import { compileRouter } from './compile.ts'
+import { compileRouter, createContext, releaseContext } from './compile.ts'
 import { SilgiError, toSilgiError } from './core/error.ts'
 import { stringifyJSON } from './core/utils.ts'
 
@@ -19,9 +19,11 @@ import type { RouterDef } from './types.ts'
 import type { Peer, Message, Hooks as WSHooks } from 'crossws'
 import type { Server as HttpServer } from 'node:http'
 
-export interface WSAdapterOptions {
+export interface WSAdapterOptions<TCtx extends Record<string, unknown> = Record<string, unknown>> {
   /** Use MessagePack binary protocol instead of JSON */
   binary?: boolean
+  /** Context factory — receives the peer on each message */
+  context?: (peer: Peer) => TCtx | Promise<TCtx>
 }
 
 interface RPCRequest {
@@ -29,6 +31,9 @@ interface RPCRequest {
   path: string
   input?: unknown
 }
+
+// Track active AbortControllers per peer for cleanup on disconnect
+const peerAbortControllers = new WeakMap<Peer, Set<AbortController>>()
 
 /**
  * Create crossws-compatible hooks for Silgi RPC over WebSocket.
@@ -41,14 +46,19 @@ interface RPCRequest {
  * import { createWSHooks } from "silgi/ws";
  * export default defineWebSocketHandler(createWSHooks(appRouter));
  *
- * // Deno
- * import { createWSHooks } from "silgi/ws";
- * Deno.serve({ handler, websocket: createWSHooks(appRouter) });
+ * // With context
+ * export default defineWebSocketHandler(createWSHooks(appRouter, {
+ *   context: (peer) => ({ userId: peer.request?.headers.get('x-user-id') }),
+ * }));
  * ```
  */
-export function createWSHooks(routerDef: RouterDef, options: WSAdapterOptions = {}): Partial<WSHooks> {
+export function createWSHooks<TCtx extends Record<string, unknown>>(
+  routerDef: RouterDef,
+  options: WSAdapterOptions<TCtx> = {},
+): Partial<WSHooks> {
   const flat = compileRouter(routerDef)
   const binary = options.binary ?? false
+  const contextFactory = options.context
 
   function send(peer: Peer, data: unknown): void {
     if (binary) {
@@ -66,8 +76,8 @@ export function createWSHooks(routerDef: RouterDef, options: WSAdapterOptions = 
   }
 
   return {
-    open(_peer) {
-      // Connection opened — no action needed
+    open(peer) {
+      peerAbortControllers.set(peer, new Set())
     },
 
     async message(peer, message) {
@@ -88,9 +98,27 @@ export function createWSHooks(routerDef: RouterDef, options: WSAdapterOptions = 
         return
       }
 
-      // Execute pipeline
-      const ctx: Record<string, unknown> = Object.create(null)
+      // Build context from pool
+      const ctx = createContext()
+      if (contextFactory) {
+        try {
+          const baseResult = contextFactory(peer)
+          const base = baseResult instanceof Promise ? await baseResult : baseResult
+          const keys = Object.keys(base)
+          for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = (base as Record<string, unknown>)[keys[i]!]
+        } catch (err) {
+          releaseContext(ctx)
+          const e = err instanceof SilgiError ? err : toSilgiError(err)
+          send(peer, { id, error: e.toJSON() })
+          return
+        }
+      }
+
+      // AbortController per call — aborted on peer disconnect
       const ac = new AbortController()
+      const controllers = peerAbortControllers.get(peer)
+      controllers?.add(ac)
+
       try {
         const result = route.handler(ctx, input ?? {}, ac.signal)
         const output = result instanceof Promise ? await result : result
@@ -100,12 +128,19 @@ export function createWSHooks(routerDef: RouterDef, options: WSAdapterOptions = 
           const iter = output as AsyncIterableIterator<unknown>
           try {
             for await (const data of iter) {
+              if (ac.signal.aborted) break
               send(peer, { id, data })
             }
-            send(peer, { id, data: null, done: true })
+            if (!ac.signal.aborted) {
+              send(peer, { id, data: null, done: true })
+            }
           } catch (err) {
-            const e = err instanceof SilgiError ? err : toSilgiError(err)
-            send(peer, { id, error: e.toJSON() })
+            if (!ac.signal.aborted) {
+              const e = err instanceof SilgiError ? err : toSilgiError(err)
+              send(peer, { id, error: e.toJSON() })
+            }
+          } finally {
+            await iter.return?.()
           }
           return
         }
@@ -115,11 +150,20 @@ export function createWSHooks(routerDef: RouterDef, options: WSAdapterOptions = 
       } catch (err) {
         const e = err instanceof SilgiError ? err : toSilgiError(err)
         send(peer, { id, error: e.toJSON() })
+      } finally {
+        controllers?.delete(ac)
+        releaseContext(ctx)
       }
     },
 
-    close(_peer, _details) {
-      // Connection closed — cleanup if needed
+    close(peer, _details) {
+      // Abort all in-flight requests for this peer
+      const controllers = peerAbortControllers.get(peer)
+      if (controllers) {
+        for (const ac of controllers) ac.abort()
+        controllers.clear()
+        peerAbortControllers.delete(peer)
+      }
     },
 
     error(_peer, error) {
@@ -141,10 +185,10 @@ export function createWSHooks(routerDef: RouterDef, options: WSAdapterOptions = 
  * server.listen(3000);
  * ```
  */
-export async function attachWebSocket(
+export async function attachWebSocket<TCtx extends Record<string, unknown>>(
   server: HttpServer,
   routerDef: RouterDef,
-  options: WSAdapterOptions = {},
+  options: WSAdapterOptions<TCtx> = {},
 ): Promise<void> {
   const nodeAdapter = (await import('crossws/adapters/node')).default
   const ws = nodeAdapter({ hooks: createWSHooks(routerDef, options) })

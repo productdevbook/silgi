@@ -42,7 +42,7 @@ describe('corsHeaders()', () => {
 
   it('rejects function origin when not matching', () => {
     const headers = corsHeaders({ origin: (o) => o.endsWith('.example.com') }, 'https://evil.com')
-    expect(headers['access-control-allow-origin']).toBe('')
+    expect(headers['access-control-allow-origin']).toBeUndefined()
   })
 
   it('includes credentials header', () => {

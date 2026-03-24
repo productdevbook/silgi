@@ -7,7 +7,6 @@
     "api",
     "client",
     "express",
-    "fastify",
     "h3",
     "middleware",
     "msgpack",
@@ -123,10 +122,6 @@
     "./better-auth": {
       "import": "./dist/integrations/better-auth/index.mjs",
       "types": "./dist/integrations/better-auth/index.d.mts"
-    },
-    "./fastify": {
-      "import": "./dist/adapters/fastify.mjs",
-      "types": "./dist/adapters/fastify.d.mts"
     },
     "./contract": {
       "import": "./dist/contract.mjs",
@@ -274,7 +269,6 @@
     "ai": "^6.0.134",
     "elysia": "^1.4.28",
     "express": "^5.2.1",
-    "fastify": "^5.8.2",
     "h3": "2.0.1-rc.16",
     "hono": "^4.12.9",
     "ioredis": "^5.10.1",

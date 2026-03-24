@@ -266,10 +266,13 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
   }
 
   // Initialize storage lazily (only if configured)
+  let storageReady: Promise<void> | undefined
   if (config.storage) {
-    import('./core/storage.ts')
+    storageReady = import('./core/storage.ts')
       .then((m) => m.initStorage(config.storage))
-      .catch((e) => console.error('[silgi] Failed to initialize storage:', e))
+      .catch((e) => {
+        throw new Error(`[silgi] Failed to initialize storage: ${e instanceof Error ? e.message : e}`)
+      })
   }
 
   const instance: SilgiInstance<TBaseCtx> = {
@@ -300,9 +303,9 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
     router: (def) => {
       const assigned = assignPaths(def)
       const flat = compileRouter(assigned)
+      // Cache against the original def — don't mutate user's object
       routerCache.set(def, flat)
-      // Copy assigned paths back so type inference sees the routes
-      Object.assign(def, assigned)
+      routerCache.set(assigned, flat)
       return def
     },
 

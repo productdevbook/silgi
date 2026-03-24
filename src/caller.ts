@@ -16,16 +16,10 @@
  * const adminCaller = s.createCaller(appRouter, {
  *   contextOverride: { user: { id: 1, role: 'admin' } },
  * })
- *
- * // Per-call options
- * const result = await caller.users.get({ id: 1 }, {
- *   signal: AbortSignal.timeout(5000),
- *   context: { requestId: 'test-123' },
- * })
  * ```
  */
 
-import { compileRouter } from './compile.ts'
+import { compileRouter, createContext, releaseContext } from './compile.ts'
 import { routerCache } from './core/router-utils.ts'
 
 import type { CompiledRouterFn } from './compile.ts'
@@ -58,7 +52,6 @@ export function createCaller(
   contextFactory: ((req: Request) => Record<string, unknown> | Promise<Record<string, unknown>>) | undefined,
   options?: CreateCallerOptions,
 ): any {
-  // Get or compile router
   let compiledRouter = routerCache.get(routerDef) as CompiledRouterFn | undefined
   if (!compiledRouter) {
     compiledRouter = compileRouter(routerDef)
@@ -68,7 +61,6 @@ export function createCaller(
   const router = compiledRouter
   const defaultTimeout = options?.timeout !== undefined ? options.timeout : 30_000
 
-  // Build a mock request for context factory
   function createMockRequest(extraHeaders?: Record<string, string>): Request {
     const headers = new Headers(options?.headers)
     if (extraHeaders) {
@@ -77,40 +69,41 @@ export function createCaller(
     return new Request('http://localhost/__caller', { headers })
   }
 
-  // Resolve context per call
+  // Resolve context using the pool — null-prototype, consistent with handler path
   async function resolveContext(perCallContext?: Record<string, unknown>): Promise<Record<string, unknown>> {
-    let ctx: Record<string, unknown> = {}
+    const ctx = createContext()
 
     if (contextFactory) {
       const mockReq = createMockRequest()
       const result = contextFactory(mockReq)
-      ctx = result instanceof Promise ? await result : result
+      const baseCtx = result instanceof Promise ? await result : result
+      const keys = Object.keys(baseCtx)
+      for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = baseCtx[keys[i]!]
     }
 
     if (options?.contextOverride) {
-      Object.assign(ctx, options.contextOverride)
+      const keys = Object.keys(options.contextOverride)
+      for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = options.contextOverride[keys[i]!]
     }
 
     if (perCallContext) {
-      Object.assign(ctx, perCallContext)
+      const keys = Object.keys(perCallContext)
+      for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = perCallContext[keys[i]!]
     }
 
     return ctx
   }
 
-  // Create nested proxy with sub-proxy memoization
   function createProxy(segments: string[]): any {
     const cache = new Map<string, any>()
 
     return new Proxy(() => {}, {
       get(_target, prop: string | symbol) {
-        // Guard against non-string props and known symbols
         if (typeof prop === 'symbol') return undefined
         if (prop === 'then' || prop === 'toJSON' || prop === 'toString' || prop === '$$typeof') {
           return undefined
         }
 
-        // Memoize sub-proxies
         let sub = cache.get(prop)
         if (!sub) {
           sub = createProxy([...segments, prop])
@@ -125,23 +118,23 @@ export function createCaller(
         const callOptions = args[1] as CallerCallOptions | undefined
 
         return (async () => {
-          // Use empty-string method fallback — matches any HTTP method
           const match = router!('', path)
           if (!match) {
             throw new Error(`Procedure not found: ${path}`)
           }
 
           const ctx = await resolveContext(callOptions?.context)
-
-          // Inject route params into context
           if (match.params) ctx.params = match.params
 
-          // Resolve signal: per-call > default timeout > no signal
           const signal =
             callOptions?.signal ?? (defaultTimeout !== null ? AbortSignal.timeout(defaultTimeout) : undefined)
 
-          const result = match.data.handler(ctx, input, signal as AbortSignal)
-          return result instanceof Promise ? await result : result
+          try {
+            const result = match.data.handler(ctx, input, signal as AbortSignal)
+            return result instanceof Promise ? await result : result
+          } finally {
+            releaseContext(ctx)
+          }
         })()
       },
     })

@@ -185,8 +185,9 @@ export function cacheQuery<T = unknown>(options: CacheQueryOptions<T> = {}): Wra
 
   let cacheName = options.name
 
-  // Per-call next() storage keyed by computed cache key — avoids shared mutable closure race
+  // Per-call next() storage keyed by unique request ID — avoids race between concurrent requests
   const pendingNextMap = new Map<string, () => Promise<unknown>>()
+  let requestCounter = 0
 
   // Each procedure gets its own cachedFn (lazy init on first call)
   let cachedFn: ReturnType<typeof defineCachedFunction> | null = null
@@ -211,11 +212,15 @@ export function cacheQuery<T = unknown>(options: CacheQueryOptions<T> = {}): Wra
         const resolvedBase = options.base ?? '/cache'
 
         cachedFn = defineCachedFunction(
-          async (_input: unknown) => {
-            const key = keyFn(_input)
-            const nextFn = pendingNextMap.get(key)!
-            pendingNextMap.delete(key)
-            return nextFn()
+          async (_input: unknown, requestId?: string) => {
+            const mapKey = requestId ?? keyFn(_input)
+            const nextFn = pendingNextMap.get(mapKey)
+            if (nextFn) {
+              pendingNextMap.delete(mapKey)
+              return nextFn()
+            }
+            // Fallback — should not happen but prevents crash
+            throw new Error('[silgi/cache] Missing next() for cache resolve')
           },
           {
             name: resolvedName,
@@ -243,11 +248,11 @@ export function cacheQuery<T = unknown>(options: CacheQueryOptions<T> = {}): Wra
         )
       }
 
-      // Store this request's next() keyed by cache key — safe under concurrency
+      // Store this request's next() keyed by unique request ID — safe under concurrency
       const input = (ctx as any)[RAW_INPUT]
-      const cacheKey = keyFn(input)
-      pendingNextMap.set(cacheKey, next)
-      return cachedFn(input)
+      const requestId = `__req_${++requestCounter}`
+      pendingNextMap.set(requestId, next)
+      return cachedFn(input, requestId)
     },
   }
 }

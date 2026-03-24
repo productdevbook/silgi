@@ -321,7 +321,7 @@ async function runHTTPBenchmarks(): Promise<HTTPResult[]> {
         const r = route.handler(ctx, undefined, sig)
         if (r instanceof Promise) {
           r.then((out) => {
-            const b = route.stringify(out)
+            const b = JSON.stringify(out)
             res.writeHead(200, { 'content-type': 'application/json', 'content-length': b.length })
             res.end(b)
           }).catch((e) => {
@@ -329,7 +329,7 @@ async function runHTTPBenchmarks(): Promise<HTTPResult[]> {
             res.end()
           })
         } else {
-          const b = route.stringify(r)
+          const b = JSON.stringify(r)
           res.writeHead(200, { 'content-type': 'application/json', 'content-length': b.length })
           res.end(b)
         }
@@ -351,7 +351,7 @@ async function runHTTPBenchmarks(): Promise<HTTPResult[]> {
         const r = route.handler(ctx, inp, sig)
         if (r instanceof Promise) {
           r.then((out) => {
-            const b = route.stringify(out)
+            const b = JSON.stringify(out)
             res.writeHead(200, { 'content-type': 'application/json', 'content-length': b.length })
             res.end(b)
           }).catch((e) => {
@@ -359,7 +359,7 @@ async function runHTTPBenchmarks(): Promise<HTTPResult[]> {
             res.end()
           })
         } else {
-          const b = route.stringify(r)
+          const b = JSON.stringify(r)
           res.writeHead(200, { 'content-type': 'application/json', 'content-length': b.length })
           res.end(b)
         }
@@ -481,12 +481,12 @@ async function runH2Benchmarks(): Promise<H2Result[]> {
       const r = route.handler(ctx, undefined, sig)
       if (r instanceof Promise) {
         r.then((out) => {
-          const b = route.stringify(out)
+          const b = JSON.stringify(out)
           res.writeHead(200, { 'content-type': 'application/json', 'content-length': Buffer.byteLength(b) })
           res.end(b)
         })
       } else {
-        const b = route.stringify(r)
+        const b = JSON.stringify(r)
         res.writeHead(200, { 'content-type': 'application/json', 'content-length': Buffer.byteLength(b) })
         res.end(b)
       }
@@ -501,12 +501,12 @@ async function runH2Benchmarks(): Promise<H2Result[]> {
       const r = route.handler(ctx, inp ?? {}, sig)
       if (r instanceof Promise) {
         r.then((out) => {
-          const b = route.stringify(out)
+          const b = JSON.stringify(out)
           res.writeHead(200, { 'content-type': 'application/json', 'content-length': Buffer.byteLength(b) })
           res.end(b)
         })
       } else {
-        const b = route.stringify(r)
+        const b = JSON.stringify(r)
         res.writeHead(200, { 'content-type': 'application/json', 'content-length': Buffer.byteLength(b) })
         res.end(b)
       }

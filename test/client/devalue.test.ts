@@ -36,11 +36,11 @@ describe('devalue codec', () => {
     expect(decode(encode(big))).toBe(big)
   })
 
-  it('roundtrips RegExp', () => {
+  it('sanitizes RegExp to string on decode', () => {
     const regex = /test/gi
-    const decoded = decode(encode(regex)) as RegExp
-    expect(decoded.source).toBe('test')
-    expect(decoded.flags).toBe('gi')
+    const decoded = decode(encode(regex))
+    // RegExp is sanitized to its string representation for security (ReDoS prevention)
+    expect(decoded).toBe('/test/gi')
   })
 
   it('roundtrips undefined in objects', () => {

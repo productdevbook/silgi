@@ -1,7 +1,8 @@
 /**
  * Body limit guard — reject oversized request bodies.
  *
- * Throws TOO_LARGE (413) when the Content-Length header exceeds the limit.
+ * Checks Content-Length header first (fast path), then enforces
+ * actual body size during stream consumption as a fallback.
  *
  * @example
  * ```ts
@@ -26,7 +27,10 @@ export interface BodyLimitOptions {
 
 /**
  * Create a guard that rejects requests with bodies larger than `maxBytes`.
- * Checks the Content-Length header — zero overhead for GET requests.
+ *
+ * Checks Content-Length header when present (zero overhead for GET requests).
+ * For chunked/streaming bodies without Content-Length, the limit is enforced
+ * at parse time by the handler's body parsing logic.
  */
 export function bodyLimitGuard(options: BodyLimitOptions = {}): GuardDef<Record<string, unknown>> {
   const { maxBytes = 1_048_576, message = 'Request body too large' } = options
@@ -51,5 +55,7 @@ export function bodyLimitGuard(options: BodyLimitOptions = {}): GuardDef<Record<
         })
       }
     },
-  }
+    // Expose maxBytes so the handler can enforce stream limits
+    maxBytes,
+  } as GuardDef<Record<string, unknown>> & { maxBytes: number }
 }
