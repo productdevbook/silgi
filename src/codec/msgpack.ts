@@ -7,6 +7,8 @@
 
 import { Packr } from 'msgpackr'
 
+import { sanitizeDecoded } from './sanitize.ts'
+
 export const MSGPACK_CONTENT_TYPE = 'application/x-msgpack'
 
 /**
@@ -35,31 +37,6 @@ export function encode(value: unknown): BodyInit {
 /** Decode a MessagePack Buffer to a value (safe for untrusted input) */
 export function decode(buf: Buffer | Uint8Array): unknown {
   return sanitizeDecoded(decoder.unpack(buf))
-}
-
-/** Strip unsafe types (Error, RegExp) that msgpackr may deserialize from untrusted input */
-function sanitizeDecoded(value: unknown): unknown {
-  if (value === null || value === undefined) return value
-  if (typeof value !== 'object') return value
-  if (value instanceof Error) return { message: (value as Error).message }
-  if (value instanceof RegExp) return String(value)
-  if (Array.isArray(value)) return value.map(sanitizeDecoded)
-  if (value instanceof Date) return value
-  if (value instanceof Map) {
-    const sanitized = new Map()
-    for (const [k, v] of value) sanitized.set(k, sanitizeDecoded(v))
-    return sanitized
-  }
-  if (value instanceof Set) {
-    const sanitized = new Set()
-    for (const v of value) sanitized.add(sanitizeDecoded(v))
-    return sanitized
-  }
-  const result: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(value)) {
-    result[k] = sanitizeDecoded(v)
-  }
-  return result
 }
 
 /** Check if a request accepts msgpack */

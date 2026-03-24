@@ -19,8 +19,7 @@
  *  13. Signing & encryption
  *  14. Body limit guard
  *  15. Coercion guard
- *  16. Custom serializer (Date, Set, Map)
- *  17. Callable (direct invocation without HTTP)
+ *  16. Callable (direct invocation without HTTP)
  *  18. Contract-first workflow
  *  19. Scalar / OpenAPI
  *  20. mapInput middleware
@@ -42,7 +41,6 @@ import {
   unsign,
   encrypt,
   decrypt,
-  createSerializer,
   createBatchHandler,
 } from 'silgi/plugins'
 import { z } from 'zod'
@@ -85,25 +83,6 @@ const db = {
 // ── PubSub ───────────────────────────────────────────
 
 const pubsub = createPublisher(new MemoryPubSub())
-
-// ── Custom Serializer ────────────────────────────────
-
-const serializer = createSerializer()
-  .register<Date>('Date', {
-    test: (v) => v instanceof Date,
-    serialize: (v) => v.toISOString(),
-    deserialize: (v) => new Date(v as string),
-  })
-  .register<Set<unknown>>('Set', {
-    test: (v) => v instanceof Set,
-    serialize: (v) => [...v],
-    deserialize: (v) => new Set(v as unknown[]),
-  })
-  .register<Map<string, unknown>>('Map', {
-    test: (v) => v instanceof Map,
-    serialize: (v) => Object.fromEntries(v),
-    deserialize: (v) => new Map(Object.entries(v as object)),
-  })
 
 // ── Silgi Instance ──────────────────────────────────
 
@@ -352,30 +331,6 @@ const signingDemo = s.$resolve(async () => {
   }
 })
 
-// --- Custom Serializer: Demo ---
-const serializerDemo = s.$resolve(async () => {
-  const data = {
-    date: new Date('2026-01-01T00:00:00Z'),
-    set: new Set([1, 2, 3]),
-    map: new Map([
-      ['a', 1],
-      ['b', 2],
-    ]),
-    nested: { created: new Date() },
-  }
-  const serialized = serializer.stringify(data)
-  const deserialized = serializer.parse(serialized)
-  return {
-    original: {
-      date: data.date.toISOString(),
-      set: [...data.set],
-      map: Object.fromEntries(data.map),
-    },
-    serialized,
-    roundTrip: deserialized,
-  }
-})
-
 // --- Subscription: Tick stream ---
 const tickStream = s.subscription(async function* () {
   for (let i = 0; i < 5; i++) {
@@ -471,7 +426,6 @@ const appRouter = s.router({
   demo: {
     cookies: cookieDemo,
     signing: signingDemo,
-    serializer: serializerDemo,
   },
   stream: {
     ticks: tickStream,
@@ -518,7 +472,6 @@ console.log('║    /users/bySlug        Get user by slug      ║')
 console.log('║    /posts/list          List posts            ║')
 console.log('║    /demo/cookies        Cookie demo           ║')
 console.log('║    /demo/signing        Sign/encrypt demo     ║')
-console.log('║    /demo/serializer     Custom serializer     ║')
 console.log('║    /admin/stats         Admin stats           ║')
 console.log('║                                              ║')
 console.log('║  MUTATIONS (POST, auth: Bearer secret-token) ║')

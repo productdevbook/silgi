@@ -12,7 +12,7 @@ export type {
 } from './types.ts'
 
 export { DynamicLink, type LinkSelector } from './dynamic-link.ts'
-export { mergeClients } from './merge.ts'
+
 export { withInterceptors, type ClientInterceptors } from './interceptor.ts'
 
 export { SilgiError, isDefinedError } from '../core/error.ts'

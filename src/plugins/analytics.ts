@@ -726,3 +726,123 @@ const FALLBACK_HTML = `<!DOCTYPE html>
 <style>body{font-family:monospace;background:#0a0a0a;color:#e4e4e7;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
 .msg{text-align:center}.msg h1{color:#edc462;margin-bottom:8px}.msg p{color:#71717a;font-size:14px}</style></head>
 <body><div class="msg"><h1>silgi analytics</h1><p>Dashboard not built. Run <code>pnpm build:dashboard</code></p></div></body></html>`
+
+// ── Analytics HTTP routing (used by handler.ts) ─────
+
+export function checkAnalyticsAuth(
+  request: Request,
+  auth: string | ((req: Request) => boolean | Promise<boolean>),
+): boolean | Promise<boolean> {
+  if (typeof auth === 'function') return auth(request)
+  const cookie = request.headers.get('cookie')
+  if (cookie) {
+    const cookies = parseCookieHeader(cookie)
+    if (cookies['silgi-auth'] === auth) return true
+  }
+  const authHeader = request.headers.get('authorization')
+  if (authHeader === `Bearer ${auth}`) return true
+  return false
+}
+
+export function sanitizeHeaders(headers: Headers): Record<string, string> {
+  const result: Record<string, string> = {}
+  const sensitiveKeys = new Set(['authorization', 'cookie', 'x-api-key', 'x-auth-token', 'proxy-authorization'])
+  headers.forEach((value, key) => {
+    result[key] = sensitiveKeys.has(key.toLowerCase()) ? '[REDACTED]' : value
+  })
+  return result
+}
+
+const analyticsLoginHTML = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Silgi Analytics</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui,-apple-system,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0a0a0a;color:#e5e5e5}
+.c{width:100%;max-width:360px;padding:0 24px}
+.logo{display:flex;align-items:center;gap:8px;margin-bottom:20px}
+.logo svg{width:20px;height:20px;color:#c2822a}
+.logo span{font-size:14px;font-weight:600;letter-spacing:-.01em}
+p{font-size:13px;color:#737373;margin-bottom:16px;line-height:1.5}
+input{width:100%;height:40px;padding:0 12px;background:#171717;border:1px solid #262626;border-radius:6px;color:#e5e5e5;font-size:13px;outline:none}
+input:focus{border-color:#c2822a}
+input::placeholder{color:#525252}
+button{width:100%;height:36px;margin-top:10px;background:#c2822a;color:#0a0a0a;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer}
+button:hover{background:#d4943b}
+.err{color:#ef4444;font-size:12px;margin-top:8px;display:none}
+</style>
+</head>
+<body>
+<div class="c">
+<div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span>Silgi Analytics</span></div>
+<p>Enter your access token to view the dashboard.</p>
+<form id="f"><input id="t" type="password" placeholder="Access token" autofocus><div class="err" id="e">Invalid token</div><button type="submit">Authenticate</button></form>
+</div>
+<script>
+document.getElementById('f').onsubmit=function(e){
+e.preventDefault();
+var t=document.getElementById('t').value.trim();
+if(!t)return;
+document.cookie='silgi-auth='+encodeURIComponent(t)+';path=/analytics;samesite=strict';
+fetch('/analytics/_api/stats',{headers:{'cookie':'silgi-auth='+encodeURIComponent(t)}}).then(function(){
+location.reload();
+}).catch(function(){location.reload()});
+};
+</script>
+</body>
+</html>`
+
+/** Return auth-failure response for analytics routes. */
+export function analyticsAuthResponse(pathname: string): Response {
+  const jsonHeaders = { 'content-type': 'application/json' }
+  if (pathname.includes('_api/')) {
+    return new Response(JSON.stringify({ code: 'UNAUTHORIZED', status: 401, message: 'Invalid token' }), {
+      status: 401,
+      headers: jsonHeaders,
+    })
+  }
+  return new Response(analyticsLoginHTML, { status: 401, headers: { 'content-type': 'text/html' } })
+}
+
+/** Serve analytics dashboard and API routes. */
+export function serveAnalyticsRoute(
+  pathname: string,
+  collector: AnalyticsCollector,
+  dashboardHtml: string | undefined,
+): Response {
+  const jsonCacheHeaders = { 'content-type': 'application/json', 'cache-control': 'no-cache' }
+  const mdHeaders = { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-cache' }
+
+  if (pathname === 'analytics/_api/stats') {
+    return new Response(JSON.stringify(collector.toJSON()), { headers: jsonCacheHeaders })
+  }
+  if (pathname === 'analytics/_api/errors') {
+    return new Response(JSON.stringify(collector.getErrors()), { headers: jsonCacheHeaders })
+  }
+  if (pathname === 'analytics/_api/requests') {
+    return new Response(JSON.stringify(collector.getRequests()), { headers: jsonCacheHeaders })
+  }
+  if (pathname.startsWith('analytics/_api/requests/') && pathname.endsWith('/md')) {
+    const id = Number(pathname.slice('analytics/_api/requests/'.length, -'/md'.length))
+    const entry = collector.getRequests().find((r) => r.id === id)
+    if (entry) return new Response(requestToMarkdown(entry), { headers: mdHeaders })
+    return new Response('not found', { status: 404 })
+  }
+  if (pathname.startsWith('analytics/_api/errors/') && pathname.endsWith('/md')) {
+    const id = Number(pathname.slice('analytics/_api/errors/'.length, -'/md'.length))
+    const entry = collector.getErrors().find((e) => e.id === id)
+    if (entry) return new Response(errorToMarkdown(entry), { headers: mdHeaders })
+    return new Response('not found', { status: 404 })
+  }
+  if (pathname === 'analytics/_api/errors/md') {
+    const errors = collector.getErrors()
+    const md =
+      errors.length === 0
+        ? 'No errors.\n'
+        : `# Errors (${errors.length})\n\n` + errors.map((e) => errorToMarkdown(e)).join('\n\n---\n\n')
+    return new Response(md, { headers: mdHeaders })
+  }
+  return new Response(dashboardHtml, { headers: { 'content-type': 'text/html' } })
+}

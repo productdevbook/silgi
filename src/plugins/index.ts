@@ -9,7 +9,7 @@ export {
   type RateLimitGuardOptions,
   type MemoryRateLimiterOptions,
 } from './ratelimit.ts'
-export { compressionWrap, type CompressionOptions } from './compression.ts'
+
 export { bodyLimitGuard, type BodyLimitOptions } from './body-limit.ts'
 export { strictGetGuard } from './strict-get.ts'
 export { getCookie, parseCookies, setCookie, deleteCookie, type CookieOptions } from './cookies.ts'
@@ -17,7 +17,7 @@ export { sign, unsign, encrypt, decrypt } from './signing.ts'
 export { coerceGuard, coerceValue, coerceObject } from './coerce.ts'
 export { createBatchHandler, type BatchHandlerOptions } from './batch-server.ts'
 export { createPublisher, MemoryPubSub, type Publisher, type PubSubBackend } from './pubsub.ts'
-export { createSerializer, type Serializer, type TypeHandler } from './custom-serializer.ts'
+
 export { fileGuard, parseMultipart, type FileGuardOptions, type UploadedFile } from './file-upload.ts'
 export {
   AnalyticsCollector,
