@@ -407,13 +407,7 @@ export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
 
 // ── COMPILED ROUTER ─────────────────────────────────
 
-import {
-  createRouter as createRadixRouter,
-  addRoute as addRadixRoute,
-  compileRouter as compileRadixRouter,
-} from './route/index.ts'
-
-import type { MatchedRoute } from './route/types.ts'
+import { createRouter as createRou3, addRoute as addRou3Route, findRoute as findRou3Route } from 'rou3'
 
 export interface CompiledRoute {
   handler: CompiledHandler
@@ -427,6 +421,12 @@ export interface CompiledRoute {
   method: string
 }
 
+/** Match result from the router */
+export interface MatchedRoute<T = unknown> {
+  data: T
+  params?: Record<string, string>
+}
+
 /** Compiled router function — returns matched route + params */
 export type CompiledRouterFn = (method: string, path: string) => MatchedRoute<CompiledRoute> | undefined
 
@@ -434,13 +434,12 @@ export type CompiledRouterFn = (method: string, path: string) => MatchedRoute<Co
 export type FlatRouter = CompiledRouterFn
 
 /**
- * Compile a router tree into a JIT-compiled radix router.
+ * Compile a router tree into a rou3 radix router.
  *
- * Uses charCodeAt dispatch + lazy split + pre-allocated results.
- * Static: ~2ns, Param: ~15ns, Wildcard: ~7ns, Miss: ~2ns.
+ * Powered by rou3 (unjs) — battle-tested, fast, minimal.
  */
 export function compileRouter(def: Record<string, unknown>): CompiledRouterFn {
-  const radix = createRadixRouter<CompiledRoute>()
+  const router = createRou3<CompiledRoute>()
 
   function walk(node: unknown, path: string[]): void {
     if (isProcedureDef(node)) {
@@ -466,10 +465,10 @@ export function compileRouter(def: Record<string, unknown>): CompiledRouterFn {
         method,
       }
 
-      addRadixRoute(radix, method, routePath, compiled)
+      addRou3Route(router, method, routePath, compiled)
 
       // Also add empty method for internal callers (createCaller uses '' method)
-      addRadixRoute(radix, '', routePath, compiled)
+      addRou3Route(router, '', routePath, compiled)
 
       return
     }
@@ -481,7 +480,8 @@ export function compileRouter(def: Record<string, unknown>): CompiledRouterFn {
   }
 
   walk(def, [])
-  return compileRadixRouter(radix)
+
+  return (method: string, path: string) => findRou3Route(router, method, path) as MatchedRoute<CompiledRoute> | undefined
 }
 
 const PROCEDURE_TYPES = /* @__PURE__ */ new Set(['query', 'mutation', 'subscription'])
