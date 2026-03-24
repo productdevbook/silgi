@@ -39,26 +39,64 @@ export { encodeResponse } from './codec.ts'
 
 // ── Response Builder ────────────────────────────────
 
+/** Wrap a stream to release pooled context on completion or cancellation. */
+function wrapStreamWithRelease(
+  source: ReadableStream<Uint8Array>,
+  ctx: Record<string, unknown>,
+): ReadableStream<Uint8Array> {
+  let released = false
+  const release = () => {
+    if (!released) {
+      released = true
+      releaseContext(ctx)
+    }
+  }
+  const reader = source.getReader()
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        const { done, value } = await reader.read()
+        if (done) {
+          release()
+          controller.close()
+        } else {
+          controller.enqueue(value)
+        }
+      } catch (err) {
+        release()
+        controller.error(err)
+      }
+    },
+    cancel() {
+      release()
+      reader.cancel()
+    },
+  })
+}
+
 function makeResponse(
   output: unknown,
   route: CompiledRoute,
   format: ResponseFormat,
-  releaseCtx?: Record<string, unknown>,
+  ctx: Record<string, unknown>,
 ): Response | Promise<Response> {
   if (output instanceof Response) {
-    if (releaseCtx) releaseContext(releaseCtx)
+    releaseContext(ctx)
     return output
   }
   if (output instanceof ReadableStream) {
-    return new Response(output, { headers: { 'content-type': 'application/octet-stream' } })
+    return new Response(wrapStreamWithRelease(output as ReadableStream<Uint8Array>, ctx), {
+      headers: { 'content-type': 'application/octet-stream' },
+    })
   }
   if (output && typeof output === 'object' && Symbol.asyncIterator in (output as object)) {
-    return new Response(iteratorToEventStream(output as AsyncIterableIterator<unknown>), {
+    const stream = iteratorToEventStream(output as AsyncIterableIterator<unknown>)
+    return new Response(wrapStreamWithRelease(stream, ctx), {
       headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
     })
   }
 
-  if (releaseCtx) releaseContext(releaseCtx)
+  releaseContext(ctx)
 
   const cacheHeaders = route.cacheControl ? { 'cache-control': route.cacheControl } : undefined
   if (format !== 'json') {
@@ -253,15 +291,12 @@ export function createFetchHandler(
 
   // ── Unified Request Handler ───────────────────────
 
-  async function handleRequest(request: Request): Promise<Response> {
+  async function handleRequest(request: Request, accumulator?: RequestAccumulator): Promise<Response> {
     const url = request.url
     const pathStart = url.indexOf('/', url.indexOf('//') + 2)
     const qMark = url.indexOf('?', pathStart)
     const fullPath = qMark === -1 ? url.slice(pathStart) : url.slice(pathStart, qMark)
     const pathname = fullPath.length > 1 ? fullPath.slice(1) : ''
-
-    let accumulator: RequestAccumulator | undefined
-    if (collector) accumulator = new RequestAccumulator(request, collector)
 
     // Scalar routes
     if (scalarEnabled) {
@@ -348,11 +383,8 @@ export function createFetchHandler(
         }
       }
 
-      // Response
-      const isStreaming =
-        output instanceof ReadableStream ||
-        (output && typeof output === 'object' && Symbol.asyncIterator in (output as object))
-      const response = makeResponse(output, route, format, isStreaming ? undefined : ctx)
+      // Response — makeResponse handles context release for all paths (including streams)
+      const response = makeResponse(output, route, format, ctx)
       return response instanceof Promise ? await response : response
     } catch (error) {
       releaseContext(ctx)
@@ -402,7 +434,7 @@ export function createFetchHandler(
 
   return async (request: Request): Promise<Response> => {
     const acc = new RequestAccumulator(request, collector!)
-    const response = await handleRequest(request)
+    const response = await handleRequest(request, acc)
     const headers = new Headers(response.headers)
     headers.set('x-request-id', acc.requestId)
     const cookie = acc.getSessionCookie()

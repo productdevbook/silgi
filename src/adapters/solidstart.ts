@@ -34,20 +34,27 @@ export function silgiSolidStart<TCtx extends Record<string, unknown>>(
 ): (event: any) => Promise<Response> {
   const prefix = options.prefix ?? '/api/rpc'
   let _handler: ((req: Request) => Response | Promise<Response>) | null = null
-  let _currentEvent: any = null
+  let _initPromise: Promise<void> | null = null
 
-  return async (event: any) => {
-    _currentEvent = event
-    if (!_handler) {
-      const { silgi } = await import('../silgi.ts')
+  // Per-request event map — keyed by the rewritten Request object (unique per call)
+  const requestEventMap = new WeakMap<Request, any>()
+
+  function ensureHandler(): Promise<void> {
+    if (_handler) return Promise.resolve()
+    return (_initPromise ??= import('../silgi.ts').then(({ silgi }) => {
       const k = silgi({
         context: (_req: Request) => {
-          if (options.context) return options.context(_currentEvent)
+          const eventRef = requestEventMap.get(_req)
+          if (options.context && eventRef) return options.context(eventRef)
           return {} as TCtx
         },
       })
       _handler = k.handler(router)
-    }
+    }))
+  }
+
+  return async (event: any) => {
+    await ensureHandler()
 
     const request: Request = event.request ?? event
     const url = new URL(request.url)
@@ -57,6 +64,10 @@ export function silgiSolidStart<TCtx extends Record<string, unknown>>(
       if (!pathname.startsWith('/')) pathname = '/' + pathname
     }
 
-    return _handler(new Request(new URL(pathname + url.search, url.origin), request))
+    const rewritten = new Request(new URL(pathname + url.search, url.origin), request)
+    // Associate the framework event with this specific request — concurrency-safe
+    requestEventMap.set(rewritten, event)
+
+    return _handler!(rewritten)
   }
 }

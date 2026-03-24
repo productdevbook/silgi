@@ -270,7 +270,7 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
     import('./core/storage.ts')
       .then((m) => m.initStorage(config.storage))
       .catch((e) => {
-        throw new Error(`[silgi] Failed to initialize storage: ${e instanceof Error ? e.message : e}`)
+        console.error(`[silgi] Failed to initialize storage: ${e instanceof Error ? e.message : e}`)
       })
   }
 

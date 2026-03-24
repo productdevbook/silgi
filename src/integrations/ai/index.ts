@@ -31,7 +31,6 @@ import type { RouterDef, ProcedureDef } from '../../types.ts'
  */
 export function procedureToTool(name: string, procedure: ProcedureDef, options?: { description?: string }) {
   const handler = compileProcedure(procedure)
-  const signal = new AbortController().signal
   const description =
     options?.description ?? (procedure.route as any)?.description ?? (procedure.route as any)?.summary ?? `Call ${name}`
 
@@ -43,8 +42,9 @@ export function procedureToTool(name: string, procedure: ProcedureDef, options?:
   return (tool as Function)({
     description,
     parameters: jsonSchema(parameters as any),
-    execute: async (input: any) => {
+    execute: async (input: any, execOptions?: { abortSignal?: AbortSignal }) => {
       const ctx: Record<string, unknown> = Object.create(null)
+      const signal = execOptions?.abortSignal ?? new AbortController().signal
       const result = handler(ctx, input ?? {}, signal)
       return result instanceof Promise ? await result : result
     },

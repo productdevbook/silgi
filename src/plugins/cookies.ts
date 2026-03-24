@@ -36,9 +36,10 @@ export function parseCookies(headers: Record<string, string> | string): Record<s
 /** Serialize a Set-Cookie header. Defaults: path="/", httpOnly, sameSite=lax. */
 export function setCookie(name: string, value: string, options: CookieOptions = {}): string {
   const defaults: CookieOptions = { path: '/', httpOnly: true, sameSite: 'lax' }
-  // SameSite=None requires Secure per RFC 6265bis
-  if (options.sameSite === 'none') defaults.secure = true
-  return serialize(name, value, { ...defaults, ...options })
+  const merged = { ...defaults, ...options }
+  // SameSite=None requires Secure per RFC 6265bis — enforce after merge so callers can't override
+  if (merged.sameSite === 'none') merged.secure = true
+  return serialize(name, value, merged)
 }
 
 /** Delete a cookie by setting maxAge=0. */

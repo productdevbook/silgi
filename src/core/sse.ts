@@ -224,11 +224,15 @@ export function iteratorToEventStream(
         clearInterval(keepAliveTimer)
         if (cancelled) return
 
-        // Send error event
-        const errorData =
-          error instanceof Error
-            ? JSON.stringify({ message: error.message, code: (error as any).code })
-            : JSON.stringify({ message: String(error) })
+        // Send error event — sanitize message to prevent leaking internal details
+        let errorData: string
+        if (error instanceof Error && 'code' in error && typeof (error as any).defined === 'boolean') {
+          // SilgiError with defined=true — safe to expose
+          errorData = JSON.stringify({ message: error.message, code: (error as any).code })
+        } else {
+          // Internal error — generic message only
+          errorData = JSON.stringify({ message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' })
+        }
 
         controller.enqueue(encodeEventMessage({ event: 'error', data: errorData }))
         controller.close()

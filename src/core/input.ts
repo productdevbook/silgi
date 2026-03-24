@@ -8,6 +8,11 @@ let _devalue: typeof import('../codec/devalue.ts') | undefined
 
 const isBun = typeof globalThis.Bun !== 'undefined'
 
+import { SilgiError } from './error.ts'
+
+/** Max allowed size for GET ?data= parameter (bytes). Prevents JSON bomb via URL. */
+const MAX_QUERY_DATA_LENGTH = 8192
+
 /** Parse request input from body or query string */
 export async function parseInput(request: Request, url: string, qMark: number): Promise<unknown> {
   if (request.method === 'GET' || !request.body) {
@@ -18,6 +23,9 @@ export async function parseInput(request: Request, url: string, qMark: number): 
         const valueStart = dataIdx + 5
         const valueEnd = searchStr.indexOf('&', valueStart)
         const encoded = valueEnd === -1 ? searchStr.slice(valueStart) : searchStr.slice(valueStart, valueEnd)
+        if (encoded.length > MAX_QUERY_DATA_LENGTH) {
+          throw new SilgiError('BAD_REQUEST', { message: 'Query data parameter too large' })
+        }
         return JSON.parse(decodeURIComponent(encoded))
       }
     }

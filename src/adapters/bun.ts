@@ -10,9 +10,8 @@
  */
 
 import { compileRouter } from '../compile.ts'
-import { SilgiError, toSilgiError } from '../core/error.ts'
+import { buildContext, isMethodAllowed, serializeError, parseQueryData } from '../core/dispatch.ts'
 import { routerCache } from '../core/router-utils.ts'
-import { ValidationError } from '../core/schema.ts'
 import { iteratorToEventStream } from '../core/sse.ts'
 
 import type { RouterDef } from '../types.ts'
@@ -55,17 +54,6 @@ export function silgiBun<TCtx extends Record<string, unknown>>(
     return Response.json(output)
   }
 
-  function makeError(error: unknown): Response {
-    if (error instanceof ValidationError) {
-      return new Response(
-        JSON.stringify({ code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } }),
-        { status: 400, headers: JSON_HDR },
-      )
-    }
-    const e = error instanceof SilgiError ? error : toSilgiError(error)
-    return new Response(JSON.stringify(e.toJSON()), { status: e.status, headers: JSON_HDR })
-  }
-
   async function fetch(request: Request): Promise<Response> {
     const url = request.url
     const pathStart = url.indexOf('/', url.indexOf('//') + 2)
@@ -78,12 +66,7 @@ export function silgiBun<TCtx extends Record<string, unknown>>(
     const route = match.data
     const reqMethod = request.method
 
-    if (
-      route.method !== '*' &&
-      reqMethod !== route.method &&
-      reqMethod !== 'OPTIONS' &&
-      !(reqMethod === 'GET' && route.method === 'POST')
-    ) {
+    if (!isMethodAllowed(reqMethod, route.method)) {
       return new Response(
         JSON.stringify({ code: 'METHOD_NOT_ALLOWED', status: 405, message: `Method ${reqMethod} not allowed` }),
         { status: 405, headers: { ...JSON_HDR, allow: route.method } },
@@ -92,14 +75,8 @@ export function silgiBun<TCtx extends Record<string, unknown>>(
 
     try {
       // Build context
-      const ctx: Record<string, unknown> = Object.create(null)
-      if (ctxFactory) {
-        const baseResult = ctxFactory(request)
-        const base = baseResult instanceof Promise ? await baseResult : baseResult
-        const keys = Object.keys(base)
-        for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = (base as any)[keys[i]!]
-      }
-      if (match.params) ctx.params = match.params
+      const baseCtx = ctxFactory ? await ctxFactory(request) : undefined
+      const ctx = buildContext(baseCtx as Record<string, unknown> | undefined, match.params)
 
       // Parse input
       let input: unknown
@@ -110,7 +87,7 @@ export function silgiBun<TCtx extends Record<string, unknown>>(
           if (di !== -1) {
             const vs = di + 5
             const ve = s.indexOf('&', vs)
-            input = JSON.parse(decodeURIComponent(ve === -1 ? s.slice(vs) : s.slice(vs, ve)))
+            input = parseQueryData(ve === -1 ? s.slice(vs) : s.slice(vs, ve))
           }
         }
       } else {
@@ -126,7 +103,8 @@ export function silgiBun<TCtx extends Record<string, unknown>>(
       const output = result instanceof Promise ? await result : result
       return makeResponse(output)
     } catch (error) {
-      return makeError(error)
+      const body = serializeError(error)
+      return new Response(JSON.stringify(body), { status: body.status, headers: JSON_HDR })
     }
   }
 

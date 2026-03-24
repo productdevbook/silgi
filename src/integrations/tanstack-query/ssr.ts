@@ -37,13 +37,30 @@ export async function prefetchQueries(
 
 /**
  * Dehydrate the query client for SSR transfer.
- * Wraps TanStack Query's dehydrate with Silgi-aware serialization.
+ * Uses TanStack Query's standalone dehydrate() function.
+ *
+ * @example
+ * ```ts
+ * import { dehydrate } from "@tanstack/react-query"
+ * import { dehydrate as silgiDehydrate } from "silgi/tanstack-query/ssr"
+ *
+ * // Preferred: pass TanStack Query's dehydrate function
+ * const state = silgiDehydrate(queryClient)
+ * ```
  */
 export function dehydrate(queryClient: any): unknown {
-  // Use TanStack Query's built-in dehydrate
-  if (typeof queryClient.dehydrate === 'function') {
-    return queryClient.dehydrate()
+  // TanStack Query's dehydrate is a standalone function, not a method on QueryClient.
+  // Try to import it dynamically.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const tq = require('@tanstack/react-query')
+    if (typeof tq.dehydrate === 'function') {
+      return tq.dehydrate(queryClient)
+    }
+  } catch {
+    // @tanstack/react-query not available — fall through to manual extraction
   }
+
   // Fallback: manual cache extraction
   const cache = queryClient.getQueryCache?.()
   if (!cache) return {}

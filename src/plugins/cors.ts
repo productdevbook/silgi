@@ -59,15 +59,19 @@ export function corsHeaders(options: CORSOptions = {}, requestOrigin?: string): 
   // Origin — omit header entirely for disallowed origins (correct CORS behavior)
   if (typeof origin === 'string') {
     headers['access-control-allow-origin'] = origin
+    // Wildcard '*' doesn't need Vary, but specific string origins do for CDN caching
+    if (origin !== '*') headers['vary'] = 'Origin'
   } else if (Array.isArray(origin)) {
     if (requestOrigin && origin.includes(requestOrigin)) {
       headers['access-control-allow-origin'] = requestOrigin
     }
+    // Always set Vary for dynamic origins — even when request has no origin header
     headers['vary'] = 'Origin'
-  } else if (typeof origin === 'function' && requestOrigin) {
-    if (origin(requestOrigin)) {
+  } else if (typeof origin === 'function') {
+    if (requestOrigin && origin(requestOrigin)) {
       headers['access-control-allow-origin'] = requestOrigin
     }
+    // Always set Vary for function-based origins
     headers['vary'] = 'Origin'
   }
 

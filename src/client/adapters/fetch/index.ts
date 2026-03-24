@@ -69,8 +69,20 @@ export class RPCLink<TClientContext extends ClientContext = ClientContext> imple
       signal: options.signal,
     })
 
-    const responseText = await response.text()
-    const responseBody = responseText ? parseEmptyableJSON(responseText) : undefined
+    const contentType = response.headers.get('content-type') ?? ''
+    let responseBody: unknown
+    if (contentType.includes('msgpack')) {
+      const { decode } = await import('../../../codec/msgpack.ts')
+      const buf = new Uint8Array(await response.arrayBuffer())
+      responseBody = buf.length > 0 ? decode(buf) : undefined
+    } else if (contentType.includes('x-devalue')) {
+      const { decode } = await import('../../../codec/devalue.ts')
+      const text = await response.text()
+      responseBody = text ? decode(text) : undefined
+    } else {
+      const responseText = await response.text()
+      responseBody = responseText ? parseEmptyableJSON(responseText) : undefined
+    }
 
     if (isErrorStatus(response.status)) {
       if (isSilgiErrorJSON(responseBody)) {

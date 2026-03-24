@@ -15,8 +15,7 @@
  */
 
 import { compileRouter } from '../compile.ts'
-import { SilgiError, toSilgiError } from '../core/error.ts'
-import { ValidationError } from '../core/schema.ts'
+import { buildContext, isMethodAllowed, serializeError } from '../core/dispatch.ts'
 import { iteratorToEventStream } from '../core/sse.ts'
 
 import type { RouterDef } from '../types.ts'
@@ -50,34 +49,22 @@ export function silgiExpress<TCtx extends Record<string, unknown>>(
     const route = match.data
 
     // HTTP method enforcement
-    const method = req.method
-    if (
-      route.method !== '*' &&
-      method !== route.method &&
-      method !== 'OPTIONS' &&
-      !(method === 'GET' && route.method === 'POST')
-    ) {
+    if (!isMethodAllowed(req.method, route.method)) {
       res
         .status(405)
         .set('allow', route.method)
         .json({
           code: 'METHOD_NOT_ALLOWED',
           status: 405,
-          message: `Method ${method} not allowed`,
+          message: `Method ${req.method} not allowed`,
         })
       return
     }
 
     const handle = async () => {
       try {
-        const ctx: Record<string, unknown> = Object.create(null)
-        // Surface URL params from radix router match
-        if (match.params) ctx.params = match.params
-        if (options.context) {
-          const baseCtx = await options.context(req)
-          const keys = Object.keys(baseCtx)
-          for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = baseCtx[keys[i]!]
-        }
+        const baseCtx = options.context ? await options.context(req) : undefined
+        const ctx = buildContext(baseCtx as Record<string, unknown> | undefined, match.params)
 
         // Input from body (POST) or query string (GET)
         let input: unknown
@@ -111,7 +98,9 @@ export function silgiExpress<TCtx extends Record<string, unknown>>(
           } else if (output instanceof ReadableStream) {
             res.setHeader('content-type', 'application/octet-stream')
             const reader = (output as ReadableStream<Uint8Array>).getReader()
-            const pump = async () => {
+            // Cancel reader on client disconnect to prevent resource leaks
+            req.on('close', () => reader.cancel())
+            try {
               while (true) {
                 const { done, value } = await reader.read()
                 if (done) {
@@ -120,14 +109,17 @@ export function silgiExpress<TCtx extends Record<string, unknown>>(
                 }
                 res.write(value)
               }
+            } finally {
+              reader.releaseLock()
             }
-            await pump()
           } else if (output && typeof output === 'object' && Symbol.asyncIterator in (output as object)) {
             const stream = iteratorToEventStream(output as AsyncIterableIterator<unknown>)
             res.setHeader('content-type', 'text/event-stream')
             res.setHeader('cache-control', 'no-cache')
             const reader = stream.getReader()
-            const pump = async () => {
+            // Cancel reader on client disconnect to release pubsub subscriptions
+            req.on('close', () => reader.cancel())
+            try {
               while (true) {
                 const { done, value } = await reader.read()
                 if (done) {
@@ -136,8 +128,9 @@ export function silgiExpress<TCtx extends Record<string, unknown>>(
                 }
                 res.write(value)
               }
+            } finally {
+              reader.releaseLock()
             }
-            await pump()
           } else {
             res.json(output)
           }
@@ -145,22 +138,16 @@ export function silgiExpress<TCtx extends Record<string, unknown>>(
           req.removeListener('close', onClose)
         }
       } catch (error) {
-        if (error instanceof ValidationError) {
-          res
-            .status(400)
-            .json({ code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } })
-          return
-        }
-        const e = error instanceof SilgiError ? error : toSilgiError(error)
-        res.status(e.status).json(e.toJSON())
+        const body = serializeError(error)
+        res.status(body.status).json(body)
       }
     }
 
     handle().catch((error) => {
       // Prevent unhandled promise rejection — send 500 if response not yet sent
       if (!res.headersSent) {
-        const e = error instanceof SilgiError ? error : toSilgiError(error)
-        res.status(e.status).json(e.toJSON())
+        const body = serializeError(error)
+        res.status(body.status).json(body)
       }
     })
   }

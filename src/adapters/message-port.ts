@@ -23,8 +23,8 @@
  */
 
 import { compileRouter } from '../compile.ts'
-import { SilgiError, toSilgiError } from '../core/error.ts'
-import { ValidationError } from '../core/schema.ts'
+import { buildContext, serializeError } from '../core/dispatch.ts'
+import { SilgiError } from '../core/error.ts'
 
 import type { ClientLink, ClientOptions, ClientContext } from '../client/types.ts'
 import type { RouterDef } from '../types.ts'
@@ -82,26 +82,19 @@ export function silgiMessagePort<TCtx extends Record<string, unknown>>(
     const route = match.data
 
     try {
-      const ctx: Record<string, unknown> = Object.create(null)
-      // Surface URL params from radix router match
-      if (match.params) ctx.params = match.params
-      if (options.context) {
-        const baseCtx = await options.context()
-        const keys = Object.keys(baseCtx)
-        for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = baseCtx[keys[i]!]
-      }
+      const baseCtx = options.context ? await options.context() : undefined
+      const ctx = buildContext(baseCtx as Record<string, unknown> | undefined, match.params)
 
-      const signal = new AbortController().signal
-      const result = await route.handler(ctx, msg.input, signal)
+      const ac = new AbortController()
+      const result = await route.handler(ctx, msg.input, ac.signal)
       port.postMessage({ __silgi: true, __type: 'response', id: msg.id, result } satisfies RPCResponse)
     } catch (error) {
-      const e =
-        error instanceof ValidationError
-          ? { code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } }
-          : error instanceof SilgiError
-            ? error.toJSON()
-            : toSilgiError(error).toJSON()
-      port.postMessage({ __silgi: true, __type: 'response', id: msg.id, error: e } satisfies RPCResponse)
+      port.postMessage({
+        __silgi: true,
+        __type: 'response',
+        id: msg.id,
+        error: serializeError(error),
+      } satisfies RPCResponse)
     }
   }
 
@@ -117,16 +110,19 @@ export class MessagePortLink<TCtx extends ClientContext = ClientContext> impleme
   #port: {
     postMessage(msg: unknown): void
     addEventListener(type: 'message', handler: (event: { data: unknown }) => void): void
+    removeEventListener?(type: 'message', handler: (event: { data: unknown }) => void): void
   }
   #pending = new Map<string, { resolve: (v: unknown) => void; reject: (e: unknown) => void }>()
   #nextId = 1
+  #messageHandler: (event: { data: unknown }) => void
 
   constructor(port: {
     postMessage(msg: unknown): void
     addEventListener(type: 'message', handler: (event: { data: unknown }) => void): void
+    removeEventListener?(type: 'message', handler: (event: { data: unknown }) => void): void
   }) {
     this.#port = port
-    port.addEventListener('message', (event: { data: unknown }) => {
+    this.#messageHandler = (event: { data: unknown }) => {
       const msg = event.data as RPCResponse
       if (!msg || typeof msg !== 'object' || !msg.__silgi || msg.__type !== 'response') return
       const pending = this.#pending.get(msg.id)
@@ -143,13 +139,30 @@ export class MessagePortLink<TCtx extends ClientContext = ClientContext> impleme
       } else {
         pending.resolve(msg.result)
       }
-    })
+    }
+    port.addEventListener('message', this.#messageHandler)
   }
 
-  call(path: readonly string[], input: unknown, _options: ClientOptions<TCtx>): Promise<unknown> {
+  call(path: readonly string[], input: unknown, options: ClientOptions<TCtx>): Promise<unknown> {
     return new Promise((resolve, reject) => {
       const id = String(this.#nextId++)
       this.#pending.set(id, { resolve, reject })
+
+      // Honour caller's abort signal
+      if (options.signal) {
+        options.signal.addEventListener(
+          'abort',
+          () => {
+            const pending = this.#pending.get(id)
+            if (pending) {
+              this.#pending.delete(id)
+              pending.reject(new DOMException('Aborted', 'AbortError'))
+            }
+          },
+          { once: true },
+        )
+      }
+
       this.#port.postMessage({
         __silgi: true,
         __type: 'request',
@@ -158,5 +171,14 @@ export class MessagePortLink<TCtx extends ClientContext = ClientContext> impleme
         input,
       } satisfies RPCMessage)
     })
+  }
+
+  /** Reject all pending calls and stop listening. */
+  dispose(): void {
+    for (const [, pending] of this.#pending) {
+      pending.reject(new DOMException('Link disposed', 'AbortError'))
+    }
+    this.#pending.clear()
+    this.#port.removeEventListener?.('message', this.#messageHandler)
   }
 }

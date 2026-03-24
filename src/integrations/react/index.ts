@@ -33,12 +33,12 @@ export function createAction<TInput = unknown, TOutput = unknown>(
   procedure: ProcedureDef,
 ): (input: TInput) => Promise<ActionResult<TOutput>> {
   const handler = compileProcedure(procedure)
-  const signal = new AbortController().signal
 
   return async (input: TInput): Promise<ActionResult<TOutput>> => {
     try {
       const ctx: Record<string, unknown> = Object.create(null)
-      const result = handler(ctx, input, signal)
+      const ac = new AbortController()
+      const result = handler(ctx, input, ac.signal)
       const output = result instanceof Promise ? await result : result
       return [null, output as TOutput]
     } catch (error) {

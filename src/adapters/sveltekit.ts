@@ -38,20 +38,30 @@ export function silgiSvelteKit<TCtx extends Record<string, unknown>>(
   const prefix = options.prefix ?? '/api/rpc'
 
   let _handler: ((req: Request) => Response | Promise<Response>) | null = null
-  let _currentEvent: any = null
+  let _initPromise: Promise<void> | null = null
 
-  return async (event: any): Promise<Response> => {
-    _currentEvent = event
-    if (!_handler) {
-      const { silgi } = await import('../silgi.ts')
+  // Initialize handler eagerly (but only once)
+  function ensureHandler(): Promise<void> {
+    if (_handler) return Promise.resolve()
+    return (_initPromise ??= import('../silgi.ts').then(({ silgi }) => {
       const k = silgi({
+        // Context factory reads the per-request event from a request header token
+        // that we set below — no shared mutable state.
         context: (_req: Request) => {
-          if (options.context) return options.context(_currentEvent)
+          const eventRef = requestEventMap.get(_req)
+          if (options.context && eventRef) return options.context(eventRef)
           return {} as TCtx
         },
       })
       _handler = k.handler(router)
-    }
+    }))
+  }
+
+  // Per-request event map — keyed by the rewritten Request object (unique per call)
+  const requestEventMap = new WeakMap<Request, any>()
+
+  return async (event: any): Promise<Response> => {
+    await ensureHandler()
 
     const req: Request = event.request
     const url = new URL(req.url)
@@ -62,7 +72,9 @@ export function silgiSvelteKit<TCtx extends Record<string, unknown>>(
     }
 
     const rewritten = new Request(new URL(pathname + url.search, url.origin), req)
+    // Associate the SvelteKit event with this specific request — concurrency-safe
+    requestEventMap.set(rewritten, event)
 
-    return _handler(rewritten)
+    return _handler!(rewritten)
   }
 }

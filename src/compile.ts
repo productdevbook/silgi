@@ -55,22 +55,35 @@ const EMPTY_PARAMS: Record<string, string> = /* @__PURE__ */ Object.freeze(Objec
 /** Sanitize a value to prevent prototype pollution from nested __proto__ keys */
 function sanitizeValue(value: unknown): unknown {
   if (typeof value !== 'object' || value === null) return value
-  // Only sanitize plain objects — class instances, arrays, etc. are safe
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) value[i] = sanitizeValue(value[i])
+    return value
+  }
+  // Only sanitize plain objects — class instances are safe
   const proto = Object.getPrototypeOf(value)
   if (proto !== Object.prototype && proto !== null) return value
-  if (Array.isArray(value)) return value
 
   const obj = value as Record<string, unknown>
-  if (!Object.prototype.hasOwnProperty.call(obj, '__proto__')) return value
+  const hasUnsafe = Object.prototype.hasOwnProperty.call(obj, '__proto__')
 
-  // Has __proto__ key — create a clean copy without it
-  const clean: Record<string, unknown> = Object.create(null)
+  if (hasUnsafe) {
+    // Has __proto__ key — create a clean copy without it, recurse into values
+    const clean: Record<string, unknown> = Object.create(null)
+    const keys = Object.keys(obj)
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i]!
+      if (!UNSAFE_KEYS.has(k)) clean[k] = sanitizeValue(obj[k])
+    }
+    return clean
+  }
+
+  // No unsafe keys at this level — still recurse into nested values
   const keys = Object.keys(obj)
   for (let i = 0; i < keys.length; i++) {
     const k = keys[i]!
-    if (k !== '__proto__') clean[k] = obj[k]
+    obj[k] = sanitizeValue(obj[k])
   }
-  return clean
+  return value
 }
 
 /** Apply a single guard result to context — direct property set */

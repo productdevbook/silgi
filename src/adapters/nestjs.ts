@@ -23,8 +23,7 @@
  */
 
 import { compileRouter } from '../compile.ts'
-import { SilgiError, toSilgiError } from '../core/error.ts'
-import { ValidationError } from '../core/schema.ts'
+import { buildContext, serializeError, parseQueryData } from '../core/dispatch.ts'
 
 import type { RouterDef } from '../types.ts'
 
@@ -58,20 +57,14 @@ export function silgiNestHandler<TCtx extends Record<string, unknown>>(
     const route = match.data
 
     try {
-      const ctx: Record<string, unknown> = Object.create(null)
-      // Surface URL params from radix router match
-      if (match.params) ctx.params = match.params
-      if (options.context) {
-        const baseCtx = await options.context(req)
-        const keys = Object.keys(baseCtx)
-        for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = baseCtx[keys[i]!]
-      }
+      const baseCtx = options.context ? await options.context(req) : undefined
+      const ctx = buildContext(baseCtx as Record<string, unknown> | undefined, match.params)
 
       let input: unknown
       if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
         input = req.body
       } else if (req.query?.data) {
-        input = typeof req.query.data === 'string' ? JSON.parse(req.query.data) : req.query.data
+        input = typeof req.query.data === 'string' ? parseQueryData(req.query.data) : req.query.data
       }
 
       const ac = new AbortController()
@@ -79,14 +72,8 @@ export function silgiNestHandler<TCtx extends Record<string, unknown>>(
       const output = await route.handler(ctx, input, ac.signal)
       res.json(output)
     } catch (error) {
-      if (error instanceof ValidationError) {
-        res
-          .status(400)
-          .json({ code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } })
-        return
-      }
-      const e = error instanceof SilgiError ? error : toSilgiError(error)
-      res.status(e.status).json(e.toJSON())
+      const body = serializeError(error)
+      res.status(body.status).json(body)
     }
   }
 }
