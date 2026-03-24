@@ -121,9 +121,18 @@ describe('withEventMeta / getEventMeta', () => {
     expect(meta).toEqual({ id: '123', retry: 5000 })
   })
 
-  it('returns original value for primitives', () => {
-    expect(withEventMeta(42, { id: '1' })).toBe(42)
-    expect(withEventMeta('str', { id: '1' })).toBe('str')
+  it('returns original value for primitives and allows meta retrieval', () => {
+    const num = withEventMeta(42, { id: '1' })
+    expect(num).toBe(42)
+    expect(getEventMeta(42)).toEqual({ id: '1' })
+    // One-shot: meta is consumed after first read
+    expect(getEventMeta(42)).toBeUndefined()
+
+    const str = withEventMeta('str', { id: '2' })
+    expect(str).toBe('str')
+    expect(getEventMeta('str')).toEqual({ id: '2' })
+
+    // null is not stored (not a useful primitive for metadata)
     expect(withEventMeta(null, { id: '1' })).toBe(null)
   })
 
@@ -131,8 +140,8 @@ describe('withEventMeta / getEventMeta', () => {
     expect(getEventMeta({ a: 1 })).toBeUndefined()
   })
 
-  it('returns undefined meta for non-objects', () => {
-    expect(getEventMeta(42)).toBeUndefined()
+  it('returns undefined meta for non-objects without prior withEventMeta', () => {
+    expect(getEventMeta(99)).toBeUndefined()
     expect(getEventMeta(null)).toBeUndefined()
   })
 })

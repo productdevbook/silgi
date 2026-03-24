@@ -15,6 +15,7 @@
 import { compileRouter } from '../compile.ts'
 import { SilgiError, toSilgiError } from '../core/error.ts'
 import { ValidationError } from '../core/schema.ts'
+import { iteratorToEventStream } from '../core/sse.ts'
 
 import type { CompiledRouterFn } from '../compile.ts'
 import type { RouterDef } from '../types.ts'
@@ -49,6 +50,23 @@ export function silgiFastify(routerDef: RouterDef, options: SilgiFastifyOptions 
       }
       const route = match.data
 
+      // HTTP method enforcement — allow GET for POST-registered queries, reject other mismatches
+      if (
+        route.method !== '*' &&
+        method !== route.method &&
+        method !== 'OPTIONS' &&
+        !(method === 'GET' && route.method === 'POST')
+      ) {
+        return reply
+          .status(405)
+          .header('allow', route.method)
+          .send({
+            code: 'METHOD_NOT_ALLOWED',
+            status: 405,
+            message: `Method ${method} not allowed`,
+          })
+      }
+
       const ctx: Record<string, unknown> = Object.create(null)
       // Surface URL params from radix router match
       if (match.params) ctx.params = match.params
@@ -71,6 +89,20 @@ export function silgiFastify(routerDef: RouterDef, options: SilgiFastifyOptions 
         // Cache-Control header for query routes
         if (route.cacheControl) {
           reply.header('cache-control', route.cacheControl)
+        }
+
+        // Handle Response, ReadableStream, and AsyncIterator outputs
+        if (output instanceof Response) {
+          reply.status(output.status)
+          output.headers.forEach((v: string, k: string) => reply.header(k, v))
+          return reply.send(output.body ? Buffer.from(await output.arrayBuffer()) : '')
+        }
+        if (output instanceof ReadableStream) {
+          return reply.header('content-type', 'application/octet-stream').send(output)
+        }
+        if (output && typeof output === 'object' && Symbol.asyncIterator in (output as object)) {
+          const stream = iteratorToEventStream(output as AsyncIterableIterator<unknown>)
+          return reply.header('content-type', 'text/event-stream').header('cache-control', 'no-cache').send(stream)
         }
 
         // Content negotiation — codecs lazy-loaded on first non-JSON request

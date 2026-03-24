@@ -17,6 +17,7 @@
 import { compileRouter } from '../compile.ts'
 import { SilgiError, toSilgiError } from '../core/error.ts'
 import { ValidationError } from '../core/schema.ts'
+import { iteratorToEventStream } from '../core/sse.ts'
 
 import type { RouterDef } from '../types.ts'
 
@@ -48,6 +49,25 @@ export function silgiExpress<TCtx extends Record<string, unknown>>(
     }
     const route = match.data
 
+    // HTTP method enforcement
+    const method = req.method
+    if (
+      route.method !== '*' &&
+      method !== route.method &&
+      method !== 'OPTIONS' &&
+      !(method === 'GET' && route.method === 'POST')
+    ) {
+      res
+        .status(405)
+        .set('allow', route.method)
+        .json({
+          code: 'METHOD_NOT_ALLOWED',
+          status: 405,
+          message: `Method ${method} not allowed`,
+        })
+      return
+    }
+
     const handle = async () => {
       try {
         const ctx: Record<string, unknown> = Object.create(null)
@@ -77,9 +97,53 @@ export function silgiExpress<TCtx extends Record<string, unknown>>(
         }
 
         const ac = new AbortController()
-        req.on('close', () => ac.abort())
-        const output = await route.handler(ctx, input, ac.signal)
-        res.json(output)
+        const onClose = () => ac.abort()
+        req.on('close', onClose)
+        try {
+          const output = await route.handler(ctx, input, ac.signal)
+
+          // Handle Response, ReadableStream, and AsyncIterator outputs
+          if (output instanceof Response) {
+            res.status(output.status)
+            output.headers.forEach((v: string, k: string) => res.setHeader(k, v))
+            const body = output.body ? Buffer.from(await output.arrayBuffer()) : ''
+            res.end(body)
+          } else if (output instanceof ReadableStream) {
+            res.setHeader('content-type', 'application/octet-stream')
+            const reader = (output as ReadableStream<Uint8Array>).getReader()
+            const pump = async () => {
+              while (true) {
+                const { done, value } = await reader.read()
+                if (done) {
+                  res.end()
+                  break
+                }
+                res.write(value)
+              }
+            }
+            await pump()
+          } else if (output && typeof output === 'object' && Symbol.asyncIterator in (output as object)) {
+            const stream = iteratorToEventStream(output as AsyncIterableIterator<unknown>)
+            res.setHeader('content-type', 'text/event-stream')
+            res.setHeader('cache-control', 'no-cache')
+            const reader = stream.getReader()
+            const pump = async () => {
+              while (true) {
+                const { done, value } = await reader.read()
+                if (done) {
+                  res.end()
+                  break
+                }
+                res.write(value)
+              }
+            }
+            await pump()
+          } else {
+            res.json(output)
+          }
+        } finally {
+          req.removeListener('close', onClose)
+        }
       } catch (error) {
         if (error instanceof ValidationError) {
           res
@@ -92,6 +156,12 @@ export function silgiExpress<TCtx extends Record<string, unknown>>(
       }
     }
 
-    handle()
+    handle().catch((error) => {
+      // Prevent unhandled promise rejection — send 500 if response not yet sent
+      if (!res.headersSent) {
+        const e = error instanceof SilgiError ? error : toSilgiError(error)
+        res.status(e.status).json(e.toJSON())
+      }
+    })
   }
 }

@@ -45,22 +45,21 @@ export function silgiBun<TCtx extends Record<string, unknown>>(
   }
   const lookup = compiled
 
-  // Context — detect sync/empty at init time
+  // Context — detect sync/empty at init time via toString() introspection only
+  // Never call the factory with a fake request to avoid side effects
   const ctxFactory = options.context
   let ctxIsSync = true
   let ctxIsEmpty = !ctxFactory
   if (ctxFactory) {
-    try {
-      const test = ctxFactory(new Request('http://localhost'))
-      if (test instanceof Promise) {
-        ctxIsSync = false
-        test.then((r) => {
-          ctxIsEmpty = Object.keys(r).length === 0
-        })
-      } else {
-        ctxIsEmpty = Object.keys(test).length === 0
-      }
-    } catch {}
+    const src = ctxFactory.toString()
+    const looksAsync = src.startsWith('async') || src.includes('await ') || src.includes('.then(')
+    if (looksAsync) {
+      ctxIsSync = false
+    } else {
+      // Detect empty context factory: () => ({}) or () => Object.create(null)
+      const bodyMatch = src.match(/=>\s*\(\s*\{\s*\}\s*\)/) || src.match(/=>\s*Object\.create\(\s*null\s*\)/)
+      ctxIsEmpty = !!bodyMatch
+    }
   }
 
   // Pre-allocated constants
@@ -94,6 +93,21 @@ export function silgiBun<TCtx extends Record<string, unknown>>(
     if (!match) return new Response(NOT_FOUND, { status: 404, headers: JSON_HDR })
 
     const route = match.data
+
+    // HTTP method enforcement — allow GET for POST-registered queries, reject other mismatches
+    const reqMethod = request.method
+    if (
+      route.method !== '*' &&
+      reqMethod !== route.method &&
+      reqMethod !== 'OPTIONS' &&
+      !(reqMethod === 'GET' && route.method === 'POST')
+    ) {
+      return new Response(
+        JSON.stringify({ code: 'METHOD_NOT_ALLOWED', status: 405, message: `Method ${reqMethod} not allowed` }),
+        { status: 405, headers: { ...JSON_HDR, allow: route.method } },
+      )
+    }
+
     const handler = route.handler
     const stringify = route.stringify
     // Response.json() is Bun-native C++ — faster than new Response(JSON.stringify(...))
@@ -127,6 +141,9 @@ export function silgiBun<TCtx extends Record<string, unknown>>(
         if (!(result instanceof Promise)) {
           // Fully sync — fastest path
           if (result instanceof Response) return result
+          if (result instanceof ReadableStream) return new Response(result, { headers: STREAM_HDR })
+          if (result && typeof result === 'object' && Symbol.asyncIterator in (result as object))
+            return new Response(iteratorToEventStream(result as AsyncIterableIterator<unknown>), { headers: SSE_HDR })
           return nativeJson ? Response.json(result) : new Response(stringify(result), { headers: JSON_HDR })
         }
 
@@ -163,7 +180,13 @@ export function silgiBun<TCtx extends Record<string, unknown>>(
       }
       if (match.params) ctx.params = match.params
 
-      const input = await request.json()
+      let input: unknown
+      try {
+        input = await request.json()
+      } catch {
+        // Bun throws SyntaxError on empty body — treat as undefined
+        input = undefined
+      }
       const result = handler(ctx, input, request.signal)
       const output = result instanceof Promise ? await result : result
 

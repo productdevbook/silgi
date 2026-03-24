@@ -50,7 +50,11 @@ function compileType(def: any): FastStringify | undefined {
     case 'number':
     case 'ZodNumber':
     case 'int':
-      return (v) => String(v)
+      // NaN and Infinity are not valid JSON — JSON.stringify produces null for them
+      return (v) => {
+        const n = v as number
+        return n !== n || n === Infinity || n === -Infinity ? 'null' : String(n)
+      }
 
     case 'boolean':
     case 'ZodBoolean':
@@ -76,13 +80,20 @@ function compileType(def: any): FastStringify | undefined {
       // V8's native JSON.stringify is faster for arrays (SIMD-optimized C++)
       return undefined
 
-    case 'optional':
-    case 'ZodOptional':
     case 'nullable':
     case 'ZodNullable': {
       const inner = compileType(getZodDef(def.innerType ?? def.wrapped))
       if (!inner) return undefined
-      return (v) => (v == null ? 'null' : inner(v))
+      // null → 'null', undefined is handled by compileObject's optional skip
+      return (v) => (v === null ? 'null' : inner(v))
+    }
+
+    case 'optional':
+    case 'ZodOptional': {
+      const inner = compileType(getZodDef(def.innerType ?? def.wrapped))
+      if (!inner) return undefined
+      // undefined is handled by compileObject's optional skip; null → 'null'
+      return (v) => (v === null ? 'null' : v === undefined ? 'null' : inner(v))
     }
 
     case 'default':

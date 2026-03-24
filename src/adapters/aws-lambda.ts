@@ -34,6 +34,10 @@ interface LambdaEvent {
   isBase64Encoded?: boolean
 }
 
+interface LambdaContext {
+  getRemainingTimeInMillis?: () => number
+}
+
 interface LambdaResponse {
   statusCode: number
   headers: Record<string, string>
@@ -48,10 +52,10 @@ interface LambdaResponse {
 export function silgiLambda<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: LambdaAdapterOptions<TCtx> = {},
-): (event: LambdaEvent) => Promise<LambdaResponse> {
+): (event: LambdaEvent, context?: LambdaContext) => Promise<LambdaResponse> {
   const flatRouter = compileRouter(router)
   const prefix = options.prefix ?? ''
-  return async (event: LambdaEvent): Promise<LambdaResponse> => {
+  return async (event: LambdaEvent, context?: LambdaContext): Promise<LambdaResponse> => {
     let pathname = event.path
     if (prefix && pathname.startsWith(prefix)) {
       pathname = pathname.slice(prefix.length)
@@ -85,17 +89,27 @@ export function silgiLambda<TCtx extends Record<string, unknown>>(
         try {
           input = JSON.parse(body)
         } catch {
-          /* ignore */
+          return {
+            statusCode: 400,
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ code: 'BAD_REQUEST', status: 400, message: 'Invalid JSON body' }),
+          }
         }
       } else if (event.queryStringParameters?.data) {
         try {
           input = JSON.parse(event.queryStringParameters.data)
         } catch {
-          /* ignore */
+          return {
+            statusCode: 400,
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ code: 'BAD_REQUEST', status: 400, message: 'Invalid JSON in data parameter' }),
+          }
         }
       }
 
-      const signal = AbortSignal.timeout(30_000) // Lambda has a max timeout
+      // Use Lambda context's remaining time if available, otherwise fall back to 30s
+      const timeoutMs = context?.getRemainingTimeInMillis ? context.getRemainingTimeInMillis() - 500 : 30_000
+      const signal = AbortSignal.timeout(Math.max(timeoutMs, 1000))
       const output = await route.handler(ctx, input, signal)
 
       return {

@@ -62,5 +62,5 @@ export async function createServeHandler(
   if (options?.analytics) console.log(`  Analytics dashboard at ${url}/analytics`)
   console.log()
 
-  hooks.callHook('serve:start', { url, port, hostname })
+  await hooks.callHook('serve:start', { url, port, hostname })
 }

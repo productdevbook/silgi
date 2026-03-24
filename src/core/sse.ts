@@ -21,12 +21,24 @@ export interface EventMeta {
   retry?: number
 }
 
+// Map for primitive event metadata — stored alongside the value in SSE encoding
+const _primitiveMeta = new Map<unknown, EventMeta>()
+
 /**
  * Attach SSE metadata (id, retry) to a value transparently.
- * Uses a Proxy so normal property access is unaffected.
+ * Uses a Proxy for objects. For primitives, stores metadata in a side-channel Map
+ * that is checked during SSE encoding via `getEventMeta`.
+ *
+ * Note: For primitives, the metadata is stored in a global Map keyed by value.
+ * This means primitives with the same value share metadata. The Map is cleaned
+ * up during `getEventMeta` reads to prevent memory leaks.
  */
 export function withEventMeta<T>(value: T, meta: EventMeta): T {
-  if (typeof value !== 'object' || value === null) return value
+  if (value === null) return value
+  if (typeof value !== 'object') {
+    _primitiveMeta.set(value, meta)
+    return value
+  }
   return new Proxy(value, {
     get(target, prop, receiver) {
       if (prop === EVENT_META_SYMBOL) return meta
@@ -39,6 +51,14 @@ export function withEventMeta<T>(value: T, meta: EventMeta): T {
  * Read SSE metadata from a value.
  */
 export function getEventMeta(value: unknown): EventMeta | undefined {
+  // Check primitive metadata map first
+  if (_primitiveMeta.size > 0) {
+    const primMeta = _primitiveMeta.get(value)
+    if (primMeta) {
+      _primitiveMeta.delete(value) // one-shot: clean up after read
+      return primMeta
+    }
+  }
   if (typeof value !== 'object' || value === null) return undefined
   return (value as Record<symbol, EventMeta>)[EVENT_META_SYMBOL]
 }
@@ -263,6 +283,7 @@ export function eventStreamToIterator<T = unknown>(
   const eventQueue: EventMessage[] = []
   let eventResolve: (() => void) | undefined
   let streamDone = false
+  let streamError: Error | undefined
 
   const pushEvent = (msg: EventMessage) => {
     eventQueue.push(msg)
@@ -285,8 +306,9 @@ export function eventStreamToIterator<T = unknown>(
         }
         sseDecoder.feed(value as string)
       }
-    } catch {
+    } catch (err) {
       streamDone = true
+      streamError = err instanceof Error ? err : new Error(String(err))
       eventResolve?.()
     }
   }
@@ -318,6 +340,7 @@ export function eventStreamToIterator<T = unknown>(
         }
 
         if (streamDone) {
+          if (streamError) throw streamError
           return { done: true, value: undefined } as IteratorReturnResult<void>
         }
 

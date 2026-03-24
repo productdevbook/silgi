@@ -406,6 +406,8 @@ export interface CompiledRoute {
   ws?: boolean
   /** Skip body parsing — procedure receives raw request (e.g. catch-all proxy) */
   passthrough?: boolean
+  /** HTTP method this route is registered for (uppercase) */
+  method: string
 }
 
 /** Compiled router function — returns matched route + params */
@@ -445,11 +447,12 @@ export function compileRouter(def: Record<string, unknown>): CompiledRouterFn {
         cacheControl,
         ws: route?.ws ?? undefined,
         passthrough: routePath.includes('**') || undefined,
+        method,
       }
 
       addRadixRoute(radix, method, routePath, compiled)
 
-      // Also add empty method for fallback (any method)
+      // Also add empty method for internal callers (createCaller uses '' method)
       addRadixRoute(radix, '', routePath, compiled)
 
       return

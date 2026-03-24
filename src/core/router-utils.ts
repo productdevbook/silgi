@@ -19,19 +19,24 @@ export function isProcedureDef(value: unknown): value is ProcedureDef {
 
 // ── Auto Path Assignment ────────────────────────────
 
-export function assignPaths(def: RouterDef, prefix: string[] = []): void {
+export function assignPaths(def: RouterDef, prefix: string[] = []): RouterDef {
+  const result: RouterDef = {}
   for (const [key, value] of Object.entries(def)) {
     const currentPath = [...prefix, key]
     if (isProcedureDef(value)) {
       if (!value.route) {
-        // Clone procedure to avoid mutating shared instances across routers
-        const cloned = { ...value, route: { path: '/' + currentPath.join('/') } }
-        ;(def as any)[key] = cloned
+        // Clone procedure — never mutate the user's original def object
+        result[key] = { ...value, route: { path: '/' + currentPath.join('/') } }
+      } else {
+        result[key] = value
       }
     } else if (typeof value === 'object' && value !== null) {
-      assignPaths(value as RouterDef, currentPath)
+      result[key] = assignPaths(value as RouterDef, currentPath)
+    } else {
+      result[key] = value
     }
   }
+  return result
 }
 
 export { compileRouter }

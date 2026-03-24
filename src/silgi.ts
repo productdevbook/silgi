@@ -298,9 +298,11 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
     subscription: ((...args: unknown[]) => createProcedure('subscription', ...args)) as SubscriptionFactory<TBaseCtx>,
 
     router: (def) => {
-      assignPaths(def)
-      const flat = compileRouter(def)
+      const assigned = assignPaths(def)
+      const flat = compileRouter(assigned)
       routerCache.set(def, flat)
+      // Copy assigned paths back so type inference sees the routes
+      Object.assign(def, assigned)
       return def
     },
 

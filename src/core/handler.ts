@@ -188,19 +188,32 @@ location.reload();
     _hasHooks = false
   }
   _recomputeHooks()
-  // Re-evaluate when hooks change (hookable fires afterEach)
-  if (hooks) {
+  // Listen for hook changes via hookable's afterEach — no monkey-patching of shared hooks object.
+  // Only wrap if not already wrapped by a previous createFetchHandler call.
+  if (hooks && !(hooks as any).__silgiWrapped) {
     const origHook = hooks.hook.bind(hooks)
     const origRemove = hooks.removeHook.bind(hooks)
+    const handlers: Set<() => void> = new Set()
+    ;(hooks as any).__silgiWrapped = true
+    ;(hooks as any).__silgiHandlers = handlers
     hooks.hook = ((name: any, fn: any) => {
       const r = origHook(name, fn)
-      _hasHooks = true
+      for (const h of handlers) h()
       return r
     }) as any
     hooks.removeHook = ((name: any, fn: any) => {
       origRemove(name, fn)
-      _recomputeHooks()
+      for (const h of handlers) h()
     }) as any
+  }
+  // Register this handler's recompute callback
+  if ((hooks as any)?.__silgiHandlers) {
+    ;(hooks as any).__silgiHandlers.add(() => {
+      _hasHooks = false
+      _recomputeHooks()
+    })
+    // Also set _hasHooks = true initially if hooks already registered
+    _recomputeHooks()
   }
   function hasActiveHooks(): boolean {
     return _hasHooks
@@ -220,26 +233,18 @@ location.reload();
   const isBun = typeof globalThis.Bun !== 'undefined'
 
   // Pre-check: is context factory sync? Also detect empty context for zero-copy path.
-  // Uses Function.toString() introspection to avoid calling the real factory (which may
-  // have side effects like DB connections, session creation, or auth logging).
+  // Uses Function.toString() introspection only — never calls the factory with a fake request
+  // to avoid side effects (DB connections, session creation, auth logging).
   let ctxFactoryIsSync = false
   let ctxFactoryIsEmpty = false
   const _ctxSrc = contextFactory.toString()
   // Heuristic: if function body contains await or returns a Promise, treat as async
   const _looksAsync = _ctxSrc.startsWith('async') || _ctxSrc.includes('await ') || _ctxSrc.includes('.then(')
   if (!_looksAsync) {
-    // Only probe sync factories — these are safe since they run synchronously and we
-    // can detect empty results without side-effect risk from dangling async work.
-    try {
-      const testResult = contextFactory(new Request('http://localhost'))
-      if (testResult instanceof Promise) {
-        // Guessed wrong — it's actually async. Swallow the result.
-        testResult.catch(() => {})
-      } else {
-        ctxFactoryIsSync = true
-        ctxFactoryIsEmpty = Object.keys(testResult).length === 0
-      }
-    } catch {}
+    ctxFactoryIsSync = true
+    // Detect empty context factory: () => ({}) or () => Object.create(null) or similar
+    const _bodyMatch = _ctxSrc.match(/=>\s*\(\s*\{\s*\}\s*\)/) || _ctxSrc.match(/=>\s*Object\.create\(\s*null\s*\)/)
+    ctxFactoryIsEmpty = !!_bodyMatch
   }
 
   function analyticsAuthResponse(pathname: string): Response {
@@ -355,6 +360,20 @@ location.reload();
     }
     const route = match.data
 
+    // HTTP method enforcement — reject mismatched methods with 405
+    // Queries (POST) also accept GET for query-string input; all routes accept OPTIONS for CORS
+    // Routes with method '*' accept any method (passthrough/wildcard)
+    const reqMethod = request.method
+    if (route.method !== '*' && reqMethod !== route.method && reqMethod !== 'OPTIONS') {
+      // Allow GET requests to POST-registered procedures (queries use GET with ?data=)
+      if (!(reqMethod === 'GET' && route.method === 'POST')) {
+        return new Response(
+          JSON.stringify({ code: 'METHOD_NOT_ALLOWED', status: 405, message: `Method ${reqMethod} not allowed` }),
+          { status: 405, headers: { ...jsonHeaders, allow: route.method } },
+        )
+      }
+    }
+
     // ── Fast sync path: GET, sync context factory, no body ──
     // Avoids async/await overhead entirely for simple queries
     const method = request.method
@@ -415,8 +434,12 @@ location.reload();
             }
           }
 
-          if (output instanceof Response) return output
+          if (output instanceof Response) {
+            releaseContext(ctx)
+            return output
+          }
           if (output instanceof ReadableStream) {
+            releaseContext(ctx)
             if (collector && accumulator) {
               accumulator.addProcedure({
                 procedure: pathname,
@@ -430,6 +453,7 @@ location.reload();
             return new Response(output, { headers: { 'content-type': 'application/octet-stream' } })
           }
           if (output && typeof output === 'object' && Symbol.asyncIterator in (output as object)) {
+            releaseContext(ctx)
             if (collector && accumulator) {
               accumulator.addProcedure({
                 procedure: pathname,
@@ -448,6 +472,7 @@ location.reload();
           // Content negotiation — check Accept header for non-JSON formats
           const accept = request.headers.get('accept')
           if (accept && (accept.includes('msgpack') || accept.includes('x-devalue'))) {
+            releaseContext(ctx)
             const fmt: ResponseFormat = accept.includes('msgpack') ? 'msgpack' : 'devalue'
             const cacheHeaders = route.cacheControl ? { 'cache-control': route.cacheControl } : undefined
             return encodeResponse(output, 200, fmt, route.stringify, cacheHeaders)
@@ -609,8 +634,8 @@ location.reload();
         }
       } else if (request.body) {
         const ct = request.headers.get('content-type')
-        if (ct && ct.charCodeAt(12) !== 106) {
-          // Not 'application/json' — check binary codecs (12th char: 'j' = 106)
+        if (ct && !ct.toLowerCase().startsWith('application/json')) {
+          // Not 'application/json' — check binary codecs
           if (ct.includes('msgpack')) {
             _msgpack ??= await import('../codec/msgpack.ts')
             const buf = new Uint8Array(await request.arrayBuffer())
@@ -640,6 +665,7 @@ location.reload();
       const output = pipelineResult instanceof Promise ? await pipelineResult : pipelineResult
 
       if (output instanceof Response) {
+        releaseContext(ctx)
         if (hasActiveHooks() || collector) {
           const durationMs = collector ? round(performance.now() - t0) : 0
           if (hasActiveHooks()) safeCallHook('response', { path: pathname, output: null, durationMs })
@@ -660,6 +686,7 @@ location.reload();
         return output
       }
       if (output instanceof ReadableStream) {
+        releaseContext(ctx)
         if (collector) {
           const durationMs = round(performance.now() - t0)
           collector.record(pathname, durationMs)
@@ -677,6 +704,7 @@ location.reload();
         return new Response(output, { headers: { 'content-type': 'application/octet-stream' } })
       }
       if (output && typeof output === 'object' && Symbol.asyncIterator in (output as object)) {
+        releaseContext(ctx)
         if (collector) {
           const durationMs = round(performance.now() - t0)
           collector.record(pathname, durationMs)
@@ -712,6 +740,7 @@ location.reload();
 
       const accept = request.headers.get('accept')
       if (accept && (accept.includes('msgpack') || accept.includes('x-devalue'))) {
+        releaseContext(ctx)
         const fmt: ResponseFormat = accept.includes('msgpack') ? 'msgpack' : 'devalue'
         const cacheHeaders = route.cacheControl ? { 'cache-control': route.cacheControl } : undefined
         return encodeResponse(output, 200, fmt, route.stringify, cacheHeaders)
@@ -808,6 +837,20 @@ location.reload();
       if (!match) return new Response(notFoundBody, { status: 404, headers: jsonHeaders })
 
       const route = match.data
+
+      // HTTP method enforcement
+      const reqMethod = request.method
+      if (
+        route.method !== '*' &&
+        reqMethod !== route.method &&
+        reqMethod !== 'OPTIONS' &&
+        !(reqMethod === 'GET' && route.method === 'POST')
+      ) {
+        return new Response(
+          JSON.stringify({ code: 'METHOD_NOT_ALLOWED', status: 405, message: `Method ${reqMethod} not allowed` }),
+          { status: 405, headers: { ...jsonHeaders, allow: route.method } },
+        )
+      }
 
       // ── GET / no body — fully sync ──
       if (request.method === 'GET' || !request.body) {
