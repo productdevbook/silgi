@@ -426,7 +426,6 @@ export interface MatchedRoute<T = unknown> {
 /** Compiled router function — returns matched route + params */
 export type CompiledRouterFn = (method: string, path: string) => MatchedRoute<CompiledRoute> | undefined
 
-
 /**
  * Compile a router tree into a rou3 radix router.
  *
@@ -475,9 +474,9 @@ export function compileRouter(def: Record<string, unknown>): CompiledRouterFn {
 
   walk(def, [])
 
-  return (method: string, path: string) => findRou3Route(router, method, path) as MatchedRoute<CompiledRoute> | undefined
+  return (method: string, path: string) =>
+    findRou3Route(router, method, path) as MatchedRoute<CompiledRoute> | undefined
 }
-
 
 /** Pool of pre-allocated null-prototype context objects — eliminates per-request GC pressure. */
 const CTX_POOL: Record<string, unknown>[] = []

@@ -5,6 +5,8 @@
  * Each concern lives in its own module (codec.ts, input.ts, sse.ts).
  */
 
+import { parse as parseCookieHeader } from 'cookie-es'
+
 import { createContext, releaseContext } from '../compile.ts'
 import { compileRouter } from '../compile.ts'
 import {
@@ -17,8 +19,6 @@ import {
 } from '../plugins/analytics.ts'
 import { generateOpenAPI, scalarHTML } from '../scalar.ts'
 
-import { parse as parseCookieHeader } from 'cookie-es'
-
 import { detectResponseFormat, encodeResponse, makeErrorResponse } from './codec.ts'
 import { SilgiError, toSilgiError } from './error.ts'
 import { parseInput } from './input.ts'
@@ -27,10 +27,10 @@ import { ValidationError } from './schema.ts'
 import { iteratorToEventStream } from './sse.ts'
 
 import type { CompiledRoute, CompiledRouterFn } from '../compile.ts'
-import type { ResponseFormat } from './codec.ts'
 import type { AnalyticsOptions } from '../plugins/analytics.ts'
 import type { ScalarOptions } from '../scalar.ts'
 import type { SilgiHooks } from '../silgi.ts'
+import type { ResponseFormat } from './codec.ts'
 import type { Hookable } from 'hookable'
 
 // Re-export for backwards compat
@@ -46,7 +46,7 @@ function makeResponse(
   releaseCtx?: Record<string, unknown>,
 ): Response | Promise<Response> {
   if (output instanceof Response) {
-    releaseCtx && releaseContext(releaseCtx)
+    if (releaseCtx) releaseContext(releaseCtx)
     return output
   }
   if (output instanceof ReadableStream) {
@@ -58,7 +58,7 @@ function makeResponse(
     })
   }
 
-  releaseCtx && releaseContext(releaseCtx)
+  if (releaseCtx) releaseContext(releaseCtx)
 
   const cacheHeaders = route.cacheControl ? { 'cache-control': route.cacheControl } : undefined
   if (format !== 'json') {
@@ -265,7 +265,8 @@ export function createFetchHandler(
 
     // Scalar routes
     if (scalarEnabled) {
-      if (pathname === 'openapi.json') return new Response(specJson, { headers: { 'content-type': 'application/json' } })
+      if (pathname === 'openapi.json')
+        return new Response(specJson, { headers: { 'content-type': 'application/json' } })
       if (pathname === 'reference') return new Response(specHtml, { headers: { 'content-type': 'text/html' } })
     }
 

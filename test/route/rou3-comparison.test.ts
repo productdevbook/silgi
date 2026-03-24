@@ -1,3 +1,4 @@
+import { createRouter, addRoute, findRoute, removeRoute } from 'rou3'
 /**
  * rou3 router — integration tests.
  *
@@ -5,8 +6,6 @@
  * route patterns correctly: static, param, wildcard, method dispatch.
  */
 import { describe, it, expect } from 'vitest'
-
-import { createRouter, addRoute, findRoute, removeRoute } from 'rou3'
 
 // ── Helpers ─────────────────────────────────────────
 

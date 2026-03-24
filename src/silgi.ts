@@ -266,9 +266,8 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
   }
 
   // Initialize storage lazily (only if configured)
-  let storageReady: Promise<void> | undefined
   if (config.storage) {
-    storageReady = import('./core/storage.ts')
+    import('./core/storage.ts')
       .then((m) => m.initStorage(config.storage))
       .catch((e) => {
         throw new Error(`[silgi] Failed to initialize storage: ${e instanceof Error ? e.message : e}`)

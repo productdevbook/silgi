@@ -56,7 +56,11 @@ export async function encodeResponse(
 /** Build error Response from any thrown error */
 export function makeErrorResponse(error: unknown, format: ResponseFormat): Response | Promise<Response> {
   if (error instanceof ValidationError) {
-    return encodeResponse({ code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } }, 400, format)
+    return encodeResponse(
+      { code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } },
+      400,
+      format,
+    )
   }
   if (error instanceof SyntaxError) {
     return encodeResponse({ code: 'BAD_REQUEST', status: 400, message: 'Invalid JSON body' }, 400, format)

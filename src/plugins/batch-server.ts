@@ -89,7 +89,12 @@ export function createBatchHandler<TCtx extends Record<string, unknown>>(
     const results = await Promise.all(
       calls.map(async (call): Promise<BatchResponse> => {
         // Validate path — must be a non-empty string within reasonable bounds
-        if (typeof call.path !== 'string' || call.path.length === 0 || call.path.length > 512 || call.path.includes('\0')) {
+        if (
+          typeof call.path !== 'string' ||
+          call.path.length === 0 ||
+          call.path.length > 512 ||
+          call.path.includes('\0')
+        ) {
           return { error: { code: 'BAD_REQUEST', status: 400, message: 'Invalid procedure path' } }
         }
         const route = flatRouter('POST', '/' + call.path)?.data

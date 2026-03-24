@@ -421,7 +421,7 @@ function schemaToJsonSchema(schema: AnySchema): JSONSchema {
   try {
     const result = std.jsonSchema.input({ target: 'draft-2020-12' })
     if (result && typeof result === 'object') {
-      const { $schema, ...rest } = result as Record<string, unknown>
+      const { $schema: _, ...rest } = result as Record<string, unknown>
       return rest as JSONSchema
     }
   } catch {}
