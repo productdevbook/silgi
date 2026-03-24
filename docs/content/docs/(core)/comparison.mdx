@@ -92,8 +92,14 @@ JIT-compiled radix tree (Silgi) vs rou3.
 - Elysia is Bun-only — excluded from Node.js benchmarks.
 
 <Callout>
-  ```bash node --experimental-strip-types bench/http.ts # HTTP (Node.js) bun bench/http-bun.ts # HTTP (Bun) node
-  --experimental-strip-types bench/router.ts # Router ```
+Run benchmarks yourself:
+
+```bash
+node --experimental-strip-types bench/http.ts    # HTTP (Node.js)
+bun bench/http-bun.ts                            # HTTP (Bun)
+node --experimental-strip-types bench/router.ts  # Router
+```
+
 </Callout>
 
 ## Choosing the right tool
