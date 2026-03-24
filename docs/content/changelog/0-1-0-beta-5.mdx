@@ -1,8 +1,8 @@
 ---
 title: 0.1.0-beta.5
-description: createCaller for testing, OpenAPI overhaul with Standard Schema, per-procedure metadata.
+description: createCaller, OpenAPI overhaul, core refactor — unified handler, rou3, security fixes, ecosystem alignment.
 version: 0.1.0-beta.5
-date: 2026-03-23
+date: 2026-03-24
 ---
 
 ## createCaller — test procedures without HTTP
@@ -124,10 +124,83 @@ Procedures with `$input()` now automatically include a `400 BAD_REQUEST` respons
 
 See [Server docs](/docs/server) for the full `$route()` options reference.
 
-## Lint fixes
+---
 
-- Fixed unused private `#t0` field in `RequestAccumulator` (was shadowed by public `t0`)
-- Removed unused `Tooltip` imports from `request-detail-page.tsx`
-- Renamed unused `calls` variable in drizzle test
+## Core refactor — h3/unjs ecosystem alignment
 
-0 lint errors, 82/82 tests passing.
+The biggest internal refactor since launch. **-3900 lines removed**, zero breaking API changes. The entire core now follows [h3/unjs](https://github.com/unjs) conventions: clean single-responsibility modules, ecosystem packages over custom code, no surprises.
+
+### Unified request handler
+
+The handler had 4 duplicated code paths (sync GET, fast POST, async, minimalHandler). Now there's **one `async handleRequest()`**. Each concern is its own module:
+
+- `core/codec.ts` — response encoding (JSON, MessagePack, devalue)
+- `core/input.ts` — request input parsing (body, query, binary codecs)
+- `core/handler.ts` — orchestration only
+
+### rou3 router
+
+Replaced the 1400-line custom JIT router (`src/route/`, 8 files with `new Function()` code generation) with [rou3](https://github.com/unjs/rou3) — the same radix tree used by h3 and Nitro. Same performance, battle-tested.
+
+### cookie-es integration
+
+Replaced 3 separate custom cookie parsers with [cookie-es](https://github.com/unjs/cookie-es). `silgi/cookies` now exposes the full cookie-es feature set including `partitioned`, `priority`, `parseSetCookie`, and `splitSetCookieString`.
+
+### callable() timeout support
+
+`callable()` now creates a fresh `AbortSignal` per call with configurable timeout:
+
+```ts
+const fn = callable(procedure, {
+  context: () => ({ db }),
+  timeout: 5000, // default 30s, null to disable
+})
+```
+
+### WebSocket context + auto-abort
+
+`createWSHooks` and `attachWebSocket` now accept a `context` option. When a peer disconnects, all in-flight requests are automatically aborted.
+
+```ts
+await attachWebSocket(server, appRouter, {
+  context: (peer) => ({ userId: peer.request?.headers.get('x-user-id') }),
+})
+```
+
+See [WebSocket docs](/docs/protocols/websocket) for the updated API.
+
+## Security fixes
+
+- **Prototype pollution** — `applyGuardResult` now sanitizes nested `__proto__` keys recursively
+- **Cache race condition** — `cacheQuery` now uses unique per-request IDs instead of shared cache keys
+- **CORS** — omits header entirely for disallowed origins (was empty string)
+- **Analytics** — removed `?token=` URL auth, truncated stored input/stack, redacted sensitive headers
+- **Devalue** — `decode()` strips `RegExp` (ReDoS) and `Error` objects
+- **Batch server** — validates `call.path` type, length, and null bytes
+
+## Context lifecycle fixes
+
+- SSE/stream responses no longer release context to pool before stream completes (use-after-release)
+- `createCaller` uses context pool with null-prototype objects (was plain `{}`)
+- `router()` no longer mutates user's original definition via `Object.assign`
+
+## Removed
+
+- **Fastify adapter** (`silgi/fastify`) — use `silgi/express`, `silgi/nextjs`, or the built-in `s.serve()`
+- **fast-stringify.ts** — `new Function()` code injection surface + XSS risk (U+2028/U+2029)
+- **analyze.ts** — fragile `Function.toString()` heuristic that could skip context factory after minification
+
+## Dead code cleanup
+
+- `core/types.ts`, `core/index.ts` — never imported
+- `utils.ts`: `once`, `mergeHeaders`, `flattenHeader`, `mergeAbortSignals` — never used
+- `compile.ts`: duplicate `isProcedureDef`, deprecated `FlatRouter` alias
+- SSE: unused `EVENT_META_SYMBOL`, global `_primitiveMeta` Map
+- Stale competitor references removed from JSDoc comments
+
+## Stats
+
+- **-3900 net lines** removed
+- **0 lint errors**, **0 type errors**
+- **80/80 test files**, **635/635 tests** passing
+- Benchmarks stable — pipeline 6-20x faster than alternatives
