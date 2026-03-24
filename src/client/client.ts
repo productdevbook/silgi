@@ -1,10 +1,7 @@
 /**
- * Client factory — creates a type-safe client from a link.
+ * Client factory — creates a type-safe proxy client from a link.
  *
- * Key optimization over oRPC:
- * - Sub-proxies are cached in a Map (oRPC creates new Proxy per access)
- * - Path accumulation uses frozen arrays (V8 fast path)
- * - preventNativeAwait is built into the proxy handler
+ * Sub-proxies are cached in a Map for O(1) repeated access.
  */
 
 import type { InferClient } from '../types.ts'
@@ -46,9 +43,7 @@ function createClientProxy<T, TClientContext extends ClientContext>(
 
       let cached = cache.get(prop)
       if (!cached) {
-        // Freeze the child path for V8 optimization
-        const childPath = Object.freeze([...path, prop])
-        cached = createClientProxy(link, childPath)
+        cached = createClientProxy(link, [...path, prop])
         cache.set(prop, cached)
       }
       return cached

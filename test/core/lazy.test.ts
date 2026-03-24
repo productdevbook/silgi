@@ -7,7 +7,6 @@ describe('lazy', () => {
     const l = lazy(() => Promise.resolve({ default: {} }))
     expect(l.__lazy).toBe(true)
     expect(typeof l.load).toBe('function')
-    expect(l._resolved).toBeUndefined()
   })
 })
 
@@ -37,9 +36,8 @@ describe('resolveLazy', () => {
 
     const result = await resolveLazy(l)
     expect(result).toBe(routerDef)
-    expect(l._resolved).toBe(routerDef)
 
-    // Second call should use cache
+    // Second call should use cache — loader only called once
     const result2 = await resolveLazy(l)
     expect(result2).toBe(routerDef)
     expect(loader).toHaveBeenCalledTimes(1)

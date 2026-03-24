@@ -20,9 +20,11 @@ import type { RouterDef, ProcedureDef } from './types.ts'
 export interface LazyRouter {
   readonly __lazy: true
   readonly load: () => Promise<{ default: RouterDef | ProcedureDef }>
-  _resolved?: RouterDef | ProcedureDef
-  _loading?: Promise<RouterDef | ProcedureDef>
 }
+
+// Resolution cache — keeps LazyRouter interface clean (no mutable properties)
+const resolved = new WeakMap<LazyRouter, RouterDef | ProcedureDef>()
+const loading = new WeakMap<LazyRouter, Promise<RouterDef | ProcedureDef>>()
 
 /**
  * Wrap a dynamic import for lazy loading.
@@ -39,11 +41,17 @@ export function isLazy(value: unknown): value is LazyRouter {
 
 /** Resolve a lazy router (cached after first load, race-safe) */
 export async function resolveLazy(value: LazyRouter): Promise<RouterDef | ProcedureDef> {
-  if (value._resolved) return value._resolved
-  if (value._loading) return value._loading
-  value._loading = value.load().then((mod) => {
-    value._resolved = mod.default
-    return mod.default
-  })
-  return value._loading
+  const cached = resolved.get(value)
+  if (cached) return cached
+
+  let pending = loading.get(value)
+  if (!pending) {
+    pending = value.load().then((mod) => {
+      resolved.set(value, mod.default)
+      loading.delete(value)
+      return mod.default
+    })
+    loading.set(value, pending)
+  }
+  return pending
 }

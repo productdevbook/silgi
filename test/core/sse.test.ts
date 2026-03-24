@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { encodeEventMessage, EventDecoder, withEventMeta, getEventMeta, unwrapEventValue } from '#src/core/sse.ts'
+import { encodeEventMessage, EventDecoder, withEventMeta, getEventMeta } from '#src/core/sse.ts'
 
 describe('encodeEventMessage', () => {
   it('encodes a simple data message', () => {
@@ -121,15 +121,16 @@ describe('withEventMeta / getEventMeta', () => {
     expect(meta).toEqual({ id: '123', retry: 5000 })
   })
 
-  it('boxes primitives and allows meta retrieval via unwrap', () => {
+  it('only works with objects (primitives pass through unchanged)', () => {
+    // withEventMeta on primitives is a no-op (no side-channel, no boxing)
     const num = withEventMeta(42, { id: '1' })
-    // Primitives are boxed — use unwrapEventValue to get the original
-    expect(unwrapEventValue(num)).toBe(42)
-    expect(getEventMeta(num)).toEqual({ id: '1' })
+    expect(num).toBe(42)
+    expect(getEventMeta(42)).toBeUndefined()
 
-    const str = withEventMeta('str', { id: '2' })
-    expect(unwrapEventValue(str)).toBe('str')
-    expect(getEventMeta(str)).toEqual({ id: '2' })
+    // Objects work correctly
+    const obj = { value: 42 }
+    withEventMeta(obj, { id: '1' })
+    expect(getEventMeta(obj)).toEqual({ id: '1' })
 
     // null is returned as-is
     expect(withEventMeta(null, { id: '1' })).toBe(null)

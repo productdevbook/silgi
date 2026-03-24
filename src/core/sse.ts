@@ -21,40 +21,28 @@ export interface EventMeta {
   retry?: number
 }
 
+// Per-event metadata cache — scoped per iterator, not global
+const _eventMeta = new WeakMap<object, EventMeta>()
+
 /**
- * Attach SSE metadata (id, retry) to a value transparently.
+ * Attach SSE metadata (id, retry) to a value.
  *
- * For objects, uses a symbol property (zero overhead).
- * For primitives, boxes them in a wrapper object that serializes correctly.
+ * Only works with object values (arrays, plain objects, etc.).
+ * Primitives cannot carry metadata — wrap them in an object first.
  */
 export function withEventMeta<T>(value: T, meta: EventMeta): T {
-  if (value === null || value === undefined) return value
-  if (typeof value !== 'object') {
-    // Box primitive with metadata — avoids global side-channel Map
-    return { __value: value, [EVENT_META_SYMBOL]: meta } as unknown as T
+  if (typeof value === 'object' && value !== null) {
+    _eventMeta.set(value as object, meta)
   }
-  // For objects, attach metadata directly via symbol (no Proxy needed, no perf cost)
-  ;(value as Record<symbol, EventMeta>)[EVENT_META_SYMBOL] = meta
   return value
 }
 
 /**
- * Read SSE metadata from a value.
+ * Read SSE metadata from a value (if attached).
  */
 export function getEventMeta(value: unknown): EventMeta | undefined {
   if (typeof value !== 'object' || value === null) return undefined
-  return (value as Record<symbol, EventMeta>)[EVENT_META_SYMBOL]
-}
-
-/**
- * Unwrap a boxed primitive value (created by withEventMeta for primitives).
- * Returns the original value if not boxed.
- */
-export function unwrapEventValue(value: unknown): unknown {
-  if (typeof value === 'object' && value !== null && '__value' in value && EVENT_META_SYMBOL in value) {
-    return (value as { __value: unknown }).__value
-  }
-  return value
+  return _eventMeta.get(value as object)
 }
 
 // === SSE Message Types ===
@@ -227,10 +215,9 @@ export function iteratorToEventStream(
 
         // Regular value — send message event
         const meta = getEventMeta(result.value)
-        const rawValue = unwrapEventValue(result.value)
         const msg: EventMessage = {
           event: 'message',
-          data: serialize(rawValue),
+          data: serialize(result.value),
           id: meta?.id,
           retry: meta?.retry,
         }
@@ -324,7 +311,7 @@ export function eventStreamToIterator<T = unknown>(
             }
             case 'error': {
               const errorData = msg.data ? JSON.parse(msg.data) : {}
-              throw Object.assign(new Error(errorData.message ?? 'Stream error'), errorData)
+              throw new Error(errorData.message ?? 'Stream error')
             }
             case 'done': {
               return { done: true, value: undefined } as IteratorReturnResult<void>

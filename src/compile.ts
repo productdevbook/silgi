@@ -426,8 +426,6 @@ export interface MatchedRoute<T = unknown> {
 /** Compiled router function — returns matched route + params */
 export type CompiledRouterFn = (method: string, path: string) => MatchedRoute<CompiledRoute> | undefined
 
-/** @deprecated Use CompiledRouterFn */
-export type FlatRouter = CompiledRouterFn
 
 /**
  * Compile a router tree into a rou3 radix router.
@@ -492,11 +490,8 @@ export function createContext(): Record<string, unknown> {
 
 /** Return a context object to the pool after request completes. */
 export function releaseContext(ctx: Record<string, unknown>): void {
-  // Wipe all properties — cheaper than Object.create(null) in V8
-  const keys = Object.keys(ctx)
-  for (let i = 0; i < keys.length; i++) delete ctx[keys[i]!]
-  // Also delete any symbol properties (RAW_INPUT etc.)
-  const syms = Object.getOwnPropertySymbols(ctx)
-  for (let i = 0; i < syms.length; i++) delete (ctx as any)[syms[i]!]
+  // Wipe all properties so the next request starts clean
+  for (const key of Object.keys(ctx)) delete ctx[key]
+  for (const sym of Object.getOwnPropertySymbols(ctx)) delete (ctx as any)[sym]
   if (CTX_POOL.length < CTX_POOL_MAX) CTX_POOL.push(ctx)
 }
