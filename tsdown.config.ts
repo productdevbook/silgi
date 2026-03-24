@@ -29,7 +29,6 @@ export default defineConfig({
     'src/plugins/cookies.ts',
     'src/plugins/cache.ts',
     'src/plugins/analytics.ts',
-    'src/adapters/fastify.ts',
     'src/adapters/express.ts',
     'src/adapters/aws-lambda.ts',
 
