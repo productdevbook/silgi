@@ -1,8 +1,5 @@
 /**
- * Cookie helpers — parse, set, and delete cookies.
- *
- * Lightweight utilities for working with cookies in Silgi handlers.
- * No dependencies. Works with both serve() and handler().
+ * Cookie helpers — thin wrapper over cookie-es (unjs).
  *
  * @example
  * ```ts
@@ -16,80 +13,37 @@
  * ```
  */
 
-/** Parse a specific cookie from a headers object or cookie string. */
+import { parse, serialize } from 'cookie-es'
+
+import type { CookieSerializeOptions } from 'cookie-es'
+
+export type CookieOptions = CookieSerializeOptions
+
+/** Parse a specific cookie value by name. */
 export function getCookie(headers: Record<string, string> | string, name: string): string | undefined {
-  const cookieStr = typeof headers === 'string' ? headers : (headers.cookie ?? headers.Cookie ?? '')
-  if (!cookieStr) return undefined
-
-  const prefix = `${name}=`
-  const cookies = cookieStr.split(';')
-  for (let i = 0; i < cookies.length; i++) {
-    const c = cookies[i]!.trim()
-    if (c.startsWith(prefix)) {
-      return decodeURIComponent(c.slice(prefix.length))
-    }
-  }
-  return undefined
+  const str = typeof headers === 'string' ? headers : (headers.cookie ?? headers.Cookie ?? '')
+  if (!str) return undefined
+  return parse(str)[name]
 }
 
-/** Parse all cookies from a headers object or cookie string. */
+/** Parse all cookies into a key-value object. */
 export function parseCookies(headers: Record<string, string> | string): Record<string, string> {
-  const cookieStr = typeof headers === 'string' ? headers : (headers.cookie ?? headers.Cookie ?? '')
-  if (!cookieStr) return {}
-
-  const result: Record<string, string> = {}
-  const cookies = cookieStr.split(';')
-  for (let i = 0; i < cookies.length; i++) {
-    const c = cookies[i]!.trim()
-    const eq = c.indexOf('=')
-    if (eq === -1) continue
-    const key = c.slice(0, eq)
-    const value = c.slice(eq + 1)
-    result[key] = decodeURIComponent(value)
-  }
-  return result
+  const str = typeof headers === 'string' ? headers : (headers.cookie ?? headers.Cookie ?? '')
+  if (!str) return {}
+  return parse(str) as Record<string, string>
 }
 
-export interface CookieOptions {
-  /** Cookie expiry in seconds from now. */
-  maxAge?: number
-  /** Absolute expiry date. */
-  expires?: Date
-  /** Cookie path. Default: "/" */
-  path?: string
-  /** Cookie domain. */
-  domain?: string
-  /** HTTPS only. Default: true in production. */
-  secure?: boolean
-  /** Prevent JavaScript access. Default: true */
-  httpOnly?: boolean
-  /** SameSite policy. Default: "lax" */
-  sameSite?: 'strict' | 'lax' | 'none'
-}
-
-/** Serialize a Set-Cookie header value. */
+/** Serialize a Set-Cookie header. Defaults: path="/", httpOnly, sameSite=lax. */
 export function setCookie(name: string, value: string, options: CookieOptions = {}): string {
-  const { path = '/', httpOnly = true, secure, sameSite = 'lax', maxAge, expires, domain } = options
-
-  let cookie = `${name}=${encodeURIComponent(value)}`
-  if (path) cookie += `; Path=${path}`
-  if (domain) cookie += `; Domain=${domain}`
-  if (maxAge !== undefined) cookie += `; Max-Age=${maxAge}`
-  if (expires) cookie += `; Expires=${expires.toUTCString()}`
-  if (httpOnly) cookie += '; HttpOnly'
-  if (
-    secure ??
-    (sameSite === 'none' ||
-      (typeof globalThis.process !== 'undefined' && globalThis.process.env?.NODE_ENV === 'production'))
-  ) {
-    cookie += '; Secure'
-  }
-  cookie += `; SameSite=${sameSite.charAt(0).toUpperCase() + sameSite.slice(1)}`
-
-  return cookie
+  const defaults: CookieOptions = { path: '/', httpOnly: true, sameSite: 'lax' }
+  // SameSite=None requires Secure per RFC 6265bis
+  if (options.sameSite === 'none') defaults.secure = true
+  return serialize(name, value, { ...defaults, ...options })
 }
 
-/** Create a Set-Cookie header that deletes a cookie. */
+/** Delete a cookie by setting maxAge=0. */
 export function deleteCookie(name: string, options: Pick<CookieOptions, 'path' | 'domain'> = {}): string {
   return setCookie(name, '', { ...options, maxAge: 0 })
 }
+
+export { parseSetCookie, splitSetCookieString } from 'cookie-es'

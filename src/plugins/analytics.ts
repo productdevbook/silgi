@@ -15,6 +15,8 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { parse as parseCookieHeader } from 'cookie-es'
+
 // ── Ring Buffer (fixed memory, no GC pressure) ──────
 
 class RingBuffer {
@@ -505,7 +507,8 @@ export class RequestAccumulator {
     this.#collector = collector
 
     // Read or generate session ID from cookie
-    const existing = parseCookie(request.headers.get('cookie'), SESSION_COOKIE)
+    const cookieHeader = request.headers.get('cookie')
+    const existing = cookieHeader ? parseCookieHeader(cookieHeader)[SESSION_COOKIE] : undefined
     if (existing && existing.length >= 10) {
       this.sessionId = existing
       this.isNewSession = false
@@ -574,24 +577,6 @@ export class RequestAccumulator {
   get hasProcedures(): boolean {
     return this.#procedures.length > 0
   }
-}
-
-// ── Cookie Parser (fast, zero-alloc for single key) ─
-
-function parseCookie(header: string | null, name: string): string | undefined {
-  if (!header) return undefined
-  const prefix = name + '='
-  let start = header.indexOf(prefix)
-  if (start === -1) return undefined
-  // Ensure it's a full match (not "other_sid=")
-  if (start > 0 && header[start - 1] !== ' ' && header[start - 1] !== ';') {
-    start = header.indexOf('; ' + prefix)
-    if (start === -1) return undefined
-    start += 2 // skip "; "
-  }
-  const valueStart = start + prefix.length
-  const valueEnd = header.indexOf(';', valueStart)
-  return valueEnd === -1 ? header.slice(valueStart) : header.slice(valueStart, valueEnd)
 }
 
 // ── Markdown Export ─────────────────────────────────

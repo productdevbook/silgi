@@ -17,6 +17,9 @@ importers:
       '@standard-schema/spec':
         specifier: ^1.1.0
         version: 1.1.0
+      cookie-es:
+        specifier: ^3.0.1
+        version: 3.0.1
       crossws:
         specifier: ^0.4.4
         version: 0.4.4(srvx@0.11.12)
@@ -93,9 +96,6 @@ importers:
       express:
         specifier: ^5.2.1
         version: 5.2.1
-      fastify:
-        specifier: ^5.8.2
-        version: 5.8.2
       h3:
         specifier: 2.0.1-rc.16
         version: 2.0.1-rc.16(crossws@0.4.4(srvx@0.11.12))
@@ -4531,6 +4531,9 @@ packages:
   cookie-es@2.0.0:
     resolution: {integrity: sha512-RAj4E421UYRgqokKUmotqAwuplYw15qtdXfY+hGzgCJ/MBjCVZcSoHK/kH9kocfjRjcDME7IiDWR/1WX1TM2Pg==}
 
+  cookie-es@3.0.1:
+    resolution: {integrity: sha512-1HqK6V6Prrm7cHzmjtCzfa370ljqPQoNeWIh5NXYqWwUI2l3DZlzjHHh25ZvJIPfwkiYnCvHykE2MIJkEVD1Rg==}
+
   cookie-signature@1.2.2:
     resolution: {integrity: sha512-D76uU73ulSXrD1UXF4KE2TMxVVwhsnCgfAyTg9k8P6KGZjlXKrOLe4dJQKI3Bxi5wjesZoFXJWElNWBjPZMbhg==}
     engines: {node: '>=6.6.0'}
@@ -8752,23 +8755,29 @@ snapshots:
       ajv: 8.18.0
       ajv-formats: 3.0.1(ajv@8.18.0)
       fast-uri: 3.1.0
+    optional: true
 
-  '@fastify/error@4.2.0': {}
+  '@fastify/error@4.2.0':
+    optional: true
 
   '@fastify/fast-json-stringify-compiler@5.0.3':
     dependencies:
       fast-json-stringify: 6.3.0
+    optional: true
 
-  '@fastify/forwarded@3.0.1': {}
+  '@fastify/forwarded@3.0.1':
+    optional: true
 
   '@fastify/merge-json-schemas@0.2.1':
     dependencies:
       dequal: 2.0.3
+    optional: true
 
   '@fastify/proxy-addr@5.1.0':
     dependencies:
       '@fastify/forwarded': 3.0.1
       ipaddr.js: 2.3.0
+    optional: true
 
   '@floating-ui/core@1.7.5':
     dependencies:
@@ -10107,7 +10116,8 @@ snapshots:
 
   '@phosphor-icons/core@2.1.1': {}
 
-  '@pinojs/redact@0.4.0': {}
+  '@pinojs/redact@0.4.0':
+    optional: true
 
   '@polka/url@1.0.0-next.29': {}
 
@@ -11924,7 +11934,8 @@ snapshots:
 
   '@zeit/schemas@2.36.0': {}
 
-  abstract-logging@2.0.1: {}
+  abstract-logging@2.0.1:
+    optional: true
 
   accepts@2.0.0:
     dependencies:
@@ -12029,12 +12040,14 @@ snapshots:
 
   astring@1.9.0: {}
 
-  atomic-sleep@1.0.0: {}
+  atomic-sleep@1.0.0:
+    optional: true
 
   avvio@9.2.0:
     dependencies:
       '@fastify/error': 4.2.0
       fastq: 1.20.1
+    optional: true
 
   axobject-query@4.1.0: {}
 
@@ -12347,6 +12360,8 @@ snapshots:
   cookie-es@1.2.2: {}
 
   cookie-es@2.0.0: {}
+
+  cookie-es@3.0.1: {}
 
   cookie-signature@1.2.2: {}
 
@@ -12838,12 +12853,14 @@ snapshots:
       fast-uri: 3.1.0
       json-schema-ref-resolver: 3.0.0
       rfdc: 1.4.1
+    optional: true
 
   fast-npm-meta@1.4.2: {}
 
   fast-querystring@1.1.2:
     dependencies:
       fast-decode-uri-component: 1.0.1
+    optional: true
 
   fast-uri@3.1.0: {}
 
@@ -12864,6 +12881,7 @@ snapshots:
       secure-json-parse: 4.1.0
       semver: 7.7.4
       toad-cache: 3.7.0
+    optional: true
 
   fastq@1.20.1:
     dependencies:
@@ -12911,6 +12929,7 @@ snapshots:
       fast-deep-equal: 3.1.3
       fast-querystring: 1.1.2
       safe-regex2: 5.1.0
+    optional: true
 
   flatted@3.4.2: {}
 
@@ -13483,7 +13502,8 @@ snapshots:
 
   ipaddr.js@1.9.1: {}
 
-  ipaddr.js@2.3.0: {}
+  ipaddr.js@2.3.0:
+    optional: true
 
   iron-webcrypto@1.2.1: {}
 
@@ -13607,6 +13627,7 @@ snapshots:
   json-schema-ref-resolver@3.0.0:
     dependencies:
       dequal: 2.0.3
+    optional: true
 
   json-schema-traverse@1.0.0: {}
 
@@ -13648,6 +13669,7 @@ snapshots:
       cookie: 1.1.1
       process-warning: 4.0.1
       set-cookie-parser: 2.7.2
+    optional: true
 
   lightningcss-android-arm64@1.32.0:
     optional: true
@@ -14887,7 +14909,8 @@ snapshots:
 
   on-change@6.0.2: {}
 
-  on-exit-leak-free@2.1.2: {}
+  on-exit-leak-free@2.1.2:
+    optional: true
 
   on-finished@2.4.1:
     dependencies:
@@ -15148,8 +15171,10 @@ snapshots:
   pino-abstract-transport@3.0.0:
     dependencies:
       split2: 4.2.0
+    optional: true
 
-  pino-std-serializers@7.1.0: {}
+  pino-std-serializers@7.1.0:
+    optional: true
 
   pino@10.3.1:
     dependencies:
@@ -15164,6 +15189,7 @@ snapshots:
       safe-stable-stringify: 2.5.0
       sonic-boom: 4.2.1
       thread-stream: 4.0.0
+    optional: true
 
   pkce-challenge@5.0.1: {}
 
@@ -15208,9 +15234,11 @@ snapshots:
     dependencies:
       parse-ms: 4.0.0
 
-  process-warning@4.0.1: {}
+  process-warning@4.0.1:
+    optional: true
 
-  process-warning@5.0.0: {}
+  process-warning@5.0.0:
+    optional: true
 
   prompts@2.4.2:
     dependencies:
@@ -15240,7 +15268,8 @@ snapshots:
 
   queue-microtask@1.2.3: {}
 
-  quick-format-unescaped@4.0.4: {}
+  quick-format-unescaped@4.0.4:
+    optional: true
 
   radash@12.1.1: {}
 
@@ -15368,7 +15397,8 @@ snapshots:
 
   readdirp@5.0.0: {}
 
-  real-require@0.2.0: {}
+  real-require@0.2.0:
+    optional: true
 
   recast@0.23.11:
     dependencies:
@@ -15563,13 +15593,15 @@ snapshots:
       onetime: 7.0.0
       signal-exit: 4.1.0
 
-  ret@0.5.0: {}
+  ret@0.5.0:
+    optional: true
 
   rettime@0.10.1: {}
 
   reusify@1.1.0: {}
 
-  rfdc@1.4.1: {}
+  rfdc@1.4.1:
+    optional: true
 
   rolldown-plugin-dts@0.22.5(@typescript/native-preview@7.0.0-dev.20260316.1)(rolldown@1.0.0-rc.9)(typescript@6.0.2):
     dependencies:
@@ -15701,8 +15733,10 @@ snapshots:
   safe-regex2@5.1.0:
     dependencies:
       ret: 0.5.0
+    optional: true
 
-  safe-stable-stringify@2.5.0: {}
+  safe-stable-stringify@2.5.0:
+    optional: true
 
   safer-buffer@2.1.2: {}
 
@@ -15714,7 +15748,8 @@ snapshots:
 
   scule@1.3.0: {}
 
-  secure-json-parse@4.1.0: {}
+  secure-json-parse@4.1.0:
+    optional: true
 
   semver@6.3.1: {}
 
@@ -15777,7 +15812,8 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  set-cookie-parser@2.7.2: {}
+  set-cookie-parser@2.7.2:
+    optional: true
 
   set-cookie-parser@3.0.1: {}
 
@@ -15930,6 +15966,7 @@ snapshots:
   sonic-boom@4.2.1:
     dependencies:
       atomic-sleep: 1.0.0
+    optional: true
 
   source-map-js@1.2.1: {}
 
@@ -15966,7 +16003,8 @@ snapshots:
       spdx-expression-parse: 3.0.1
       spdx-ranges: 2.1.1
 
-  split2@4.2.0: {}
+  split2@4.2.0:
+    optional: true
 
   srvx@0.10.1: {}
 
@@ -16123,6 +16161,7 @@ snapshots:
   thread-stream@4.0.0:
     dependencies:
       real-require: 0.2.0
+    optional: true
 
   time-span@5.1.0:
     dependencies:
@@ -16157,7 +16196,8 @@ snapshots:
     dependencies:
       is-number: 7.0.0
 
-  toad-cache@3.7.0: {}
+  toad-cache@3.7.0:
+    optional: true
 
   toidentifier@1.0.1: {}
 

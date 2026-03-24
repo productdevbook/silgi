@@ -17,6 +17,8 @@ import {
 } from '../plugins/analytics.ts'
 import { generateOpenAPI, scalarHTML } from '../scalar.ts'
 
+import { parse as parseCookieHeader } from 'cookie-es'
+
 import { detectResponseFormat, encodeResponse, makeErrorResponse } from './codec.ts'
 import { SilgiError, toSilgiError } from './error.ts'
 import { parseInput } from './input.ts'
@@ -82,8 +84,8 @@ function checkAnalyticsAuth(
   if (typeof auth === 'function') return auth(request)
   const cookie = request.headers.get('cookie')
   if (cookie) {
-    const match = cookie.match(/(?:^|;\s*)silgi-auth=([^;]*)/)
-    if (match && decodeURIComponent(match[1]!) === auth) return true
+    const cookies = parseCookieHeader(cookie)
+    if (cookies['silgi-auth'] === auth) return true
   }
   const authHeader = request.headers.get('authorization')
   if (authHeader === `Bearer ${auth}`) return true
