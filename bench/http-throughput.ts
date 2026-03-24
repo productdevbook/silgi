@@ -119,8 +119,12 @@ for (const concurrency of CONCURRENCY) {
 
       // Collect stderr/stdout for debugging
       let output = ''
-      proc.stdout?.on('data', (d: Buffer) => { output += d.toString() })
-      proc.stderr?.on('data', (d: Buffer) => { output += d.toString() })
+      proc.stdout?.on('data', (d: Buffer) => {
+        output += d.toString()
+      })
+      proc.stderr?.on('data', (d: Buffer) => {
+        output += d.toString()
+      })
 
       try {
         await waitForPort(port)
