@@ -1,19 +1,15 @@
 /**
- * Pipeline Compiler v3 — 2026 Optimized
+ * Pipeline Compiler — guard unrolling, context pooling, rou3 routing.
  *
- * Innovations:
  * 1. UNROLLED GUARDS — 0-4 guard specialization (no loop, V8 inlines)
- * 2. FLAT MAP ROUTER — O(1) lookup via Map.get()
- * 3. ZERO-ALLOC CONTEXT — Object.create(null) with direct property set
- * 4. AbortSignal.any() — native signal composition
- * 5. Promise.withResolvers() — cleaner deferred patterns
- * 6. RESULT-BASED ERRORS — avoid throw for typed errors (optional)
- *
- * Benchmark target: 5-8x faster than oRPC
+ * 2. ZERO-ALLOC CONTEXT — Object.create(null) + pool reuse
+ * 3. ROU3 ROUTER — unjs radix tree (same as h3/nitro)
  */
 
 import { SilgiError } from './core/error.ts'
+import { isProcedureDef } from './core/router-utils.ts'
 import { validateSchema } from './core/schema.ts'
+
 import type { ProcedureDef, GuardDef, WrapDef, ErrorDef } from './types.ts'
 
 /** Internal symbol for pipeline raw input — prevents collision with user context keys */
@@ -484,18 +480,6 @@ export function compileRouter(def: Record<string, unknown>): CompiledRouterFn {
   return (method: string, path: string) => findRou3Route(router, method, path) as MatchedRoute<CompiledRoute> | undefined
 }
 
-const PROCEDURE_TYPES = /* @__PURE__ */ new Set(['query', 'mutation', 'subscription'])
-
-function isProcedureDef(value: unknown): value is ProcedureDef {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'type' in value &&
-    PROCEDURE_TYPES.has((value as any).type) &&
-    'resolve' in value &&
-    typeof (value as ProcedureDef).resolve === 'function'
-  )
-}
 
 /** Pool of pre-allocated null-prototype context objects — eliminates per-request GC pressure. */
 const CTX_POOL: Record<string, unknown>[] = []

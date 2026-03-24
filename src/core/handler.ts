@@ -1,3 +1,10 @@
+/**
+ * Fetch API handler — single unified request handler.
+ *
+ * Orchestrates: routing → context → input parsing → pipeline → response encoding.
+ * Each concern lives in its own module (codec.ts, input.ts, sse.ts).
+ */
+
 import { createContext, releaseContext } from '../compile.ts'
 import { compileRouter } from '../compile.ts'
 import {
@@ -10,86 +17,25 @@ import {
 } from '../plugins/analytics.ts'
 import { generateOpenAPI, scalarHTML } from '../scalar.ts'
 
+import { detectResponseFormat, encodeResponse, makeErrorResponse } from './codec.ts'
 import { SilgiError, toSilgiError } from './error.ts'
+import { parseInput } from './input.ts'
 import { routerCache } from './router-utils.ts'
 import { ValidationError } from './schema.ts'
 import { iteratorToEventStream } from './sse.ts'
-import { stringifyJSON } from './utils.ts'
 
 import type { CompiledRoute, CompiledRouterFn } from '../compile.ts'
+import type { ResponseFormat } from './codec.ts'
 import type { AnalyticsOptions } from '../plugins/analytics.ts'
 import type { ScalarOptions } from '../scalar.ts'
 import type { SilgiHooks } from '../silgi.ts'
 import type { Hookable } from 'hookable'
 
-// Lazy-loaded codecs — resolved on first non-JSON request
-let _msgpack: typeof import('../codec/msgpack.ts') | undefined
-let _devalue: typeof import('../codec/devalue.ts') | undefined
+// Re-export for backwards compat
+export type { ResponseFormat } from './codec.ts'
+export { encodeResponse } from './codec.ts'
 
-// ── Response Encoding Helper ────────────────────────
-
-export type ResponseFormat = 'json' | 'msgpack' | 'devalue'
-
-export async function encodeResponse(
-  data: unknown,
-  status: number,
-  format: ResponseFormat,
-  extraHeaders?: Record<string, string>,
-): Promise<Response> {
-  switch (format) {
-    case 'msgpack': {
-      _msgpack ??= await import('../codec/msgpack.ts')
-      return new Response(_msgpack.encode(data), {
-        status,
-        headers: { 'content-type': _msgpack.MSGPACK_CONTENT_TYPE, ...extraHeaders },
-      })
-    }
-    case 'devalue': {
-      _devalue ??= await import('../codec/devalue.ts')
-      return new Response(_devalue.encode(data), {
-        status,
-        headers: { 'content-type': _devalue.DEVALUE_CONTENT_TYPE, ...extraHeaders },
-      })
-    }
-    default:
-      return new Response(stringifyJSON(data), {
-        status,
-        headers: { 'content-type': 'application/json', ...extraHeaders },
-      })
-  }
-}
-
-function round(n: number): number {
-  return Math.round(n * 100) / 100
-}
-
-function checkAnalyticsAuth(
-  request: Request,
-  auth: string | ((req: Request) => boolean | Promise<boolean>),
-): boolean | Promise<boolean> {
-  if (typeof auth === 'function') return auth(request)
-  // Token auth: check cookie or Authorization header only (no URL query for security)
-  const cookie = request.headers.get('cookie')
-  if (cookie) {
-    const match = cookie.match(/(?:^|;\s*)silgi-auth=([^;]*)/)
-    if (match && decodeURIComponent(match[1]!) === auth) return true
-  }
-  const authHeader = request.headers.get('authorization')
-  if (authHeader === `Bearer ${auth}`) return true
-  return false
-}
-
-// ── Response Format Detection ───────────────────────
-
-function detectResponseFormat(request: Request): ResponseFormat {
-  const accept = request.headers.get('accept')
-  if (!accept) return 'json'
-  if (accept.includes('msgpack')) return 'msgpack'
-  if (accept.includes('x-devalue')) return 'devalue'
-  return 'json'
-}
-
-// ── Shared Response Builder ─────────────────────────
+// ── Response Builder ────────────────────────────────
 
 function makeResponse(
   output: unknown,
@@ -102,27 +48,20 @@ function makeResponse(
     return output
   }
   if (output instanceof ReadableStream) {
-    // Don't release context — stream may still reference it via closures
-    // Context will be GC'd when stream is done
     return new Response(output, { headers: { 'content-type': 'application/octet-stream' } })
   }
   if (output && typeof output === 'object' && Symbol.asyncIterator in (output as object)) {
-    // SSE/subscription — don't release context until stream closes
-    const stream = iteratorToEventStream(output as AsyncIterableIterator<unknown>)
-    return new Response(stream, {
+    return new Response(iteratorToEventStream(output as AsyncIterableIterator<unknown>), {
       headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
     })
   }
 
-  // Regular JSON/codec response — safe to release context now
   releaseCtx && releaseContext(releaseCtx)
 
   const cacheHeaders = route.cacheControl ? { 'cache-control': route.cacheControl } : undefined
-
   if (format !== 'json') {
     return encodeResponse(output, 200, format, cacheHeaders)
   }
-
   return new Response(JSON.stringify(output), {
     headers: cacheHeaders
       ? { 'content-type': 'application/json', ...cacheHeaders }
@@ -130,69 +69,35 @@ function makeResponse(
   })
 }
 
-// ── Shared Error Handler ────────────────────────────
+// ── Analytics Helpers ───────────────────────────────
 
-function makeErrorResponse(error: unknown, format: ResponseFormat): Response | Promise<Response> {
-  if (error instanceof ValidationError) {
-    const body = { code: 'BAD_REQUEST', status: 400, message: error.message, data: { issues: error.issues } }
-    return encodeResponse(body, 400, format)
-  }
-  if (error instanceof SyntaxError) {
-    const body = { code: 'BAD_REQUEST', status: 400, message: 'Invalid JSON body' }
-    return encodeResponse(body, 400, format)
-  }
-  const e = error instanceof SilgiError ? error : toSilgiError(error)
-  return encodeResponse(e.toJSON(), e.status, format)
+function round(n: number): number {
+  return Math.round(n * 100) / 100
 }
 
-// ── Input Parsing ───────────────────────────────────
-
-const isBun = typeof globalThis.Bun !== 'undefined'
-
-async function parseInput(request: Request, url: string, qMark: number): Promise<unknown> {
-  if (request.method === 'GET' || !request.body) {
-    if (qMark !== -1) {
-      const searchStr = url.slice(qMark + 1)
-      const dataIdx = searchStr.indexOf('data=')
-      if (dataIdx !== -1) {
-        const valueStart = dataIdx + 5
-        const valueEnd = searchStr.indexOf('&', valueStart)
-        const encoded = valueEnd === -1 ? searchStr.slice(valueStart) : searchStr.slice(valueStart, valueEnd)
-        return JSON.parse(decodeURIComponent(encoded))
-      }
-    }
-    return undefined
+function checkAnalyticsAuth(
+  request: Request,
+  auth: string | ((req: Request) => boolean | Promise<boolean>),
+): boolean | Promise<boolean> {
+  if (typeof auth === 'function') return auth(request)
+  const cookie = request.headers.get('cookie')
+  if (cookie) {
+    const match = cookie.match(/(?:^|;\s*)silgi-auth=([^;]*)/)
+    if (match && decodeURIComponent(match[1]!) === auth) return true
   }
-
-  const ct = request.headers.get('content-type')
-
-  // Binary codecs
-  if (ct) {
-    if (ct.includes('msgpack')) {
-      _msgpack ??= await import('../codec/msgpack.ts')
-      const buf = new Uint8Array(await request.arrayBuffer())
-      return buf.length > 0 ? _msgpack.decode(buf) : undefined
-    }
-    if (ct.includes('x-devalue')) {
-      _devalue ??= await import('../codec/devalue.ts')
-      const text = await request.text()
-      return text ? _devalue.decode(text) : undefined
-    }
-  }
-
-  // JSON body
-  if (isBun) {
-    try {
-      return await request.json()
-    } catch {
-      return undefined
-    }
-  }
-  const text = await request.text()
-  return text ? JSON.parse(text) : undefined
+  const authHeader = request.headers.get('authorization')
+  if (authHeader === `Bearer ${auth}`) return true
+  return false
 }
 
-// ── Fetch Handler ───────────────────────────────────
+function sanitizeHeaders(headers: Headers): Record<string, string> {
+  const result: Record<string, string> = {}
+  const sensitiveKeys = new Set(['authorization', 'cookie', 'x-api-key', 'x-auth-token', 'proxy-authorization'])
+  headers.forEach((value, key) => {
+    result[key] = sensitiveKeys.has(key.toLowerCase()) ? '[REDACTED]' : value
+  })
+  return result
+}
 
 const analyticsLoginHTML = `<!doctype html>
 <html lang="en">
@@ -235,6 +140,8 @@ location.reload();
 </body>
 </html>`
 
+// ── Fetch Handler ───────────────────────────────────
+
 export function createFetchHandler(
   routerDef: import('../types.ts').RouterDef,
   contextFactory: (req: Request) => Record<string, unknown> | Promise<Record<string, unknown>>,
@@ -248,7 +155,6 @@ export function createFetchHandler(
     routerCache.set(routerDef, compiledRouter)
   }
 
-  // Pre-allocated constants
   const jsonHeaders = { 'content-type': 'application/json' }
   const notFoundBody = JSON.stringify({ code: 'NOT_FOUND', status: 404, message: 'Procedure not found' })
 
@@ -274,7 +180,7 @@ export function createFetchHandler(
     analyticsAuth = analyticsOpts.auth
   }
 
-  // Hook helpers — use hookable's API directly, no monkey-patching
+  // Hook helper
   function callHook(name: keyof SilgiHooks, event: any): void {
     if (!hooks) return
     try {
@@ -283,7 +189,7 @@ export function createFetchHandler(
     } catch {}
   }
 
-  // Analytics serving
+  // Analytics routes
   function analyticsAuthResponse(pathname: string): Response {
     if (pathname.includes('_api/')) {
       return new Response(JSON.stringify({ code: 'UNAUTHORIZED', status: 401, message: 'Invalid token' }), {
@@ -344,30 +250,21 @@ export function createFetchHandler(
   }
 
   // ── Unified Request Handler ───────────────────────
-  // Single code path for all requests — clean, maintainable, correct.
 
   async function handleRequest(request: Request): Promise<Response> {
-    // URL parse
     const url = request.url
     const pathStart = url.indexOf('/', url.indexOf('//') + 2)
     const qMark = url.indexOf('?', pathStart)
     const fullPath = qMark === -1 ? url.slice(pathStart) : url.slice(pathStart, qMark)
     const pathname = fullPath.length > 1 ? fullPath.slice(1) : ''
 
-    // Analytics accumulator
     let accumulator: RequestAccumulator | undefined
-    if (collector) {
-      accumulator = new RequestAccumulator(request, collector)
-    }
+    if (collector) accumulator = new RequestAccumulator(request, collector)
 
     // Scalar routes
     if (scalarEnabled) {
-      if (pathname === 'openapi.json') {
-        return new Response(specJson, { headers: { 'content-type': 'application/json' } })
-      }
-      if (pathname === 'reference') {
-        return new Response(specHtml, { headers: { 'content-type': 'text/html' } })
-      }
+      if (pathname === 'openapi.json') return new Response(specJson, { headers: { 'content-type': 'application/json' } })
+      if (pathname === 'reference') return new Response(specHtml, { headers: { 'content-type': 'text/html' } })
     }
 
     // Analytics routes
@@ -404,12 +301,11 @@ export function createFetchHandler(
     let t0 = 0
 
     try {
-      // Context factory — always called
+      // Context
       const baseCtxResult = contextFactory(request)
       const baseCtx = baseCtxResult instanceof Promise ? await baseCtxResult : baseCtxResult
       const keys = Object.keys(baseCtx)
       for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = baseCtx[keys[i]!]
-
       if (match.params) ctx.params = match.params
 
       // Analytics trace
@@ -419,48 +315,46 @@ export function createFetchHandler(
         ctx.trace = reqTrace.trace.bind(reqTrace)
       }
 
-      // Parse input (skip for passthrough routes)
-      if (!route.passthrough) {
-        rawInput = await parseInput(request, url, qMark)
-      }
+      // Input
+      if (!route.passthrough) rawInput = await parseInput(request, url, qMark)
 
       callHook('request', { path: pathname, input: rawInput })
 
-      // Execute pipeline
+      // Pipeline
       t0 = collector ? performance.now() : 0
       const pipelineResult = route.handler(ctx, rawInput, request.signal)
       const output = pipelineResult instanceof Promise ? await pipelineResult : pipelineResult
 
-      // Record analytics
+      // Analytics
       const durationMs = collector ? round(performance.now() - t0) : 0
       callHook('response', { path: pathname, output, durationMs })
-
       if (collector) {
         collector.record(pathname, durationMs)
         if (accumulator) {
+          const isStream =
+            output instanceof ReadableStream ||
+            (output && typeof output === 'object' && Symbol.asyncIterator in (output as object))
           accumulator.addProcedure({
             procedure: pathname,
             durationMs,
             status: 200,
             input: rawInput,
-            output: output instanceof ReadableStream || (output && typeof output === 'object' && Symbol.asyncIterator in (output as object)) ? null : output,
+            output: isStream ? null : output,
             spans: reqTrace?.spans ?? [],
           })
         }
       }
 
-      // Build response — for streaming, context is NOT released (stream may hold refs)
+      // Response
       const isStreaming =
         output instanceof ReadableStream ||
         (output && typeof output === 'object' && Symbol.asyncIterator in (output as object))
-
       const response = makeResponse(output, route, format, isStreaming ? undefined : ctx)
       return response instanceof Promise ? await response : response
     } catch (error) {
       releaseContext(ctx)
       callHook('error', { path: pathname, error })
 
-      // Record error analytics
       if (collector) {
         const durationMs = t0 ? round(performance.now() - t0) : 0
         const errorMsg = error instanceof Error ? error.message : String(error)
@@ -476,14 +370,12 @@ export function createFetchHandler(
           error: errorMsg,
           code: isValidation ? 'BAD_REQUEST' : (silgiErr?.code ?? 'INTERNAL_SERVER_ERROR'),
           status: errStatus,
-          // Truncate for security — don't store unbounded attacker input
           stack: error instanceof Error ? (error.stack ?? '').slice(0, 2048) : '',
           input: typeof rawInput === 'string' ? rawInput.slice(0, 4096) : rawInput,
           headers: sanitizeHeaders(request.headers),
           durationMs,
           spans: reqTrace?.spans ?? [],
         })
-
         if (accumulator) {
           accumulator.addProcedure({
             procedure: pathname,
@@ -502,13 +394,12 @@ export function createFetchHandler(
     }
   }
 
-  // Wrap with analytics headers if collector is active
+  // Wrap with analytics headers
   if (!collector) return handleRequest
 
   return async (request: Request): Promise<Response> => {
     const acc = new RequestAccumulator(request, collector!)
     const response = await handleRequest(request)
-
     const headers = new Headers(response.headers)
     headers.set('x-request-id', acc.requestId)
     const cookie = acc.getSessionCookie()
@@ -517,15 +408,4 @@ export function createFetchHandler(
     acc.flushWithResponse(injected)
     return injected
   }
-}
-
-// ── Sanitize headers for analytics storage ──────────
-
-function sanitizeHeaders(headers: Headers): Record<string, string> {
-  const result: Record<string, string> = {}
-  const sensitiveKeys = new Set(['authorization', 'cookie', 'x-api-key', 'x-auth-token', 'proxy-authorization'])
-  headers.forEach((value, key) => {
-    result[key] = sensitiveKeys.has(key.toLowerCase()) ? '[REDACTED]' : value
-  })
-  return result
 }

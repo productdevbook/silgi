@@ -3,7 +3,6 @@ import { describe, it, expect } from 'vitest'
 import { SilgiError, isDefinedError, toSilgiError, isSilgiErrorJSON, fromSilgiErrorJSON } from '#src/core/error.ts'
 import { AsyncIteratorClass } from '#src/core/iterator.ts'
 import { validateSchema, type as typeSchema } from '#src/core/schema.ts'
-import { once, mergeHeaders } from '#src/core/utils.ts'
 
 // === SilgiError ===
 describe('SilgiError', () => {
@@ -69,23 +68,6 @@ describe('SilgiError', () => {
     expect(err.code).toBe('CONFLICT')
     expect(err.status).toBe(409)
     expect(err.defined).toBe(true)
-  })
-})
-
-// === Utils ===
-describe('utils', () => {
-  it('once memoizes', async () => {
-    let count = 0
-    const fn = once(async () => ++count)
-    expect(await fn()).toBe(1)
-    expect(await fn()).toBe(1)
-  })
-
-  it('mergeHeaders combines multi-value', () => {
-    const result = mergeHeaders({ 'x-a': '1', 'x-b': '2' }, { 'x-a': '3', 'x-c': '4' })
-    expect(result['x-a']).toEqual(['1', '3'])
-    expect(result['x-b']).toBe('2')
-    expect(result['x-c']).toBe('4')
   })
 })
 

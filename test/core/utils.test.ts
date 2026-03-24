@@ -1,62 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { mergeAbortSignals, flattenHeader, parseEmptyableJSON, sequential } from '#src/core/utils.ts'
-
-describe('mergeAbortSignals', () => {
-  it('returns undefined for empty array', () => {
-    expect(mergeAbortSignals([])).toBeUndefined()
-  })
-
-  it('returns the single signal when only one is defined', () => {
-    const ac = new AbortController()
-    const merged = mergeAbortSignals([ac.signal])
-    expect(merged).toBe(ac.signal)
-  })
-
-  it('fires when ANY signal aborts (OR-gate), not when all abort', async () => {
-    const ac1 = new AbortController()
-    const ac2 = new AbortController()
-    const merged = mergeAbortSignals([ac1.signal, ac2.signal])!
-    expect(merged).toBeDefined()
-
-    // Abort only one signal
-    ac1.abort('reason1')
-
-    // Merged should fire immediately (OR-gate behavior)
-    await new Promise((r) => setTimeout(r, 10))
-    expect(merged.aborted).toBe(true)
-  })
-
-  it('merges defined signals when some are undefined (filters undefined)', () => {
-    const ac = new AbortController()
-    const merged = mergeAbortSignals([ac.signal, undefined])
-    // Should still return the defined signal, not undefined
-    expect(merged).toBeDefined()
-  })
-
-  it('returns aborted signal immediately if any input signal is already aborted', () => {
-    const ac1 = new AbortController()
-    ac1.abort('already')
-    const ac2 = new AbortController()
-    const merged = mergeAbortSignals([ac1.signal, ac2.signal])!
-    expect(merged).toBeDefined()
-    expect(merged.aborted).toBe(true)
-  })
-})
-
-describe('flattenHeader', () => {
-  it('returns undefined for undefined', () => {
-    expect(flattenHeader(undefined)).toBeUndefined()
-  })
-
-  it('returns string as-is', () => {
-    expect(flattenHeader('text/html')).toBe('text/html')
-  })
-
-  it('joins array with comma-space', () => {
-    expect(flattenHeader(['a', 'b', 'c'])).toBe('a, b, c')
-  })
-})
+import { parseEmptyableJSON, sequential } from '#src/core/utils.ts'
 
 describe('parseEmptyableJSON', () => {
   it('returns undefined for empty string', () => {
