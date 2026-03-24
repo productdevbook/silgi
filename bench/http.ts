@@ -1,5 +1,5 @@
 /**
- * HTTP benchmark — Silgi vs Hono vs Express.
+ * HTTP benchmark — Silgi vs Fastify vs Hono vs Express.
  *
  * Measures real HTTP round-trip latency (sequential requests).
  * Each framework serves the same simple JSON endpoint.
@@ -17,6 +17,7 @@ import http from 'node:http'
 
 import { serve as honoServe } from '@hono/node-server'
 import express from 'express'
+import Fastify from 'fastify'
 import { Hono } from 'hono'
 import { serve as srvxServe } from 'srvx'
 
@@ -131,6 +132,21 @@ async function benchHono(): Promise<Result> {
   return result
 }
 
+async function benchFastify(): Promise<Result> {
+  const app = Fastify()
+  app.post('/users/list', async (req) => {
+    const { limit = 10 } = req.body as any
+    return { users: makeUsers(limit) }
+  })
+  await app.listen({ port: 0, host: '127.0.0.1' })
+  const port = (app.server.address() as any).port
+  const url = `http://127.0.0.1:${port}/users/list`
+  await verify(url)
+  const result = await measure(url, REQUESTS)
+  await app.close()
+  return result
+}
+
 async function benchExpress(): Promise<Result> {
   const app = express()
   app.use(express.json())
@@ -153,20 +169,33 @@ async function benchExpress(): Promise<Result> {
 
 const frameworks: [string, () => Promise<Result>][] = [
   ['Silgi', benchSilgi],
+  ['Fastify', benchFastify],
   ['Hono', benchHono],
   ['Express', benchExpress],
 ]
+
+// Round-robin: alternate frameworks each round to eliminate ordering bias.
+// V8 JIT warmup and GC pressure affect the first framework unfairly otherwise.
+const allResults = new Map<string, Result[]>(frameworks.map(([name]) => [name, []]))
+
+for (let round = 0; round < ROUNDS; round++) {
+  // Rotate starting position each round
+  const offset = round % frameworks.length
+  for (let i = 0; i < frameworks.length; i++) {
+    const [name, fn] = frameworks[(i + offset) % frameworks.length]!
+    allResults.get(name)!.push(await fn())
+  }
+}
 
 console.log(`\nHTTP Benchmark — ${REQUESTS} requests × ${ROUNDS} rounds (${WARMUP} warmup each)\n`)
 console.log('| Framework | avg | p50 | p95 | p99 | req/s |')
 console.log('|---|---|---|---|---|---|')
 
-for (const [name, fn] of frameworks) {
-  const results: Result[] = []
-  for (let round = 0; round < ROUNDS; round++) {
-    results.push(await fn())
-  }
-  const r = median(results)
+const sorted = frameworks
+  .map(([name]) => [name, median(allResults.get(name)!)] as const)
+  .toSorted(([, a], [, b]) => a.avg - b.avg)
+
+for (const [name, r] of sorted) {
   console.log(`| ${name} | ${fmt(r.avg)} | ${fmt(r.p50)} | ${fmt(r.p95)} | ${fmt(r.p99)} | ${fmtRps(r.rps)} |`)
 }
 

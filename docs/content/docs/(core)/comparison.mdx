@@ -12,32 +12,29 @@ import { Callout } from 'fumadocs-ui/components/callout'
   number is wrong or unfair, [let us know](https://github.com/productdevbook/silgi/issues).
 </Callout>
 
-All benchmarks: Apple M3 Max, 5000 sequential requests, 500 warmup, 3 rounds median. Response correctness verified. Numbers are real — reproduce them on your hardware.
+All benchmarks: Apple M3 Max, Node.js v24.11.0. HTTP throughput measured with [bombardier](https://github.com/codesenberg/bombardier) (`--fasthttp`), each server in a separate process, 10s duration × 3 rounds median, 3s warmup (discarded). Numbers are real — reproduce them on your hardware.
 
-## HTTP — Bun 1.3.11
+## HTTP throughput — 64 concurrent connections
 
-Simple POST endpoint returning JSON. All frameworks use `Bun.serve()`.
+Simple POST endpoint returning JSON. Server and load generator run as separate processes.
 
-| Framework | avg  | p50  | p95  | p99   | req/s    |
-| --------- | ---- | ---- | ---- | ----- | -------- |
-| Elysia    | 44µs | 42µs | 53µs | 66µs  | 22,865/s |
-| Hono      | 45µs | 43µs | 53µs | 72µs  | 22,265/s |
-| Silgi     | 51µs | 44µs | 83µs | 160µs | 19,634/s |
+| Framework | avg latency | p50     | p95     | p99     | req/s      |
+| --------- | ----------- | ------- | ------- | ------- | ---------- |
+| Fastify   | 1,131µs     | 1,036µs | 1,427µs | 4,159µs | 56,520/s   |
+| Express   | 1,348µs     | 1,285µs | 1,620µs | 2,503µs | 47,436/s   |
+| Silgi     | 1,488µs     | 1,422µs | 1,806µs | 2,731µs | 42,976/s   |
+| Hono      | 1,694µs     | 1,556µs | 2,344µs | 3,102µs | 37,772/s   |
 
-On Bun all three deliver similar throughput. Silgi has higher tail latency (p95/p99) due to Fetch API overhead.
+## HTTP throughput — 256 concurrent connections
 
-## HTTP — Node.js v24.11.0
+| Framework | avg latency | p50     | p95     | p99     | req/s      |
+| --------- | ----------- | ------- | ------- | ------- | ---------- |
+| Fastify   | 4,776µs     | 4,399µs | 7,562µs | 8,493µs | 53,571/s   |
+| Express   | 5,621µs     | 5,436µs | 6,661µs | 7,226µs | 45,514/s   |
+| Silgi     | 6,044µs     | 5,815µs | 7,050µs | 7,709µs | 42,330/s   |
+| Hono      | 6,991µs     | 6,559µs | 8,287µs | 9,294µs | 36,597/s   |
 
-Same endpoint. Silgi and Hono use Fetch API adapters (srvx / @hono/node-server). Fastify and Express use native `req`/`res`.
-
-| Framework | avg   | p50  | p95   | p99   | req/s    |
-| --------- | ----- | ---- | ----- | ----- | -------- |
-| Fastify   | 87µs  | 79µs | 102µs | 152µs | 11,435/s |
-| Hono      | 95µs  | 85µs | 110µs | 187µs | 10,481/s |
-| Silgi     | 103µs | 92µs | 125µs | 194µs | 9,742/s  |
-| Express   | 127µs | 93µs | 204µs | 817µs | 7,863/s  |
-
-Silgi uses the Fetch API (`Request`/`Response`) while Fastify uses native Node.js `req`/`res`. This adds ~10µs adapter overhead per request. Hono uses a similar Fetch adapter. The gap closes as middleware complexity grows.
+Silgi and Hono use the Fetch API (`Request`/`Response`) while Fastify and Express use native Node.js `req`/`res`. This adapter overhead accounts for the throughput gap. Silgi consistently beats Hono, and the gap narrows as middleware complexity grows — see the RPC pipeline benchmarks below.
 
 ## RPC pipeline (no HTTP)
 
@@ -45,36 +42,37 @@ Measures middleware pipeline overhead in isolation — no TCP, no serialization.
 
 | Scenario           | Silgi      | oRPC     | H3 v2    |
 | ------------------ | ---------- | -------- | -------- |
-| No middleware      | **111 ns** | 685 ns   | 2,025 ns |
-| Zod validation     | **241 ns** | 804 ns   | 4,214 ns |
-| 3 middleware + Zod | **297 ns** | 1,718 ns | 3,954 ns |
-| 5 middleware + Zod | **413 ns** | 2,219 ns | 3,917 ns |
+| No middleware      | **96 ns**  | 676 ns   | 2,253 ns |
+| Zod validation     | **133 ns** | 819 ns   | 4,334 ns |
+| 3 middleware + Zod | **178 ns** | 1,758 ns | 4,192 ns |
+| 5 middleware + Zod | **330 ns** | 2,396 ns | 4,771 ns |
 
 <Callout>
   Hono, Elysia, Fastify, and Express are not included — they don't have an equivalent pipeline concept measurable in
   isolation. Their overhead is in the HTTP benchmarks above.
 </Callout>
 
-## Tail latency (p99)
+## HTTP/1.1 — RPC over TCP (Node.js v24.11.0)
 
-RPC over HTTP with Guard + Zod validation.
+Full request/response latency — 3000 sequential requests per scenario.
 
-| Framework | avg   | p50   | p99   |
-| --------- | ----- | ----- | ----- |
-| Silgi     | 79µs  | 70µs  | 148µs |
-| oRPC      | 116µs | 103µs | 223µs |
-| H3 v2     | 96µs  | 82µs  | 236µs |
+| Scenario                        | Silgi          | H3 v2          | oRPC           |
+| ------------------------------- | -------------- | -------------- | -------------- |
+| Simple (no mw, no validation)   | **90µs** (11,064/s) | 90µs (11,135/s) | 76µs (13,203/s) |
+| Zod input validation            | **93µs** (10,714/s) | 100µs (10,033/s) | 121µs (8,263/s) |
+| Guard + Zod validation          | **87µs** (11,469/s) | 90µs (11,102/s) | 118µs (8,500/s) |
 
-## Router
+Silgi wins when middleware complexity grows — compiled pipelines eliminate per-request overhead that accumulates in other frameworks.
 
-JIT-compiled radix tree (Silgi) vs rou3.
+## WebSocket (persistent connection)
 
-| Scenario                | Silgi   | rou3    |
-| ----------------------- | ------- | ------- |
-| Static `/users/list`    | 3.1 ns  | 3.9 ns  |
-| Param `/users/123`      | 22.0 ns | 25.6 ns |
-| Wildcard `/files/a/b/c` | 19.2 ns | 91.3 ns |
-| Miss `/missing/deep`    | 4.5 ns  | 22.3 ns |
+RPC over WebSocket — 2000 sequential messages on a persistent connection.
+
+| Scenario                      | Silgi    | oRPC   | H3 v2  |
+| ----------------------------- | -------- | ------ | ------ |
+| Simple query (persistent conn) | **38µs** | 39µs   | 34µs   |
+
+All three frameworks are nearly identical on WebSocket — the persistent connection eliminates TCP handshake overhead, leaving only message serialization and pipeline execution.
 
 ## Memory
 
@@ -88,16 +86,17 @@ JIT-compiled radix tree (Silgi) vs rou3.
 ## Notes
 
 - Real-world APIs spend 95%+ of time in DB queries. Framework overhead matters for high-throughput services.
-- All benchmarks are sequential. Concurrent load may differ.
+- HTTP throughput benchmarks use bombardier with `--fasthttp` flag — same methodology as Hono and Elysia benchmarks.
+- Each framework runs as a separate process to avoid shared-resource bias.
 - Elysia is Bun-only — excluded from Node.js benchmarks.
 
 <Callout>
 Run benchmarks yourself:
 
 ```bash
-node --experimental-strip-types bench/http.ts    # HTTP (Node.js)
-bun bench/http-bun.ts                            # HTTP (Bun)
-node --experimental-strip-types bench/router.ts  # Router
+node --experimental-strip-types bench/http-throughput.ts  # HTTP throughput (bombardier)
+node --experimental-strip-types bench/http.ts             # HTTP latency (sequential)
+pnpm bench                                               # Pipeline + RPC benchmarks
 ```
 
 </Callout>
