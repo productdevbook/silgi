@@ -31,6 +31,6 @@ export interface NextjsAdapterOptions<TCtx extends Record<string, unknown>> exte
 export function silgiNextjs<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: NextjsAdapterOptions<TCtx> = {},
-): (req: Request) => Promise<Response> {
+): (req: Request) => Response | Promise<Response> {
   return createFetchAdapter(router, options, '/api/rpc')
 }

@@ -12,6 +12,15 @@ import { ValidationError } from './schema.ts'
 // ── Context Building ────────────────────────────────
 
 /**
+ * Copy properties from source into target context via direct property set.
+ * V8 monomorphic access — no Object.assign, no spread.
+ */
+export function applyContext(target: Record<string, unknown>, source: Record<string, unknown>): void {
+  const keys = Object.keys(source)
+  for (let i = 0; i < keys.length; i++) target[keys[i]!] = source[keys[i]!]
+}
+
+/**
  * Build a null-prototype context object from a base context and route params.
  * Uses direct property assignment (no Object.assign) for V8 monomorphic access.
  */
@@ -20,10 +29,7 @@ export function buildContext(
   params: Record<string, string> | undefined,
 ): Record<string, unknown> {
   const ctx: Record<string, unknown> = Object.create(null)
-  if (baseCtx) {
-    const keys = Object.keys(baseCtx)
-    for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = baseCtx[keys[i]!]
-  }
+  if (baseCtx) applyContext(ctx, baseCtx)
   if (params) ctx.params = params
   return ctx
 }

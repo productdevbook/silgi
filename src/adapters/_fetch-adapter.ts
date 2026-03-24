@@ -2,12 +2,15 @@
  * Shared factory for fetch-passthrough adapters.
  *
  * Next.js, Astro, Remix, SvelteKit, and SolidStart all do the same thing:
- * lazy-init a silgi handler → strip URL prefix → rewrite request → dispatch.
+ * strip URL prefix → rewrite request → dispatch to fetch handler.
  *
  * This module eliminates the duplication. Each adapter file becomes a thin
  * wrapper that extracts the framework-specific Request and calls this factory.
  */
 
+import { createFetchHandler } from '../core/handler.ts'
+
+import type { FetchHandler } from '../core/handler.ts'
 import type { RouterDef } from '../types.ts'
 
 export interface FetchAdapterConfig<TCtx extends Record<string, unknown>> {
@@ -27,36 +30,32 @@ export interface FetchAdapterConfigWithEvent<TCtx extends Record<string, unknown
   context?: (event: TEvent) => TCtx | Promise<TCtx>
 }
 
+/** Strip prefix from request URL and create a rewritten Request. */
+function rewriteRequest(request: Request, prefix: string): Request {
+  const url = new URL(request.url)
+  let pathname = url.pathname
+  if (pathname.startsWith(prefix)) {
+    pathname = pathname.slice(prefix.length)
+    if (!pathname.startsWith('/')) pathname = '/' + pathname
+  }
+  return new Request(new URL(pathname + url.search, url.origin), request)
+}
+
 /**
- * Create a fetch-passthrough adapter that strips a prefix and delegates to silgi handler.
+ * Create a fetch-passthrough adapter that strips a prefix and delegates to handler.
  * Used by adapters that receive a standard Request (Next.js, Astro, Remix).
  */
 export function createFetchAdapter<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: FetchAdapterConfig<TCtx>,
   defaultPrefix: string,
-): (request: Request) => Promise<Response> {
+): FetchHandler {
   const prefix = options.prefix ?? defaultPrefix
-  let _handler: ((req: Request) => Response | Promise<Response>) | null = null
-  let _initPromise: Promise<void> | null = null
+  const contextFactory = options.context ?? (() => ({}) as TCtx)
+  const handler = createFetchHandler(router, contextFactory as (req: Request) => Record<string, unknown>)
 
-  function ensureHandler(): Promise<void> {
-    if (_handler) return Promise.resolve()
-    return (_initPromise ??= import('../silgi.ts').then(({ silgi }) => {
-      const k = silgi({ context: options.context ?? (() => ({}) as TCtx) })
-      _handler = k.handler(router)
-    }))
-  }
-
-  return async (request: Request): Promise<Response> => {
-    await ensureHandler()
-    const url = new URL(request.url)
-    let pathname = url.pathname
-    if (pathname.startsWith(prefix)) {
-      pathname = pathname.slice(prefix.length)
-      if (!pathname.startsWith('/')) pathname = '/' + pathname
-    }
-    return _handler!(new Request(new URL(pathname + url.search, url.origin), request))
+  return (request: Request): Response | Promise<Response> => {
+    return handler(rewriteRequest(request, prefix))
   }
 }
 
@@ -70,37 +69,21 @@ export function createEventFetchAdapter<TCtx extends Record<string, unknown>, TE
   options: FetchAdapterConfigWithEvent<TCtx, TEvent>,
   defaultPrefix: string,
   extractRequest: (event: TEvent) => Request,
-): (event: TEvent) => Promise<Response> {
+): (event: TEvent) => Response | Promise<Response> {
   const prefix = options.prefix ?? defaultPrefix
-  let _handler: ((req: Request) => Response | Promise<Response>) | null = null
-  let _initPromise: Promise<void> | null = null
   const requestEventMap = new WeakMap<Request, TEvent>()
 
-  function ensureHandler(): Promise<void> {
-    if (_handler) return Promise.resolve()
-    return (_initPromise ??= import('../silgi.ts').then(({ silgi }) => {
-      const k = silgi({
-        context: (_req: Request) => {
-          const eventRef = requestEventMap.get(_req)
-          if (options.context && eventRef) return options.context(eventRef)
-          return {} as TCtx
-        },
-      })
-      _handler = k.handler(router)
-    }))
-  }
+  const handler = createFetchHandler(router, (_req: Request) => {
+    const eventRef = requestEventMap.get(_req)
+    if (options.context && eventRef)
+      return options.context(eventRef) as Record<string, unknown> | Promise<Record<string, unknown>>
+    return {} as Record<string, unknown>
+  })
 
-  return async (event: TEvent): Promise<Response> => {
-    await ensureHandler()
+  return (event: TEvent): Response | Promise<Response> => {
     const request = extractRequest(event)
-    const url = new URL(request.url)
-    let pathname = url.pathname
-    if (pathname.startsWith(prefix)) {
-      pathname = pathname.slice(prefix.length)
-      if (!pathname.startsWith('/')) pathname = '/' + pathname
-    }
-    const rewritten = new Request(new URL(pathname + url.search, url.origin), request)
+    const rewritten = rewriteRequest(request, prefix)
     requestEventMap.set(rewritten, event)
-    return _handler!(rewritten)
+    return handler(rewritten)
   }
 }

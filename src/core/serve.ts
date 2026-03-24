@@ -6,6 +6,7 @@ import type { AnalyticsOptions } from '../plugins/analytics.ts'
 import type { ScalarOptions } from '../scalar.ts'
 import type { SilgiHooks } from '../silgi.ts'
 import type { RouterDef } from '../types.ts'
+import type { FetchHandler } from './handler.ts'
 import type { Hookable } from 'hookable'
 
 // ── Serve Handler ───────────────────────────────────
@@ -26,16 +27,25 @@ export async function createServeHandler(
   const port = options?.port ?? 3000
   const hostname = options?.hostname ?? '127.0.0.1'
 
-  // Reuse the Fetch API handler — same logic for serve() and handler()
-  const fetchHandler = createFetchHandler(routerDef, contextFactory, hooks, {
-    scalar: options?.scalar,
-    analytics: options?.analytics,
-  })
+  // Build handler pipeline: base → scalar → analytics
+  let handler: FetchHandler = createFetchHandler(routerDef, contextFactory, hooks)
+
+  if (options?.scalar) {
+    const { wrapWithScalar } = await import('../scalar.ts')
+    const scalarOpts = typeof options.scalar === 'object' ? options.scalar : {}
+    handler = wrapWithScalar(handler, routerDef, scalarOpts)
+  }
+
+  if (options?.analytics) {
+    const { wrapWithAnalytics } = await import('../plugins/analytics.ts')
+    const analyticsOpts = typeof options.analytics === 'object' ? options.analytics : {}
+    handler = wrapWithAnalytics(handler, analyticsOpts)
+  }
 
   const server = await serve({
     port,
     hostname,
-    fetch: fetchHandler,
+    fetch: handler,
 
     // TLS / HTTP/2
     ...(options?.http2 && {

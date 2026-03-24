@@ -20,6 +20,7 @@
  */
 
 import { compileProcedure } from './compile.ts'
+import { applyContext } from './core/dispatch.ts'
 
 import type { ProcedureDef, ErrorDef } from './types.ts'
 
@@ -50,12 +51,9 @@ export function callable<TInput, TOutput, TErrors extends ErrorDef, TCtx extends
 
   return (async (input?: unknown) => {
     const ctx = await contextFactory()
-    // Copy into null-prototype object (consistent with handler path)
     const ctxObj: Record<string, unknown> = Object.create(null)
-    const keys = Object.keys(ctx)
-    for (let i = 0; i < keys.length; i++) ctxObj[keys[i]!] = ctx[keys[i]!]
+    applyContext(ctxObj, ctx)
 
-    // Fresh AbortSignal per call — supports timeout
     const signal = defaultTimeout !== null ? AbortSignal.timeout(defaultTimeout) : new AbortController().signal
     return handler(ctxObj, input, signal)
   }) as CallableFn<TInput, TOutput>

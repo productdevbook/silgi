@@ -31,7 +31,7 @@ export interface RemixAdapterOptions<TCtx extends Record<string, unknown>> exten
 export function silgiRemix<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: RemixAdapterOptions<TCtx> = {},
-): (args: { request: Request; params: Record<string, string> }) => Promise<Response> {
+): (args: { request: Request; params: Record<string, string> }) => Response | Promise<Response> {
   const handler = createFetchAdapter(router, options, '/rpc')
   return ({ request }) => handler(request)
 }

@@ -19,6 +19,7 @@ import { createFetchHandler } from './core/handler.ts'
 import { assignPaths, routerCache } from './core/router-utils.ts'
 
 import type { ProcedureBuilder } from './builder.ts'
+import type { FetchHandler } from './core/handler.ts'
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
 import type { StorageConfig } from './core/storage.ts'
 import type { useStorage } from './core/storage.ts'
@@ -313,10 +314,32 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
     },
 
     handler: (routerDef, options) => {
-      let fetchHandler: ((req: Request) => Response | Promise<Response>) | undefined
+      let fetchHandler: FetchHandler | undefined
+      let initPromise: Promise<void> | undefined
+
+      async function init(): Promise<void> {
+        let h: FetchHandler = createFetchHandler(routerDef, contextFactory, hooks)
+        if (options?.scalar) {
+          const { wrapWithScalar } = await import('./scalar.ts')
+          const scalarOpts = typeof options.scalar === 'object' ? options.scalar : {}
+          h = wrapWithScalar(h, routerDef, scalarOpts)
+        }
+        if (options?.analytics) {
+          const { wrapWithAnalytics } = await import('./plugins/analytics.ts')
+          const analyticsOpts = typeof options.analytics === 'object' ? options.analytics : {}
+          h = wrapWithAnalytics(h, analyticsOpts)
+        }
+        fetchHandler = h
+      }
+
       return (request: Request): Response | Promise<Response> => {
-        fetchHandler ??= createFetchHandler(routerDef, contextFactory, hooks, options)
-        return fetchHandler(request)
+        if (fetchHandler) return fetchHandler(request)
+        if (!options?.scalar && !options?.analytics) {
+          fetchHandler = createFetchHandler(routerDef, contextFactory, hooks)
+          return fetchHandler(request)
+        }
+        initPromise ??= init()
+        return initPromise.then(() => fetchHandler!(request))
       }
     },
 

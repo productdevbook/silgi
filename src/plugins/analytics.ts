@@ -846,3 +846,99 @@ export function serveAnalyticsRoute(
   }
   return new Response(dashboardHtml, { headers: { 'content-type': 'text/html' } })
 }
+
+// ── Handler Wrapper ─────────────────────────────────
+
+import { SilgiError, toSilgiError } from '../core/error.ts'
+import { ValidationError } from '../core/schema.ts'
+
+import type { FetchHandler } from '../core/handler.ts'
+
+/**
+ * Wrap a fetch handler with analytics collection.
+ * Intercepts analytics dashboard routes and instruments every request.
+ */
+export function wrapWithAnalytics(handler: FetchHandler, options: AnalyticsOptions = {}): FetchHandler {
+  const collector = new AnalyticsCollector(options)
+  const dashboardHtml = analyticsHTML()
+  const auth = options.auth
+
+  return async (request: Request): Promise<Response> => {
+    const url = request.url
+    const pathStart = url.indexOf('/', url.indexOf('//') + 2)
+    const qMark = url.indexOf('?', pathStart)
+    const fullPath = qMark === -1 ? url.slice(pathStart) : url.slice(pathStart, qMark)
+    const pathname = fullPath.length > 1 ? fullPath.slice(1) : ''
+
+    // Analytics dashboard routes
+    if (pathname.startsWith('analytics')) {
+      if (auth) {
+        const authResult = checkAnalyticsAuth(request, auth)
+        const ok = authResult instanceof Promise ? await authResult : authResult
+        if (!ok) return analyticsAuthResponse(pathname)
+      }
+      return serveAnalyticsRoute(pathname, collector, dashboardHtml)
+    }
+
+    // Instrument the request
+    const acc = new RequestAccumulator(request, collector)
+    const reqTrace = new RequestTrace()
+    const t0 = performance.now()
+
+    // Inject trace into request headers so context factory can access it
+    // We use a WeakMap to avoid mutating the request
+    analyticsTraceMap.set(request, reqTrace)
+
+    let response: Response
+    try {
+      response = await handler(request)
+      const durationMs = round(performance.now() - t0)
+
+      collector.record(pathname, durationMs)
+      acc.addProcedure({
+        procedure: pathname,
+        durationMs,
+        status: response.status,
+        input: null,
+        output: null,
+        spans: reqTrace.spans ?? [],
+      })
+    } catch (error) {
+      const durationMs = round(performance.now() - t0)
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      const isValidation = error instanceof ValidationError
+      const silgiErr = isValidation ? null : error instanceof SilgiError ? error : toSilgiError(error)
+      const errStatus = isValidation ? 400 : (silgiErr?.status ?? 500)
+
+      collector.recordError(pathname, durationMs, errorMsg)
+      collector.recordDetailedError({
+        requestId: acc.requestId,
+        timestamp: Date.now(),
+        procedure: pathname,
+        error: errorMsg,
+        code: isValidation ? 'BAD_REQUEST' : (silgiErr?.code ?? 'INTERNAL_SERVER_ERROR'),
+        status: errStatus,
+        stack: error instanceof Error ? (error.stack ?? '').slice(0, 2048) : '',
+        input: null,
+        headers: sanitizeHeaders(request.headers),
+        durationMs,
+        spans: reqTrace.spans ?? [],
+      })
+      throw error
+    } finally {
+      analyticsTraceMap.delete(request)
+    }
+
+    // Inject analytics headers
+    const headers = new Headers(response.headers)
+    headers.set('x-request-id', acc.requestId)
+    const cookie = acc.getSessionCookie()
+    if (cookie) headers.append('set-cookie', cookie)
+    const injected = new Response(response.body, { status: response.status, statusText: response.statusText, headers })
+    acc.flushWithResponse(injected)
+    return injected
+  }
+}
+
+/** WeakMap to pass analytics trace to context without coupling handler to analytics. */
+export const analyticsTraceMap = new WeakMap<Request, RequestTrace>()

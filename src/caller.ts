@@ -20,6 +20,7 @@
  */
 
 import { compileRouter, createContext, releaseContext } from './compile.ts'
+import { applyContext } from './core/dispatch.ts'
 import { routerCache } from './core/router-utils.ts'
 
 import type { CompiledRouterFn } from './compile.ts'
@@ -77,19 +78,11 @@ export function createCaller(
       const mockReq = createMockRequest()
       const result = contextFactory(mockReq)
       const baseCtx = result instanceof Promise ? await result : result
-      const keys = Object.keys(baseCtx)
-      for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = baseCtx[keys[i]!]
+      applyContext(ctx, baseCtx)
     }
 
-    if (options?.contextOverride) {
-      const keys = Object.keys(options.contextOverride)
-      for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = options.contextOverride[keys[i]!]
-    }
-
-    if (perCallContext) {
-      const keys = Object.keys(perCallContext)
-      for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = perCallContext[keys[i]!]
-    }
+    if (options?.contextOverride) applyContext(ctx, options.contextOverride)
+    if (perCallContext) applyContext(ctx, perCallContext)
 
     return ctx
   }

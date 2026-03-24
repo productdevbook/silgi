@@ -33,6 +33,6 @@ export interface SolidStartAdapterOptions<
 export function silgiSolidStart<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: SolidStartAdapterOptions<TCtx> = {},
-): (event: any) => Promise<Response> {
+): (event: any) => Response | Promise<Response> {
   return createEventFetchAdapter(router, options, '/api/rpc', (event) => event.request ?? event)
 }

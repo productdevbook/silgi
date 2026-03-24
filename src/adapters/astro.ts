@@ -32,7 +32,7 @@ export interface AstroAdapterOptions<TCtx extends Record<string, unknown>> exten
 export function silgiAstro<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: AstroAdapterOptions<TCtx> = {},
-): (ctx: { request: Request; params: Record<string, string> }) => Promise<Response> {
+): (ctx: { request: Request; params: Record<string, string> }) => Response | Promise<Response> {
   const handler = createFetchAdapter(router, options, '/api/rpc')
   return ({ request }) => handler(request)
 }

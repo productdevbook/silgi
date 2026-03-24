@@ -34,6 +34,6 @@ export interface SvelteKitAdapterOptions<
 export function silgiSvelteKit<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: SvelteKitAdapterOptions<TCtx> = {},
-): (event: any) => Promise<Response> {
+): (event: any) => Response | Promise<Response> {
   return createEventFetchAdapter(router, options, '/api/rpc', (event) => event.request)
 }
