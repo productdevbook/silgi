@@ -221,7 +221,7 @@ s.serve(appRouter, {
 })
 ```
 
-The token is checked against the `Authorization: Bearer <token>` header or a `?token=<token>` query parameter.
+The token is checked against the `Authorization: Bearer <token>` header or the `silgi-auth` cookie (set automatically by the login page).
 
 ### Custom auth
 

@@ -90,6 +90,21 @@ await attachWebSocket(server, appRouter)
 server.listen(3000)
 ```
 
+Both `attachWebSocket` and `createWSHooks` accept a context factory via the `context` option. The factory receives the `Peer` object:
+
+```ts twoslash
+// @noErrors
+import { attachWebSocket } from 'silgi/ws'
+
+await attachWebSocket(server, appRouter, {
+  context: (peer) => ({
+    userId: peer.request?.headers.get('x-user-id'),
+  }),
+})
+```
+
+When a client disconnects, all in-flight requests for that peer are automatically aborted.
+
 ### With createWSHooks (Nitro, Nuxt, Deno, Bun)
 
 For frameworks that use crossws natively, use `createWSHooks` to get crossws-compatible hooks:

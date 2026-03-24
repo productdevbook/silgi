@@ -43,7 +43,7 @@ pnpm bench:memory   # Memory profiling (--expose-gc)
 
 ### Adapters (src/adapters/)
 
-14 framework adapters (fastify, h3, express, elysia, nextjs, nitro, sveltekit, remix, astro, solidstart, nestjs, aws-lambda, message-port, peer). Each converts framework-specific request/response to `StandardRequest`/`StandardResponse`.
+13 framework adapters (h3, express, elysia, nextjs, nitro, sveltekit, remix, astro, solidstart, nestjs, aws-lambda, message-port, peer). Each converts framework-specific request/response to `StandardRequest`/`StandardResponse`.
 
 ### Plugins (src/plugins/)
 
@@ -95,7 +95,7 @@ These patterns are intentional and critical — do not refactor them away:
 - **ContextPool**: Pre-allocated context objects, zero per-request allocation
 - **Frozen arrays**: Child paths frozen via `Object.freeze` for V8 optimization
 - **Direct property set**: Guards merge context via direct property assignment, not `Object.assign`
-- **Sucrose-style analysis** (`analyze.ts`): `Function.toString()` introspection for compile-time optimization decisions
+- **Unified handler**: Single `async handleRequest` code path — no duplicated fast paths. Clean, maintainable, correct.
 
 ## Workflow Rules
 

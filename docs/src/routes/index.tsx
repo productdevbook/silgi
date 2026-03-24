@@ -299,7 +299,7 @@ function IntegrationGrid() {
           <CT t='AI SDK' d='routerToTools() — LLMs call your procedures through function calling.' />
         </Cell>
         <Cell bl>
-          <CT t='Fastify' d='Register as a plugin alongside existing REST routes.' />
+          <CT t='NestJS' d='Module-based integration with NestJS controllers.' />
         </Cell>
       </W>
     </section>

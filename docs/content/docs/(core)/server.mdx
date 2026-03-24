@@ -402,13 +402,14 @@ const getUsers = s
 
 const getUsersFn = callable(getUsers, {
   context: () => ({ db: getDB() }),
+  timeout: 5000, // optional — default 30s, null to disable
 })
 
 // Direct call — compiled pipeline, no HTTP
 const users = await getUsersFn({ limit: 10 })
 ```
 
-The compiled pipeline (guards, wraps, validation) runs exactly as it would through `serve()` or `handler()`. The only difference is there's no network involved.
+Each call gets a fresh `AbortSignal` with the configured timeout. The compiled pipeline (guards, wraps, validation) runs exactly as it would through `serve()` or `handler()`. The only difference is there's no network involved.
 
 ## What's next?
 
