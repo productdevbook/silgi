@@ -1,6 +1,6 @@
 {
   "name": "silgi",
-  "version": "0.1.0-beta.4",
+  "version": "0.1.0-beta.5",
   "private": false,
   "description": "The fastest end-to-end type-safe RPC framework for TypeScript — compiled pipelines, single package, every runtime",
   "keywords": [
@@ -230,10 +230,10 @@
     "bench:memory": "node --expose-gc --experimental-strip-types bench/memory.ts",
     "bench:bun": "bun test/bun-compat.ts",
     "play": "pnpm build && pnpm --filter silgi-playground dev",
-    "lint": "oxlint . && oxfmt --check .",
-    "lint:fix": "oxlint --fix . && oxfmt .",
-    "format": "oxfmt .",
-    "fix": "oxlint --fix . && oxfmt .",
+    "lint": "oxlint . && oxfmt --check --ignore-path .oxfmtignore .",
+    "lint:fix": "oxlint --fix . && oxfmt --ignore-path .oxfmtignore .",
+    "format": "oxfmt --ignore-path .oxfmtignore .",
+    "fix": "oxlint --fix . && oxfmt --ignore-path .oxfmtignore .",
     "test": "vitest run",
     "typecheck": "tsgo --noEmit",
     "release:beta": "pnpm build && npm publish --tag beta --access public",
