@@ -97,6 +97,9 @@ export type { LazyRouter } from './lazy.ts'
 export { useStorage, initStorage, resetStorage } from './core/storage.ts'
 export type { StorageConfig, Storage, StorageValue, Driver } from './core/storage.ts'
 
+// ── Server ─────────────────────────────────────────
+export type { SilgiServer, ServeOptions } from './core/serve.ts'
+
 // ── OpenAPI / Scalar ────────────────────────────────
 export { generateOpenAPI, scalarHTML } from './scalar.ts'
 export type { ScalarOptions } from './scalar.ts'

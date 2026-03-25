@@ -21,6 +21,7 @@ import { assignPaths, routerCache } from './core/router-utils.ts'
 import type { ProcedureBuilder } from './builder.ts'
 import type { FetchHandler } from './core/handler.ts'
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
+import type { ServeOptions, SilgiServer } from './core/serve.ts'
 import type { StorageConfig } from './core/storage.ts'
 import type { useStorage } from './core/storage.ts'
 import type { AnalyticsOptions } from './plugins/analytics.ts'
@@ -50,6 +51,8 @@ export interface SilgiHooks {
   error: (event: { path: string; error: unknown }) => void
   /** Called when the server starts */
   'serve:start': (event: { url: string; port: number; hostname: string }) => void
+  /** Called when the server is shutting down */
+  'serve:stop': (event: { url: string; port: number; hostname: string }) => void
 }
 
 // ── Silgi Instance ─────────────────────────────────
@@ -145,22 +148,8 @@ export interface SilgiInstance<TBaseCtx extends Record<string, unknown>> {
     },
   ) => InferClient<T>
 
-  /** Create & start a Node.js HTTP server */
-  serve: (
-    router: RouterDef,
-    options?: {
-      port?: number
-      hostname?: string
-      /** Enable Scalar API Reference UI at /reference and /openapi.json */
-      scalar?: boolean | ScalarOptions
-      /** Enable analytics dashboard at /analytics */
-      analytics?: boolean | AnalyticsOptions
-      /** Enable WebSocket RPC (requires crossws) */
-      ws?: boolean
-      /** Enable HTTP/2 (requires cert + key for TLS) */
-      http2?: { cert: string; key: string }
-    },
-  ) => Promise<void>
+  /** Create & start a Node.js HTTP server. Returns a handle to gracefully shut down. */
+  serve: (router: RouterDef, options?: ServeOptions) => Promise<SilgiServer>
 }
 
 // ── Guard Factory ───────────────────────────────────

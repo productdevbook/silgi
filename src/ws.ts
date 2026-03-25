@@ -24,6 +24,40 @@ export interface WSAdapterOptions<TCtx extends Record<string, unknown> = Record<
   binary?: boolean
   /** Context factory — receives the peer on each message */
   context?: (peer: Peer) => TCtx | Promise<TCtx>
+  /**
+   * Enable per-message-deflate compression.
+   *
+   * - `true`: enable with defaults
+   * - `object`: fine-tune zlib options (passed to ws `perMessageDeflate`)
+   *
+   * @default false
+   */
+  compress?:
+    | boolean
+    | {
+        threshold?: number
+        serverNoContextTakeover?: boolean
+        clientNoContextTakeover?: boolean
+        serverMaxWindowBits?: number
+        clientMaxWindowBits?: number
+      }
+  /**
+   * Maximum allowed message size in bytes.
+   * Messages exceeding this limit will cause the connection to be closed.
+   *
+   * @default 1_048_576 (1 MB)
+   */
+  maxPayload?: number
+  /**
+   * Keepalive ping interval in milliseconds.
+   * Server sends a ping frame at this interval; if the client
+   * does not respond with a pong before the next ping, the connection is terminated.
+   *
+   * Set to `0` or `false` to disable.
+   *
+   * @default 30_000 (30 seconds)
+   */
+  keepalive?: number | false
 }
 
 interface RPCRequest {
@@ -34,6 +68,9 @@ interface RPCRequest {
 
 // Track active AbortControllers per peer for cleanup on disconnect
 const peerAbortControllers = new WeakMap<Peer, Set<AbortController>>()
+
+// Track keepalive timers per peer for cleanup on disconnect
+const peerKeepaliveTimers = new WeakMap<Peer, ReturnType<typeof setInterval>>()
 
 /**
  * Create crossws-compatible hooks for Silgi RPC over WebSocket.
@@ -59,12 +96,14 @@ export function createWSHooks<TCtx extends Record<string, unknown>>(
   const flat = compileRouter(routerDef)
   const binary = options.binary ?? false
   const contextFactory = options.context
+  const keepaliveMs = options.keepalive === false ? 0 : (options.keepalive ?? 30_000)
 
   function send(peer: Peer, data: unknown): void {
+    const compress = !!options.compress
     if (binary) {
-      peer.send(msgpackEncode(data) as ArrayBuffer)
+      peer.send(msgpackEncode(data) as ArrayBuffer, { compress })
     } else {
-      peer.send(stringifyJSON(data))
+      peer.send(stringifyJSON(data), { compress })
     }
   }
 
@@ -78,6 +117,28 @@ export function createWSHooks<TCtx extends Record<string, unknown>>(
   return {
     open(peer) {
       peerAbortControllers.set(peer, new Set())
+
+      // Keepalive — ping at interval, terminate if no pong before next ping
+      if (keepaliveMs > 0) {
+        const ws = (peer as any)._internal?.ws
+        if (ws && typeof ws.ping === 'function') {
+          let alive = true
+          ws.on('pong', () => {
+            alive = true
+          })
+          const timer = setInterval(() => {
+            if (!alive) {
+              clearInterval(timer)
+              ws.terminate()
+              return
+            }
+            alive = false
+            ws.ping()
+          }, keepaliveMs)
+          // Store timer for cleanup
+          peerKeepaliveTimers.set(peer, timer)
+        }
+      }
     },
 
     async message(peer, message) {
@@ -157,6 +218,13 @@ export function createWSHooks<TCtx extends Record<string, unknown>>(
     },
 
     close(peer, _details) {
+      // Clear keepalive timer
+      const timer = peerKeepaliveTimers.get(peer)
+      if (timer) {
+        clearInterval(timer)
+        peerKeepaliveTimers.delete(peer)
+      }
+
       // Abort all in-flight requests for this peer
       const controllers = peerAbortControllers.get(peer)
       if (controllers) {
@@ -191,7 +259,22 @@ export async function attachWebSocket<TCtx extends Record<string, unknown>>(
   options: WSAdapterOptions<TCtx> = {},
 ): Promise<void> {
   const nodeAdapter = (await import('crossws/adapters/node')).default
-  const ws = nodeAdapter({ hooks: createWSHooks(routerDef, options) })
+
+  // Build ws ServerOptions for compression and maxPayload
+  const serverOptions: Record<string, unknown> = {}
+
+  if (options.compress) {
+    serverOptions.perMessageDeflate = typeof options.compress === 'object' ? options.compress : true
+  }
+
+  if (options.maxPayload !== undefined) {
+    serverOptions.maxPayload = options.maxPayload
+  }
+
+  const ws = nodeAdapter({
+    hooks: createWSHooks(routerDef, options),
+    ...(Object.keys(serverOptions).length > 0 && { serverOptions }),
+  })
 
   server.on('upgrade', (req, socket, head) => {
     ws.handleUpgrade(req, socket, head)

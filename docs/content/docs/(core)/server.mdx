@@ -37,6 +37,16 @@ Run it with `npx tsx src/server.ts` and you'll see:
 Silgi server running at http://127.0.0.1:3000
 ```
 
+`serve()` returns a `SilgiServer` handle you can use to shut down the server programmatically:
+
+```ts twoslash
+// @noErrors
+const server = await s.serve(appRouter, { port: 3000 })
+
+// Later — gracefully shut down
+await server.close()
+```
+
 ### All options
 
 ```ts twoslash
@@ -51,16 +61,18 @@ s.serve(appRouter, {
     cert: './certs/cert.pem',
     key: './certs/key.pem',
   },
+  gracefulShutdown: true, // default — shuts down cleanly on SIGINT/SIGTERM
 })
 ```
 
-| Option     | Type                       | Default       | Description                                                                                  |
-| ---------- | -------------------------- | ------------- | -------------------------------------------------------------------------------------------- |
-| `port`     | `number`                   | `3000`        | Port to listen on. If it's taken, Silgi automatically picks the next free port in 3000-3100. |
-| `hostname` | `string`                   | `"127.0.0.1"` | Network interface. Use `"0.0.0.0"` to accept connections from other machines.                |
-| `scalar`   | `boolean \| ScalarOptions` | `false`       | Enable auto-generated API docs at `/reference`.                                              |
-| `ws`       | `boolean`                  | `false`       | Enable WebSocket RPC on the same port.                                                       |
-| `http2`    | `{ cert, key }`            | `undefined`   | Enable HTTP/2 with TLS certificates. Falls back to HTTP/1.1 for older clients.               |
+| Option             | Type                                     | Default       | Description                                                                                  |
+| ------------------ | ---------------------------------------- | ------------- | -------------------------------------------------------------------------------------------- |
+| `port`             | `number`                                 | `3000`        | Port to listen on. If it's taken, Silgi automatically picks the next free port in 3000-3100. |
+| `hostname`         | `string`                                 | `"127.0.0.1"` | Network interface. Use `"0.0.0.0"` to accept connections from other machines.                |
+| `scalar`           | `boolean \| ScalarOptions`               | `false`       | Enable auto-generated API docs at `/reference`.                                              |
+| `ws`               | `boolean \| WSAdapterOptions`            | `false`       | Enable WebSocket RPC on the same port. Pass an object for [WS options](#websocket-options).  |
+| `http2`            | `{ cert, key }`                          | `undefined`   | Enable HTTP/2 with TLS certificates. Falls back to HTTP/1.1 for older clients.               |
+| `gracefulShutdown` | `boolean \| { timeout?, forceTimeout? }` | `true`        | Handle SIGINT/SIGTERM for clean shutdown. See [graceful shutdown](#graceful-shutdown).       |
 
 ### Runtime support
 
@@ -295,6 +307,110 @@ HTTP and WebSocket share the same port. Only procedures marked with `$route({ ws
 
 See the [WebSocket protocol](/docs/protocols/websocket) page for per-procedure setup, framework integration, and the message format.
 
+### WebSocket options
+
+Pass an options object instead of `true` to configure compression, keepalive, and payload limits:
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, {
+  port: 3000,
+  ws: {
+    compress: true, // enable per-message-deflate compression
+    maxPayload: 1_048_576, // 1 MB max message size (default)
+    keepalive: 30_000, // ping every 30s, terminate unresponsive peers
+  },
+})
+```
+
+| Option       | Type                | Default     | Description                                                                                                                                 |
+| ------------ | ------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `compress`   | `boolean \| object` | `false`     | Enable per-message-deflate. Pass an object to fine-tune zlib options.                                                                       |
+| `maxPayload` | `number`            | `1_048_576` | Maximum message size in bytes. Connections sending larger messages are terminated.                                                          |
+| `keepalive`  | `number \| false`   | `30_000`    | Ping interval in ms. If the client doesn't respond with pong before the next ping, the connection is terminated. Set to `false` to disable. |
+| `binary`     | `boolean`           | `false`     | Use MessagePack binary protocol instead of JSON.                                                                                            |
+| `context`    | `(peer) => ctx`     | —           | Context factory — receives the crossws peer on each message.                                                                                |
+
+These options also work with `attachWebSocket()` for standalone setups:
+
+```ts twoslash
+// @noErrors
+import { attachWebSocket } from 'silgi/ws'
+
+attachWebSocket(httpServer, appRouter, {
+  compress: true,
+  keepalive: 60_000,
+  maxPayload: 5 * 1024 * 1024, // 5 MB
+})
+```
+
+## Graceful shutdown
+
+By default, Silgi handles `SIGINT` and `SIGTERM` signals to shut down cleanly — waiting for in-flight requests to finish before closing the server.
+
+```ts twoslash
+// @noErrors
+const server = await s.serve(appRouter, {
+  port: 3000,
+  gracefulShutdown: true, // default
+})
+```
+
+### Programmatic shutdown
+
+`serve()` returns a `SilgiServer` handle with a `close()` method:
+
+```ts twoslash
+// @noErrors
+const server = await s.serve(appRouter, { port: 3000 })
+
+// Graceful — waits for in-flight requests
+await server.close()
+
+// Force — immediately terminates all connections
+await server.close(true)
+```
+
+The `SilgiServer` object exposes:
+
+| Property   | Type                                 | Description                                    |
+| ---------- | ------------------------------------ | ---------------------------------------------- |
+| `url`      | `string`                             | Server URL (e.g. `"http://127.0.0.1:3000"`)    |
+| `port`     | `number`                             | Actual listening port (resolved for `port: 0`) |
+| `hostname` | `string`                             | Configured hostname                            |
+| `close()`  | `(force?: boolean) => Promise<void>` | Shut down the server                           |
+
+### Shutdown timeouts
+
+For fine-grained control over shutdown behavior:
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, {
+  gracefulShutdown: {
+    timeout: 10_000, // wait up to 10s for in-flight requests
+    forceTimeout: 15_000, // force-kill after 15s
+  },
+})
+```
+
+### Shutdown hook
+
+The `serve:stop` hook fires when `close()` is called — useful for cleanup like closing database connections:
+
+```ts twoslash
+// @noErrors
+const s = silgi({
+  context: (req) => ({ db: getDB() }),
+  hooks: {
+    'serve:stop': async ({ url }) => {
+      await db.end()
+      console.log(`Server at ${url} stopped`)
+    },
+  },
+})
+```
+
 ## Lifecycle hooks
 
 Silgi fires hooks at key points during request processing. Register them in the `hooks` option when creating the instance:
@@ -337,6 +453,7 @@ s.removeHook('error', myHookFn)
 | `response`    | After a successful response      | `{ path, output, durationMs }` |
 | `error`       | When any error occurs            | `{ path, error }`              |
 | `serve:start` | When the server starts listening | `{ url, port, hostname }`      |
+| `serve:stop`  | When the server is shutting down | `{ url, port, hostname }`      |
 
 <Callout type='info'>
   Hooks are for side effects like logging and metrics. They don't modify the request or response. For that, use [guards
