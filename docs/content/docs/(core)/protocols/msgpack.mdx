@@ -22,7 +22,7 @@ This matters most for mobile apps, APIs with large responses, and high-traffic s
 
 ## Client setup
 
-Enable binary mode with one flag:
+Set the protocol to `'messagepack'`:
 
 ```ts twoslash
 // @noErrors
@@ -31,7 +31,7 @@ import { createClient } from 'silgi/client'
 
 const link = createLink({
   url: 'http://localhost:3000',
-  binary: true,
+  protocol: 'messagepack',
 })
 
 const client = createClient<AppRouter>(link)
@@ -99,7 +99,7 @@ You can also use MessagePack over WebSocket for even lower overhead:
 // @noErrors
 import { attachWebSocket } from 'silgi/ws'
 
-await attachWebSocket(server, appRouter, { binary: true })
+await attachWebSocket(server, appRouter, { protocol: 'messagepack' })
 ```
 
 Messages are sent as binary WebSocket frames instead of text.

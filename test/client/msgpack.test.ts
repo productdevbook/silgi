@@ -152,8 +152,8 @@ describe('binary transport (end-to-end)', () => {
     expect(data.echo).toBe('hello binary')
   })
 
-  it('ofetch client with binary: true works end-to-end', async () => {
-    const link = createLink({ url: baseUrl, binary: true })
+  it('ofetch client with protocol: messagepack works end-to-end', async () => {
+    const link = createLink({ url: baseUrl, protocol: 'messagepack' })
     const client = createClient<InferClient<typeof appRouter>>(link)
 
     const result = await client.echo({ msg: 'binary rpc' })
@@ -161,7 +161,7 @@ describe('binary transport (end-to-end)', () => {
   })
 
   it('ofetch binary client handles mutations', async () => {
-    const link = createLink({ url: baseUrl, binary: true })
+    const link = createLink({ url: baseUrl, protocol: 'messagepack' })
     const client = createClient<InferClient<typeof appRouter>>(link)
 
     const result = await client.add({ a: 10, b: 32 })
@@ -169,7 +169,7 @@ describe('binary transport (end-to-end)', () => {
   })
 
   it('ofetch binary client handles no-input queries', async () => {
-    const link = createLink({ url: baseUrl, binary: true })
+    const link = createLink({ url: baseUrl, protocol: 'messagepack' })
     const client = createClient<InferClient<typeof appRouter>>(link)
 
     const result = await client.health()

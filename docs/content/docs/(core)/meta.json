@@ -10,6 +10,7 @@
     "examples",
     "---",
     "concepts",
+    "compiled-pipelines",
     "procedures",
     "middleware",
     "errors",

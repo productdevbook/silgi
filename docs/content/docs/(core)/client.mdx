@@ -171,15 +171,15 @@ const link = createLink({
 })
 ```
 
-## Binary mode
+## Protocol selection
 
-Set `binary: true` to use MessagePack instead of JSON. Payloads are smaller and encoding/decoding is faster:
+Set `protocol` to choose the wire format. Payloads are smaller and encoding/decoding is faster with MessagePack:
 
 ```ts twoslash
 // @noErrors
 const link = createLink({
   url: 'http://localhost:3000',
-  binary: true,
+  protocol: 'messagepack',
 })
 ```
 

@@ -29,10 +29,25 @@ export interface SilgiLinkOptions<TClientContext extends ClientContext = ClientC
   /** Timeout in ms (default: 30000) */
   timeout?: number
 
-  /** Use MessagePack binary protocol (2-4x faster, ~50% smaller payloads) */
+  /**
+   * Wire protocol for request/response encoding.
+   *
+   * - `'json'` — default, standard JSON
+   * - `'messagepack'` — 2-4x faster, ~50% smaller payloads
+   * - `'devalue'` — preserves Date, Map, Set, BigInt, circular refs
+   *
+   * @default 'json'
+   */
+  protocol?: 'json' | 'messagepack' | 'devalue'
+
+  /**
+   * @deprecated Use `protocol: 'messagepack'` instead.
+   */
   binary?: boolean
 
-  /** Use devalue protocol (preserves Date, Map, Set, BigInt, circular refs) */
+  /**
+   * @deprecated Use `protocol: 'devalue'` instead.
+   */
   devalue?: boolean
 
   /** ofetch interceptors */
@@ -62,8 +77,11 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
   const defaultTimeout = options.timeout ?? 30_000
   const defaultRetry = options.retry
   const defaultRetryDelay = options.retryDelay ?? 0
-  const binary = options.binary ?? false
-  const useDevalue = options.devalue ?? false
+  // Resolve protocol — new `protocol` field takes precedence over deprecated booleans
+  const resolvedProtocol: 'json' | 'messagepack' | 'devalue' = options.protocol
+    ?? (options.binary ? 'messagepack' : undefined)
+    ?? (options.devalue ? 'devalue' : undefined)
+    ?? 'json'
 
   return {
     async call(path, input, callOptions) {
@@ -75,13 +93,13 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
         ...(typeof options.headers === 'function' ? options.headers(callOptions) : options.headers),
       }
 
-      // Protocol selection: binary (msgpack) > devalue > json (default)
+      // Protocol selection: messagepack > devalue > json (default)
       let body: any
-      if (binary) {
+      if (resolvedProtocol === 'messagepack') {
         headers['content-type'] = MSGPACK_CONTENT_TYPE
         headers['accept'] = MSGPACK_CONTENT_TYPE
         body = input !== undefined && input !== null ? msgpackEncode(input) : undefined
-      } else if (useDevalue) {
+      } else if (resolvedProtocol === 'devalue') {
         const { encode: devalueEncode, DEVALUE_CONTENT_TYPE } = await import('../../../codec/devalue.ts')
         headers['content-type'] = DEVALUE_CONTENT_TYPE
         headers['accept'] = DEVALUE_CONTENT_TYPE
@@ -105,9 +123,9 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
           onRequestError: options.onRequestError,
           onResponseError: options.onResponseError,
           // Response handling per protocol
-          ...(binary
+          ...(resolvedProtocol === 'messagepack'
             ? { responseType: 'arrayBuffer' as const }
-            : useDevalue
+            : resolvedProtocol === 'devalue'
               ? { responseType: 'text' as const }
               : {
                   parseResponse(text: string) {
@@ -123,9 +141,9 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
 
         // Decode response
         let decoded: unknown
-        if (binary) {
+        if (resolvedProtocol === 'messagepack') {
           decoded = msgpackDecode(new Uint8Array(data as ArrayBuffer))
-        } else if (useDevalue) {
+        } else if (resolvedProtocol === 'devalue') {
           const { decode: devalueDecode } = await import('../../../codec/devalue.ts')
           decoded = data ? devalueDecode(data as string) : undefined
         } else {

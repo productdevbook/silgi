@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const client = useClient({ binary: true })
+const client = useClient({ protocol: 'messagepack' })
 
 
 const todos = ref<any[]>([])

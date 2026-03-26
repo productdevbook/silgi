@@ -34,7 +34,7 @@ Accept: application/x-devalue+json    --> devalue
 
 For request bodies, the server checks `Content-Type` and decodes accordingly. This all happens inside Silgi — you don't need to configure anything on the server.
 
-On the client side, setting `binary: true` in `createLink` switches to MessagePack automatically:
+On the client side, set `protocol` in `createLink` to choose the wire format:
 
 ```ts twoslash
 // @noErrors
@@ -42,13 +42,13 @@ import { createLink } from 'silgi/client/ofetch'
 
 const link = createLink({
   url: 'http://localhost:3000',
-  binary: true, // uses MessagePack for all requests
+  protocol: 'messagepack', // or 'devalue', default is 'json'
 })
 ```
 
 <Callout type='info'>
-  You can also use these formats over [WebSocket](/docs/protocols/websocket). Pass `binary: true` to `attachWebSocket`
-  for MessagePack over WebSocket.
+  You can also use these formats over [WebSocket](/docs/protocols/websocket). Pass `protocol: 'messagepack'` to
+  `attachWebSocket` for MessagePack over WebSocket.
 </Callout>
 
 ## Choose a format

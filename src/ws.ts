@@ -20,7 +20,19 @@ import type { Peer, Message, Hooks as WSHooks } from 'crossws'
 import type { Server as HttpServer } from 'node:http'
 
 export interface WSAdapterOptions<TCtx extends Record<string, unknown> = Record<string, unknown>> {
-  /** Use MessagePack binary protocol instead of JSON */
+  /**
+   * Wire protocol for WebSocket message encoding.
+   *
+   * - `'json'` — default, text frames with JSON
+   * - `'messagepack'` — binary frames with MessagePack
+   *
+   * @default 'json'
+   */
+  protocol?: 'json' | 'messagepack'
+
+  /**
+   * @deprecated Use `protocol: 'messagepack'` instead.
+   */
   binary?: boolean
   /** Context factory — receives the peer on each message */
   context?: (peer: Peer) => TCtx | Promise<TCtx>
@@ -94,13 +106,13 @@ export function createWSHooks<TCtx extends Record<string, unknown>>(
   options: WSAdapterOptions<TCtx> = {},
 ): Partial<WSHooks> {
   const flat = compileRouter(routerDef)
-  const binary = options.binary ?? false
+  const useMsgpack = options.protocol === 'messagepack' || (options.protocol == null && (options.binary ?? false))
   const contextFactory = options.context
   const keepaliveMs = options.keepalive === false ? 0 : (options.keepalive ?? 30_000)
 
   function send(peer: Peer, data: unknown): void {
     const compress = !!options.compress
-    if (binary) {
+    if (useMsgpack) {
       peer.send(msgpackEncode(data) as ArrayBuffer, { compress })
     } else {
       peer.send(stringifyJSON(data), { compress })
@@ -108,7 +120,7 @@ export function createWSHooks<TCtx extends Record<string, unknown>>(
   }
 
   function parseMessage(message: Message): RPCRequest {
-    if (binary) {
+    if (useMsgpack) {
       return msgpackDecode(message.uint8Array()) as RPCRequest
     }
     return message.json<RPCRequest>()

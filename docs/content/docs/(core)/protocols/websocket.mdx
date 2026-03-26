@@ -255,16 +255,16 @@ ws.onmessage = ({ data }) => {
 
 ## Binary WebSocket
 
-Combine WebSocket with [MessagePack](/docs/protocols/msgpack) for smaller messages. Pass `binary: true` when setting up:
+Combine WebSocket with [MessagePack](/docs/protocols/msgpack) for smaller messages. Set `protocol: 'messagepack'` when setting up:
 
 ```ts twoslash
 // @noErrors
 import { attachWebSocket } from 'silgi/ws'
 
-await attachWebSocket(server, appRouter, { binary: true })
+await attachWebSocket(server, appRouter, { protocol: 'messagepack' })
 ```
 
-With binary mode, messages are sent as MessagePack-encoded binary frames instead of JSON text. On the client side, you'd use `msgpack` to encode/decode instead of `JSON.parse`/`JSON.stringify`.
+With MessagePack protocol, messages are sent as binary WebSocket frames instead of JSON text. On the client side, you'd use `msgpack` to encode/decode instead of `JSON.parse`/`JSON.stringify`.
 
 <Callout type='info'>
   Binary WebSocket is especially useful for high-throughput scenarios where many small messages are sent per second. The

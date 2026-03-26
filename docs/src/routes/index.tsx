@@ -269,7 +269,7 @@ function ProtocolGrid() {
           <Badge c='var(--k-accent)' t='MessagePack' b='binary' />
           <p className='text-sm text-[var(--k-dim)] font-normal leading-relaxed mt-3'>
             30% smaller payloads. Native Date. One flag:{' '}
-            <code className='k-mono text-[var(--k-text)]'>binary: true</code>
+            <code className='k-mono text-[var(--k-text)]'>protocol: 'messagepack'</code>
           </p>
         </Cell>
         <Cell bl>
