@@ -9,7 +9,7 @@ When your server starts, Silgi doesn't just register your procedures — it **co
 
 ## Overview
 
-<Mermaid chart="graph LR\n  A[s.router] --> B[compileProcedure]\n  B --> C{Has wraps?}\n  C -->|No schemas| D[Sync fast path]\n  C -->|Has schemas| E[Semi-sync path]\n  C -->|Yes| F[Wrap path]\n  A --> G[compileRouter]\n  G --> H[rou3 radix tree]" />
+<Mermaid chart="graph TD\n  A[s.router] --> B[compileProcedure]\n  B --> C{Has wraps?}\n  C -->|No schemas| D[Sync fast path]\n  C -->|Has schemas| E[Semi-sync path]\n  C -->|Yes| F[Wrap path]\n  A --> G[compileRouter]\n  G --> H[rou3 radix tree]" />
 
 ## What gets compiled?
 
@@ -62,7 +62,7 @@ The sync fast path is the most common case — a procedure with a few guards and
 
 ### Sync fast path in detail
 
-<Mermaid chart="graph LR\n  CTX[Acquire ctx] --> RG[Run guards]\n  RG --> RES[Call resolver]\n  RES --> OUT[Return result]\n  OUT --> REL[Release ctx]" />
+<Mermaid chart="graph TD\n  CTX[Acquire ctx] --> RG[Run guards]\n  RG --> RES[Call resolver]\n  RES --> OUT[Return result]\n  OUT --> REL[Release ctx]" />
 
 ### Wrap path in detail
 
