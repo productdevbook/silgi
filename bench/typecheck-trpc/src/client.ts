@@ -1,5 +1,6 @@
-import type { router } from './router'
 import { createTRPCClient, httpBatchLink } from '@trpc/client'
+
+import type { router } from './router'
 
 export const client = createTRPCClient<typeof router>({
   links: [

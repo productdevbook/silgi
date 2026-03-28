@@ -13,8 +13,9 @@
  * ```
  */
 
-import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './schema.ts'
 import { validateSchema } from './schema.ts'
+
+import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './schema.ts'
 
 // ── Types ────────────────────────────────────────────
 
@@ -55,14 +56,22 @@ export interface TaskOptions<TCtx, TInput, TOutput> {
 // ── defineTask (standalone, no context) ──────────────
 
 /** Define a standalone task with config */
-export function defineTask<TOutput>(
-  options: { name: string; cron?: string; description?: string; resolve: (event: TaskEvent<undefined, {}>) => Promise<TOutput> | TOutput },
-): TaskDef<undefined, TOutput>
+export function defineTask<TOutput>(options: {
+  name: string
+  cron?: string
+  description?: string
+  resolve: (event: TaskEvent<undefined, {}>) => Promise<TOutput> | TOutput
+}): TaskDef<undefined, TOutput>
 
 /** Define a standalone task with input schema + config */
 export function defineTask<TSchema extends AnySchema, TOutput>(
   input: TSchema,
-  options: { name: string; cron?: string; description?: string; resolve: (event: TaskEvent<InferSchemaOutput<TSchema>, {}>) => Promise<TOutput> | TOutput },
+  options: {
+    name: string
+    cron?: string
+    description?: string
+    resolve: (event: TaskEvent<InferSchemaOutput<TSchema>, {}>) => Promise<TOutput> | TOutput
+  },
 ): TaskDef<InferSchemaInput<TSchema>, TOutput>
 
 export function defineTask(...args: any[]): TaskDef<any, any> {
@@ -90,7 +99,10 @@ export function setTaskAnalytics(cb: TaskCompleteCallback | null): void {
   _onTaskComplete = cb
 }
 
-export function createTaskDef(contextFactory: (() => unknown | Promise<unknown>) | null, ...args: any[]): TaskDef<any, any> {
+export function createTaskDef(
+  contextFactory: (() => unknown | Promise<unknown>) | null,
+  ...args: any[]
+): TaskDef<any, any> {
   let inputSchema: AnySchema | null = null
   let resolve: Function
   let cron: string | null = null
@@ -154,7 +166,16 @@ export function createTaskDef(contextFactory: (() => unknown | Promise<unknown>)
       }
 
       if (_onTaskComplete) {
-        _onTaskComplete({ taskName: name, trigger: 'dispatch', timestamp: Date.now(), durationMs: Math.round((performance.now() - t0) * 100) / 100, status: 'success', input, output, spans: reqTrace?.spans })
+        _onTaskComplete({
+          taskName: name,
+          trigger: 'dispatch',
+          timestamp: Date.now(),
+          durationMs: Math.round((performance.now() - t0) * 100) / 100,
+          status: 'success',
+          input,
+          output,
+          spans: reqTrace?.spans,
+        })
       }
       return output
     } catch (err) {
@@ -171,7 +192,16 @@ export function createTaskDef(contextFactory: (() => unknown | Promise<unknown>)
       }
 
       if (_onTaskComplete) {
-        _onTaskComplete({ taskName: name, trigger: 'dispatch', timestamp: Date.now(), durationMs: Math.round((performance.now() - t0) * 100) / 100, status: 'error', error: err instanceof Error ? err.message : String(err), input, spans: reqTrace?.spans })
+        _onTaskComplete({
+          taskName: name,
+          trigger: 'dispatch',
+          timestamp: Date.now(),
+          durationMs: Math.round((performance.now() - t0) * 100) / 100,
+          status: 'error',
+          error: err instanceof Error ? err.message : String(err),
+          input,
+          spans: reqTrace?.spans,
+        })
       }
       throw err
     }

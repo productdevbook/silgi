@@ -1,7 +1,6 @@
 import { describe, it, expect, expectTypeOf, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
 
-import { silgi } from '#src/silgi.ts'
 import { createGeneralUtils } from '#src/integrations/pinia-colada/general-utils.ts'
 import * as generalUtilsModule from '#src/integrations/pinia-colada/general-utils.ts'
 import * as keyModule from '#src/integrations/pinia-colada/key.ts'
@@ -9,6 +8,7 @@ import { buildKey } from '#src/integrations/pinia-colada/key.ts'
 import { createProcedureUtils } from '#src/integrations/pinia-colada/procedure-utils.ts'
 import * as procedureUtilsModule from '#src/integrations/pinia-colada/procedure-utils.ts'
 import { createRouterUtils } from '#src/integrations/pinia-colada/router-utils.ts'
+import { silgi } from '#src/silgi.ts'
 
 // === buildKey ===
 
@@ -224,10 +224,10 @@ import { z } from 'zod'
 
 import type { Client } from '#src/client/types.ts'
 import type { SilgiError } from '#src/core/error.ts'
-import type { InferClient } from '#src/types.ts'
-import type { RouterUtils } from '#src/integrations/pinia-colada/router-utils.ts'
 import type { ProcedureUtils } from '#src/integrations/pinia-colada/procedure-utils.ts'
+import type { RouterUtils } from '#src/integrations/pinia-colada/router-utils.ts'
 import type { QueryOptionsIn, MutationOptionsIn } from '#src/integrations/pinia-colada/types.ts'
+import type { InferClient } from '#src/types.ts'
 import type { UseQueryOptions, UseMutationOptions, EntryKey } from '@pinia/colada'
 import type { MaybeRefOrGetter } from 'vue'
 
@@ -238,17 +238,11 @@ const k = silgi({
 const appRouter = k.router({
   health: k.$resolve(() => ({ status: 'ok' as const })),
   users: {
-    list: k
-      .$input(z.object({ limit: z.number().optional() }))
-      .$resolve(({ ctx }) => ctx.db.users),
-    get: k
-      .$input(z.object({ id: z.number() }))
-      .$resolve(({ input, ctx }) => {
-        return ctx.db.users.find((u) => u.id === input.id)!
-      }),
-    create: k
-      .$input(z.object({ name: z.string() }))
-      .$resolve(({ input }) => ({ id: 1, name: input.name })),
+    list: k.$input(z.object({ limit: z.number().optional() })).$resolve(({ ctx }) => ctx.db.users),
+    get: k.$input(z.object({ id: z.number() })).$resolve(({ input, ctx }) => {
+      return ctx.db.users.find((u) => u.id === input.id)!
+    }),
+    create: k.$input(z.object({ name: z.string() })).$resolve(({ input }) => ({ id: 1, name: input.name })),
   },
 })
 

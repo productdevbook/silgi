@@ -45,12 +45,14 @@ await fs.rm(CONSUME_DIR, { recursive: true, force: true })
 await fs.mkdir(ROUTER_DIR, { recursive: true })
 await fs.mkdir(CONSUME_DIR, { recursive: true })
 
-await Promise.all(names.map(async (name) => {
-  await fs.writeFile(path.join(ROUTER_DIR, `${name}.ts`), createRouter(name))
-  await fs.writeFile(path.join(CONSUME_DIR, `${name}.ts`), createConsume(name))
-}))
+await Promise.all(
+  names.map(async (name) => {
+    await fs.writeFile(path.join(ROUTER_DIR, `${name}.ts`), createRouter(name))
+    await fs.writeFile(path.join(CONSUME_DIR, `${name}.ts`), createConsume(name))
+  }),
+)
 
-const index = `${names.map(n => `import { ${n} } from './${n}'`).join('\n')}
+const index = `${names.map((n) => `import { ${n} } from './${n}'`).join('\n')}
 
 export const router = {
   ${names.join(',\n  ')},

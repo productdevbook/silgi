@@ -3,32 +3,26 @@ const messages = ref<Array<{ id: string; direction: 'out' | 'in'; data: unknown;
 const connected = ref(false)
 const error = ref('')
 
-
 let ws: WebSocket | null = null
 let msgId = 0
-
 
 function connect() {
   error.value = ''
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
   ws = new WebSocket(`${proto}//${location.host}`)
 
-
   ws.addEventListener('open', () => {
     connected.value = true
   })
-
 
   ws.addEventListener('message', (event) => {
     const msg = JSON.parse(event.data)
     messages.value.push({ id: msg.id, direction: 'in', data: msg, ts: Date.now() })
   })
 
-
   ws.addEventListener('close', () => {
     connected.value = false
   })
-
 
   ws.addEventListener('error', () => {
     error.value = 'Connection failed'
@@ -36,12 +30,10 @@ function connect() {
   })
 }
 
-
 function disconnect() {
   ws?.close()
   ws = null
 }
-
 
 function send(path: string, input?: unknown) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return
@@ -51,29 +43,23 @@ function send(path: string, input?: unknown) {
   messages.value.push({ id, direction: 'out', data: payload, ts: Date.now() })
 }
 
-
 // ── Demo actions ──
-
 
 function callHealth() {
   send('demo/slow')
 }
 
-
 function callEcho() {
   send('demo/compute', { a: Math.floor(Math.random() * 100), b: Math.floor(Math.random() * 100), op: 'add' })
 }
-
 
 function callClock() {
   send('demo/clock')
 }
 
-
 function callNotFound() {
   send('does/not/exist')
 }
-
 
 onUnmounted(() => disconnect())
 </script>

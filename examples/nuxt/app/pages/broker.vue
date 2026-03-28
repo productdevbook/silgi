@@ -1,7 +1,6 @@
 <script setup lang="ts">
 const client = useClient()
 
-
 const pingResult = ref<any>(null)
 const uppercaseInput = ref('hello world')
 const uppercaseResult = ref<any>(null)
@@ -9,7 +8,6 @@ const fibInput = ref(10)
 const fibResult = ref<any>(null)
 const error = ref<string | null>(null)
 const loading = ref(false)
-
 
 async function doPing() {
   error.value = null
@@ -22,7 +20,6 @@ async function doPing() {
   loading.value = false
 }
 
-
 async function doUppercase() {
   error.value = null
   try {
@@ -31,7 +28,6 @@ async function doUppercase() {
     error.value = e.message ?? 'Failed'
   }
 }
-
 
 async function doFib() {
   error.value = null

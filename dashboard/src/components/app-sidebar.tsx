@@ -35,7 +35,15 @@ interface AppSidebarProps {
   taskCount: number
 }
 
-export function AppSidebar({ route, navigate, data, errorCount, requestCount, sessionCount, taskCount }: AppSidebarProps) {
+export function AppSidebar({
+  route,
+  navigate,
+  data,
+  errorCount,
+  requestCount,
+  sessionCount,
+  taskCount,
+}: AppSidebarProps) {
   return (
     <Sidebar collapsible='icon'>
       <SidebarHeader className='gap-0'>

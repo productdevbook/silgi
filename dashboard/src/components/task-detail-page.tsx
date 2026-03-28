@@ -21,7 +21,9 @@ export function TaskDetailPage({ taskExecutions, id, navigate }: TaskDetailPageP
 
   if (!entry) {
     return (
-      <div className='flex min-h-40 items-center justify-center text-sm text-muted-foreground'>Task execution not found</div>
+      <div className='flex min-h-40 items-center justify-center text-sm text-muted-foreground'>
+        Task execution not found
+      </div>
     )
   }
 

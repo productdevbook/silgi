@@ -14,7 +14,7 @@ const auth = k.guard(() => ({ user: { id: 1, role: 'admin' } }))
 
 k.$use(auth).$resolve(({ ctx }) => {
   ctx.user.role // ✅ typed as string — no cast needed
-  ctx.db         // ✅ base context still available
+  ctx.db // ✅ base context still available
   return { ok: true }
 })
 ```
@@ -26,8 +26,8 @@ const timing = k.wrap(async (ctx, next) => next())
 const rateLimit = k.guard(() => {}) // returns void → no ctx change
 
 k.$use(auth)
-  .$use(timing)      // ctx unchanged
-  .$use(rateLimit)    // ctx unchanged
+  .$use(timing) // ctx unchanged
+  .$use(rateLimit) // ctx unchanged
   .$resolve(({ ctx }) => {
     ctx.user // ✅ still typed from auth guard
   })
@@ -43,11 +43,11 @@ Three targeted optimizations based on studying the [TypeScript Go compiler](http
 - **`analytics.ts`**: Extracted `jsonResponse()` helper so `JSON.stringify` overload resolution happens once with `unknown` instead of per-specific-type
 - **`pinia-colada/types.ts`**: Replaced `SetOptional<UseQueryOptions, 'key' | 'query'>` (`Omit & Partial<Pick>` = 3 mapped types) with `Partial<UseQueryOptions>` (single mapped type)
 
-| Metric | Before | After | Change |
-| ------ | ------ | ----- | ------ |
-| Types | 29,595 | 25,592 | **-14%** |
-| Instantiations | 53,766 | 29,337 | **-47%** |
-| Check time (tsgo) | 28ms | 24ms | -14% |
+| Metric            | Before | After  | Change   |
+| ----------------- | ------ | ------ | -------- |
+| Types             | 29,595 | 25,592 | **-14%** |
+| Instantiations    | 53,766 | 29,337 | **-47%** |
+| Check time (tsgo) | 28ms   | 24ms   | -14%     |
 
 ## InferClient optimizations
 

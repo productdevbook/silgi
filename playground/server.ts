@@ -201,12 +201,22 @@ const listUsers = s
   .$input(z.object({ limit: z.number().min(1).max(100).optional() }))
   .$resolve(async ({ input, ctx }) => {
     const limit = input.limit ?? 10
-    const users = await trace(ctx, 'db.users.findMany', () => {
-      return ctx.db.users.slice(0, limit)
-    }, { kind: 'db', detail: `SELECT * FROM users LIMIT ${limit}` })
-    const total = await trace(ctx, 'db.users.count', () => {
-      return ctx.db.users.length
-    }, { kind: 'db', detail: 'SELECT COUNT(*) FROM users' })
+    const users = await trace(
+      ctx,
+      'db.users.findMany',
+      () => {
+        return ctx.db.users.slice(0, limit)
+      },
+      { kind: 'db', detail: `SELECT * FROM users LIMIT ${limit}` },
+    )
+    const total = await trace(
+      ctx,
+      'db.users.count',
+      () => {
+        return ctx.db.users.length
+      },
+      { kind: 'db', detail: 'SELECT COUNT(*) FROM users' },
+    )
     return { users, total }
   })
 
@@ -409,23 +419,34 @@ const adminRouter = implement(adminContract, {
 // ── Tasks ───────────────────────────────────────────
 
 // 1. Task with input + trace() spans — send welcome email
-const sendWelcomeEmail = s.task(
-  z.object({ userId: z.number(), email: z.string().email() }),
-  { name: 'send-welcome-email', description: 'Send welcome email to new user', resolve: async ({ input, ctx }) => {
+const sendWelcomeEmail = s.task(z.object({ userId: z.number(), email: z.string().email() }), {
+  name: 'send-welcome-email',
+  description: 'Send welcome email to new user',
+  resolve: async ({ input, ctx }) => {
     // trace() inside tasks automatically produces spans visible in dashboard
-    const user = await trace(ctx, 'db.users.findById', async () => {
-      await new Promise((r) => setTimeout(r, 10))
-      return ctx.db.users.find((u) => u.id === input.userId)
-    }, { kind: 'db', detail: `SELECT * FROM users WHERE id = ${input.userId}` })
+    const user = await trace(
+      ctx,
+      'db.users.findById',
+      async () => {
+        await new Promise((r) => setTimeout(r, 10))
+        return ctx.db.users.find((u) => u.id === input.userId)
+      },
+      { kind: 'db', detail: `SELECT * FROM users WHERE id = ${input.userId}` },
+    )
 
-    await trace(ctx, 'email.send', async () => {
-      await new Promise((r) => setTimeout(r, 80))
-      console.log(`    [task] Sent welcome email to ${input.email} (user: ${user?.name ?? 'unknown'})`)
-    }, { kind: 'email', detail: `to: ${input.email}` })
+    await trace(
+      ctx,
+      'email.send',
+      async () => {
+        await new Promise((r) => setTimeout(r, 80))
+        console.log(`    [task] Sent welcome email to ${input.email} (user: ${user?.name ?? 'unknown'})`)
+      },
+      { kind: 'email', detail: `to: ${input.email}` },
+    )
 
     return { sent: true, to: input.email }
-  }},
-)
+  },
+})
 
 // 2. Task without input — cleanup old data
 const cleanupOldData = s.task({
@@ -471,17 +492,22 @@ const createUserWithEmail = s
   .$input(z.object({ name: z.string(), email: z.string().email() }))
   .$output(UserSchema)
   .$resolve(async ({ input, ctx }) => {
-    const user = await trace(ctx, 'db.users.create', async () => {
-      const u = {
-        id: ctx.db.nextUserId++,
-        name: input.name,
-        email: input.email,
-        role: 'user' as const,
-        createdAt: new Date().toISOString(),
-      }
-      ctx.db.users.push(u)
-      return u
-    }, { kind: 'db', detail: `INSERT INTO users (name, email) VALUES ('${input.name}', '${input.email}')` })
+    const user = await trace(
+      ctx,
+      'db.users.create',
+      async () => {
+        const u = {
+          id: ctx.db.nextUserId++,
+          name: input.name,
+          email: input.email,
+          role: 'user' as const,
+          createdAt: new Date().toISOString(),
+        }
+        ctx.db.users.push(u)
+        return u
+      },
+      { kind: 'db', detail: `INSERT INTO users (name, email) VALUES ('${input.name}', '${input.email}')` },
+    )
 
     // Pass { ctx } — automatically adds span to parent request trace
     sendWelcomeEmail.dispatch({ userId: user.id, email: user.email }, { ctx })
@@ -557,7 +583,7 @@ s.serve(appRouter, {
     description: 'Full feature showcase — every Silgi capability in one server',
     security: { type: 'http', scheme: 'bearer', bearerFormat: 'Token' },
   },
-  analytics: true
+  analytics: true,
 })
 
 console.log('\n╔══════════════════════════════════════════════╗')

@@ -1,13 +1,11 @@
 <script setup lang="ts">
 const client = useClient()
 
-
 const username = ref('admin')
 const password = ref('any')
 const token = ref('')
 const user = ref<{ id: number; username: string; role: string } | null>(null)
 const error = ref('')
-
 
 async function login() {
   error.value = ''
@@ -20,7 +18,6 @@ async function login() {
   }
 }
 
-
 async function fetchMe() {
   try {
     user.value = await client.auth.me({ token: token.value })
@@ -28,7 +25,6 @@ async function fetchMe() {
     user.value = null
   }
 }
-
 
 async function logout() {
   await client.auth.logout({ token: token.value })

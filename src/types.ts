@@ -158,8 +158,9 @@ export type RouterDef = {
 import type { TaskDef } from './core/task.ts'
 
 /** Return type wrapper — subscription yields, query/mutation returns Promise */
-type ProcedureResult<TType extends ProcedureType, TOutput> =
-  TType extends 'subscription' ? AsyncIterableIterator<TOutput> : Promise<TOutput>
+type ProcedureResult<TType extends ProcedureType, TOutput> = TType extends 'subscription'
+  ? AsyncIterableIterator<TOutput>
+  : Promise<TOutput>
 
 /** Infer client type from router */
 export type InferClient<T> =

@@ -1,15 +1,12 @@
 <script setup lang="ts">
 const client = useClient()
 
-
 const todos = ref<any[]>([])
 const newTitle = ref('')
 const loading = ref(true)
 const responseInfo = ref('')
 
-
 onMounted(() => fetchTodos())
-
 
 async function fetchTodos() {
   loading.value = true
@@ -18,7 +15,6 @@ async function fetchTodos() {
   responseInfo.value = `JSON — ${(performance.now() - start).toFixed(1)}ms`
   loading.value = false
 }
-
 
 async function addTodo() {
   if (!newTitle.value.trim()) return

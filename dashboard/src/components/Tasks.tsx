@@ -22,7 +22,7 @@ export function Tasks({ data, taskExecutions, scheduledTasks, navigate }: TasksP
   )
 
   const filtered = useMemo(() => {
-    const list = [...taskExecutions].reverse()
+    const list = [...taskExecutions].toReversed()
     if (filter === 'all') return list
     return list.filter((t) => t.status === filter)
   }, [taskExecutions, filter])
@@ -46,20 +46,30 @@ export function Tasks({ data, taskExecutions, scheduledTasks, navigate }: TasksP
               <div key={s.name + s.cron} className='rounded-lg border bg-card p-3'>
                 <div className='flex items-center justify-between'>
                   <span className='font-mono text-xs font-medium'>{s.name}</span>
-                  <Badge variant='outline' className='text-[10px] font-mono'>{s.cron}</Badge>
+                  <Badge variant='outline' className='text-[10px] font-mono'>
+                    {s.cron}
+                  </Badge>
                 </div>
-                {s.description && (
-                  <p className='mt-1 text-[11px] text-muted-foreground'>{s.description}</p>
-                )}
+                {s.description && <p className='mt-1 text-[11px] text-muted-foreground'>{s.description}</p>}
                 <div className='mt-2 flex gap-4 text-[11px] text-muted-foreground'>
-                  <span>Runs: <span className='font-mono text-foreground'>{s.runs}</span></span>
+                  <span>
+                    Runs: <span className='font-mono text-foreground'>{s.runs}</span>
+                  </span>
                   <span className={cn(s.errors > 0 && 'text-destructive')}>
                     Errors: <span className='font-mono'>{s.errors}</span>
                   </span>
                 </div>
                 <div className='mt-1 flex gap-4 text-[11px] text-muted-foreground'>
-                  <span>Last: <span className='font-mono text-foreground'>{s.lastRun ? fmtRelativeTime(s.lastRun) : '—'}</span></span>
-                  <span>Next: <span className='font-mono text-foreground'>{s.nextRun ? fmtRelativeTime(s.nextRun).replace(' ago', '') : '—'}</span></span>
+                  <span>
+                    Last:{' '}
+                    <span className='font-mono text-foreground'>{s.lastRun ? fmtRelativeTime(s.lastRun) : '—'}</span>
+                  </span>
+                  <span>
+                    Next:{' '}
+                    <span className='font-mono text-foreground'>
+                      {s.nextRun ? fmtRelativeTime(s.nextRun).replace(' ago', '') : '—'}
+                    </span>
+                  </span>
                 </div>
               </div>
             ))}
@@ -87,7 +97,12 @@ export function Tasks({ data, taskExecutions, scheduledTasks, navigate }: TasksP
                   <tr key={name} className='border-b last:border-0 hover:bg-muted/20'>
                     <td className='px-3 py-2 font-mono text-xs'>{name}</td>
                     <td className='px-3 py-2 text-right font-mono tabular-nums'>{stats.runs}</td>
-                    <td className={cn('px-3 py-2 text-right font-mono tabular-nums', stats.errors > 0 && 'text-destructive font-medium')}>
+                    <td
+                      className={cn(
+                        'px-3 py-2 text-right font-mono tabular-nums',
+                        stats.errors > 0 && 'text-destructive font-medium',
+                      )}
+                    >
                       {stats.errors}
                     </td>
                     <td className='px-3 py-2 text-right font-mono tabular-nums text-muted-foreground'>
@@ -150,7 +165,9 @@ export function Tasks({ data, taskExecutions, scheduledTasks, navigate }: TasksP
                   >
                     <td className='px-3 py-2 font-mono text-xs'>{t.taskName || '(unnamed)'}</td>
                     <td className='px-3 py-2'>
-                      <Badge variant='outline' className='text-[10px] font-normal'>{t.trigger}</Badge>
+                      <Badge variant='outline' className='text-[10px] font-normal'>
+                        {t.trigger}
+                      </Badge>
                     </td>
                     <td className='px-3 py-2'>
                       <Badge variant={t.status === 'success' ? 'default' : 'destructive'} className='text-[10px]'>
@@ -185,4 +202,3 @@ function StatCard({ label, value, danger }: { label: string; value: number | str
     </div>
   )
 }
-

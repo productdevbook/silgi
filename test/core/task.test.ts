@@ -1,8 +1,8 @@
 import { describe, it, expect, expectTypeOf, afterEach } from 'vitest'
 import { z } from 'zod'
 
-import { silgi } from '#src/silgi.ts'
 import { defineTask, runTask, collectCronTasks, setTaskAnalytics } from '#src/core/task.ts'
+import { silgi } from '#src/silgi.ts'
 
 import type { TaskDef } from '#src/core/task.ts'
 
@@ -19,18 +19,18 @@ describe('defineTask', () => {
   })
 
   it('with input schema', async () => {
-    const task = defineTask(
-      z.object({ name: z.string() }),
-      { name: 'greet', resolve: async ({ input }) => `hello ${input.name}` },
-    )
+    const task = defineTask(z.object({ name: z.string() }), {
+      name: 'greet',
+      resolve: async ({ input }) => `hello ${input.name}`,
+    })
     expect(await task.dispatch({ name: 'world' })).toBe('hello world')
   })
 
   it('validates input', async () => {
-    const task = defineTask(
-      z.object({ count: z.number() }),
-      { name: 'double', resolve: async ({ input }) => input.count * 2 },
-    )
+    const task = defineTask(z.object({ count: z.number() }), {
+      name: 'double',
+      resolve: async ({ input }) => input.count * 2,
+    })
     await expect(task.dispatch({ count: 'bad' } as any)).rejects.toThrow()
   })
 
@@ -47,10 +47,11 @@ describe('defineTask', () => {
   })
 
   it('with schema + config', async () => {
-    const task = defineTask(
-      z.object({ id: z.number() }),
-      { name: 'process', description: 'Process item', resolve: async ({ input }) => ({ processed: input.id }) },
-    )
+    const task = defineTask(z.object({ id: z.number() }), {
+      name: 'process',
+      description: 'Process item',
+      resolve: async ({ input }) => ({ processed: input.id }),
+    })
     expect(task.route?.summary).toBe('Process item')
     expect(await task.dispatch({ id: 5 })).toEqual({ processed: 5 })
   })
@@ -70,10 +71,10 @@ describe('s.task()', () => {
   })
 
   it('with schema', async () => {
-    const task = s.task(
-      z.object({ email: z.string().email() }),
-      { name: 'send', resolve: async ({ input }) => ({ sent: true, to: input.email }) },
-    )
+    const task = s.task(z.object({ email: z.string().email() }), {
+      name: 'send',
+      resolve: async ({ input }) => ({ sent: true, to: input.email }),
+    })
     expect(await task.dispatch({ email: 'test@test.com' })).toEqual({ sent: true, to: 'test@test.com' })
   })
 
@@ -87,10 +88,10 @@ describe('s.task()', () => {
 
 describe('router mount', () => {
   it('task mounts directly on router', () => {
-    const sendEmail = defineTask(
-      z.object({ to: z.string() }),
-      { name: 'send-email', resolve: async ({ input }) => ({ sent: true }) },
-    )
+    const sendEmail = defineTask(z.object({ to: z.string() }), {
+      name: 'send-email',
+      resolve: async ({ input }) => ({ sent: true }),
+    })
 
     const router = s.router({ tasks: { sendEmail } })
     expect(router.tasks.sendEmail._tag).toBe('task')
@@ -119,7 +120,11 @@ describe('runTask', () => {
     let callCount = 0
     const task = defineTask({
       name: 'dedup',
-      resolve: async () => { callCount++; await new Promise((r) => setTimeout(r, 50)); return callCount },
+      resolve: async () => {
+        callCount++
+        await new Promise((r) => setTimeout(r, 50))
+        return callCount
+      },
     })
 
     const [a, b] = await Promise.all([runTask(task), runTask(task)])
@@ -176,10 +181,10 @@ describe('task context', () => {
 
   it('s.task() with input + context', async () => {
     const k = silgi({ context: () => ({ secret: 'abc' }) })
-    const task = k.task(
-      z.object({ userId: z.string() }),
-      { name: 'ctx-input', resolve: async ({ input, ctx }) => `user:${input.userId} secret:${ctx.secret}` },
-    )
+    const task = k.task(z.object({ userId: z.string() }), {
+      name: 'ctx-input',
+      resolve: async ({ input, ctx }) => `user:${input.userId} secret:${ctx.secret}`,
+    })
     expect(await task.dispatch({ userId: '123' })).toBe('user:123 secret:abc')
   })
 
@@ -214,7 +219,12 @@ describe('task analytics', () => {
     const events: any[] = []
     setTaskAnalytics((e) => events.push(e))
 
-    const task = defineTask({ name: 'failing', resolve: async () => { throw new Error('boom') } })
+    const task = defineTask({
+      name: 'failing',
+      resolve: async () => {
+        throw new Error('boom')
+      },
+    })
     await expect(task.dispatch()).rejects.toThrow('boom')
 
     expect(events).toHaveLength(1)
@@ -232,13 +242,13 @@ describe('task analytics', () => {
 
 describe('type safety', () => {
   it('dispatch input typed from schema', () => {
-    const task = defineTask(
-      z.object({ to: z.string(), subject: z.string() }),
-      { name: 'typed', resolve: async ({ input }) => {
+    const task = defineTask(z.object({ to: z.string(), subject: z.string() }), {
+      name: 'typed',
+      resolve: async ({ input }) => {
         expectTypeOf(input).toEqualTypeOf<{ to: string; subject: string }>()
         return { sent: true }
-      }},
-    )
+      },
+    })
     expectTypeOf(task.dispatch).parameter(0).toEqualTypeOf<{ to: string; subject: string }>()
     expectTypeOf(task.dispatch).returns.resolves.toEqualTypeOf<{ sent: true }>()
   })
@@ -249,29 +259,32 @@ describe('type safety', () => {
   })
 
   it('s.task() matches defineTask types', () => {
-    const task = s.task(
-      z.object({ id: z.number() }),
-      { name: 'match', resolve: async ({ input }) => ({ found: input.id > 0 }) },
-    )
+    const task = s.task(z.object({ id: z.number() }), {
+      name: 'match',
+      resolve: async ({ input }) => ({ found: input.id > 0 }),
+    })
     expectTypeOf(task).toMatchTypeOf<TaskDef<{ id: number }, { found: boolean }>>()
   })
 
   it('s.task() ctx is typed as TBaseCtx', () => {
     const k = silgi({ context: () => ({ db: 'pg', count: 0 }) })
 
-    k.task({ name: 'a', resolve: async ({ ctx }) => {
-      expectTypeOf(ctx.db).toBeString()
-      expectTypeOf(ctx.count).toBeNumber()
-      return true
-    }})
+    k.task({
+      name: 'a',
+      resolve: async ({ ctx }) => {
+        expectTypeOf(ctx.db).toBeString()
+        expectTypeOf(ctx.count).toBeNumber()
+        return true
+      },
+    })
 
-    k.task(
-      z.object({ id: z.number() }),
-      { name: 'b', resolve: async ({ input, ctx }) => {
+    k.task(z.object({ id: z.number() }), {
+      name: 'b',
+      resolve: async ({ input, ctx }) => {
         expectTypeOf(input).toEqualTypeOf<{ id: number }>()
         expectTypeOf(ctx.db).toBeString()
         return true
-      }},
-    )
+      },
+    })
   })
 })

@@ -1,12 +1,10 @@
 <script setup lang="ts">
 const client = useClient()
 
-
 // Timing wrap
 const result = ref<any>(null)
 const loading = ref(false)
 const duration = ref('')
-
 
 async function callSlow() {
   loading.value = true
@@ -16,10 +14,8 @@ async function callSlow() {
   loading.value = false
 }
 
-
 // HTTP Cache
 const httpCache = ref<any>(null)
-
 
 async function callHttpCached() {
   const start = performance.now()
@@ -27,10 +23,8 @@ async function callHttpCached() {
   httpCache.value._ms = `${(performance.now() - start).toFixed(0)}ms`
 }
 
-
 // Server Cache (ocache)
 const serverCache = ref<any>(null)
-
 
 async function callServerCached() {
   const start = performance.now()
@@ -38,19 +32,16 @@ async function callServerCached() {
   serverCache.value._ms = `${(performance.now() - start).toFixed(0)}ms`
 }
 
-
 async function invalidate() {
   await client.demo.invalidateCache()
   serverCache.value = null
 }
-
 
 // Compute
 const computeResult = ref('')
 const a = ref(10)
 const b = ref(3)
 const op = ref<'add' | 'sub' | 'mul' | 'div'>('add')
-
 
 async function callCompute() {
   const data = await client.demo.compute({ a: a.value, b: b.value, op: op.value })

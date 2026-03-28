@@ -64,8 +64,8 @@ type MediumClient = {
 
 // ── Pinia Colada Benchmarks ────────────────────────────────
 
-import type { RouterUtils } from '../src/integrations/pinia-colada/router-utils.ts'
 import type { ProcedureUtils } from '../src/integrations/pinia-colada/procedure-utils.ts'
+import type { RouterUtils } from '../src/integrations/pinia-colada/router-utils.ts'
 import type { QueryOptionsIn, MutationOptionsIn } from '../src/integrations/pinia-colada/types.ts'
 
 // Baseline: cost of importing pinia-colada types
@@ -76,38 +76,38 @@ bench.baseline(() => {
 // Pinia Colada: RouterUtils with small client
 bench('colada: RouterUtils<SmallClient>', () => {
   return {} as RouterUtils<SmallClient>
-}).types([0,"instantiations"])
+}).types([0, 'instantiations'])
 
 // Pinia Colada: RouterUtils with medium client
 bench('colada: RouterUtils<MediumClient>', () => {
   return {} as RouterUtils<MediumClient>
-}).types([21,"instantiations"])
+}).types([21, 'instantiations'])
 
 // Pinia Colada: ProcedureUtils inference
 bench('colada: ProcedureUtils leaf', () => {
   return {} as ProcedureUtils<{}, { id: number }, { id: number; name: string; email: string }, SilgiError>
-}).types([0,"instantiations"])
+}).types([0, 'instantiations'])
 
 // Pinia Colada: QueryOptionsIn conditional type
 bench('colada: QueryOptionsIn (with input)', () => {
   return {} as QueryOptionsIn<{}, { id: number }, { name: string }, SilgiError, undefined>
-}).types([37,"instantiations"])
+}).types([37, 'instantiations'])
 
 // Pinia Colada: QueryOptionsIn no-input (optional)
 bench('colada: QueryOptionsIn (no input)', () => {
   return {} as QueryOptionsIn<{}, undefined, { status: string }, SilgiError, undefined>
-}).types([36,"instantiations"])
+}).types([36, 'instantiations'])
 
 // Pinia Colada: MutationOptionsIn
 bench('colada: MutationOptionsIn', () => {
   return {} as MutationOptionsIn<{}, { name: string }, { id: number }, SilgiError, Record<any, any>>
-}).types([38,"instantiations"])
+}).types([38, 'instantiations'])
 
 // Pinia Colada: Deep nested access type
 bench('colada: deep nested type', () => {
   type R = RouterUtils<MediumClient>
   return {} as R['posts']['comments']
-}).types([118,"instantiations"])
+}).types([118, 'instantiations'])
 
 // ── TanStack Query Benchmarks ──────────────────────────────
 
@@ -116,23 +116,23 @@ import type { QueryUtils, ProcedureQueryUtils } from '../src/integrations/tansta
 // TanStack: QueryUtils with small client
 bench('tanstack: QueryUtils<SmallClient>', () => {
   return {} as QueryUtils<SmallClient>
-}).types([52,"instantiations"])
+}).types([52, 'instantiations'])
 
 // TanStack: QueryUtils with medium client
 bench('tanstack: QueryUtils<MediumClient>', () => {
   return {} as QueryUtils<MediumClient>
-}).types([52,"instantiations"])
+}).types([52, 'instantiations'])
 
 // TanStack: ProcedureQueryUtils leaf
 bench('tanstack: ProcedureQueryUtils leaf', () => {
   return {} as ProcedureQueryUtils<{ id: number }, { id: number; name: string; email: string }, SilgiError>
-}).types([0,"instantiations"])
+}).types([0, 'instantiations'])
 
 // TanStack: Deep nested access type
 bench('tanstack: deep nested type', () => {
   type R = QueryUtils<MediumClient>
   return {} as R['posts']['comments']
-}).types([125,"instantiations"])
+}).types([125, 'instantiations'])
 
 // ── InferClient Benchmark ──────────────────────────────────
 
@@ -150,7 +150,7 @@ bench('core: InferClient small', () => {
     }
   }
   return {} as InferClient<Router>
-}).types([33,"instantiations"])
+}).types([33, 'instantiations'])
 
 // InferClient: medium router
 bench('core: InferClient medium', () => {
@@ -186,4 +186,4 @@ bench('core: InferClient medium', () => {
     }
   }
   return {} as InferClient<Router>
-}).types([33,"instantiations"])
+}).types([33, 'instantiations'])

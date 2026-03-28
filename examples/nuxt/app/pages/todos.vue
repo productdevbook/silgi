@@ -1,22 +1,18 @@
 <script setup lang="ts">
 const client = useClient()
 
-
 const todos = ref<any[]>([])
 const newTitle = ref('')
 const loading = ref(true)
 const errorMsg = ref('')
 
-
 onMounted(() => fetchTodos())
-
 
 async function fetchTodos() {
   loading.value = true
   todos.value = await client.todos.list()
   loading.value = false
 }
-
 
 async function addTodo() {
   if (!newTitle.value.trim()) return
@@ -30,7 +26,6 @@ async function addTodo() {
   }
 }
 
-
 async function toggleTodo(id: number) {
   errorMsg.value = ''
   try {
@@ -40,7 +35,6 @@ async function toggleTodo(id: number) {
     errorMsg.value = e?.data?.code || e?.message || 'Unknown error'
   }
 }
-
 
 async function removeTodo(id: number) {
   errorMsg.value = ''
@@ -52,7 +46,6 @@ async function removeTodo(id: number) {
   }
 }
 
-
 // ── Error triggers for analytics testing ────────────
 async function triggerNotFound() {
   errorMsg.value = ''
@@ -63,7 +56,6 @@ async function triggerNotFound() {
   }
 }
 
-
 async function triggerValidation() {
   errorMsg.value = ''
   try {
@@ -72,7 +64,6 @@ async function triggerValidation() {
     errorMsg.value = `Validation: empty title rejected`
   }
 }
-
 
 async function triggerBadType() {
   errorMsg.value = ''

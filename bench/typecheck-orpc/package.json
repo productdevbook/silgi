@@ -1,8 +1,8 @@
 {
   "name": "typecheck-orpc",
-  "type": "module",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "gen": "tsx scripts/gen.ts",
     "bench": "tsx scripts/gen.ts && tsc --noEmit --extendedDiagnostics"

@@ -12,7 +12,17 @@
  */
 
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
-import type { ProcedureDef, ProcedureType, ErrorDef, GuardDef, WrapDef, MiddlewareDef, ResolveContext, Route, Meta } from './types.ts'
+import type {
+  ProcedureDef,
+  ProcedureType,
+  ErrorDef,
+  GuardDef,
+  WrapDef,
+  MiddlewareDef,
+  ResolveContext,
+  Route,
+  Meta,
+} from './types.ts'
 
 // ── Builder Interfaces ──────────────────────────────
 
@@ -27,7 +37,13 @@ export interface ProcedureBuilder<
   /** Add a guard — enriches context with guard return type */
   $use<TReturn extends Record<string, unknown> | void, TGErrors extends ErrorDef = {}>(
     guard: GuardDef<TCtx, TReturn, TGErrors>,
-  ): ProcedureBuilder<TType, TBaseCtx, TReturn extends Record<string, unknown> ? TCtx & TReturn : TCtx, TInput, TGErrors & TErrors>
+  ): ProcedureBuilder<
+    TType,
+    TBaseCtx,
+    TReturn extends Record<string, unknown> ? TCtx & TReturn : TCtx,
+    TInput,
+    TGErrors & TErrors
+  >
 
   /** Add a wrap middleware — does not change context type */
   $use(wrap: WrapDef<TCtx>): ProcedureBuilder<TType, TBaseCtx, TCtx, TInput, TErrors>
@@ -73,7 +89,14 @@ export interface ProcedureBuilderWithOutput<
   /** Add a guard — enriches context with guard return type */
   $use<TReturn extends Record<string, unknown> | void, TGErrors extends ErrorDef = {}>(
     guard: GuardDef<TCtx, TReturn, TGErrors>,
-  ): ProcedureBuilderWithOutput<TType, TBaseCtx, TReturn extends Record<string, unknown> ? TCtx & TReturn : TCtx, TInput, TOutputResolved, TGErrors & TErrors>
+  ): ProcedureBuilderWithOutput<
+    TType,
+    TBaseCtx,
+    TReturn extends Record<string, unknown> ? TCtx & TReturn : TCtx,
+    TInput,
+    TOutputResolved,
+    TGErrors & TErrors
+  >
 
   /** Add a wrap middleware — does not change context type */
   $use(wrap: WrapDef<TCtx>): ProcedureBuilderWithOutput<TType, TBaseCtx, TCtx, TInput, TOutputResolved, TErrors>

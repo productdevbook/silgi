@@ -1,9 +1,7 @@
 <script setup lang="ts">
 const client = useClient()
 
-
 const results = ref<Array<{ action: string; status: string; detail: string }>>([])
-
 
 async function testNotFound() {
   try {
@@ -14,7 +12,6 @@ async function testNotFound() {
   }
 }
 
-
 async function testValidation() {
   try {
     await client.todos.create({ title: '' })
@@ -23,7 +20,6 @@ async function testValidation() {
     addResult('create("")', 'error', `${e?.data?.code || e?.code} — validation failed`)
   }
 }
-
 
 async function testUnauthorized() {
   try {
@@ -34,7 +30,6 @@ async function testUnauthorized() {
   }
 }
 
-
 async function testSuccess() {
   try {
     const data = await client.todos.list()
@@ -44,11 +39,9 @@ async function testSuccess() {
   }
 }
 
-
 function addResult(action: string, status: string, detail: string) {
   results.value.push({ action, status, detail })
 }
-
 
 function clear() {
   results.value = []
