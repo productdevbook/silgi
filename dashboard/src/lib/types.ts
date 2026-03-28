@@ -84,6 +84,16 @@ export interface TaskSnapshot {
   tasks: Record<string, { runs: number; errors: number; avgDurationMs: number; lastRun: number | null }>
 }
 
+export interface ScheduledTaskInfo {
+  name: string
+  cron: string
+  description?: string
+  nextRun: number | null
+  lastRun: number | null
+  runs: number
+  errors: number
+}
+
 /** An HTTP request containing one or more procedure calls. */
 export interface RequestEntry {
   id: number

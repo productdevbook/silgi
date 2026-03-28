@@ -1020,6 +1020,10 @@ export async function serveAnalyticsRoute(
     const tasks = await collector.getTaskExecutions()
     return jsonResponse(tasks, jsonCacheHeaders)
   }
+  if (pathname === 'analytics/_api/scheduled') {
+    const { getScheduledTasks } = await import('../core/task.ts')
+    return jsonResponse(getScheduledTasks(), jsonCacheHeaders)
+  }
   if (pathname.startsWith('analytics/_api/requests/') && pathname.endsWith('/md')) {
     const id = Number(pathname.slice('analytics/_api/requests/'.length, -'/md'.length))
     const requests = await collector.getRequests()

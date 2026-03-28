@@ -1,13 +1,14 @@
 import { mockData, mockErrors, mockRequests } from '@/lib/mock-data'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { AnalyticsData, ErrorEntry, RequestEntry, TaskExecution } from '@/lib/types'
+import type { AnalyticsData, ErrorEntry, RequestEntry, ScheduledTaskInfo, TaskExecution } from '@/lib/types'
 
 const ENDPOINTS = {
   stats: '/analytics/_api/stats',
   errors: '/analytics/_api/errors',
   requests: '/analytics/_api/requests',
   tasks: '/analytics/_api/tasks',
+  scheduled: '/analytics/_api/scheduled',
 } as const
 
 export function useAnalytics(intervalMs = 2000) {
@@ -15,6 +16,7 @@ export function useAnalytics(intervalMs = 2000) {
   const [errors, setErrors] = useState<ErrorEntry[]>([])
   const [requests, setRequests] = useState<RequestEntry[]>([])
   const [taskExecutions, setTaskExecutions] = useState<TaskExecution[]>([])
+  const [scheduledTasks, setScheduledTasks] = useState<ScheduledTaskInfo[]>([])
   const [autoRefresh, setAutoRefresh] = useState(true)
   const useMock = useRef(false)
 
@@ -44,6 +46,8 @@ export function useAnalytics(intervalMs = 2000) {
       setErrors(newErrors)
       setRequests(newRequests)
       if (taskRes.ok) setTaskExecutions(await taskRes.json())
+      const schedRes = await fetch(ENDPOINTS.scheduled).catch(() => null)
+      if (schedRes?.ok) setScheduledTasks(await schedRes.json())
     } catch {
       fallbackToMock()
     }
@@ -65,5 +69,5 @@ export function useAnalytics(intervalMs = 2000) {
     return () => clearInterval(timer)
   }, [poll, intervalMs, autoRefresh])
 
-  return { data, errors, requests, taskExecutions, autoRefresh, setAutoRefresh } as const
+  return { data, errors, requests, taskExecutions, scheduledTasks, autoRefresh, setAutoRefresh } as const
 }

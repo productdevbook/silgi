@@ -98,8 +98,8 @@ export { useStorage, initStorage, resetStorage } from './core/storage.ts'
 export type { StorageConfig, Storage, StorageValue, Driver } from './core/storage.ts'
 
 // ── Tasks ──────────────────────────────────────────
-export { defineTask, runTask, collectCronTasks, startCronJobs, stopCronJobs, setTaskAnalytics } from './core/task.ts'
-export type { TaskDef, TaskEvent } from './core/task.ts'
+export { defineTask, runTask, collectCronTasks, startCronJobs, stopCronJobs, setTaskAnalytics, getScheduledTasks } from './core/task.ts'
+export type { TaskDef, TaskEvent, ScheduledTaskInfo } from './core/task.ts'
 
 // ── Server ─────────────────────────────────────────
 export type { SilgiServer, ServeOptions } from './core/serve.ts'

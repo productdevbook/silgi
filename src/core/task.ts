@@ -162,8 +162,9 @@ export function createTaskDef(contextFactory: (() => unknown | Promise<unknown>)
     route: description ? { summary: description, tags: ['Tasks'] } : null,
     meta: null,
     _contextFactory: contextFactory,
+    __cronName: name,
     dispatch: dispatch as any,
-  }
+  } as any
 }
 
 // ── runTask ──────────────────────────────────────────
@@ -202,22 +203,69 @@ export function collectCronTasks(def: Record<string, unknown>): Array<{ cron: st
   return result
 }
 
-let _cronJobs: Array<{ stop: () => void }> = []
+interface CronJobEntry {
+  name: string
+  cron: string
+  description?: string
+  job: { stop: () => void; nextRun: () => Date | null }
+  lastRun: number | null
+  runs: number
+  errors: number
+}
+
+let _cronEntries: CronJobEntry[] = []
 
 export async function startCronJobs(cronTasks: Array<{ cron: string; task: TaskDef<any, any> }>): Promise<void> {
   if (cronTasks.length === 0) return
   const { Cron } = await import('croner')
   for (const { cron, task } of cronTasks) {
+    const taskName = (task as any).__cronName || cron
+    const entry: CronJobEntry = {
+      name: taskName,
+      cron,
+      description: task.route?.summary,
+      job: null as any,
+      lastRun: null,
+      runs: 0,
+      errors: 0,
+    }
+
     const job = new Cron(cron, async () => {
+      entry.lastRun = Date.now()
+      entry.runs++
       task.dispatch(undefined).catch((err: unknown) => {
+        entry.errors++
         console.error(`[silgi] Cron task failed:`, err instanceof Error ? err.message : err)
       })
     })
-    _cronJobs.push(job)
+    entry.job = job
+    _cronEntries.push(entry)
   }
 }
 
+export interface ScheduledTaskInfo {
+  name: string
+  cron: string
+  description?: string
+  nextRun: number | null
+  lastRun: number | null
+  runs: number
+  errors: number
+}
+
+export function getScheduledTasks(): ScheduledTaskInfo[] {
+  return _cronEntries.map((e) => ({
+    name: e.name,
+    cron: e.cron,
+    description: e.description,
+    nextRun: e.job.nextRun()?.getTime() ?? null,
+    lastRun: e.lastRun,
+    runs: e.runs,
+    errors: e.errors,
+  }))
+}
+
 export function stopCronJobs(): void {
-  for (const job of _cronJobs) job.stop()
-  _cronJobs = []
+  for (const e of _cronEntries) e.job.stop()
+  _cronEntries = []
 }

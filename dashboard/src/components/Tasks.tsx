@@ -3,15 +3,17 @@ import { fmtMs, fmtRelativeTime, fmtTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useMemo, useState } from 'react'
 
-import type { AnalyticsData, TaskExecution } from '@/lib/types'
+import type { AnalyticsData, ScheduledTaskInfo, TaskExecution } from '@/lib/types'
 
 interface TasksProps {
   data: AnalyticsData | null
   taskExecutions: TaskExecution[]
+  scheduledTasks: ScheduledTaskInfo[]
 }
 
-export function Tasks({ data, taskExecutions }: TasksProps) {
+export function Tasks({ data, taskExecutions, scheduledTasks }: TasksProps) {
   const [filter, setFilter] = useState<'all' | 'success' | 'error'>('all')
+  const [selectedId, setSelectedId] = useState<number | null>(null)
 
   const taskStats = data?.tasks
   const statEntries = useMemo(
@@ -25,6 +27,8 @@ export function Tasks({ data, taskExecutions }: TasksProps) {
     return list.filter((t) => t.status === filter)
   }, [taskExecutions, filter])
 
+  const selected = selectedId !== null ? taskExecutions.find((t) => t.id === selectedId) : null
+
   return (
     <div className='flex flex-col gap-6 p-4 md:p-6'>
       {/* Stats cards */}
@@ -32,16 +36,38 @@ export function Tasks({ data, taskExecutions }: TasksProps) {
         <StatCard label='Total runs' value={taskStats?.totalRuns ?? 0} />
         <StatCard label='Errors' value={taskStats?.totalErrors ?? 0} danger={!!taskStats?.totalErrors} />
         <StatCard label='Task types' value={statEntries.length} />
-        <StatCard
-          label='Avg duration'
-          value={
-            statEntries.length > 0
-              ? fmtMs(statEntries.reduce((s, [, v]) => s + v.avgDurationMs, 0) / statEntries.length)
-              : '—'
-          }
-          raw
-        />
+        <StatCard label='Scheduled' value={scheduledTasks.length} />
       </div>
+
+      {/* Scheduled tasks */}
+      {scheduledTasks.length > 0 && (
+        <div>
+          <h3 className='mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground'>Scheduled (cron)</h3>
+          <div className='grid gap-2 sm:grid-cols-2 lg:grid-cols-3'>
+            {scheduledTasks.map((s) => (
+              <div key={s.name + s.cron} className='rounded-lg border bg-card p-3'>
+                <div className='flex items-center justify-between'>
+                  <span className='font-mono text-xs font-medium'>{s.name}</span>
+                  <Badge variant='outline' className='text-[10px] font-mono'>{s.cron}</Badge>
+                </div>
+                {s.description && (
+                  <p className='mt-1 text-[11px] text-muted-foreground'>{s.description}</p>
+                )}
+                <div className='mt-2 flex gap-4 text-[11px] text-muted-foreground'>
+                  <span>Runs: <span className='font-mono text-foreground'>{s.runs}</span></span>
+                  <span className={cn(s.errors > 0 && 'text-destructive')}>
+                    Errors: <span className='font-mono'>{s.errors}</span>
+                  </span>
+                </div>
+                <div className='mt-1 flex gap-4 text-[11px] text-muted-foreground'>
+                  <span>Last: <span className='font-mono text-foreground'>{s.lastRun ? fmtRelativeTime(s.lastRun) : '—'}</span></span>
+                  <span>Next: <span className='font-mono text-foreground'>{s.nextRun ? fmtRelativeTime(s.nextRun).replace(' ago', '') : '—'}</span></span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Per-task breakdown */}
       {statEntries.length > 0 && (
@@ -80,64 +106,110 @@ export function Tasks({ data, taskExecutions }: TasksProps) {
         </div>
       )}
 
-      {/* Execution history */}
-      <div>
-        <div className='mb-2 flex items-center justify-between'>
-          <h3 className='text-xs font-medium uppercase tracking-wider text-muted-foreground'>Execution history</h3>
-          <div className='flex gap-1'>
-            {(['all', 'success', 'error'] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={cn(
-                  'rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors',
-                  filter === f ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
-                )}
-              >
-                {f === 'all' ? 'All' : f === 'success' ? 'Success' : 'Errors'}
-              </button>
-            ))}
+      {/* Execution history + detail */}
+      <div className='flex flex-col gap-4 lg:flex-row'>
+        <div className='flex-1'>
+          <div className='mb-2 flex items-center justify-between'>
+            <h3 className='text-xs font-medium uppercase tracking-wider text-muted-foreground'>Execution history</h3>
+            <div className='flex gap-1'>
+              {(['all', 'success', 'error'] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className={cn(
+                    'rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors',
+                    filter === f ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted',
+                  )}
+                >
+                  {f === 'all' ? 'All' : f === 'success' ? 'Success' : 'Errors'}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {filtered.length === 0 ? (
+            <div className='flex h-32 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground'>
+              No task executions yet
+            </div>
+          ) : (
+            <div className='overflow-hidden rounded-lg border'>
+              <table className='w-full text-sm'>
+                <thead>
+                  <tr className='border-b bg-muted/40 text-left text-xs text-muted-foreground'>
+                    <th className='px-3 py-2 font-medium'>Task</th>
+                    <th className='px-3 py-2 font-medium'>Trigger</th>
+                    <th className='px-3 py-2 font-medium'>Status</th>
+                    <th className='px-3 py-2 font-medium text-right'>Duration</th>
+                    <th className='px-3 py-2 font-medium text-right'>Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.slice(0, 100).map((t) => (
+                    <tr
+                      key={t.id}
+                      onClick={() => setSelectedId(t.id === selectedId ? null : t.id)}
+                      className={cn(
+                        'cursor-pointer border-b last:border-0 transition-colors',
+                        t.id === selectedId ? 'bg-primary/5' : 'hover:bg-muted/20',
+                      )}
+                    >
+                      <td className='px-3 py-2 font-mono text-xs'>{t.taskName || '(unnamed)'}</td>
+                      <td className='px-3 py-2'>
+                        <Badge variant='outline' className='text-[10px] font-normal'>{t.trigger}</Badge>
+                      </td>
+                      <td className='px-3 py-2'>
+                        <Badge variant={t.status === 'success' ? 'default' : 'destructive'} className='text-[10px]'>
+                          {t.status}
+                        </Badge>
+                      </td>
+                      <td className='px-3 py-2 text-right font-mono tabular-nums text-muted-foreground'>
+                        {fmtMs(t.durationMs)}
+                      </td>
+                      <td className='px-3 py-2 text-right text-muted-foreground text-xs'>{fmtTime(t.timestamp)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
-        {filtered.length === 0 ? (
-          <div className='flex h-32 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground'>
-            No task executions yet
-          </div>
-        ) : (
-          <div className='overflow-hidden rounded-lg border'>
-            <table className='w-full text-sm'>
-              <thead>
-                <tr className='border-b bg-muted/40 text-left text-xs text-muted-foreground'>
-                  <th className='px-3 py-2 font-medium'>Task</th>
-                  <th className='px-3 py-2 font-medium'>Trigger</th>
-                  <th className='px-3 py-2 font-medium'>Status</th>
-                  <th className='px-3 py-2 font-medium text-right'>Duration</th>
-                  <th className='px-3 py-2 font-medium text-right'>Time</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.slice(0, 100).map((t) => (
-                  <tr key={t.id} className='border-b last:border-0 hover:bg-muted/20'>
-                    <td className='px-3 py-2 font-mono text-xs'>{t.taskName || '(unnamed)'}</td>
-                    <td className='px-3 py-2'>
-                      <Badge variant='outline' className='text-[10px] font-normal'>
-                        {t.trigger}
-                      </Badge>
-                    </td>
-                    <td className='px-3 py-2'>
-                      <Badge variant={t.status === 'success' ? 'default' : 'destructive'} className='text-[10px]'>
-                        {t.status}
-                      </Badge>
-                    </td>
-                    <td className='px-3 py-2 text-right font-mono tabular-nums text-muted-foreground'>
-                      {fmtMs(t.durationMs)}
-                    </td>
-                    <td className='px-3 py-2 text-right text-muted-foreground text-xs'>{fmtTime(t.timestamp)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {/* Detail panel */}
+        {selected && (
+          <div className='w-full shrink-0 lg:w-80'>
+            <div className='sticky top-14 rounded-lg border bg-card'>
+              <div className='flex items-center justify-between border-b px-3 py-2'>
+                <h4 className='text-xs font-medium uppercase tracking-wider text-muted-foreground'>Detail</h4>
+                <button onClick={() => setSelectedId(null)} className='text-muted-foreground hover:text-foreground text-xs'>
+                  Close
+                </button>
+              </div>
+              <div className='flex flex-col gap-3 p-3 text-sm'>
+                <DetailRow label='Task' value={selected.taskName || '(unnamed)'} mono />
+                <DetailRow label='Trigger' value={selected.trigger} />
+                <DetailRow label='Status' value={selected.status} danger={selected.status === 'error'} />
+                <DetailRow label='Duration' value={fmtMs(selected.durationMs)} mono />
+                <DetailRow label='Time' value={fmtTime(selected.timestamp)} mono />
+                {selected.error && (
+                  <div>
+                    <p className='text-[11px] font-medium text-muted-foreground mb-1'>Error</p>
+                    <pre className='rounded-md bg-destructive/10 p-2 text-xs text-destructive overflow-auto max-h-32'>{selected.error}</pre>
+                  </div>
+                )}
+                {selected.input !== undefined && selected.input !== null && (
+                  <div>
+                    <p className='text-[11px] font-medium text-muted-foreground mb-1'>Input</p>
+                    <pre className='rounded-md bg-muted p-2 text-xs overflow-auto max-h-32'>{JSON.stringify(selected.input, null, 2)}</pre>
+                  </div>
+                )}
+                {selected.output !== undefined && selected.output !== null && (
+                  <div>
+                    <p className='text-[11px] font-medium text-muted-foreground mb-1'>Output</p>
+                    <pre className='rounded-md bg-muted p-2 text-xs overflow-auto max-h-32'>{JSON.stringify(selected.output, null, 2)}</pre>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -145,13 +217,22 @@ export function Tasks({ data, taskExecutions }: TasksProps) {
   )
 }
 
-function StatCard({ label, value, danger, raw }: { label: string; value: number | string; danger?: boolean; raw?: boolean }) {
+function StatCard({ label, value, danger }: { label: string; value: number | string; danger?: boolean }) {
   return (
     <div className='rounded-lg border bg-card p-3'>
       <p className='text-[11px] font-medium text-muted-foreground'>{label}</p>
       <p className={cn('mt-1 text-xl font-semibold tabular-nums', danger && 'text-destructive')}>
-        {raw ? value : typeof value === 'number' ? value.toLocaleString() : value}
+        {typeof value === 'number' ? value.toLocaleString() : value}
       </p>
+    </div>
+  )
+}
+
+function DetailRow({ label, value, mono, danger }: { label: string; value: string; mono?: boolean; danger?: boolean }) {
+  return (
+    <div className='flex items-center justify-between'>
+      <span className='text-[11px] text-muted-foreground'>{label}</span>
+      <span className={cn('text-xs', mono && 'font-mono', danger && 'font-medium text-destructive')}>{value}</span>
     </div>
   )
 }

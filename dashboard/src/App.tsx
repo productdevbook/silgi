@@ -88,7 +88,9 @@ export default function App() {
           {route.page === 'requests' && route.id && (
             <RequestDetailPage requests={analytics.requests} id={route.id} navigate={navigate} />
           )}
-          {route.page === 'tasks' && <Tasks data={analytics.data} taskExecutions={analytics.taskExecutions} />}
+          {route.page === 'tasks' && (
+            <Tasks data={analytics.data} taskExecutions={analytics.taskExecutions} scheduledTasks={analytics.scheduledTasks} />
+          )}
           {route.page === 'sessions' && !route.id && <Sessions requests={analytics.requests} navigate={navigate} />}
           {route.page === 'sessions' && route.id && (
             <SessionDetailPage requests={analytics.requests} sessionId={route.id} navigate={navigate} />
