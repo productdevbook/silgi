@@ -1,0 +1,73 @@
+---
+title: 0.1.0-beta.7
+description: Pinia Colada integration for Vue, Hey API integration for OpenAPI SDK conversion.
+version: 0.1.0-beta.7
+date: 2026-03-28
+---
+
+## Pinia Colada integration
+
+New `silgi/pinia-colada` export brings first-class [Pinia Colada](https://pinia-colada.esm.dev/) support for Vue. Generate type-safe `queryOptions` and `mutationOptions` from your Silgi client — with full Vue reactivity.
+
+```ts
+import { createSilgiVueColadaUtils } from 'silgi/pinia-colada'
+import { client } from './client'
+
+const utils = createSilgiVueColadaUtils(client)
+```
+
+Use in Vue components:
+
+```vue
+<script setup lang="ts">
+import { useQuery } from '@pinia/colada'
+
+const { data } = useQuery(
+  utils.users.list.queryOptions({
+    input: computed(() => ({ limit: 10 })),
+  }),
+)
+</script>
+```
+
+What's included:
+
+- **`queryOptions()`** — returns a reactive `computed` key + query function for `useQuery`
+- **`mutationOptions()`** — returns key function + mutation function for `useMutation`
+- **`key()`** — generate cache keys for invalidation via `useQueryCache`
+- **`call`** — direct procedure call (same as the underlying client)
+- **Reactive inputs** — `input` and `context` accept `ref()`, `computed()`, or getter functions
+- **Recursive proxy** — mirrors your client structure (`utils.users.list.queryOptions(...)`)
+
+See [Pinia Colada docs](/docs/libraries/pinia-colada).
+
+## Hey API integration
+
+New `silgi/hey-api` export lets you convert [Hey API](https://heyapi.dev/) generated OpenAPI clients into Silgi-compatible clients. This bridges the gap between OpenAPI code generation and the Silgi ecosystem.
+
+```ts
+import { experimental_toSilgiClient } from 'silgi/hey-api'
+import * as sdk from './client/sdk.gen'
+
+const client = experimental_toSilgiClient(sdk)
+
+const { body } = await client.listPlanets()
+```
+
+The converted client works with all Silgi integrations — TanStack Query, Pinia Colada, and more:
+
+```ts
+import { createQueryUtils } from 'silgi/tanstack-query'
+
+const utils = createQueryUtils(client)
+// Now use utils.listPlanets.queryOptions(...) with useQuery
+```
+
+Features:
+
+- Abort signal forwarding from both input and client options
+- `lastEventId` header support for SSE resumption
+- `throwOnError: true` by default — errors propagate as-is from Hey API
+- Returns `{ body, request, response }` for each call
+
+See [Hey API docs](/docs/libraries/hey-api).
