@@ -1,1 +1,1 @@
-export * from './to-silgi-client.ts'
+export * from './to-client.ts'

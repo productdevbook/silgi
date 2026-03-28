@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
 
-import { experimental_toSilgiClient } from '#src/integrations/hey-api/to-silgi-client.ts'
+import { toClient } from '#src/integrations/hey-api/to-client.ts'
 
-describe('experimental_toSilgiClient', () => {
+describe('toClient', () => {
   it('should ignore non-function properties', () => {
-    const client = experimental_toSilgiClient({
+    const client = toClient({
       listPlanets: () => Promise.resolve({ data: [], request: new Request('http://x'), response: new Response() }),
       somethingElse: 123,
     })
@@ -26,7 +26,7 @@ describe('experimental_toSilgiClient', () => {
       }),
     }
 
-    const client = experimental_toSilgiClient(sdk)
+    const client = toClient(sdk)
     const result = await client.planetList()
 
     expect(result).toEqual({
@@ -51,7 +51,7 @@ describe('experimental_toSilgiClient', () => {
       }),
     }
 
-    const client = experimental_toSilgiClient(sdk)
+    const client = toClient(sdk)
     await client.planetList({ query: { limit: 10, offset: 0 } })
 
     expect(sdk.planetList).toHaveBeenCalledWith({
@@ -71,7 +71,7 @@ describe('experimental_toSilgiClient', () => {
       }),
     }
 
-    const client = experimental_toSilgiClient(sdk)
+    const client = toClient(sdk)
     await client.planetList({ headers: { 'x-something': 'value' } }, { lastEventId: '456' })
 
     expect(sdk.planetList).toHaveBeenCalledWith({
@@ -96,7 +96,7 @@ describe('experimental_toSilgiClient', () => {
         }),
       }
 
-      const client = experimental_toSilgiClient(sdk)
+      const client = toClient(sdk)
       await client.doSomething({ signal: controller.signal })
 
       expect(capturedSignal!.aborted).toBe(false)
@@ -115,7 +115,7 @@ describe('experimental_toSilgiClient', () => {
         }),
       }
 
-      const client = experimental_toSilgiClient(sdk)
+      const client = toClient(sdk)
       await client.doSomething({}, { signal: controller.signal })
 
       expect(capturedSignal!.aborted).toBe(false)
@@ -134,7 +134,7 @@ describe('experimental_toSilgiClient', () => {
         }),
       }
 
-      const client = experimental_toSilgiClient(sdk)
+      const client = toClient(sdk)
       await client.doSomething({ signal: controller.signal })
 
       expect(sdk.doSomething).toHaveBeenCalledTimes(1)
@@ -151,7 +151,7 @@ describe('experimental_toSilgiClient', () => {
         }),
       }
 
-      const client = experimental_toSilgiClient(sdk)
+      const client = toClient(sdk)
       await client.doSomething({}, { signal: controller.signal })
 
       expect(sdk.doSomething).toHaveBeenCalledTimes(1)
@@ -163,7 +163,7 @@ describe('experimental_toSilgiClient', () => {
       planetList: vi.fn().mockRejectedValue(new Error('Internal Server Error')),
     }
 
-    const client = experimental_toSilgiClient(sdk)
+    const client = toClient(sdk)
     await expect(client.planetList()).rejects.toThrow('Internal Server Error')
   })
 })

@@ -6,4 +6,4 @@ export * from './procedure-utils.ts'
 export * from './router-utils.ts'
 export * from './types.ts'
 
-export { createRouterUtils as createSilgiVueColadaUtils }
+export { createRouterUtils as createColadaUtils }

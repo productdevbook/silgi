@@ -7,7 +7,7 @@ import { Tabs, Tab } from 'fumadocs-ui/components/tabs'
 import { Callout } from 'fumadocs-ui/components/callout'
 import { Step, Steps } from 'fumadocs-ui/components/steps'
 
-[Pinia Colada](https://pinia-colada.esm.dev/) is a smart data-fetching layer for Vue built on top of Pinia. Silgi provides `createSilgiVueColadaUtils`, a utility that generates type-safe `queryOptions` and `mutationOptions` from your client — with full Vue reactivity support.
+[Pinia Colada](https://pinia-colada.esm.dev/) is a smart data-fetching layer for Vue built on top of Pinia. Silgi provides `createColadaUtils`, a utility that generates type-safe `queryOptions` and `mutationOptions` from your client — with full Vue reactivity support.
 
 ## Prerequisites
 
@@ -28,10 +28,10 @@ You need a Silgi [client](/docs/client) set up. The Pinia Colada integration wra
 
 ```ts twoslash
 // @noErrors
-import { createSilgiVueColadaUtils } from 'silgi/pinia-colada'
+import { createColadaUtils } from 'silgi/pinia-colada'
 import { client } from './client' // your Silgi client
 
-const utils = createSilgiVueColadaUtils(client)
+const utils = createColadaUtils(client)
 ```
 
 The `utils` object mirrors your client's structure. If your client has `client.users.list`, then `utils.users.list` gives you query/mutation helpers for that procedure.

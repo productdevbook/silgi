@@ -10,10 +10,10 @@ date: 2026-03-28
 New `silgi/pinia-colada` export brings first-class [Pinia Colada](https://pinia-colada.esm.dev/) support for Vue. Generate type-safe `queryOptions` and `mutationOptions` from your Silgi client — with full Vue reactivity.
 
 ```ts
-import { createSilgiVueColadaUtils } from 'silgi/pinia-colada'
+import { createColadaUtils } from 'silgi/pinia-colada'
 import { client } from './client'
 
-const utils = createSilgiVueColadaUtils(client)
+const utils = createColadaUtils(client)
 ```
 
 Use in Vue components:
@@ -46,10 +46,10 @@ See [Pinia Colada docs](/docs/libraries/pinia-colada).
 New `silgi/hey-api` export lets you convert [Hey API](https://heyapi.dev/) generated OpenAPI clients into Silgi-compatible clients. This bridges the gap between OpenAPI code generation and the Silgi ecosystem.
 
 ```ts
-import { experimental_toSilgiClient } from 'silgi/hey-api'
+import { toClient } from 'silgi/hey-api'
 import * as sdk from './client/sdk.gen'
 
-const client = experimental_toSilgiClient(sdk)
+const client = toClient(sdk)
 
 const { body } = await client.listPlanets()
 ```

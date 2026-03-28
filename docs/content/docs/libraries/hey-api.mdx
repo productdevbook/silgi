@@ -10,8 +10,8 @@ import { Step, Steps } from 'fumadocs-ui/components/steps'
 Convert a [Hey API](https://heyapi.dev/) generated client into a Silgi client to use it with the full Silgi ecosystem — TanStack Query, Pinia Colada, and other integrations.
 
 <Callout type='warn'>
-  [Hey API](https://heyapi.dev/) is still in an unstable stage. This integration is marked `experimental_` and may
-  introduce breaking changes in the future.
+  [Hey API](https://heyapi.dev/) is still in an unstable stage. This integration may introduce breaking changes in the
+  future.
 </Callout>
 
 ## Setup
@@ -40,10 +40,10 @@ This outputs the generated SDK into the `src/client` directory.
 
 ```ts twoslash
 // @noErrors
-import { experimental_toSilgiClient } from 'silgi/hey-api'
+import { toClient } from 'silgi/hey-api'
 import * as sdk from './client/sdk.gen'
 
-export const client = experimental_toSilgiClient(sdk)
+export const client = toClient(sdk)
 ```
 
 The `client` now behaves like any standard Silgi client — you can use it with [TanStack Query](/docs/libraries/tanstack-query), [Pinia Colada](/docs/libraries/pinia-colada), or call procedures directly.
@@ -87,11 +87,11 @@ Combine with `createQueryUtils` for full query/mutation support:
 
 ```ts twoslash
 // @noErrors
-import { experimental_toSilgiClient } from 'silgi/hey-api'
+import { toClient } from 'silgi/hey-api'
 import { createQueryUtils } from 'silgi/tanstack-query'
 import * as sdk from './client/sdk.gen'
 
-const client = experimental_toSilgiClient(sdk)
+const client = toClient(sdk)
 const utils = createQueryUtils(client)
 
 // Now use with useQuery, useMutation, etc.
@@ -102,11 +102,11 @@ const options = utils.listPlanets.queryOptions({ input: {} })
 
 ```ts twoslash
 // @noErrors
-import { experimental_toSilgiClient } from 'silgi/hey-api'
+import { toClient } from 'silgi/hey-api'
 import { createSilgiVueColadaUtils } from 'silgi/pinia-colada'
 import * as sdk from './client/sdk.gen'
 
-const client = experimental_toSilgiClient(sdk)
+const client = toClient(sdk)
 const utils = createSilgiVueColadaUtils(client)
 ```
 

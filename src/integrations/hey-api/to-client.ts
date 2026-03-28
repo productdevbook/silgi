@@ -1,7 +1,7 @@
 import type { Client, ClientContext, NestedClient } from '../../client/types.ts'
 import type { SilgiError } from '../../core/error.ts'
 
-export type ToSilgiClientResult<T extends Record<string, any>> = {
+export type ToClientResult<T extends Record<string, any>> = {
   [K in keyof T]: T[K] extends (options: infer UInput) => Promise<infer UResult>
     ? Client<
         Record<never, never>,
@@ -14,7 +14,7 @@ export type ToSilgiClientResult<T extends Record<string, any>> = {
         SilgiError
       >
     : T[K] extends Record<string, any>
-      ? ToSilgiClientResult<T[K]>
+      ? ToClientResult<T[K]>
       : never
 }
 
@@ -24,7 +24,7 @@ export type ToSilgiClientResult<T extends Record<string, any>> = {
  * This allows you to use any Hey API generated client with the Silgi
  * ecosystem — including TanStack Query, Pinia Colada, and other integrations.
  */
-export function experimental_toSilgiClient<T extends Record<string, any>>(sdk: T): ToSilgiClientResult<T> {
+export function toClient<T extends Record<string, any>>(sdk: T): ToClientResult<T> {
   const client = {} as Record<string, Client<Record<never, never>, undefined | Record<any, any>, any, any>>
 
   for (const key in sdk) {
@@ -62,5 +62,5 @@ export function experimental_toSilgiClient<T extends Record<string, any>>(sdk: T
     }
   }
 
-  return client as ToSilgiClientResult<T>
+  return client as ToClientResult<T>
 }
