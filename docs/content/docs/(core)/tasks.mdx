@@ -7,16 +7,18 @@ import { Callout } from 'fumadocs-ui/components/callout'
 
 A task is a piece of work that runs in the background. Send an email, generate a report, clean up old data — anything you don't want blocking your API response.
 
-Silgi tasks give you three things:
-1. **Type-safe input** — same Zod validation as procedures
-2. **Context access** — `ctx.db`, `ctx.mailer`, everything from your silgi instance
-3. **Router mount** — tasks become HTTP endpoints, callable from webhooks or dashboards
+Silgi tasks give you:
+- **Type-safe input** — same Zod validation as procedures
+- **Context access** — `ctx.db`, `ctx.mailer`, everything from your silgi instance
+- **Router mount** — tasks become HTTP endpoints, callable from webhooks or dashboards
+- **Analytics** — every dispatch is tracked with duration, status, and trace spans
+- **Cron scheduling** — auto-discovered by `serve()`, no extra config
 
 <Callout>
-  Tasks handle define, dispatch, and schedule. They don't handle queues, retries, or orchestration. For that, pair them with [Trigger.dev](https://trigger.dev/), [BullMQ](https://bullmq.io/), or [pg-boss](https://github.com/timgit/pg-boss).
+  Tasks handle define, dispatch, and schedule. For queues, retries, and orchestration, pair with [Trigger.dev](https://trigger.dev/), [BullMQ](https://bullmq.io/), or [pg-boss](https://github.com/timgit/pg-boss).
 </Callout>
 
-## Your first task
+## Defining a task
 
 Every task needs a `name` and a `resolve` function:
 
@@ -26,15 +28,16 @@ const sendEmail = s.task(
   {
     name: 'send-email',
     resolve: async ({ input, ctx }) => {
-      const user = await ctx.db.users.findByEmail(input.to)
-      await ctx.mailer.send(user.email, input.subject)
+      await ctx.mailer.send(input.to, input.subject)
       return { sent: true }
     },
   },
 )
 ```
 
-`ctx` is the same context from your `silgi()` setup — database, services, everything is there. `name` is required — it identifies the task in analytics and logs.
+`name` is required — it identifies the task in the analytics dashboard and logs.
+
+`ctx` is the same context from your `silgi()` setup — database, services, everything is there.
 
 A task without input:
 
@@ -48,6 +51,18 @@ const prune = s.task({
 })
 ```
 
+With input schema:
+
+```ts
+const sendEmail = s.task(
+  z.object({ to: z.string(), subject: z.string() }),
+  {
+    name: 'send-email',
+    resolve: async ({ input, ctx }) => { ... },
+  },
+)
+```
+
 ## Dispatching
 
 Call `.dispatch()` — input is validated, context is created:
@@ -56,7 +71,9 @@ Call `.dispatch()` — input is validated, context is created:
 await sendEmail.dispatch({ to: 'alice@example.com', subject: 'Welcome' })
 ```
 
-Dispatch from inside a procedure:
+### From a procedure — pass `{ ctx }` for tracing
+
+When you dispatch a task from inside a procedure, pass `{ ctx }` as the second argument. This automatically records a span on the parent request's trace timeline:
 
 ```ts
 const createUser = s
@@ -64,23 +81,43 @@ const createUser = s
   .$resolve(async ({ input, ctx }) => {
     const user = await ctx.db.users.create(input)
 
-    // Fire and forget — doesn't block the response
-    sendEmail.dispatch({ to: input.email, subject: 'Welcome' })
+    // { ctx } → span appears in parent request's analytics timeline
+    sendEmail.dispatch({ to: input.email, subject: 'Welcome' }, { ctx })
 
     return user
   })
 ```
 
-## Put tasks in your router
+In the analytics dashboard, the request detail for `/users/create` will show:
 
-Tasks mount directly on the router. No wrapper, no `.handler` — just the task:
+```
+users/create — 2 spans, 4.2ms total
+├─ db.users.create     (db)     1.1ms
+└─ task:send-email     (queue)  92.3ms
+```
+
+The `task:send-email` span is added automatically — no `trace()` wrapper needed.
+
+<Callout>
+  `{ ctx }` is optional. Without it, the task still runs and tracks analytics, but no span appears on the parent request. Use it when you want to see which tasks a request triggered.
+</Callout>
+
+### Standalone dispatch
+
+Without `{ ctx }`, the task runs independently. This is how cron, scripts, and standalone calls work:
+
+```ts
+// No parent request — no span, but task analytics still recorded
+await sendEmail.dispatch({ to: 'alice@example.com', subject: 'Reminder' })
+```
+
+## Mounting on router
+
+Tasks mount directly on the router — no wrapper needed:
 
 ```ts title="server/router.ts"
 const router = s.router({
-  users: {
-    create: createUser,
-    list: listUsers,
-  },
+  users: { create: createUser },
   tasks: {
     sendEmail,
     prune,
@@ -88,7 +125,7 @@ const router = s.router({
 })
 ```
 
-Now `POST /tasks/sendEmail` with a JSON body runs the task through the full Silgi pipeline — guards, validation, context, everything.
+Now `POST /tasks/sendEmail` with JSON body runs the task through the full Silgi pipeline — guards, validation, context.
 
 ## Cron scheduling
 
@@ -132,23 +169,34 @@ Common cron patterns:
 | `0 0 * * 0` | Every Sunday at midnight |
 | `0 0 1 * *` | First day of every month |
 
+## Analytics dashboard
+
+Every task dispatch is tracked automatically in the [analytics dashboard](/docs/analytics):
+
+- **Task list** — runs, errors, average duration per task
+- **Scheduled tasks** — cron expression, next run, last run, run count
+- **Execution history** — click any row for full detail: input, output, error, duration
+- **Trace spans** — `trace()` calls inside tasks produce spans, visible in the detail timeline
+
+When a task is dispatched with `{ ctx }`, the parent request's detail page also shows the task as a `queue` span.
+
 ## Prevent duplicate runs
 
-`runTask()` ensures only one instance runs at a time. If you call it twice, the second call waits for the first:
+`runTask()` ensures only one instance runs at a time. If you call it twice, the second call gets the same result:
 
 ```ts
 import { runTask } from 'silgi'
 
-// Both calls get the same result — task runs once
 const [a, b] = await Promise.all([
   runTask(prune),
   runTask(prune),
 ])
+// Runs once — a === b
 ```
 
 ## Standalone tasks
 
-You can define tasks without a silgi instance using `defineTask`. These don't have context access:
+Define tasks without a silgi instance using `defineTask`. These don't have context access:
 
 ```ts
 import { defineTask } from 'silgi'
@@ -158,7 +206,6 @@ const processFile = defineTask(
   {
     name: 'process-file',
     resolve: async ({ input }) => {
-      // No ctx here — standalone task
       return { processed: true }
     },
   },
