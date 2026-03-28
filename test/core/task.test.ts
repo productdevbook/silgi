@@ -1,8 +1,8 @@
-import { describe, it, expect, expectTypeOf } from 'vitest'
+import { describe, it, expect, expectTypeOf, afterEach } from 'vitest'
 import { z } from 'zod'
 
 import { silgi } from '#src/silgi.ts'
-import { defineTask, runTask, collectCronTasks } from '#src/core/task.ts'
+import { defineTask, runTask, collectCronTasks, setTaskAnalytics } from '#src/core/task.ts'
 
 import type { TaskDef } from '#src/core/task.ts'
 
@@ -219,6 +219,53 @@ describe('task context', () => {
 
     const result = await task.dispatch()
     expect(result).toEqual([])
+  })
+})
+
+// ── Analytics tracking ──────────────────────────────
+
+describe('task analytics', () => {
+  afterEach(() => setTaskAnalytics(null))
+
+  it('calls analytics callback on success', async () => {
+    const events: any[] = []
+    setTaskAnalytics((e) => events.push(e))
+
+    const task = defineTask({
+      name: 'test-task',
+      resolve: async () => ({ ok: true }),
+    })
+
+    await task.dispatch()
+
+    expect(events).toHaveLength(1)
+    expect(events[0].taskName).toBe('test-task')
+    expect(events[0].trigger).toBe('dispatch')
+    expect(events[0].status).toBe('success')
+    expect(events[0].durationMs).toBeGreaterThanOrEqual(0)
+    expect(events[0].output).toEqual({ ok: true })
+  })
+
+  it('calls analytics callback on error', async () => {
+    const events: any[] = []
+    setTaskAnalytics((e) => events.push(e))
+
+    const task = defineTask({
+      name: 'failing-task',
+      resolve: async () => { throw new Error('boom') },
+    })
+
+    await expect(task.dispatch()).rejects.toThrow('boom')
+
+    expect(events).toHaveLength(1)
+    expect(events[0].status).toBe('error')
+    expect(events[0].error).toBe('boom')
+  })
+
+  it('no callback when analytics not set', async () => {
+    const task = defineTask(async () => 'ok')
+    // Should not throw even without analytics
+    await expect(task.dispatch()).resolves.toBe('ok')
   })
 })
 

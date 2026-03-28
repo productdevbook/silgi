@@ -140,6 +140,19 @@ export interface RequestEntry {
   isBatch: boolean
 }
 
+/** A background task execution record. */
+export interface TaskExecution {
+  id: number
+  taskName: string
+  trigger: 'dispatch' | 'cron' | 'http'
+  timestamp: number
+  durationMs: number
+  status: 'success' | 'error'
+  error?: string
+  input?: unknown
+  output?: unknown
+}
+
 export interface AnalyticsOptions {
   /** Latency samples to keep per procedure (default: 1024) */
   bufferSize?: number
@@ -149,6 +162,8 @@ export interface AnalyticsOptions {
   maxErrors?: number
   /** Max recent request entries to keep (default: 200) */
   maxRequests?: number
+  /** Max task execution entries to keep (default: 200) */
+  maxTasks?: number
   /**
    * Protect dashboard access.
    * - `string` — secret token checked against `Authorization: Bearer <token>` header or `?token=` query param
@@ -169,6 +184,12 @@ export interface ProcedureSnapshot {
   lastErrorTime: number | null
 }
 
+export interface TaskSnapshot {
+  totalRuns: number
+  totalErrors: number
+  tasks: Record<string, { runs: number; errors: number; avgDurationMs: number; lastRun: number | null }>
+}
+
 export interface AnalyticsSnapshot {
   uptime: number
   totalRequests: number
@@ -178,6 +199,7 @@ export interface AnalyticsSnapshot {
   avgLatency: number
   procedures: Record<string, ProcedureSnapshot>
   timeSeries: TimeWindow[]
+  tasks: TaskSnapshot
 }
 
 // ── Request ID Generator (Snowflake-style) ──────────
@@ -442,12 +464,16 @@ export class AnalyticsCollector {
   #historySeconds: number
   #maxErrors: number
   #maxRequests: number
+  #maxTasks: number
   #timeSeries: TimeWindow[] = []
   #currentWindow: TimeWindow
   #errors: ErrorEntry[] = []
   #nextErrorId = 1
   #requests: RequestEntry[] = []
   #nextRequestId = 1
+  #taskExecutions: TaskExecution[] = []
+  #nextTaskId = 1
+  #taskStats = new Map<string, { runs: number; errors: number; totalDuration: number; lastRun: number }>()
   #store: AnalyticsStore
   #counterFlushCounter = 0
 
@@ -456,6 +482,7 @@ export class AnalyticsCollector {
     this.#historySeconds = options.historySeconds ?? 120
     this.#maxErrors = options.maxErrors ?? 100
     this.#maxRequests = options.maxRequests ?? 200
+    this.#maxTasks = options.maxTasks ?? 200
     this.#currentWindow = { time: Math.floor(Date.now() / 1000), count: 0, errors: 0 }
 
     this.#store = new AnalyticsStore(this.#maxRequests, this.#maxErrors, options.flushInterval ?? 5000)
@@ -502,6 +529,29 @@ export class AnalyticsCollector {
     }
     this.#store.enqueueRequest(full)
     this.#flushCountersIfNeeded()
+  }
+
+  recordTask(entry: Omit<TaskExecution, 'id'>): void {
+    const full = { ...entry, id: this.#nextTaskId++ }
+    this.#taskExecutions.push(full)
+    if (this.#taskExecutions.length > this.#maxTasks) {
+      this.#taskExecutions.shift()
+    }
+
+    // Aggregate stats
+    let stats = this.#taskStats.get(entry.taskName)
+    if (!stats) {
+      stats = { runs: 0, errors: 0, totalDuration: 0, lastRun: 0 }
+      this.#taskStats.set(entry.taskName, stats)
+    }
+    stats.runs++
+    if (entry.status === 'error') stats.errors++
+    stats.totalDuration += entry.durationMs
+    stats.lastRun = entry.timestamp
+  }
+
+  async getTaskExecutions(): Promise<TaskExecution[]> {
+    return [...this.#taskExecutions]
   }
 
   #getOrCreate(path: string): ProcedureEntry {
@@ -588,7 +638,25 @@ export class AnalyticsCollector {
       avgLatency: totalLatencyCount > 0 ? round(totalLatencySum / totalLatencyCount) : 0,
       procedures,
       timeSeries: this.#currentWindow.count > 0 ? [...this.#timeSeries, this.#currentWindow] : [...this.#timeSeries],
+      tasks: this.#taskSnapshotJSON(),
     }
+  }
+
+  #taskSnapshotJSON(): TaskSnapshot {
+    let totalRuns = 0
+    let totalErrors = 0
+    const tasks: TaskSnapshot['tasks'] = {}
+    for (const [name, s] of this.#taskStats) {
+      totalRuns += s.runs
+      totalErrors += s.errors
+      tasks[name] = {
+        runs: s.runs,
+        errors: s.errors,
+        avgDurationMs: s.runs > 0 ? round(s.totalDuration / s.runs) : 0,
+        lastRun: s.lastRun || null,
+      }
+    }
+    return { totalRuns, totalErrors, tasks }
   }
 }
 
@@ -948,6 +1016,10 @@ export async function serveAnalyticsRoute(
     const requests = await collector.getRequests()
     return jsonResponse(requests, jsonCacheHeaders)
   }
+  if (pathname === 'analytics/_api/tasks') {
+    const tasks = await collector.getTaskExecutions()
+    return jsonResponse(tasks, jsonCacheHeaders)
+  }
   if (pathname.startsWith('analytics/_api/requests/') && pathname.endsWith('/md')) {
     const id = Number(pathname.slice('analytics/_api/requests/'.length, -'/md'.length))
     const requests = await collector.getRequests()
@@ -988,6 +1060,11 @@ export function wrapWithAnalytics(handler: FetchHandler, options: AnalyticsOptio
   const collector = new AnalyticsCollector(options)
   const dashboardHtml = analyticsHTML()
   const auth = options.auth
+
+  // Wire task analytics
+  import('../core/task.ts').then(({ setTaskAnalytics }) => {
+    setTaskAnalytics((entry) => collector.recordTask(entry))
+  })
 
   return async (request: Request): Promise<Response> => {
     const url = request.url

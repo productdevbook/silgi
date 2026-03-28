@@ -81,6 +81,24 @@ export function defineTask(...args: any[]): TaskDef<any, any> {
 
 // ── createTaskDef (shared impl, ctx factory optional) ─
 
+export type TaskCompleteCallback = (entry: {
+  taskName: string
+  trigger: 'dispatch' | 'cron' | 'http'
+  timestamp: number
+  durationMs: number
+  status: 'success' | 'error'
+  error?: string
+  input?: unknown
+  output?: unknown
+}) => void
+
+let _onTaskComplete: TaskCompleteCallback | null = null
+
+/** Register a global callback for task completion — used by analytics plugin. */
+export function setTaskAnalytics(cb: TaskCompleteCallback | null): void {
+  _onTaskComplete = cb
+}
+
 export function createTaskDef(contextFactory: (() => unknown | Promise<unknown>) | null, ...args: any[]): TaskDef<any, any> {
   let inputSchema: AnySchema | null = null
   let resolve: Function
@@ -113,11 +131,23 @@ export function createTaskDef(contextFactory: (() => unknown | Promise<unknown>)
     return resolve({ input: opts.input, ctx: opts.ctx, name, scheduledTime: undefined })
   }
 
-  // Programmatic dispatch — creates ctx from factory
+  // Programmatic dispatch — creates ctx from factory, tracks analytics
   const dispatch = async (rawInput?: unknown) => {
     const input = inputSchema ? await validateSchema(inputSchema, rawInput) : rawInput
     const ctx = contextFactory ? await contextFactory() : {}
-    return resolve({ input, ctx, name, scheduledTime: undefined })
+    const t0 = performance.now()
+    try {
+      const output = await resolve({ input, ctx, name, scheduledTime: undefined })
+      if (_onTaskComplete) {
+        _onTaskComplete({ taskName: name, trigger: 'dispatch', timestamp: Date.now(), durationMs: Math.round((performance.now() - t0) * 100) / 100, status: 'success', input, output })
+      }
+      return output
+    } catch (err) {
+      if (_onTaskComplete) {
+        _onTaskComplete({ taskName: name, trigger: 'dispatch', timestamp: Date.now(), durationMs: Math.round((performance.now() - t0) * 100) / 100, status: 'error', error: err instanceof Error ? err.message : String(err), input })
+      }
+      throw err
+    }
   }
 
   return {
