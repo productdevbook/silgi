@@ -23,6 +23,8 @@
  *  18. Contract-first workflow
  *  19. Scalar / OpenAPI
  *  20. mapInput middleware
+ *  21. Background tasks (dispatch, cron, router mount)
+ *  22. Task analytics tracking
  */
 
 import { silgi, SilgiError, callable, lifecycleWrap, mapInput } from 'silgi'
@@ -404,6 +406,66 @@ const adminRouter = implement(adminContract, {
   },
 })
 
+// ── Tasks ───────────────────────────────────────────
+
+// 1. Task with input — send welcome email
+const sendWelcomeEmail = s.task(
+  z.object({ userId: z.number(), email: z.string().email() }),
+  async ({ input, ctx }) => {
+    const user = ctx.db.users.find((u) => u.id === input.userId)
+    console.log(`    [task] Sending welcome email to ${input.email} (user: ${user?.name ?? 'unknown'})`)
+    // Simulate email sending delay
+    await new Promise((r) => setTimeout(r, 100))
+    return { sent: true, to: input.email }
+  },
+)
+
+// 2. Task without input — cleanup old data
+const cleanupOldData = s.task(async ({ ctx }) => {
+  const before = ctx.db.posts.length
+  // In real app: delete old drafts, expired sessions, etc.
+  console.log(`    [task] Cleanup: ${before} posts checked`)
+  return { checked: before, deleted: 0 }
+})
+
+// 3. Task with cron — daily stats snapshot
+const dailyStats = s.task({
+  cron: '0 0 * * *',
+  name: 'daily-stats',
+  description: 'Snapshot daily statistics',
+  resolve: async ({ ctx }) => {
+    const stats = {
+      users: ctx.db.users.length,
+      posts: ctx.db.posts.length,
+      published: ctx.db.posts.filter((p) => p.published).length,
+      timestamp: new Date().toISOString(),
+    }
+    console.log(`    [task:cron] Daily stats: ${JSON.stringify(stats)}`)
+    return stats
+  },
+})
+
+// 4. Task dispatched from procedure — fire and forget
+const createUserWithEmail = s
+  .$use(auth, timing)
+  .$input(z.object({ name: z.string(), email: z.string().email() }))
+  .$output(UserSchema)
+  .$resolve(async ({ input, ctx }) => {
+    const user = {
+      id: ctx.db.nextUserId++,
+      name: input.name,
+      email: input.email,
+      role: 'user' as const,
+      createdAt: new Date().toISOString(),
+    }
+    ctx.db.users.push(user)
+
+    // Fire-and-forget: send welcome email in background
+    sendWelcomeEmail.dispatch({ userId: user.id, email: user.email })
+
+    return user
+  })
+
 // ── Callable: Direct invocation (no HTTP) ────────────
 
 const directListUsers = callable(listUsers, {
@@ -423,6 +485,7 @@ const appRouter = s.router({
     list: listUsers,
     get: getUser,
     create: createUser,
+    createWithEmail: createUserWithEmail,
     delete: deleteUser,
     bySlug: getUserBySlug,
   },
@@ -439,6 +502,11 @@ const appRouter = s.router({
     userEvents,
   },
   admin: adminRouter,
+  tasks: {
+    sendWelcomeEmail,
+    cleanupOldData,
+    dailyStats,
+  },
 })
 
 export type AppRouter = typeof appRouter
@@ -483,10 +551,16 @@ console.log('║    /demo/signing        Sign/encrypt demo     ║')
 console.log('║    /admin/stats         Admin stats           ║')
 console.log('║                                              ║')
 console.log('║  MUTATIONS (POST, auth: Bearer secret-token) ║')
-console.log('║    /users/create        Create user           ║')
-console.log('║    /users/delete        Delete user           ║')
-console.log('║    /posts/create        Create post           ║')
-console.log('║    /admin/resetDb       Reset database        ║')
+console.log('║    /users/create           Create user        ║')
+console.log('║    /users/createWithEmail  Create + email     ║')
+console.log('║    /users/delete           Delete user        ║')
+console.log('║    /posts/create           Create post        ║')
+console.log('║    /admin/resetDb          Reset database     ║')
+console.log('║                                              ║')
+console.log('║  TASKS (POST, background work)               ║')
+console.log('║    /tasks/sendWelcomeEmail Send email         ║')
+console.log('║    /tasks/cleanupOldData   Cleanup task       ║')
+console.log('║    /tasks/dailyStats       Stats (cron daily) ║')
 console.log('║                                              ║')
 console.log('║  SUBSCRIPTIONS (SSE)                         ║')
 console.log('║    /stream/ticks        5-tick stream         ║')
