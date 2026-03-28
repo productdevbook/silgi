@@ -1,0 +1,15 @@
+{
+  "name": "typecheck-silgi",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "gen": "tsx scripts/gen.ts",
+    "bench": "tsx scripts/gen.ts && tsc --noEmit --extendedDiagnostics",
+    "bench:tsgo": "tsx scripts/gen.ts && tsgo --noEmit --diagnostics"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  }
+}

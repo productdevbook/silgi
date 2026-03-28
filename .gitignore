@@ -4,6 +4,9 @@ dist
 .turbo
 coverage
 .attest
+bench/typecheck-*/src/router
+bench/typecheck-*/src/consume
+bench/typecheck-*/node_modules
 
 # Deploy (k8s credentials, secrets)
 deploy/

@@ -1,0 +1,19 @@
+{
+  "name": "typecheck-trpc",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "gen": "tsx scripts/gen.ts",
+    "bench": "tsx scripts/gen.ts && tsc --noEmit --extendedDiagnostics"
+  },
+  "dependencies": {
+    "@standard-schema/spec": "^1.1.0",
+    "@trpc/client": "11.1.0",
+    "@trpc/server": "11.1.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  }
+}

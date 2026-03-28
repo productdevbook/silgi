@@ -1,6 +1,6 @@
 ---
 title: Benchmarks
-description: Real performance numbers — Silgi, oRPC, Hono, Elysia, Fastify, Express.
+description: Real performance numbers — runtime throughput, type-checking speed, memory usage.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
@@ -82,6 +82,30 @@ All three frameworks are nearly identical on WebSocket — the persistent connec
 | --------- | ---------- |
 | Silgi     | ~40 bytes  |
 | oRPC      | ~56 bytes  |
+
+## TypeScript type-checking — 3,000 procedures
+
+Measures `tsc --noEmit` wall-clock time on a project with **500 routers × 6 procedures = 3,000 procedures** plus 500 consumer files that exercise client types with explicit annotations. Uses [Standard Schema](https://github.com/standard-schema/standard-schema) instead of Zod to isolate framework type overhead.
+
+| Framework | Instantiations | Check time | Total time | Memory |
+| --------- | -------------- | ---------- | ---------- | ------ |
+| Silgi     | **254,449**    | **0.77s**  | **1.19s**  | 369 MB |
+| oRPC      | 896,796        | 1.09s      | 1.38s      | 475 MB |
+| tRPC      | 1,260,273      | 1.96s      | 2.22s      | 543 MB |
+
+Silgi produces **3.5× fewer type instantiations** than oRPC and **5× fewer** than tRPC. In practice this means faster editor responsiveness and shorter CI type-check runs as your router grows.
+
+<Callout>
+Run the typecheck benchmark yourself:
+
+```bash
+# Generate 3,000 procedures and measure
+cd bench/typecheck-silgi && npm run bench
+cd bench/typecheck-orpc  && npm run bench
+cd bench/typecheck-trpc  && npm run bench
+```
+
+</Callout>
 
 ## Notes
 
