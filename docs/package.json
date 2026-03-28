@@ -26,18 +26,18 @@
     "fumadocs-mdx": "14.2.10",
     "fumadocs-twoslash": "^3.1.14",
     "fumadocs-ui": "16.6.17",
-    "lucide-react": "^0.577.0",
+    "lucide-react": "^1.7.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "silgi": "workspace:*",
     "tailwind-merge": "^3.5.0",
     "tslib": "^2.8.1",
     "twoslash": "^0.3.6",
-    "vite": "^8.0.1",
+    "vite": "^8.0.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.8",
+    "@biomejs/biome": "^2.4.9",
     "@tailwindcss/vite": "^4.2.2",
     "@types/mdx": "^2.0.13",
     "@types/node": "^25.5.0",
@@ -46,8 +46,8 @@
     "@vitejs/plugin-react": "^6.0.1",
     "nitro": "^3.0.260311-beta",
     "serve": "^14.2.6",
-    "srvx": "^0.11.12",
+    "srvx": "^0.11.13",
     "tailwindcss": "^4.2.2",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.2"
   }
 }
