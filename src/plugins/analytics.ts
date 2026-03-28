@@ -156,31 +156,8 @@ export interface AnalyticsOptions {
    * - `undefined` — no auth (open access, NOT recommended in production)
    */
   auth?: string | ((req: Request) => boolean | Promise<boolean>)
-  /**
-   * Persist request/error logs to unstorage for durability across restarts.
-   * Accepts any unstorage-compatible Storage instance (redis, fs, memory, etc.).
-   *
-   * @example
-   * ```ts
-   * import { createStorage } from 'silgi/unstorage'
-   * import redisDriver from 'unstorage/drivers/redis'
-   *
-   * s.handler(router, {
-   *   analytics: {
-   *     storage: createStorage({ driver: redisDriver({ url: 'redis://localhost' }) }),
-   *   }
-   * })
-   * ```
-   */
-  storage?: AnalyticsStorage
   /** Interval in ms between storage flushes (default: 5000) */
   flushInterval?: number
-}
-
-/** Minimal storage interface — compatible with unstorage */
-export interface AnalyticsStorage {
-  getItem<T = unknown>(key: string): Promise<T | null> | T | null
-  setItem(key: string, value: unknown): Promise<void> | void
 }
 
 export interface ProcedureSnapshot {
@@ -364,8 +341,10 @@ export async function trace<T>(
 
 // ── Persistent Store ─────────────────────────────────
 
+import { useStorage } from '../core/storage.ts'
+
 class AnalyticsStore {
-  #storage: AnalyticsStorage
+  #storage: ReturnType<typeof useStorage>
   #pendingRequests: RequestEntry[] = []
   #pendingErrors: ErrorEntry[] = []
   #maxRequests: number
@@ -373,8 +352,8 @@ class AnalyticsStore {
   #timer: ReturnType<typeof setInterval> | null = null
   #flushing = false
 
-  constructor(storage: AnalyticsStorage, maxRequests: number, maxErrors: number, flushInterval: number) {
-    this.#storage = storage
+  constructor(maxRequests: number, maxErrors: number, flushInterval: number) {
+    this.#storage = useStorage()
     this.#maxRequests = maxRequests
     this.#maxErrors = maxErrors
     this.#timer = setInterval(() => this.flush(), flushInterval)
@@ -469,7 +448,7 @@ export class AnalyticsCollector {
   #nextErrorId = 1
   #requests: RequestEntry[] = []
   #nextRequestId = 1
-  #store: AnalyticsStore | null = null
+  #store: AnalyticsStore
   #counterFlushCounter = 0
 
   constructor(options: AnalyticsOptions = {}) {
@@ -479,18 +458,11 @@ export class AnalyticsCollector {
     this.#maxRequests = options.maxRequests ?? 200
     this.#currentWindow = { time: Math.floor(Date.now() / 1000), count: 0, errors: 0 }
 
-    if (options.storage) {
-      this.#store = new AnalyticsStore(
-        options.storage,
-        this.#maxRequests,
-        this.#maxErrors,
-        options.flushInterval ?? 5000,
-      )
-      this.#store.hydrate().then((c) => {
-        this.#totalRequests += c.totalRequests
-        this.#totalErrors += c.totalErrors
-      })
-    }
+    this.#store = new AnalyticsStore(this.#maxRequests, this.#maxErrors, options.flushInterval ?? 5000)
+    this.#store.hydrate().then((c) => {
+      this.#totalRequests += c.totalRequests
+      this.#totalErrors += c.totalErrors
+    })
   }
 
   record(path: string, durationMs: number): void {
@@ -519,7 +491,7 @@ export class AnalyticsCollector {
     if (this.#errors.length > this.#maxErrors) {
       this.#errors.shift()
     }
-    this.#store?.enqueueError(full)
+    this.#store.enqueueError(full)
   }
 
   recordDetailedRequest(entry: Omit<RequestEntry, 'id'>): void {
@@ -528,7 +500,7 @@ export class AnalyticsCollector {
     if (this.#requests.length > this.#maxRequests) {
       this.#requests.shift()
     }
-    this.#store?.enqueueRequest(full)
+    this.#store.enqueueRequest(full)
     this.#flushCountersIfNeeded()
   }
 
@@ -562,28 +534,23 @@ export class AnalyticsCollector {
     if (isError) this.#currentWindow.errors++
   }
 
-  getErrors(): ErrorEntry[] | Promise<ErrorEntry[]> {
-    if (this.#store) return this.#store.getErrors()
-    return this.#errors
+  getErrors(): Promise<ErrorEntry[]> {
+    return this.#store.getErrors()
   }
 
-  getRequests(): RequestEntry[] | Promise<RequestEntry[]> {
-    if (this.#store) return this.#store.getRequests()
-    return this.#requests
+  getRequests(): Promise<RequestEntry[]> {
+    return this.#store.getRequests()
   }
 
   #flushCountersIfNeeded(): void {
-    if (!this.#store) return
     if (++this.#counterFlushCounter % 50 === 0) {
       this.#store.saveCounters(this.#totalRequests, this.#totalErrors)
     }
   }
 
   async dispose(): Promise<void> {
-    if (this.#store) {
-      await this.#store.saveCounters(this.#totalRequests, this.#totalErrors)
-      await this.#store.dispose()
-    }
+    await this.#store.saveCounters(this.#totalRequests, this.#totalErrors)
+    await this.#store.dispose()
   }
 
   toJSON(): AnalyticsSnapshot {
