@@ -11,9 +11,11 @@
     "---",
     "ai-sdk",
     "tanstack-query",
+    "pinia-colada",
     "react",
     "---",
     "openapi-client",
+    "hey-api",
     "broker",
     "trpc"
   ]
