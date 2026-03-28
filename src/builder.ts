@@ -26,11 +26,11 @@ export interface ProcedureBuilder<
 > {
   /** Add a guard — enriches context with guard return type */
   $use<TReturn extends Record<string, unknown> | void, TGErrors extends ErrorDef = {}>(
-    guard: GuardDef<any, TReturn, TGErrors>,
+    guard: GuardDef<TCtx, TReturn, TGErrors>,
   ): ProcedureBuilder<TType, TBaseCtx, TReturn extends Record<string, unknown> ? TCtx & TReturn : TCtx, TInput, TGErrors & TErrors>
 
   /** Add a wrap middleware — does not change context type */
-  $use(wrap: WrapDef<any>): ProcedureBuilder<TType, TBaseCtx, TCtx, TInput, TErrors>
+  $use(wrap: WrapDef<TCtx>): ProcedureBuilder<TType, TBaseCtx, TCtx, TInput, TErrors>
 
   /** Set input schema */
   $input<TSchema extends AnySchema>(
@@ -72,11 +72,11 @@ export interface ProcedureBuilderWithOutput<
 > {
   /** Add a guard — enriches context with guard return type */
   $use<TReturn extends Record<string, unknown> | void, TGErrors extends ErrorDef = {}>(
-    guard: GuardDef<any, TReturn, TGErrors>,
+    guard: GuardDef<TCtx, TReturn, TGErrors>,
   ): ProcedureBuilderWithOutput<TType, TBaseCtx, TReturn extends Record<string, unknown> ? TCtx & TReturn : TCtx, TInput, TOutputResolved, TGErrors & TErrors>
 
   /** Add a wrap middleware — does not change context type */
-  $use(wrap: WrapDef<any>): ProcedureBuilderWithOutput<TType, TBaseCtx, TCtx, TInput, TOutputResolved, TErrors>
+  $use(wrap: WrapDef<TCtx>): ProcedureBuilderWithOutput<TType, TBaseCtx, TCtx, TInput, TOutputResolved, TErrors>
 
   /** Set typed errors */
   $errors<TNewErrors extends ErrorDef>(
