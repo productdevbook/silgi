@@ -353,7 +353,7 @@ class AnalyticsStore {
   #flushing = false
 
   constructor(maxRequests: number, maxErrors: number, flushInterval: number) {
-    this.#storage = useStorage()
+    this.#storage = useStorage('data')
     this.#maxRequests = maxRequests
     this.#maxErrors = maxErrors
     this.#timer = setInterval(() => this.flush(), flushInterval)
