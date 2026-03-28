@@ -465,23 +465,27 @@ const heartbeat = s.task({
   },
 })
 
-// 5. Task dispatched from procedure — fire and forget
+// 5. Task dispatched from procedure — with trace() spans
 const createUserWithEmail = s
   .$use(auth, timing)
   .$input(z.object({ name: z.string(), email: z.string().email() }))
   .$output(UserSchema)
   .$resolve(async ({ input, ctx }) => {
-    const user = {
-      id: ctx.db.nextUserId++,
-      name: input.name,
-      email: input.email,
-      role: 'user' as const,
-      createdAt: new Date().toISOString(),
-    }
-    ctx.db.users.push(user)
+    const user = await trace(ctx, 'db.users.create', async () => {
+      const u = {
+        id: ctx.db.nextUserId++,
+        name: input.name,
+        email: input.email,
+        role: 'user' as const,
+        createdAt: new Date().toISOString(),
+      }
+      ctx.db.users.push(u)
+      return u
+    }, { kind: 'db', detail: `INSERT INTO users (name, email) VALUES ('${input.name}', '${input.email}')` })
 
-    // Fire-and-forget: send welcome email in background
-    sendWelcomeEmail.dispatch({ userId: user.id, email: user.email })
+    await trace(ctx, 'task.sendWelcomeEmail', async () => {
+      sendWelcomeEmail.dispatch({ userId: user.id, email: user.email })
+    }, { kind: 'queue', detail: `dispatch send-welcome-email to ${user.email}` })
 
     return user
   })
