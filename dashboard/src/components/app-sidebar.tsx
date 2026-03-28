@@ -17,6 +17,7 @@ import {
   DashboardBrowsingIcon,
   Pulse01Icon,
   RocketIcon,
+  TaskDaily01Icon,
   UserMultiple02Icon,
 } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -31,9 +32,10 @@ interface AppSidebarProps {
   errorCount: number
   requestCount: number
   sessionCount: number
+  taskCount: number
 }
 
-export function AppSidebar({ route, navigate, data, errorCount, requestCount, sessionCount }: AppSidebarProps) {
+export function AppSidebar({ route, navigate, data, errorCount, requestCount, sessionCount, taskCount }: AppSidebarProps) {
   return (
     <Sidebar collapsible='icon'>
       <SidebarHeader className='gap-0'>
@@ -88,6 +90,17 @@ export function AppSidebar({ route, navigate, data, errorCount, requestCount, se
                   {sessionCount > 0 && (
                     <span className='ml-auto font-mono text-[10px] tabular-nums text-muted-foreground group-data-[collapsible=icon]:hidden'>
                       {sessionCount}
+                    </span>
+                  )}
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton isActive={route.page === 'tasks'} onClick={() => navigate('tasks')}>
+                  <HugeiconsIcon icon={TaskDaily01Icon} size={15} />
+                  <span>Tasks</span>
+                  {taskCount > 0 && (
+                    <span className='ml-auto font-mono text-[10px] tabular-nums text-muted-foreground group-data-[collapsible=icon]:hidden'>
+                      {taskCount}
                     </span>
                   )}
                 </SidebarMenuButton>

@@ -6,6 +6,7 @@ import { RequestDetailPage } from '@/components/request-detail-page'
 import { Requests } from '@/components/requests'
 import { SessionDetailPage } from '@/components/session-detail-page'
 import { Sessions } from '@/components/sessions'
+import { Tasks } from '@/components/Tasks'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -26,6 +27,7 @@ export default function App() {
   })
 
   const sessionCount = new Set(analytics.requests.map((r) => r.sessionId).filter(Boolean)).size
+  const taskCount = analytics.data?.tasks?.totalRuns ?? 0
 
   return (
     <SidebarProvider defaultOpen={false}>
@@ -36,6 +38,7 @@ export default function App() {
         errorCount={analytics.errors.length}
         requestCount={analytics.requests.length}
         sessionCount={sessionCount}
+        taskCount={taskCount}
       />
       <SidebarInset className='overflow-hidden'>
         <header className='sticky top-0 z-10 flex h-11 items-center justify-between gap-3 border-b bg-background/95 px-3 backdrop-blur md:px-4'>
@@ -85,6 +88,7 @@ export default function App() {
           {route.page === 'requests' && route.id && (
             <RequestDetailPage requests={analytics.requests} id={route.id} navigate={navigate} />
           )}
+          {route.page === 'tasks' && <Tasks data={analytics.data} taskExecutions={analytics.taskExecutions} />}
           {route.page === 'sessions' && !route.id && <Sessions requests={analytics.requests} navigate={navigate} />}
           {route.page === 'sessions' && route.id && (
             <SessionDetailPage requests={analytics.requests} sessionId={route.id} navigate={navigate} />

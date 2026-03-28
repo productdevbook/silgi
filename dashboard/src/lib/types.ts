@@ -22,6 +22,7 @@ export interface AnalyticsData {
   avgLatency: number
   procedures: Record<string, ProcedureSnapshot>
   timeSeries: TimeWindow[]
+  tasks?: TaskSnapshot
 }
 
 export type SpanKind = 'db' | 'http' | 'cache' | 'queue' | 'email' | 'ai' | 'custom'
@@ -62,6 +63,25 @@ export interface ProcedureCall {
   output: unknown
   spans: TraceSpan[]
   error?: string
+}
+
+/** A background task execution. */
+export interface TaskExecution {
+  id: number
+  taskName: string
+  trigger: 'dispatch' | 'cron' | 'http'
+  timestamp: number
+  durationMs: number
+  status: 'success' | 'error'
+  error?: string
+  input?: unknown
+  output?: unknown
+}
+
+export interface TaskSnapshot {
+  totalRuns: number
+  totalErrors: number
+  tasks: Record<string, { runs: number; errors: number; avgDurationMs: number; lastRun: number | null }>
 }
 
 /** An HTTP request containing one or more procedure calls. */
