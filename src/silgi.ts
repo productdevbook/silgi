@@ -178,26 +178,15 @@ interface GuardFactory<TBaseCtx> {
 // ── Task Factory ────────────────────────────────────
 
 interface TaskFactory<TBaseCtx> {
-  /** Task without input: `task(resolve)` */
+  /** Task with config: `task({ name, resolve })` */
   <TOutput>(
-    resolve: (event: TaskEvent<undefined, TBaseCtx>) => Promise<TOutput> | TOutput,
+    options: { name: string; cron?: string; description?: string; resolve: (event: TaskEvent<undefined, TBaseCtx>) => Promise<TOutput> | TOutput },
   ): TaskDef<undefined, TOutput>
 
-  /** Task with config (cron, resolve): `task({ cron, resolve })` */
-  <TOutput>(
-    options: { cron?: string; name?: string; description?: string; resolve: (event: TaskEvent<undefined, TBaseCtx>) => Promise<TOutput> | TOutput },
-  ): TaskDef<undefined, TOutput>
-
-  /** Task with input schema: `task(schema, resolve)` */
+  /** Task with input schema + config: `task(schema, { name, resolve })` */
   <TSchema extends TaskSchema, TOutput>(
     input: TSchema,
-    resolve: (event: TaskEvent<TaskSchemaOutput<TSchema>, TBaseCtx>) => Promise<TOutput> | TOutput,
-  ): TaskDef<TaskSchemaInput<TSchema>, TOutput>
-
-  /** Task with input schema + config: `task(schema, { cron, resolve })` */
-  <TSchema extends TaskSchema, TOutput>(
-    input: TSchema,
-    options: { cron?: string; name?: string; description?: string; resolve: (event: TaskEvent<TaskSchemaOutput<TSchema>, TBaseCtx>) => Promise<TOutput> | TOutput },
+    options: { name: string; cron?: string; description?: string; resolve: (event: TaskEvent<TaskSchemaOutput<TSchema>, TBaseCtx>) => Promise<TOutput> | TOutput },
   ): TaskDef<TaskSchemaInput<TSchema>, TOutput>
 }
 

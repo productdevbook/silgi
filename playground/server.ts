@@ -411,7 +411,7 @@ const adminRouter = implement(adminContract, {
 // 1. Task with input + trace() spans — send welcome email
 const sendWelcomeEmail = s.task(
   z.object({ userId: z.number(), email: z.string().email() }),
-  async ({ input, ctx }) => {
+  { name: 'send-welcome-email', description: 'Send welcome email to new user', resolve: async ({ input, ctx }) => {
     // trace() inside tasks automatically produces spans visible in dashboard
     const user = await trace(ctx, 'db.users.findById', async () => {
       await new Promise((r) => setTimeout(r, 10))
@@ -424,15 +424,18 @@ const sendWelcomeEmail = s.task(
     }, { kind: 'email', detail: `to: ${input.email}` })
 
     return { sent: true, to: input.email }
-  },
+  }},
 )
 
 // 2. Task without input — cleanup old data
-const cleanupOldData = s.task(async ({ ctx }) => {
-  const before = ctx.db.posts.length
-  // In real app: delete old drafts, expired sessions, etc.
-  console.log(`    [task] Cleanup: ${before} posts checked`)
-  return { checked: before, deleted: 0 }
+const cleanupOldData = s.task({
+  name: 'cleanup-old-data',
+  description: 'Clean up old drafts and expired sessions',
+  resolve: async ({ ctx }) => {
+    const before = ctx.db.posts.length
+    console.log(`    [task] Cleanup: ${before} posts checked`)
+    return { checked: before, deleted: 0 }
+  },
 })
 
 // 3. Task with cron — stats snapshot every 30s (use '0 0 * * *' in production)

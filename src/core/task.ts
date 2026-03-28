@@ -53,26 +53,15 @@ export interface TaskOptions<TCtx, TInput, TOutput> {
 
 // ── defineTask (standalone, no context) ──────────────
 
-/** Define a standalone task without input */
-export function defineTask<TOutput>(
-  resolve: (event: TaskEvent<undefined, {}>) => Promise<TOutput> | TOutput,
-): TaskDef<undefined, TOutput>
-
-/** Define a standalone task with input schema */
-export function defineTask<TSchema extends AnySchema, TOutput>(
-  input: TSchema,
-  resolve: (event: TaskEvent<InferSchemaOutput<TSchema>, {}>) => Promise<TOutput> | TOutput,
-): TaskDef<InferSchemaInput<TSchema>, TOutput>
-
 /** Define a standalone task with config */
 export function defineTask<TOutput>(
-  options: { cron?: string; name?: string; description?: string; resolve: (event: TaskEvent<undefined, {}>) => Promise<TOutput> | TOutput },
+  options: { name: string; cron?: string; description?: string; resolve: (event: TaskEvent<undefined, {}>) => Promise<TOutput> | TOutput },
 ): TaskDef<undefined, TOutput>
 
 /** Define a standalone task with input schema + config */
 export function defineTask<TSchema extends AnySchema, TOutput>(
   input: TSchema,
-  options: { cron?: string; name?: string; description?: string; resolve: (event: TaskEvent<InferSchemaOutput<TSchema>, {}>) => Promise<TOutput> | TOutput },
+  options: { name: string; cron?: string; description?: string; resolve: (event: TaskEvent<InferSchemaOutput<TSchema>, {}>) => Promise<TOutput> | TOutput },
 ): TaskDef<InferSchemaInput<TSchema>, TOutput>
 
 export function defineTask(...args: any[]): TaskDef<any, any> {
@@ -107,24 +96,23 @@ export function createTaskDef(contextFactory: (() => unknown | Promise<unknown>)
   let name = ''
   let description: string | undefined
 
-  if (args.length === 1 && typeof args[0] === 'function') {
-    resolve = args[0]
-  } else if (args.length === 1 && typeof args[0] === 'object') {
+  if (args.length === 1 && typeof args[0] === 'object') {
+    // task({ name, resolve })
+    if (!args[0].name) throw new TypeError('Task name is required')
     resolve = args[0].resolve
     cron = args[0].cron ?? null
-    name = args[0].name ?? ''
+    name = args[0].name
     description = args[0].description
-  } else if (args.length === 2 && typeof args[1] === 'function') {
-    inputSchema = args[0]
-    resolve = args[1]
   } else if (args.length === 2 && typeof args[1] === 'object') {
+    // task(schema, { name, resolve })
+    if (!args[1].name) throw new TypeError('Task name is required')
     inputSchema = args[0]
     resolve = args[1].resolve
     cron = args[1].cron ?? null
-    name = args[1].name ?? ''
+    name = args[1].name
     description = args[1].description
   } else {
-    throw new TypeError('Invalid task arguments')
+    throw new TypeError('Invalid task arguments — use task({ name, resolve }) or task(schema, { name, resolve })')
   }
 
   // Handler resolve — called by Silgi pipeline (ctx comes from pipeline)

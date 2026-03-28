@@ -18,27 +18,33 @@ Silgi tasks give you three things:
 
 ## Your first task
 
-A task looks like a procedure, but runs in the background:
+Every task needs a `name` and a `resolve` function:
 
 ```ts title="server/tasks.ts"
 const sendEmail = s.task(
   z.object({ to: z.string().email(), subject: z.string() }),
-  async ({ input, ctx }) => {
-    const user = await ctx.db.users.findByEmail(input.to)
-    await ctx.mailer.send(user.email, input.subject)
-    return { sent: true }
+  {
+    name: 'send-email',
+    resolve: async ({ input, ctx }) => {
+      const user = await ctx.db.users.findByEmail(input.to)
+      await ctx.mailer.send(user.email, input.subject)
+      return { sent: true }
+    },
   },
 )
 ```
 
-`ctx` is the same context from your `silgi()` setup — database, services, everything is there.
+`ctx` is the same context from your `silgi()` setup — database, services, everything is there. `name` is required — it identifies the task in analytics and logs.
 
 A task without input:
 
 ```ts
-const prune = s.task(async ({ ctx }) => {
-  const count = await ctx.db.logs.deleteOlderThan('30d')
-  return { deleted: count }
+const prune = s.task({
+  name: 'prune-logs',
+  resolve: async ({ ctx }) => {
+    const count = await ctx.db.logs.deleteOlderThan('30d')
+    return { deleted: count }
+  },
 })
 ```
 
@@ -90,6 +96,7 @@ Add `cron` to run a task on a schedule:
 
 ```ts
 const dailyReport = s.task({
+  name: 'daily-report',
   cron: '0 9 * * *',
   description: 'Generate daily sales report',
   resolve: async ({ ctx }) => {
@@ -148,9 +155,12 @@ import { defineTask } from 'silgi'
 
 const processFile = defineTask(
   z.object({ path: z.string() }),
-  async ({ input }) => {
-    // No ctx here — standalone task
-    return { processed: true }
+  {
+    name: 'process-file',
+    resolve: async ({ input }) => {
+      // No ctx here — standalone task
+      return { processed: true }
+    },
   },
 )
 
