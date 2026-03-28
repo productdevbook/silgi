@@ -337,6 +337,132 @@ describe('errorToMarkdown', () => {
   })
 })
 
+describe('AnalyticsCollector — persistence', () => {
+  function createMemoryStorage(): import('#src/plugins/analytics.ts').AnalyticsStorage {
+    const store = new Map<string, unknown>()
+    return {
+      getItem: <T>(key: string) => (store.get(key) as T) ?? null,
+      setItem: (key: string, value: unknown) => {
+        store.set(key, value)
+      },
+    }
+  }
+
+  it('persists requests to storage on flush', async () => {
+    const storage = createMemoryStorage()
+    const collector = new AnalyticsCollector({ storage, flushInterval: 999_999 })
+
+    collector.recordDetailedRequest({
+      timestamp: Date.now(),
+      procedure: 'users/list',
+      durationMs: 2.0,
+      status: 200,
+      input: null,
+      spans: [],
+    })
+
+    // Manually flush (timer won't fire in test)
+    await collector.dispose()
+
+    // Create new collector with same storage — data should be there
+    const collector2 = new AnalyticsCollector({ storage, flushInterval: 999_999 })
+    const requests = await collector2.getRequests()
+    expect(requests).toHaveLength(1)
+    expect(requests[0]!.procedure).toBe('users/list')
+    await collector2.dispose()
+  })
+
+  it('persists errors to storage on flush', async () => {
+    const storage = createMemoryStorage()
+    const collector = new AnalyticsCollector({ storage, flushInterval: 999_999 })
+
+    collector.recordDetailedError({
+      requestId: 'test-req',
+      timestamp: Date.now(),
+      procedure: 'users/create',
+      error: 'fail',
+      code: 'ERR',
+      status: 500,
+      stack: '',
+      input: null,
+      headers: {},
+      durationMs: 1,
+      spans: [],
+    })
+
+    await collector.dispose()
+
+    const collector2 = new AnalyticsCollector({ storage, flushInterval: 999_999 })
+    const errors = await collector2.getErrors()
+    expect(errors).toHaveLength(1)
+    expect(errors[0]!.procedure).toBe('users/create')
+    await collector2.dispose()
+  })
+
+  it('persists and restores counters', async () => {
+    const storage = createMemoryStorage()
+    const collector = new AnalyticsCollector({ storage, flushInterval: 999_999 })
+
+    collector.record('a', 1)
+    collector.record('a', 2)
+    collector.recordError('a', 3, 'err')
+    collector.recordDetailedRequest({
+      timestamp: Date.now(),
+      procedure: 'a',
+      durationMs: 1,
+      status: 200,
+      input: null,
+      spans: [],
+    })
+
+    await collector.dispose()
+
+    // Wait for hydrate
+    const collector2 = new AnalyticsCollector({ storage, flushInterval: 999_999 })
+    await new Promise((r) => setTimeout(r, 10)) // let hydrate() resolve
+    const snap = collector2.toJSON()
+    expect(snap.totalRequests).toBe(3)
+    expect(snap.totalErrors).toBe(1)
+    await collector2.dispose()
+  })
+
+  it('merges pending and stored entries', async () => {
+    const storage = createMemoryStorage()
+
+    // First collector: persist 2 requests
+    const c1 = new AnalyticsCollector({ storage, flushInterval: 999_999 })
+    c1.recordDetailedRequest({ timestamp: 1, procedure: 'a', durationMs: 1, status: 200, input: null, spans: [] })
+    c1.recordDetailedRequest({ timestamp: 2, procedure: 'b', durationMs: 2, status: 200, input: null, spans: [] })
+    await c1.dispose()
+
+    // Second collector: add 1 more (pending, not yet flushed)
+    const c2 = new AnalyticsCollector({ storage, flushInterval: 999_999 })
+    c2.recordDetailedRequest({ timestamp: 3, procedure: 'c', durationMs: 3, status: 200, input: null, spans: [] })
+
+    const requests = await c2.getRequests()
+    expect(requests).toHaveLength(3)
+    expect(requests.map((r) => r.procedure)).toEqual(['a', 'b', 'c'])
+    await c2.dispose()
+  })
+
+  it('trims to maxRequests on flush', async () => {
+    const storage = createMemoryStorage()
+    const c = new AnalyticsCollector({ storage, flushInterval: 999_999, maxRequests: 3 })
+
+    for (let i = 0; i < 5; i++) {
+      c.recordDetailedRequest({ timestamp: i, procedure: `r${i}`, durationMs: 1, status: 200, input: null, spans: [] })
+    }
+
+    await c.dispose()
+
+    const c2 = new AnalyticsCollector({ storage, flushInterval: 999_999, maxRequests: 3 })
+    const requests = await c2.getRequests()
+    expect(requests).toHaveLength(3)
+    expect(requests[0]!.procedure).toBe('r2')
+    await c2.dispose()
+  })
+})
+
 describe('analyticsHTML', () => {
   it('returns HTML dashboard', () => {
     const html = analyticsHTML()

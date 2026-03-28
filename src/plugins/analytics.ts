@@ -156,6 +156,31 @@ export interface AnalyticsOptions {
    * - `undefined` — no auth (open access, NOT recommended in production)
    */
   auth?: string | ((req: Request) => boolean | Promise<boolean>)
+  /**
+   * Persist request/error logs to unstorage for durability across restarts.
+   * Accepts any unstorage-compatible Storage instance (redis, fs, memory, etc.).
+   *
+   * @example
+   * ```ts
+   * import { createStorage } from 'silgi/unstorage'
+   * import redisDriver from 'unstorage/drivers/redis'
+   *
+   * s.handler(router, {
+   *   analytics: {
+   *     storage: createStorage({ driver: redisDriver({ url: 'redis://localhost' }) }),
+   *   }
+   * })
+   * ```
+   */
+  storage?: AnalyticsStorage
+  /** Interval in ms between storage flushes (default: 5000) */
+  flushInterval?: number
+}
+
+/** Minimal storage interface — compatible with unstorage */
+export interface AnalyticsStorage {
+  getItem<T = unknown>(key: string): Promise<T | null> | T | null
+  setItem(key: string, value: unknown): Promise<void> | void
 }
 
 export interface ProcedureSnapshot {
@@ -337,6 +362,96 @@ export async function trace<T>(
   return fn()
 }
 
+// ── Persistent Store ─────────────────────────────────
+
+class AnalyticsStore {
+  #storage: AnalyticsStorage
+  #pendingRequests: RequestEntry[] = []
+  #pendingErrors: ErrorEntry[] = []
+  #maxRequests: number
+  #maxErrors: number
+  #timer: ReturnType<typeof setInterval> | null = null
+  #flushing = false
+
+  constructor(storage: AnalyticsStorage, maxRequests: number, maxErrors: number, flushInterval: number) {
+    this.#storage = storage
+    this.#maxRequests = maxRequests
+    this.#maxErrors = maxErrors
+    this.#timer = setInterval(() => this.flush(), flushInterval)
+    if (typeof this.#timer === 'object' && 'unref' in this.#timer) this.#timer.unref()
+  }
+
+  enqueueRequest(entry: RequestEntry): void {
+    this.#pendingRequests.push(entry)
+  }
+
+  enqueueError(entry: ErrorEntry): void {
+    this.#pendingErrors.push(entry)
+  }
+
+  async flush(): Promise<void> {
+    if (this.#flushing) return
+    const requests = this.#pendingRequests.splice(0)
+    const errors = this.#pendingErrors.splice(0)
+    if (requests.length === 0 && errors.length === 0) return
+
+    this.#flushing = true
+    try {
+      if (requests.length > 0) {
+        const existing = (await this.#storage.getItem<RequestEntry[]>('analytics:requests')) ?? []
+        const merged = [...existing, ...requests].slice(-this.#maxRequests)
+        await this.#storage.setItem('analytics:requests', merged)
+      }
+      if (errors.length > 0) {
+        const existing = (await this.#storage.getItem<ErrorEntry[]>('analytics:errors')) ?? []
+        const merged = [...existing, ...errors].slice(-this.#maxErrors)
+        await this.#storage.setItem('analytics:errors', merged)
+      }
+    } catch {
+      // Storage failure — re-enqueue items so they're not lost
+      this.#pendingRequests.unshift(...requests)
+      this.#pendingErrors.unshift(...errors)
+    } finally {
+      this.#flushing = false
+    }
+  }
+
+  async getRequests(): Promise<RequestEntry[]> {
+    const stored = (await this.#storage.getItem<RequestEntry[]>('analytics:requests')) ?? []
+    if (this.#pendingRequests.length === 0) return stored
+    return [...stored, ...this.#pendingRequests].slice(-this.#maxRequests)
+  }
+
+  async getErrors(): Promise<ErrorEntry[]> {
+    const stored = (await this.#storage.getItem<ErrorEntry[]>('analytics:errors')) ?? []
+    if (this.#pendingErrors.length === 0) return stored
+    return [...stored, ...this.#pendingErrors].slice(-this.#maxErrors)
+  }
+
+  async hydrate(): Promise<{ totalRequests: number; totalErrors: number }> {
+    try {
+      const counters = await this.#storage.getItem<{ totalRequests: number; totalErrors: number }>('analytics:counters')
+      return counters ?? { totalRequests: 0, totalErrors: 0 }
+    } catch {
+      return { totalRequests: 0, totalErrors: 0 }
+    }
+  }
+
+  async saveCounters(totalRequests: number, totalErrors: number): Promise<void> {
+    try {
+      await this.#storage.setItem('analytics:counters', { totalRequests, totalErrors })
+    } catch {
+      // Best-effort
+    }
+  }
+
+  async dispose(): Promise<void> {
+    if (this.#timer) clearInterval(this.#timer)
+    this.#timer = null
+    await this.flush()
+  }
+}
+
 // ── Collector ───────────────────────────────────────
 
 export class AnalyticsCollector {
@@ -354,6 +469,8 @@ export class AnalyticsCollector {
   #nextErrorId = 1
   #requests: RequestEntry[] = []
   #nextRequestId = 1
+  #store: AnalyticsStore | null = null
+  #counterFlushCounter = 0
 
   constructor(options: AnalyticsOptions = {}) {
     this.#bufferSize = options.bufferSize ?? 1024
@@ -361,6 +478,19 @@ export class AnalyticsCollector {
     this.#maxErrors = options.maxErrors ?? 100
     this.#maxRequests = options.maxRequests ?? 200
     this.#currentWindow = { time: Math.floor(Date.now() / 1000), count: 0, errors: 0 }
+
+    if (options.storage) {
+      this.#store = new AnalyticsStore(
+        options.storage,
+        this.#maxRequests,
+        this.#maxErrors,
+        options.flushInterval ?? 5000,
+      )
+      this.#store.hydrate().then((c) => {
+        this.#totalRequests += c.totalRequests
+        this.#totalErrors += c.totalErrors
+      })
+    }
   }
 
   record(path: string, durationMs: number): void {
@@ -384,17 +514,22 @@ export class AnalyticsCollector {
   }
 
   recordDetailedError(entry: Omit<ErrorEntry, 'id'>): void {
-    this.#errors.push({ ...entry, id: this.#nextErrorId++ })
+    const full = { ...entry, id: this.#nextErrorId++ }
+    this.#errors.push(full)
     if (this.#errors.length > this.#maxErrors) {
       this.#errors.shift()
     }
+    this.#store?.enqueueError(full)
   }
 
   recordDetailedRequest(entry: Omit<RequestEntry, 'id'>): void {
-    this.#requests.push({ ...entry, id: this.#nextRequestId++ })
+    const full = { ...entry, id: this.#nextRequestId++ }
+    this.#requests.push(full)
     if (this.#requests.length > this.#maxRequests) {
       this.#requests.shift()
     }
+    this.#store?.enqueueRequest(full)
+    this.#flushCountersIfNeeded()
   }
 
   #getOrCreate(path: string): ProcedureEntry {
@@ -427,12 +562,28 @@ export class AnalyticsCollector {
     if (isError) this.#currentWindow.errors++
   }
 
-  getErrors(): ErrorEntry[] {
+  getErrors(): ErrorEntry[] | Promise<ErrorEntry[]> {
+    if (this.#store) return this.#store.getErrors()
     return this.#errors
   }
 
-  getRequests(): RequestEntry[] {
+  getRequests(): RequestEntry[] | Promise<RequestEntry[]> {
+    if (this.#store) return this.#store.getRequests()
     return this.#requests
+  }
+
+  #flushCountersIfNeeded(): void {
+    if (!this.#store) return
+    if (++this.#counterFlushCounter % 50 === 0) {
+      this.#store.saveCounters(this.#totalRequests, this.#totalErrors)
+    }
+  }
+
+  async dispose(): Promise<void> {
+    if (this.#store) {
+      await this.#store.saveCounters(this.#totalRequests, this.#totalErrors)
+      await this.#store.dispose()
+    }
   }
 
   toJSON(): AnalyticsSnapshot {
@@ -807,11 +958,11 @@ export function analyticsAuthResponse(pathname: string): Response {
 }
 
 /** Serve analytics dashboard and API routes. */
-export function serveAnalyticsRoute(
+export async function serveAnalyticsRoute(
   pathname: string,
   collector: AnalyticsCollector,
   dashboardHtml: string | undefined,
-): Response {
+): Promise<Response> {
   const jsonCacheHeaders = { 'content-type': 'application/json', 'cache-control': 'no-cache' }
   const mdHeaders = { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-cache' }
 
@@ -819,25 +970,29 @@ export function serveAnalyticsRoute(
     return new Response(JSON.stringify(collector.toJSON()), { headers: jsonCacheHeaders })
   }
   if (pathname === 'analytics/_api/errors') {
-    return new Response(JSON.stringify(collector.getErrors()), { headers: jsonCacheHeaders })
+    const errors = await collector.getErrors()
+    return new Response(JSON.stringify(errors), { headers: jsonCacheHeaders })
   }
   if (pathname === 'analytics/_api/requests') {
-    return new Response(JSON.stringify(collector.getRequests()), { headers: jsonCacheHeaders })
+    const requests = await collector.getRequests()
+    return new Response(JSON.stringify(requests), { headers: jsonCacheHeaders })
   }
   if (pathname.startsWith('analytics/_api/requests/') && pathname.endsWith('/md')) {
     const id = Number(pathname.slice('analytics/_api/requests/'.length, -'/md'.length))
-    const entry = collector.getRequests().find((r) => r.id === id)
+    const requests = await collector.getRequests()
+    const entry = requests.find((r) => r.id === id)
     if (entry) return new Response(requestToMarkdown(entry), { headers: mdHeaders })
     return new Response('not found', { status: 404 })
   }
   if (pathname.startsWith('analytics/_api/errors/') && pathname.endsWith('/md')) {
     const id = Number(pathname.slice('analytics/_api/errors/'.length, -'/md'.length))
-    const entry = collector.getErrors().find((e) => e.id === id)
+    const errors = await collector.getErrors()
+    const entry = errors.find((e) => e.id === id)
     if (entry) return new Response(errorToMarkdown(entry), { headers: mdHeaders })
     return new Response('not found', { status: 404 })
   }
   if (pathname === 'analytics/_api/errors/md') {
-    const errors = collector.getErrors()
+    const errors = await collector.getErrors()
     const md =
       errors.length === 0
         ? 'No errors.\n'
