@@ -97,6 +97,10 @@ export type { LazyRouter } from './lazy.ts'
 export { useStorage, initStorage, resetStorage } from './core/storage.ts'
 export type { StorageConfig, Storage, StorageValue, Driver } from './core/storage.ts'
 
+// ── Tasks ──────────────────────────────────────────
+export { defineTask, runTask, collectCronTasks, startCronJobs, stopCronJobs } from './core/task.ts'
+export type { TaskDef, TaskEvent } from './core/task.ts'
+
 // ── Server ─────────────────────────────────────────
 export type { SilgiServer, ServeOptions } from './core/serve.ts'
 

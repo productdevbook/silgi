@@ -151,8 +151,11 @@ export interface ResolveContext<TCtx, TInput, TErrors extends ErrorDef> {
 // ── Router Types ──────────────────────────────────
 
 export type RouterDef = {
-  [key: string]: ProcedureDef<any, any, any, any> | RouterDef
+  [key: string]: ProcedureDef<any, any, any, any> | TaskDef<any, any> | RouterDef
 }
+
+// Re-export for circular dependency avoidance
+import type { TaskDef } from './core/task.ts'
 
 /** Return type wrapper — subscription yields, query/mutation returns Promise */
 type ProcedureResult<TType extends ProcedureType, TOutput> =

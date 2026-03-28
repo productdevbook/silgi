@@ -1,0 +1,173 @@
+---
+title: Tasks
+description: Run background work with type-safe input and automatic scheduling.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+
+A task is a piece of work that runs in the background. Send an email, generate a report, clean up old data — anything you don't want blocking your API response.
+
+Silgi tasks give you three things:
+1. **Type-safe input** — same Zod validation as procedures
+2. **Context access** — `ctx.db`, `ctx.mailer`, everything from your silgi instance
+3. **Router mount** — tasks become HTTP endpoints, callable from webhooks or dashboards
+
+<Callout>
+  Tasks handle define, dispatch, and schedule. They don't handle queues, retries, or orchestration. For that, pair them with [Trigger.dev](https://trigger.dev/), [BullMQ](https://bullmq.io/), or [pg-boss](https://github.com/timgit/pg-boss).
+</Callout>
+
+## Your first task
+
+A task looks like a procedure, but runs in the background:
+
+```ts title="server/tasks.ts"
+const sendEmail = s.task(
+  z.object({ to: z.string().email(), subject: z.string() }),
+  async ({ input, ctx }) => {
+    const user = await ctx.db.users.findByEmail(input.to)
+    await ctx.mailer.send(user.email, input.subject)
+    return { sent: true }
+  },
+)
+```
+
+`ctx` is the same context from your `silgi()` setup — database, services, everything is there.
+
+A task without input:
+
+```ts
+const prune = s.task(async ({ ctx }) => {
+  const count = await ctx.db.logs.deleteOlderThan('30d')
+  return { deleted: count }
+})
+```
+
+## Dispatching
+
+Call `.dispatch()` — input is validated, context is created:
+
+```ts
+await sendEmail.dispatch({ to: 'alice@example.com', subject: 'Welcome' })
+```
+
+Dispatch from inside a procedure:
+
+```ts
+const createUser = s
+  .$input(z.object({ name: z.string(), email: z.string() }))
+  .$resolve(async ({ input, ctx }) => {
+    const user = await ctx.db.users.create(input)
+
+    // Fire and forget — doesn't block the response
+    sendEmail.dispatch({ to: input.email, subject: 'Welcome' })
+
+    return user
+  })
+```
+
+## Put tasks in your router
+
+Tasks mount directly on the router. No wrapper, no `.handler` — just the task:
+
+```ts title="server/router.ts"
+const router = s.router({
+  users: {
+    create: createUser,
+    list: listUsers,
+  },
+  tasks: {
+    sendEmail,
+    prune,
+  },
+})
+```
+
+Now `POST /tasks/sendEmail` with a JSON body runs the task through the full Silgi pipeline — guards, validation, context, everything.
+
+## Cron scheduling
+
+Add `cron` to run a task on a schedule:
+
+```ts
+const dailyReport = s.task({
+  cron: '0 9 * * *',
+  description: 'Generate daily sales report',
+  resolve: async ({ ctx }) => {
+    return await ctx.db.reports.generateDaily()
+  },
+})
+```
+
+Put it in the router and call `serve()` — cron starts automatically:
+
+```ts
+const router = s.router({
+  tasks: { dailyReport },
+})
+
+await s.serve(router)
+// Console: "1 cron task(s) scheduled"
+```
+
+No extra config. Silgi walks your router, finds tasks with `cron`, and schedules them.
+
+<Callout type="warn">
+  Cron tasks run without input — don't use a schema with them.
+</Callout>
+
+Common cron patterns:
+
+| Pattern | Meaning |
+| ------- | ------- |
+| `0 9 * * *` | Every day at 9:00 AM |
+| `0 */6 * * *` | Every 6 hours |
+| `*/10 * * * *` | Every 10 minutes |
+| `0 0 * * 0` | Every Sunday at midnight |
+| `0 0 1 * *` | First day of every month |
+
+## Prevent duplicate runs
+
+`runTask()` ensures only one instance runs at a time. If you call it twice, the second call waits for the first:
+
+```ts
+import { runTask } from 'silgi'
+
+// Both calls get the same result — task runs once
+const [a, b] = await Promise.all([
+  runTask(prune),
+  runTask(prune),
+])
+```
+
+## Standalone tasks
+
+You can define tasks without a silgi instance using `defineTask`. These don't have context access:
+
+```ts
+import { defineTask } from 'silgi'
+
+const processFile = defineTask(
+  z.object({ path: z.string() }),
+  async ({ input }) => {
+    // No ctx here — standalone task
+    return { processed: true }
+  },
+)
+
+await processFile.dispatch({ path: '/uploads/data.csv' })
+```
+
+Use `s.task()` when you need `ctx`. Use `defineTask()` for self-contained utilities.
+
+## What tasks don't do
+
+Tasks are intentionally simple. Here's what to use for more:
+
+| Need | Use |
+| ---- | --- |
+| Retry on failure | [BullMQ](https://bullmq.io/) or [pg-boss](https://github.com/timgit/pg-boss) |
+| Job queue with priority | [BullMQ](https://bullmq.io/) or [Hatchet](https://hatchet.run/) |
+| Multi-step workflows | [Trigger.dev](https://trigger.dev/) or [Inngest](https://inngest.com/) |
+| Durable execution | [Temporal](https://temporal.io/) |
+
+Silgi tasks pair well with all of these — define your task logic in Silgi, dispatch it through whatever queue you need.

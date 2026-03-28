@@ -17,6 +17,7 @@ import { createCaller } from './caller.ts'
 import { compileRouter } from './compile.ts'
 import { createFetchHandler } from './core/handler.ts'
 import { assignPaths, routerCache } from './core/router-utils.ts'
+import { defineTask, createTaskDef } from './core/task.ts'
 
 import type { ProcedureBuilder } from './builder.ts'
 import type { FetchHandler } from './core/handler.ts'
@@ -26,6 +27,8 @@ import type { StorageConfig } from './core/storage.ts'
 import type { useStorage } from './core/storage.ts'
 import type { AnalyticsOptions } from './plugins/analytics.ts'
 import type { ScalarOptions } from './scalar.ts'
+import type { TaskDef, TaskEvent } from './core/task.ts'
+import type { AnySchema as TaskSchema, InferSchemaInput as TaskSchemaInput, InferSchemaOutput as TaskSchemaOutput } from './core/schema.ts'
 import type {
   ProcedureDef,
   ProcedureType,
@@ -121,6 +124,9 @@ export interface SilgiInstance<TBaseCtx extends Record<string, unknown>> {
   /** Define a subscription (SSE stream) */
   subscription: SubscriptionFactory<TBaseCtx>
 
+  /** Define a background task — type-safe payload with context, optional cron */
+  task: TaskFactory<TBaseCtx>
+
   /** Assemble router and compile pipelines */
   router: <T extends RouterDef>(def: T) => T
 
@@ -167,6 +173,32 @@ interface GuardFactory<TBaseCtx> {
   <TReturn extends Record<string, unknown> | void, TErrors extends ErrorDef>(
     config: GuardConfig<TBaseCtx, TReturn, TErrors>,
   ): GuardDef<TBaseCtx, TReturn, TErrors>
+}
+
+// ── Task Factory ────────────────────────────────────
+
+interface TaskFactory<TBaseCtx> {
+  /** Task without input: `task(resolve)` */
+  <TOutput>(
+    resolve: (event: TaskEvent<undefined, TBaseCtx>) => Promise<TOutput> | TOutput,
+  ): TaskDef<undefined, TOutput>
+
+  /** Task with config (cron, resolve): `task({ cron, resolve })` */
+  <TOutput>(
+    options: { cron?: string; name?: string; description?: string; resolve: (event: TaskEvent<undefined, TBaseCtx>) => Promise<TOutput> | TOutput },
+  ): TaskDef<undefined, TOutput>
+
+  /** Task with input schema: `task(schema, resolve)` */
+  <TSchema extends TaskSchema, TOutput>(
+    input: TSchema,
+    resolve: (event: TaskEvent<TaskSchemaOutput<TSchema>, TBaseCtx>) => Promise<TOutput> | TOutput,
+  ): TaskDef<TaskSchemaInput<TSchema>, TOutput>
+
+  /** Task with input schema + config: `task(schema, { cron, resolve })` */
+  <TSchema extends TaskSchema, TOutput>(
+    input: TSchema,
+    options: { cron?: string; name?: string; description?: string; resolve: (event: TaskEvent<TaskSchemaOutput<TSchema>, TBaseCtx>) => Promise<TOutput> | TOutput },
+  ): TaskDef<TaskSchemaInput<TSchema>, TOutput>
 }
 
 // ── Procedure Factories ──────────────────────────────
@@ -293,6 +325,8 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
 
     subscription: ((...args: unknown[]) => createProcedure('subscription', ...args)) as SubscriptionFactory<TBaseCtx>,
 
+    task: ((...args: unknown[]) => createTaskDef(() => contextFactory(new Request('http://localhost')), ...args)) as TaskFactory<TBaseCtx>,
+
     router: (def) => {
       const assigned = assignPaths(def)
       const flat = compileRouter(assigned)
@@ -338,7 +372,17 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
 
     serve: async (routerDef, options) => {
       const { createServeHandler } = await import('./core/serve.ts')
-      return createServeHandler(routerDef, contextFactory, hooks, options)
+      const server = await createServeHandler(routerDef, contextFactory, hooks, options)
+
+      // Auto-discover and start cron tasks from router
+      const { collectCronTasks, startCronJobs } = await import('./core/task.ts')
+      const cronTasks = collectCronTasks(routerDef)
+      if (cronTasks.length > 0) {
+        await startCronJobs(cronTasks)
+        console.log(`  ${cronTasks.length} cron task(s) scheduled`)
+      }
+
+      return server
     },
   }
 

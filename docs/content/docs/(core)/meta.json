@@ -21,6 +21,7 @@
     "client-plugins",
     "testing",
     "analytics",
+    "tasks",
     "---",
     "protocols",
     "---",

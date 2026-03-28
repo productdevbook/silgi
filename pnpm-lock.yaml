@@ -20,6 +20,9 @@ importers:
       cookie-es:
         specifier: ^3.1.1
         version: 3.1.1
+      croner:
+        specifier: ^10.0.1
+        version: 10.0.1
       crossws:
         specifier: ^0.4.4
         version: 0.4.4(srvx@0.11.13)
@@ -4686,6 +4689,10 @@ packages:
 
   crelt@1.0.6:
     resolution: {integrity: sha512-VQ2MBenTq1fWZUH9DJNGti7kKv6EeAuYr3cLwxUWhIu1baTaXh4Ib5W2CqHVqib4/MqbYGJqiL3Zb8GJZr3l4g==}
+
+  croner@10.0.1:
+    resolution: {integrity: sha512-ixNtAJndqh173VQ4KodSdJEI6nuioBWI0V1ITNKhZZsO0pEMoDxz539T4FTTbSZ/xIOSuDnzxLVRqBVSvPNE2g==}
+    engines: {node: '>=18.0'}
 
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
@@ -12712,6 +12719,8 @@ snapshots:
       typescript: 6.0.2
 
   crelt@1.0.6: {}
+
+  croner@10.0.1: {}
 
   cross-spawn@7.0.6:
     dependencies:
