@@ -57,7 +57,7 @@ Configure shutdown behavior:
 ```ts
 await s.serve(appRouter, {
   gracefulShutdown: {
-    timeout: 10_000,      // max ms to wait for in-flight requests
+    timeout: 10_000, // max ms to wait for in-flight requests
     forceTimeout: 15_000, // max ms before process.exit
   },
 })
@@ -73,9 +73,9 @@ The WebSocket adapter gains three new options:
 
 ```ts
 await attachWebSocket(server, appRouter, {
-  compress: true,         // per-message-deflate (or pass object for fine-tuning)
-  maxPayload: 1_048_576,  // 1 MB connection-level limit
-  keepalive: 30_000,      // ping/pong interval — dead peers are terminated
+  compress: true, // per-message-deflate (or pass object for fine-tuning)
+  maxPayload: 1_048_576, // 1 MB connection-level limit
+  keepalive: 30_000, // ping/pong interval — dead peers are terminated
 })
 ```
 

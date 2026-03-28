@@ -78,10 +78,11 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
   const defaultRetry = options.retry
   const defaultRetryDelay = options.retryDelay ?? 0
   // Resolve protocol — new `protocol` field takes precedence over deprecated booleans
-  const resolvedProtocol: 'json' | 'messagepack' | 'devalue' = options.protocol
-    ?? (options.binary ? 'messagepack' : undefined)
-    ?? (options.devalue ? 'devalue' : undefined)
-    ?? 'json'
+  const resolvedProtocol: 'json' | 'messagepack' | 'devalue' =
+    options.protocol ??
+    (options.binary ? 'messagepack' : undefined) ??
+    (options.devalue ? 'devalue' : undefined) ??
+    'json'
 
   return {
     async call(path, input, callOptions) {
