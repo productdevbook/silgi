@@ -11,7 +11,10 @@
  * ```
  */
 
+import { createTaskFromProcedure } from './core/task.ts'
+
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
+import type { TaskConfig, TaskDef, TaskEvent } from './core/task.ts'
 import type {
   ProcedureDef,
   ProcedureType,
@@ -36,7 +39,7 @@ export interface ProcedureBuilder<
 > {
   /** Add a guard — enriches context with guard return type */
   $use<TReturn extends Record<string, unknown> | void, TGErrors extends ErrorDef = {}>(
-    guard: GuardDef<TCtx, TReturn, TGErrors>,
+    guard: GuardDef<any, TReturn, TGErrors>,
   ): ProcedureBuilder<
     TType,
     TBaseCtx,
@@ -46,7 +49,7 @@ export interface ProcedureBuilder<
   >
 
   /** Add a wrap middleware — does not change context type */
-  $use(wrap: WrapDef<TCtx>): ProcedureBuilder<TType, TBaseCtx, TCtx, TInput, TErrors>
+  $use(wrap: WrapDef<any>): ProcedureBuilder<TType, TBaseCtx, TCtx, TInput, TErrors>
 
   /** Set input schema */
   $input<TSchema extends AnySchema>(
@@ -75,6 +78,14 @@ export interface ProcedureBuilder<
       ? (opts: ResolveContext<TCtx, TInput, TErrors>) => AsyncIterableIterator<TOutput>
       : (opts: ResolveContext<TCtx, TInput, TErrors>) => Promise<TOutput> | TOutput,
   ): ProcedureDef<TType, TInput, TOutput, TErrors>
+
+  /** Create a background task — guards, input, errors all apply */
+  $task<TOutput>(config: {
+    name: string
+    cron?: string
+    description?: string
+    resolve: (event: TaskEvent<TInput, TCtx>) => Promise<TOutput> | TOutput
+  }): TaskDef<TInput, TOutput>
 }
 
 /** Builder after .$output() — return type is constrained for autocomplete */
@@ -88,7 +99,7 @@ export interface ProcedureBuilderWithOutput<
 > {
   /** Add a guard — enriches context with guard return type */
   $use<TReturn extends Record<string, unknown> | void, TGErrors extends ErrorDef = {}>(
-    guard: GuardDef<TCtx, TReturn, TGErrors>,
+    guard: GuardDef<any, TReturn, TGErrors>,
   ): ProcedureBuilderWithOutput<
     TType,
     TBaseCtx,
@@ -99,7 +110,7 @@ export interface ProcedureBuilderWithOutput<
   >
 
   /** Add a wrap middleware — does not change context type */
-  $use(wrap: WrapDef<TCtx>): ProcedureBuilderWithOutput<TType, TBaseCtx, TCtx, TInput, TOutputResolved, TErrors>
+  $use(wrap: WrapDef<any>): ProcedureBuilderWithOutput<TType, TBaseCtx, TCtx, TInput, TOutputResolved, TErrors>
 
   /** Set typed errors */
   $errors<TNewErrors extends ErrorDef>(
@@ -118,17 +129,19 @@ export interface ProcedureBuilderWithOutput<
       ? (opts: ResolveContext<TCtx, TInput, TErrors>) => AsyncIterableIterator<TOutputResolved>
       : (opts: ResolveContext<TCtx, TInput, TErrors>) => Promise<TOutputResolved> | TOutputResolved,
   ): ProcedureDef<TType, TInput, TOutputResolved, TErrors>
+
+  /** Create a background task — guards, input, output, errors all apply */
+  $task(config: {
+    name: string
+    cron?: string
+    description?: string
+    resolve: (event: TaskEvent<TInput, TCtx>) => Promise<TOutputResolved> | TOutputResolved
+  }): TaskDef<TInput, TOutputResolved>
 }
 
 // ── Builder Implementation ──────────────────────────
-// Self-rewrite pattern for V8 optimization:
-// - ProcedureDef properties live directly on the instance
-// - $resolve() sets `resolve` and returns `this` as ProcedureDef
-// - Zero extra allocation: builder IS the final ProcedureDef
-// - ~2ns creation (vs 13ns class + new object, vs 1.7ns config literal)
 
 class ProcBuilder {
-  // ProcedureDef shape — same property names, same order
   type: ProcedureType
   input: AnySchema | null = null
   output: AnySchema | null = null
@@ -137,6 +150,9 @@ class ProcBuilder {
   resolve: Function | null = null
   route: Route | null = null
   meta: Meta | null = null
+
+  // Set by createProcedureBuilder when created via silgi instance
+  _contextFactory: (() => unknown | Promise<unknown>) | null = null
 
   constructor(type: ProcedureType) {
     this.type = type
@@ -177,16 +193,17 @@ class ProcBuilder {
     this.resolve = fn
     return this as unknown as ProcedureDef
   }
-}
 
-// Compile-time guard: ProcBuilder properties must match ProcedureDef shape.
-// If ProcedureDef gains a property that ProcBuilder lacks, this line will error.
-type _AssertShape = {
-  [K in keyof ProcedureDef]: K extends keyof ProcBuilder ? ProcBuilder[K] : never
+  $task(config: TaskConfig & { resolve: Function }): TaskDef {
+    return createTaskFromProcedure(config, config.resolve, this.input, this.use, this._contextFactory)
+  }
 }
 
 export function createProcedureBuilder<TType extends ProcedureType, TBaseCtx extends Record<string, unknown>>(
   type: TType,
+  contextFactory?: (() => unknown | Promise<unknown>) | null,
 ): ProcedureBuilder<TType, TBaseCtx> {
-  return new ProcBuilder(type) as unknown as ProcedureBuilder<TType, TBaseCtx>
+  const b = new ProcBuilder(type)
+  if (contextFactory) b._contextFactory = contextFactory
+  return b as unknown as ProcedureBuilder<TType, TBaseCtx>
 }

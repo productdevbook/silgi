@@ -1,21 +1,14 @@
 /**
- * Task API — type-safe background tasks with context, cron, and router mount.
+ * Task API — type-safe background tasks built on the procedure builder.
  *
- * @example
- * ```ts
- * const sendEmail = s.task(
- *   z.object({ userId: z.string() }),
- *   async ({ input, ctx }) => {
- *     const user = await ctx.db.users.get(input.userId)
- *     await mailer.send(user.email, 'Welcome')
- *   },
- * )
- * ```
+ * Tasks are procedures with dispatch + cron capabilities:
+ *   s.$use(auth).$input(schema).$task({ name: 'send-email', resolve })
  */
 
 import { validateSchema } from './schema.ts'
 
-import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './schema.ts'
+import type { MiddlewareDef } from '../types.ts'
+import type { AnySchema } from './schema.ts'
 
 // ── Types ────────────────────────────────────────────
 
@@ -33,52 +26,17 @@ export interface TaskDef<TInput = unknown, TOutput = unknown> {
   readonly input: AnySchema | null
   readonly output: null
   readonly errors: null
-  readonly use: null
+  readonly use: readonly MiddlewareDef[] | null
   readonly resolve: Function
   readonly route: { summary?: string; tags?: string[] } | null
   readonly meta: null
-  /** Internal: context factory for programmatic dispatch */
   readonly _contextFactory: (() => unknown | Promise<unknown>) | null
-  /** Type-safe dispatch — validates input, creates context, runs.
-   *  Pass `{ ctx }` from a procedure to auto-record a span on the parent request. */
   dispatch: undefined extends TInput
     ? (input?: TInput, options?: { ctx?: Record<string, unknown> }) => Promise<TOutput>
     : (input: TInput, options?: { ctx?: Record<string, unknown> }) => Promise<TOutput>
 }
 
-export interface TaskOptions<TCtx, TInput, TOutput> {
-  cron?: string
-  name?: string
-  description?: string
-  resolve: (event: TaskEvent<TInput, TCtx>) => Promise<TOutput> | TOutput
-}
-
-// ── defineTask (standalone, no context) ──────────────
-
-/** Define a standalone task with config */
-export function defineTask<TOutput>(options: {
-  name: string
-  cron?: string
-  description?: string
-  resolve: (event: TaskEvent<undefined, {}>) => Promise<TOutput> | TOutput
-}): TaskDef<undefined, TOutput>
-
-/** Define a standalone task with input schema + config */
-export function defineTask<TSchema extends AnySchema, TOutput>(
-  input: TSchema,
-  options: {
-    name: string
-    cron?: string
-    description?: string
-    resolve: (event: TaskEvent<InferSchemaOutput<TSchema>, {}>) => Promise<TOutput> | TOutput
-  },
-): TaskDef<InferSchemaInput<TSchema>, TOutput>
-
-export function defineTask(...args: any[]): TaskDef<any, any> {
-  return createTaskDef(null, ...args)
-}
-
-// ── createTaskDef (shared impl, ctx factory optional) ─
+// ── Analytics callback ───────────────────────────────
 
 export type TaskCompleteCallback = (entry: {
   taskName: string
@@ -94,67 +52,55 @@ export type TaskCompleteCallback = (entry: {
 
 let _onTaskComplete: TaskCompleteCallback | null = null
 
-/** Register a global callback for task completion — used by analytics plugin. */
 export function setTaskAnalytics(cb: TaskCompleteCallback | null): void {
   _onTaskComplete = cb
 }
 
-export function createTaskDef(
-  contextFactory: (() => unknown | Promise<unknown>) | null,
-  ...args: any[]
-): TaskDef<any, any> {
-  let inputSchema: AnySchema | null = null
-  let resolve: Function
-  let cron: string | null = null
-  let name = ''
-  let description: string | undefined
+// ── createTaskFromProcedure — called by builder.$task() ──
 
-  if (args.length === 1 && typeof args[0] === 'object') {
-    // task({ name, resolve })
-    if (!args[0].name) throw new TypeError('Task name is required')
-    resolve = args[0].resolve
-    cron = args[0].cron ?? null
-    name = args[0].name
-    description = args[0].description
-  } else if (args.length === 2 && typeof args[1] === 'object') {
-    // task(schema, { name, resolve })
-    if (!args[1].name) throw new TypeError('Task name is required')
-    inputSchema = args[0]
-    resolve = args[1].resolve
-    cron = args[1].cron ?? null
-    name = args[1].name
-    description = args[1].description
-  } else {
-    throw new TypeError('Invalid task arguments — use task({ name, resolve }) or task(schema, { name, resolve })')
-  }
+export interface TaskConfig {
+  name: string
+  cron?: string
+  description?: string
+}
+
+export function createTaskFromProcedure(
+  config: TaskConfig,
+  resolveFn: Function,
+  inputSchema: AnySchema | null,
+  use: readonly MiddlewareDef[] | null,
+  contextFactory: (() => unknown | Promise<unknown>) | null,
+): TaskDef<any, any> {
+  const { name, cron = null, description } = config
+
+  if (!name) throw new TypeError('Task name is required')
 
   // Handler resolve — called by Silgi pipeline (ctx comes from pipeline)
   const taskResolve = async (opts: any) => {
-    return resolve({ input: opts.input, ctx: opts.ctx, name, scheduledTime: undefined })
+    return resolveFn({ input: opts.input, ctx: opts.ctx, name, scheduledTime: undefined })
   }
 
-  // Programmatic dispatch — creates ctx from factory, injects trace, tracks analytics
+  // Programmatic dispatch
   const dispatch = async (rawInput?: unknown, opts?: { ctx?: Record<string, unknown> }) => {
     const input = inputSchema ? await validateSchema(inputSchema, rawInput) : rawInput
-    const ctx = contextFactory ? await (contextFactory as Function)() : {}
+    const ctx: any = contextFactory ? await (contextFactory as Function)() : {}
 
-    // If parent ctx passed, record a span on the parent request's trace
+    // If parent ctx passed, record span on parent request trace
     const parentTrace = (opts?.ctx as any)?.__analyticsTrace
     const spanStart = parentTrace ? performance.now() : 0
 
-    // Inject RequestTrace so trace() calls inside the task produce spans
+    // Inject RequestTrace for trace() calls inside the task
     let reqTrace: any = null
     try {
       const { RequestTrace } = await import('../plugins/analytics.ts')
       reqTrace = new RequestTrace()
-      ;(ctx as any).__analyticsTrace = reqTrace
+      ctx.__analyticsTrace = reqTrace
     } catch {}
 
     const t0 = performance.now()
     try {
-      const output = await resolve({ input, ctx, name, scheduledTime: undefined })
+      const output = await resolveFn({ input, ctx, name, scheduledTime: undefined })
 
-      // Add span to parent request trace
       if (parentTrace) {
         parentTrace.spans.push({
           name: `task:${name}`,
@@ -179,7 +125,6 @@ export function createTaskDef(
       }
       return output
     } catch (err) {
-      // Add error span to parent request trace
       if (parentTrace) {
         parentTrace.spans.push({
           name: `task:${name}`,
@@ -214,14 +159,13 @@ export function createTaskDef(
     input: inputSchema,
     output: null,
     errors: null,
-    use: null,
+    use,
     resolve: taskResolve,
     route: description ? { summary: description, tags: ['Tasks'] } : null,
     meta: null,
     _contextFactory: contextFactory,
-    __cronName: name,
     dispatch: dispatch as any,
-  } as any
+  }
 }
 
 // ── runTask ──────────────────────────────────────────
@@ -276,7 +220,7 @@ export async function startCronJobs(cronTasks: Array<{ cron: string; task: TaskD
   if (cronTasks.length === 0) return
   const { Cron } = await import('croner')
   for (const { cron, task } of cronTasks) {
-    const taskName = (task as any).__cronName || cron
+    const taskName = (task as any).route?.summary || cron
     const entry: CronJobEntry = {
       name: taskName,
       cron,
@@ -286,7 +230,6 @@ export async function startCronJobs(cronTasks: Array<{ cron: string; task: TaskD
       runs: 0,
       errors: 0,
     }
-
     const job = new Cron(cron, async () => {
       entry.lastRun = Date.now()
       entry.runs++

@@ -1,19 +1,13 @@
 ---
 title: Tasks
-description: Run background work with type-safe input and automatic scheduling.
+description: Run background work with guards, type-safe input, and automatic scheduling.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
 
 A task is a piece of work that runs in the background. Send an email, generate a report, clean up old data — anything you don't want blocking your API response.
 
-Silgi tasks give you:
-
-- **Type-safe input** — same Zod validation as procedures
-- **Context access** — `ctx.db`, `ctx.mailer`, everything from your silgi instance
-- **Router mount** — tasks become HTTP endpoints, callable from webhooks or dashboards
-- **Analytics** — every dispatch is tracked with duration, status, and trace spans
-- **Cron scheduling** — auto-discovered by `serve()`, no extra config
+Tasks use the same builder chain as procedures — `$use`, `$input`, `$errors` all work. The only difference: `$task()` instead of `$resolve()`.
 
 <Callout>
   Tasks handle define, dispatch, and schedule. For queues, retries, and orchestration, pair with
@@ -22,44 +16,38 @@ Silgi tasks give you:
 
 ## Defining a task
 
-Every task needs a `name` and a `resolve` function:
+Use the builder chain, ending with `$task()`:
 
 ```ts title="server/tasks.ts"
-const sendEmail = s.task(z.object({ to: z.string().email(), subject: z.string() }), {
-  name: 'send-email',
-  resolve: async ({ input, ctx }) => {
-    await ctx.mailer.send(input.to, input.subject)
-    return { sent: true }
-  },
-})
+const sendEmail = s
+  .$use(auth)
+  .$input(z.object({ to: z.string().email(), subject: z.string() }))
+  .$task({
+    name: 'send-email',
+    resolve: async ({ input, ctx }) => {
+      await ctx.mailer.send(input.to, input.subject)
+      return { sent: true }
+    },
+  })
 ```
 
-`name` is required — it identifies the task in the analytics dashboard and logs.
+Everything before `$task()` works the same as procedures:
 
-`ctx` is the same context from your `silgi()` setup — database, services, everything is there.
+- `$use(guard)` — adds guards, enriches `ctx`
+- `$input(schema)` — validates input
+- `$errors({ ... })` — typed error codes
+- `$route({ ... })` — OpenAPI metadata
 
-A task without input:
+A task without input or guards:
 
 ```ts
-const prune = s.task({
+const prune = s.$task({
   name: 'prune-logs',
   resolve: async ({ ctx }) => {
     const count = await ctx.db.logs.deleteOlderThan('30d')
     return { deleted: count }
   },
 })
-```
-
-With input schema:
-
-```ts
-const sendEmail = s.task(
-  z.object({ to: z.string(), subject: z.string() }),
-  {
-    name: 'send-email',
-    resolve: async ({ input, ctx }) => { ... },
-  },
-)
 ```
 
 ## Dispatching
@@ -72,20 +60,19 @@ await sendEmail.dispatch({ to: 'alice@example.com', subject: 'Welcome' })
 
 ### From a procedure — pass `{ ctx }` for tracing
 
-When you dispatch a task from inside a procedure, pass `{ ctx }` as the second argument. This automatically records a span on the parent request's trace timeline:
+When you dispatch a task from inside a procedure, pass `{ ctx }`. This automatically adds a span to the parent request's trace timeline:
 
 ```ts
 const createUser = s.$input(z.object({ name: z.string(), email: z.string() })).$resolve(async ({ input, ctx }) => {
   const user = await ctx.db.users.create(input)
 
-  // { ctx } → span appears in parent request's analytics timeline
   sendEmail.dispatch({ to: input.email, subject: 'Welcome' }, { ctx })
 
   return user
 })
 ```
 
-In the analytics dashboard, the request detail for `/users/create` will show:
+The analytics dashboard shows the task as a `queue` span on the request detail:
 
 ```
 users/create — 2 spans, 4.2ms total
@@ -93,44 +80,30 @@ users/create — 2 spans, 4.2ms total
 └─ task:send-email     (queue)  92.3ms
 ```
 
-The `task:send-email` span is added automatically — no `trace()` wrapper needed.
-
 <Callout>
   `{ctx}` is optional. Without it, the task still runs and tracks analytics, but no span appears on the parent request.
-  Use it when you want to see which tasks a request triggered.
 </Callout>
-
-### Standalone dispatch
-
-Without `{ ctx }`, the task runs independently. This is how cron, scripts, and standalone calls work:
-
-```ts
-// No parent request — no span, but task analytics still recorded
-await sendEmail.dispatch({ to: 'alice@example.com', subject: 'Reminder' })
-```
 
 ## Mounting on router
 
-Tasks mount directly on the router — no wrapper needed:
+Tasks mount directly — guards run when called via HTTP:
 
 ```ts title="server/router.ts"
 const router = s.router({
   users: { create: createUser },
   tasks: {
-    sendEmail,
-    prune,
+    sendEmail, // POST /tasks/sendEmail — auth guard runs
+    prune, // POST /tasks/prune — no guard
   },
 })
 ```
-
-Now `POST /tasks/sendEmail` with JSON body runs the task through the full Silgi pipeline — guards, validation, context.
 
 ## Cron scheduling
 
 Add `cron` to run a task on a schedule:
 
 ```ts
-const dailyReport = s.task({
+const dailyReport = s.$task({
   name: 'daily-report',
   cron: '0 9 * * *',
   description: 'Generate daily sales report',
@@ -143,19 +116,11 @@ const dailyReport = s.task({
 Put it in the router and call `serve()` — cron starts automatically:
 
 ```ts
-const router = s.router({
-  tasks: { dailyReport },
-})
-
+const router = s.router({ tasks: { dailyReport } })
 await s.serve(router)
-// Console: "1 cron task(s) scheduled"
 ```
 
-No extra config. Silgi walks your router, finds tasks with `cron`, and schedules them.
-
-<Callout type='warn'>Cron tasks run without input — don't use a schema with them.</Callout>
-
-Common cron patterns:
+<Callout type='warn'>Cron tasks run without input — don't use `$input()` with them.</Callout>
 
 | Pattern        | Meaning                  |
 | -------------- | ------------------------ |
@@ -163,22 +128,18 @@ Common cron patterns:
 | `0 */6 * * *`  | Every 6 hours            |
 | `*/10 * * * *` | Every 10 minutes         |
 | `0 0 * * 0`    | Every Sunday at midnight |
-| `0 0 1 * *`    | First day of every month |
 
-## Analytics dashboard
+## Analytics
 
-Every task dispatch is tracked automatically in the [analytics dashboard](/docs/analytics):
+Every dispatch is tracked in the [analytics dashboard](/docs/analytics):
 
-- **Task list** — runs, errors, average duration per task
-- **Scheduled tasks** — cron expression, next run, last run, run count
-- **Execution history** — click any row for full detail: input, output, error, duration
-- **Trace spans** — `trace()` calls inside tasks produce spans, visible in the detail timeline
-
-When a task is dispatched with `{ ctx }`, the parent request's detail page also shows the task as a `queue` span.
+- **Task list** — runs, errors, avg duration
+- **Scheduled tasks** — cron expression, next/last run
+- **Execution detail** — click for input, output, error, trace spans
 
 ## Prevent duplicate runs
 
-`runTask()` ensures only one instance runs at a time. If you call it twice, the second call gets the same result:
+`runTask()` ensures one instance at a time:
 
 ```ts
 import { runTask } from 'silgi'
@@ -186,35 +147,3 @@ import { runTask } from 'silgi'
 const [a, b] = await Promise.all([runTask(prune), runTask(prune)])
 // Runs once — a === b
 ```
-
-## Standalone tasks
-
-Define tasks without a silgi instance using `defineTask`. These don't have context access:
-
-```ts
-import { defineTask } from 'silgi'
-
-const processFile = defineTask(z.object({ path: z.string() }), {
-  name: 'process-file',
-  resolve: async ({ input }) => {
-    return { processed: true }
-  },
-})
-
-await processFile.dispatch({ path: '/uploads/data.csv' })
-```
-
-Use `s.task()` when you need `ctx`. Use `defineTask()` for self-contained utilities.
-
-## What tasks don't do
-
-Tasks are intentionally simple. Here's what to use for more:
-
-| Need                    | Use                                                                          |
-| ----------------------- | ---------------------------------------------------------------------------- |
-| Retry on failure        | [BullMQ](https://bullmq.io/) or [pg-boss](https://github.com/timgit/pg-boss) |
-| Job queue with priority | [BullMQ](https://bullmq.io/) or [Hatchet](https://hatchet.run/)              |
-| Multi-step workflows    | [Trigger.dev](https://trigger.dev/) or [Inngest](https://inngest.com/)       |
-| Durable execution       | [Temporal](https://temporal.io/)                                             |
-
-Silgi tasks pair well with all of these — define your task logic in Silgi, dispatch it through whatever queue you need.

@@ -17,20 +17,14 @@ import { createCaller } from './caller.ts'
 import { compileRouter } from './compile.ts'
 import { createFetchHandler } from './core/handler.ts'
 import { assignPaths, routerCache } from './core/router-utils.ts'
-import { defineTask, createTaskDef } from './core/task.ts'
+import { createTaskFromProcedure } from './core/task.ts'
 
 import type { ProcedureBuilder } from './builder.ts'
 import type { FetchHandler } from './core/handler.ts'
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
-import type {
-  AnySchema as TaskSchema,
-  InferSchemaInput as TaskSchemaInput,
-  InferSchemaOutput as TaskSchemaOutput,
-} from './core/schema.ts'
 import type { ServeOptions, SilgiServer } from './core/serve.ts'
 import type { StorageConfig } from './core/storage.ts'
 import type { useStorage } from './core/storage.ts'
-import type { TaskDef, TaskEvent } from './core/task.ts'
 import type { AnalyticsOptions } from './plugins/analytics.ts'
 import type { ScalarOptions } from './scalar.ts'
 import type {
@@ -128,8 +122,8 @@ export interface SilgiInstance<TBaseCtx extends Record<string, unknown>> {
   /** Define a subscription (SSE stream) */
   subscription: SubscriptionFactory<TBaseCtx>
 
-  /** Define a background task — type-safe payload with context, optional cron */
-  task: TaskFactory<TBaseCtx>
+  /** Start a builder — create a background task */
+  $task: ProcedureBuilder<'query', TBaseCtx>['$task']
 
   /** Assemble router and compile pipelines */
   router: <T extends RouterDef>(def: T) => T
@@ -177,29 +171,6 @@ interface GuardFactory<TBaseCtx> {
   <TReturn extends Record<string, unknown> | void, TErrors extends ErrorDef>(
     config: GuardConfig<TBaseCtx, TReturn, TErrors>,
   ): GuardDef<TBaseCtx, TReturn, TErrors>
-}
-
-// ── Task Factory ────────────────────────────────────
-
-interface TaskFactory<TBaseCtx> {
-  /** Task with config: `task({ name, resolve })` */
-  <TOutput>(options: {
-    name: string
-    cron?: string
-    description?: string
-    resolve: (event: TaskEvent<undefined, TBaseCtx>) => Promise<TOutput> | TOutput
-  }): TaskDef<undefined, TOutput>
-
-  /** Task with input schema + config: `task(schema, { name, resolve })` */
-  <TSchema extends TaskSchema, TOutput>(
-    input: TSchema,
-    options: {
-      name: string
-      cron?: string
-      description?: string
-      resolve: (event: TaskEvent<TaskSchemaOutput<TSchema>, TBaseCtx>) => Promise<TOutput> | TOutput
-    },
-  ): TaskDef<TaskSchemaInput<TSchema>, TOutput>
 }
 
 // ── Procedure Factories ──────────────────────────────
@@ -297,6 +268,8 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
       })
   }
 
+  const ctxFactory = () => contextFactory(new Request('http://localhost'))
+
   const instance: SilgiInstance<TBaseCtx> = {
     hook: hooks.hook.bind(hooks),
     removeHook: hooks.removeHook.bind(hooks),
@@ -313,21 +286,24 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
     wrap: (fn) => ({ kind: 'wrap' as const, fn }),
 
     $resolve: ((fn: any) => createProcedure('query', fn)) as any,
-    $input: ((schema: any) => createProcedureBuilder('query').$input(schema)) as any,
+    $input: ((schema: any) => createProcedureBuilder('query', ctxFactory).$input(schema)) as any,
     $use: ((...middleware: any[]) => {
-      const b = createProcedureBuilder('query') as any
+      const b = createProcedureBuilder('query', ctxFactory) as any
       for (const m of middleware) b.$use(m)
       return b
     }) as any,
-    $output: ((schema: any) => createProcedureBuilder('query').$output(schema)) as any,
-    $errors: ((errors: any) => createProcedureBuilder('query').$errors(errors)) as any,
-    $route: ((route: any) => createProcedureBuilder('query').$route(route)) as any,
-    $meta: ((meta: any) => createProcedureBuilder('query').$meta(meta)) as any,
+    $output: ((schema: any) => createProcedureBuilder('query', ctxFactory).$output(schema)) as any,
+    $errors: ((errors: any) => createProcedureBuilder('query', ctxFactory).$errors(errors)) as any,
+    $route: ((route: any) => createProcedureBuilder('query', ctxFactory).$route(route)) as any,
+    $meta: ((meta: any) => createProcedureBuilder('query', ctxFactory).$meta(meta)) as any,
 
     subscription: ((...args: unknown[]) => createProcedure('subscription', ...args)) as SubscriptionFactory<TBaseCtx>,
 
-    task: ((...args: unknown[]) =>
-      createTaskDef(() => contextFactory(new Request('http://localhost')), ...args)) as TaskFactory<TBaseCtx>,
+    $task: ((config: any) => {
+      return createTaskFromProcedure(config, config.resolve, null, null, () =>
+        contextFactory(new Request('http://localhost')),
+      )
+    }) as any,
 
     router: (def) => {
       const assigned = assignPaths(def)

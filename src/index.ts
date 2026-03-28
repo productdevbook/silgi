@@ -99,7 +99,6 @@ export type { StorageConfig, Storage, StorageValue, Driver } from './core/storag
 
 // ── Tasks ──────────────────────────────────────────
 export {
-  defineTask,
   runTask,
   collectCronTasks,
   startCronJobs,
