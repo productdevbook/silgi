@@ -428,11 +428,11 @@ const cleanupOldData = s.task(async ({ ctx }) => {
   return { checked: before, deleted: 0 }
 })
 
-// 3. Task with cron — daily stats snapshot
-const dailyStats = s.task({
-  cron: '0 0 * * *',
-  name: 'daily-stats',
-  description: 'Snapshot daily statistics',
+// 3. Task with cron — stats snapshot every 30s (use '0 0 * * *' in production)
+const statsSnapshot = s.task({
+  cron: '*/30 * * * * *',
+  name: 'stats-snapshot',
+  description: 'Snapshot statistics',
   resolve: async ({ ctx }) => {
     const stats = {
       users: ctx.db.users.length,
@@ -440,12 +440,22 @@ const dailyStats = s.task({
       published: ctx.db.posts.filter((p) => p.published).length,
       timestamp: new Date().toISOString(),
     }
-    console.log(`    [task:cron] Daily stats: ${JSON.stringify(stats)}`)
+    console.log(`    [task:cron] Stats snapshot: ${JSON.stringify(stats)}`)
     return stats
   },
 })
 
-// 4. Task dispatched from procedure — fire and forget
+// 4. Heartbeat — every 10s, visible in dashboard
+const heartbeat = s.task({
+  cron: '*/10 * * * * *',
+  name: 'heartbeat',
+  description: 'Periodic health ping',
+  resolve: async () => {
+    return { alive: true, time: Date.now() }
+  },
+})
+
+// 5. Task dispatched from procedure — fire and forget
 const createUserWithEmail = s
   .$use(auth, timing)
   .$input(z.object({ name: z.string(), email: z.string().email() }))
@@ -505,7 +515,8 @@ const appRouter = s.router({
   tasks: {
     sendWelcomeEmail,
     cleanupOldData,
-    dailyStats,
+    statsSnapshot,
+    heartbeat,
   },
 })
 
@@ -560,7 +571,8 @@ console.log('║                                              ║')
 console.log('║  TASKS (POST, background work)               ║')
 console.log('║    /tasks/sendWelcomeEmail Send email         ║')
 console.log('║    /tasks/cleanupOldData   Cleanup task       ║')
-console.log('║    /tasks/dailyStats       Stats (cron daily) ║')
+console.log('║    /tasks/statsSnapshot    Cron: every 30s    ║')
+console.log('║    /tasks/heartbeat        Cron: every 10s    ║')
 console.log('║                                              ║')
 console.log('║  SUBSCRIPTIONS (SSE)                         ║')
 console.log('║    /stream/ticks        5-tick stream         ║')
