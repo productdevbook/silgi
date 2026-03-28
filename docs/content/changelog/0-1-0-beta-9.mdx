@@ -1,0 +1,95 @@
+---
+title: 0.1.0-beta.9
+description: 47% fewer type instantiations, type-safe guard context, typecheck benchmarks vs oRPC and tRPC.
+version: 0.1.0-beta.9
+date: 2026-03-28
+---
+
+## Type-safe guard context
+
+`$use()` now threads guard return types into the resolver context. Previously, guard-added properties were invisible to TypeScript inside `$resolve()` — you had to cast. Now they're fully inferred.
+
+```ts
+const auth = k.guard(() => ({ user: { id: 1, role: 'admin' } }))
+
+k.$use(auth).$resolve(({ ctx }) => {
+  ctx.user.role // ✅ typed as string — no cast needed
+  ctx.db         // ✅ base context still available
+  return { ok: true }
+})
+```
+
+Guards that return `void` (pure validators) don't pollute context — intersecting with `{}` is a no-op. Wrap middleware also doesn't change context type:
+
+```ts
+const timing = k.wrap(async (ctx, next) => next())
+const rateLimit = k.guard(() => {}) // returns void → no ctx change
+
+k.$use(auth)
+  .$use(timing)      // ctx unchanged
+  .$use(rateLimit)    // ctx unchanged
+  .$resolve(({ ctx }) => {
+    ctx.user // ✅ still typed from auth guard
+  })
+```
+
+Guard errors are also accumulated — `fail()` sees error codes from all guards in the chain plus procedure-level errors.
+
+## 47% fewer type instantiations
+
+Three targeted optimizations based on studying the [TypeScript Go compiler](https://github.com/microsoft/typescript-go) source code:
+
+- **`serve.ts`**: Removed `as import('node:http').Server` inline cast that triggered full `http.Server` variance resolution (42ms hot spot → eliminated)
+- **`analytics.ts`**: Extracted `jsonResponse()` helper so `JSON.stringify` overload resolution happens once with `unknown` instead of per-specific-type
+- **`pinia-colada/types.ts`**: Replaced `SetOptional<UseQueryOptions, 'key' | 'query'>` (`Omit & Partial<Pick>` = 3 mapped types) with `Partial<UseQueryOptions>` (single mapped type)
+
+| Metric | Before | After | Change |
+| ------ | ------ | ----- | ------ |
+| Types | 29,595 | 25,592 | **-14%** |
+| Instantiations | 53,766 | 29,337 | **-47%** |
+| Check time (tsgo) | 28ms | 24ms | -14% |
+
+## InferClient optimizations
+
+- **`createClient`**: Return type was `InferClient<T> extends never ? T : InferClient<T>` — forcing the compiler to walk the entire router tree twice. Now returns `InferClient<T>` directly (single evaluation).
+- **`InferClient`**: Extracted `ProcedureResult<TType, TOutput>` to deduplicate the `undefined extends TInput` check that was evaluated in both subscription and query branches.
+
+## Typecheck benchmarks — Silgi vs oRPC vs tRPC
+
+New benchmark suite generates **500 routers × 6 procedures = 3,000 procedures** plus 500 consumer files, then measures `tsc --noEmit`. Uses Standard Schema instead of Zod to isolate framework type overhead.
+
+| Framework | Instantiations | Check time | Total time | Memory |
+| --------- | -------------- | ---------- | ---------- | ------ |
+| Silgi     | **385,509**    | **0.91s**  | **1.36s**  | 413 MB |
+| oRPC      | 896,796        | 1.05s      | 1.34s      | 475 MB |
+| tRPC      | 1,260,273      | 1.88s      | 2.15s      | 541 MB |
+
+Silgi produces **2.3× fewer instantiations** than oRPC and **3.3× fewer** than tRPC. See updated [Benchmarks](/docs/comparison) page.
+
+```bash
+# Run yourself
+cd bench/typecheck-silgi && npm run bench
+cd bench/typecheck-orpc  && npm run bench
+cd bench/typecheck-trpc  && npm run bench
+```
+
+## @arktype/attest type regression tracking
+
+New per-expression instantiation benchmarks using [@arktype/attest](https://github.com/arktypeio/arktype/tree/main/ark/attest). Run with `pnpm bench:types`:
+
+```
+colada: QueryOptionsIn (with input)   37 instantiations
+colada: MutationOptionsIn             38 instantiations
+tanstack: QueryUtils<MediumClient>    52 instantiations
+core: InferClient medium              33 instantiations
+```
+
+## ProcBuilder structural safety
+
+Added a compile-time guard ensuring the runtime `ProcBuilder` class and the `ProcedureDef` interface stay in sync. If a property is added to one but not the other, the build fails:
+
+```ts
+type _AssertShape = {
+  [K in keyof ProcedureDef]: K extends keyof ProcBuilder ? ProcBuilder[K] : never
+}
+```
