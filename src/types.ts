@@ -154,16 +154,16 @@ export type RouterDef = {
   [key: string]: ProcedureDef<any, any, any, any> | RouterDef
 }
 
+/** Return type wrapper — subscription yields, query/mutation returns Promise */
+type ProcedureResult<TType extends ProcedureType, TOutput> =
+  TType extends 'subscription' ? AsyncIterableIterator<TOutput> : Promise<TOutput>
+
 /** Infer client type from router */
 export type InferClient<T> =
   T extends ProcedureDef<infer TType, infer TInput, infer TOutput>
-    ? TType extends 'subscription'
-      ? undefined extends TInput
-        ? () => AsyncIterableIterator<TOutput>
-        : (input: TInput) => AsyncIterableIterator<TOutput>
-      : undefined extends TInput
-        ? () => Promise<TOutput>
-        : (input: TInput) => Promise<TOutput>
+    ? undefined extends TInput
+      ? () => ProcedureResult<TType, TOutput>
+      : (input: TInput) => ProcedureResult<TType, TOutput>
     : T extends Record<string, unknown>
       ? { [K in keyof T]: InferClient<T[K]> }
       : never

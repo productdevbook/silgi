@@ -89,11 +89,11 @@ Measures `tsc --noEmit` wall-clock time on a project with **500 routers × 6 pro
 
 | Framework | Instantiations | Check time | Total time | Memory |
 | --------- | -------------- | ---------- | ---------- | ------ |
-| Silgi     | **254,449**    | **0.77s**  | **1.19s**  | 369 MB |
+| Silgi     | **384,776**    | **0.88s**  | **1.34s**  | 411 MB |
 | oRPC      | 896,796        | 1.09s      | 1.38s      | 475 MB |
 | tRPC      | 1,260,273      | 1.96s      | 2.22s      | 543 MB |
 
-Silgi produces **3.5× fewer type instantiations** than oRPC and **5× fewer** than tRPC. In practice this means faster editor responsiveness and shorter CI type-check runs as your router grows.
+Silgi produces **2.3× fewer type instantiations** than oRPC and **3.3× fewer** than tRPC. In practice this means faster editor responsiveness and shorter CI type-check runs as your router grows.
 
 <Callout>
 Run the typecheck benchmark yourself:

@@ -7,6 +7,8 @@
 import type { InferClient } from '../types.ts'
 import type { ClientLink, ClientContext, ClientOptions } from './types.ts'
 
+type ResolveClient<T> = InferClient<T> extends never ? T : InferClient<T>
+
 /**
  * Create a type-safe client from a link.
  *
@@ -21,7 +23,7 @@ import type { ClientLink, ClientContext, ClientOptions } from './types.ts'
  */
 export function createClient<T, TClientContext extends ClientContext = Record<never, never>>(
   link: ClientLink<TClientContext>,
-): InferClient<T> extends never ? T : InferClient<T> {
+): ResolveClient<T> {
   return createClientProxy(link, []) as any
 }
 
