@@ -1,3 +1,4 @@
+import { SpanWaterfall } from '@/components/span-waterfall'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useCopy } from '@/hooks'
@@ -39,6 +40,7 @@ export function TaskDetailPage({ taskExecutions, id, navigate }: TaskDetailPageP
         <Badge variant={entry.status === 'success' ? 'default' : 'destructive'}>{entry.status}</Badge>
         <Badge variant='outline'>{entry.trigger}</Badge>
         <Badge variant='secondary'>{fmtMs(entry.durationMs)}</Badge>
+        {entry.spans?.length > 0 && <Badge variant='secondary'>{entry.spans.length} spans</Badge>}
         <span className='text-[11px] text-muted-foreground'>{fmtTime(entry.timestamp)}</span>
         <span className='text-[11px] text-muted-foreground'>({fmtRelativeTime(entry.timestamp)})</span>
         <div className='ml-auto'>
@@ -57,6 +59,13 @@ export function TaskDetailPage({ taskExecutions, id, navigate }: TaskDetailPageP
       <div className='grid flex-1 overflow-hidden xl:grid-cols-[1.2fr_0.8fr]'>
         {/* Left: data */}
         <div className='min-w-0 xl:border-r'>
+          {/* Span timeline */}
+          {entry.spans?.length > 0 && (
+            <Section label={`Span timeline — ${entry.spans.length} spans, ${fmtMs(entry.durationMs)} total`}>
+              <SpanWaterfall spans={entry.spans} totalMs={entry.durationMs} />
+            </Section>
+          )}
+
           {/* Input */}
           <Section label='Input'>
             {entry.input !== undefined && entry.input !== null ? (

@@ -136,6 +136,7 @@ export function Tasks({ data, taskExecutions, scheduledTasks, navigate }: TasksP
                   <th className='px-3 py-2 font-medium'>Task</th>
                   <th className='px-3 py-2 font-medium'>Trigger</th>
                   <th className='px-3 py-2 font-medium'>Status</th>
+                  <th className='px-3 py-2 font-medium text-right'>Spans</th>
                   <th className='px-3 py-2 font-medium text-right'>Duration</th>
                   <th className='px-3 py-2 font-medium text-right'>Time</th>
                 </tr>
@@ -155,6 +156,9 @@ export function Tasks({ data, taskExecutions, scheduledTasks, navigate }: TasksP
                       <Badge variant={t.status === 'success' ? 'default' : 'destructive'} className='text-[10px]'>
                         {t.status}
                       </Badge>
+                    </td>
+                    <td className='px-3 py-2 text-right font-mono tabular-nums text-muted-foreground'>
+                      {t.spans?.length || 0}
                     </td>
                     <td className='px-3 py-2 text-right font-mono tabular-nums text-muted-foreground'>
                       {fmtMs(t.durationMs)}

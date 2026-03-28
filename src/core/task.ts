@@ -90,6 +90,7 @@ export type TaskCompleteCallback = (entry: {
   error?: string
   input?: unknown
   output?: unknown
+  spans?: unknown[]
 }) => void
 
 let _onTaskComplete: TaskCompleteCallback | null = null
@@ -131,20 +132,29 @@ export function createTaskDef(contextFactory: (() => unknown | Promise<unknown>)
     return resolve({ input: opts.input, ctx: opts.ctx, name, scheduledTime: undefined })
   }
 
-  // Programmatic dispatch — creates ctx from factory, tracks analytics
+  // Programmatic dispatch — creates ctx from factory, injects trace, tracks analytics
   const dispatch = async (rawInput?: unknown) => {
     const input = inputSchema ? await validateSchema(inputSchema, rawInput) : rawInput
-    const ctx = contextFactory ? await contextFactory() : {}
+    const ctx = contextFactory ? await (contextFactory as Function)() : {}
+
+    // Inject RequestTrace so trace() calls inside the task produce spans
+    let reqTrace: any = null
+    try {
+      const { RequestTrace } = await import('../plugins/analytics.ts')
+      reqTrace = new RequestTrace()
+      ;(ctx as any).__analyticsTrace = reqTrace
+    } catch {}
+
     const t0 = performance.now()
     try {
       const output = await resolve({ input, ctx, name, scheduledTime: undefined })
       if (_onTaskComplete) {
-        _onTaskComplete({ taskName: name, trigger: 'dispatch', timestamp: Date.now(), durationMs: Math.round((performance.now() - t0) * 100) / 100, status: 'success', input, output })
+        _onTaskComplete({ taskName: name, trigger: 'dispatch', timestamp: Date.now(), durationMs: Math.round((performance.now() - t0) * 100) / 100, status: 'success', input, output, spans: reqTrace?.spans })
       }
       return output
     } catch (err) {
       if (_onTaskComplete) {
-        _onTaskComplete({ taskName: name, trigger: 'dispatch', timestamp: Date.now(), durationMs: Math.round((performance.now() - t0) * 100) / 100, status: 'error', error: err instanceof Error ? err.message : String(err), input })
+        _onTaskComplete({ taskName: name, trigger: 'dispatch', timestamp: Date.now(), durationMs: Math.round((performance.now() - t0) * 100) / 100, status: 'error', error: err instanceof Error ? err.message : String(err), input, spans: reqTrace?.spans })
       }
       throw err
     }

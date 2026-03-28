@@ -76,6 +76,7 @@ export interface TaskExecution {
   error?: string
   input?: unknown
   output?: unknown
+  spans: TraceSpan[]
 }
 
 export interface TaskSnapshot {

@@ -408,14 +408,21 @@ const adminRouter = implement(adminContract, {
 
 // ── Tasks ───────────────────────────────────────────
 
-// 1. Task with input — send welcome email
+// 1. Task with input + trace() spans — send welcome email
 const sendWelcomeEmail = s.task(
   z.object({ userId: z.number(), email: z.string().email() }),
   async ({ input, ctx }) => {
-    const user = ctx.db.users.find((u) => u.id === input.userId)
-    console.log(`    [task] Sending welcome email to ${input.email} (user: ${user?.name ?? 'unknown'})`)
-    // Simulate email sending delay
-    await new Promise((r) => setTimeout(r, 100))
+    // trace() inside tasks automatically produces spans visible in dashboard
+    const user = await trace(ctx, 'db.users.findById', async () => {
+      await new Promise((r) => setTimeout(r, 10))
+      return ctx.db.users.find((u) => u.id === input.userId)
+    }, { kind: 'db', detail: `SELECT * FROM users WHERE id = ${input.userId}` })
+
+    await trace(ctx, 'email.send', async () => {
+      await new Promise((r) => setTimeout(r, 80))
+      console.log(`    [task] Sent welcome email to ${input.email} (user: ${user?.name ?? 'unknown'})`)
+    }, { kind: 'email', detail: `to: ${input.email}` })
+
     return { sent: true, to: input.email }
   },
 )

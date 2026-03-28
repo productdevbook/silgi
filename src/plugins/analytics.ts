@@ -151,6 +151,7 @@ export interface TaskExecution {
   error?: string
   input?: unknown
   output?: unknown
+  spans: TraceSpan[]
 }
 
 export interface AnalyticsOptions {
@@ -1067,7 +1068,7 @@ export function wrapWithAnalytics(handler: FetchHandler, options: AnalyticsOptio
 
   // Wire task analytics
   import('../core/task.ts').then(({ setTaskAnalytics }) => {
-    setTaskAnalytics((entry) => collector.recordTask(entry))
+    setTaskAnalytics((entry) => collector.recordTask({ ...entry, spans: (entry.spans ?? []) as TraceSpan[] }))
   })
 
   return async (request: Request): Promise<Response> => {

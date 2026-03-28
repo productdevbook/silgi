@@ -212,9 +212,11 @@ describe('task context', () => {
     expect(result).toBe('user:123 secret:abc')
   })
 
-  it('standalone defineTask gets empty context', async () => {
+  it('standalone defineTask gets minimal context', async () => {
     const task = defineTask(async ({ ctx }) => {
-      return Object.keys(ctx)
+      // Standalone tasks get empty ctx (plus __analyticsTrace if analytics loaded)
+      const keys = Object.keys(ctx).filter((k) => !k.startsWith('__'))
+      return keys
     })
 
     const result = await task.dispatch()
