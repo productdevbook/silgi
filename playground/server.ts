@@ -26,6 +26,7 @@
  */
 
 import { silgi, SilgiError, callable, lifecycleWrap, mapInput } from 'silgi'
+import { trace } from 'silgi/analytics'
 import { contract, implement } from 'silgi/contract'
 import {
   cors,
@@ -198,7 +199,13 @@ const listUsers = s
   .$input(z.object({ limit: z.number().min(1).max(100).optional() }))
   .$resolve(async ({ input, ctx }) => {
     const limit = input.limit ?? 10
-    return { users: ctx.db.users.slice(0, limit), total: ctx.db.users.length }
+    const users = await trace(ctx, 'db.users.findMany', () => {
+      return ctx.db.users.slice(0, limit)
+    }, { kind: 'db', detail: `SELECT * FROM users LIMIT ${limit}` })
+    const total = await trace(ctx, 'db.users.count', () => {
+      return ctx.db.users.length
+    }, { kind: 'db', detail: 'SELECT COUNT(*) FROM users' })
+    return { users, total }
   })
 
 // --- Users: Get (with NOT_FOUND error) ---
@@ -458,6 +465,7 @@ s.serve(appRouter, {
     description: 'Full feature showcase — every Silgi capability in one server',
     security: { type: 'http', scheme: 'bearer', bearerFormat: 'Token' },
   },
+  analytics: true
 })
 
 console.log('\n╔══════════════════════════════════════════════╗')
