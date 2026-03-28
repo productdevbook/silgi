@@ -483,9 +483,8 @@ const createUserWithEmail = s
       return u
     }, { kind: 'db', detail: `INSERT INTO users (name, email) VALUES ('${input.name}', '${input.email}')` })
 
-    await trace(ctx, 'task.sendWelcomeEmail', async () => {
-      sendWelcomeEmail.dispatch({ userId: user.id, email: user.email })
-    }, { kind: 'queue', detail: `dispatch send-welcome-email to ${user.email}` })
+    // Pass { ctx } — automatically adds span to parent request trace
+    sendWelcomeEmail.dispatch({ userId: user.id, email: user.email }, { ctx })
 
     return user
   })

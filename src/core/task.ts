@@ -38,10 +38,11 @@ export interface TaskDef<TInput = unknown, TOutput = unknown> {
   readonly meta: null
   /** Internal: context factory for programmatic dispatch */
   readonly _contextFactory: (() => unknown | Promise<unknown>) | null
-  /** Type-safe dispatch — validates input, creates context, runs */
+  /** Type-safe dispatch — validates input, creates context, runs.
+   *  Pass `{ ctx }` from a procedure to auto-record a span on the parent request. */
   dispatch: undefined extends TInput
-    ? (input?: TInput) => Promise<TOutput>
-    : (input: TInput) => Promise<TOutput>
+    ? (input?: TInput, options?: { ctx?: Record<string, unknown> }) => Promise<TOutput>
+    : (input: TInput, options?: { ctx?: Record<string, unknown> }) => Promise<TOutput>
 }
 
 export interface TaskOptions<TCtx, TInput, TOutput> {
@@ -121,9 +122,13 @@ export function createTaskDef(contextFactory: (() => unknown | Promise<unknown>)
   }
 
   // Programmatic dispatch — creates ctx from factory, injects trace, tracks analytics
-  const dispatch = async (rawInput?: unknown) => {
+  const dispatch = async (rawInput?: unknown, opts?: { ctx?: Record<string, unknown> }) => {
     const input = inputSchema ? await validateSchema(inputSchema, rawInput) : rawInput
     const ctx = contextFactory ? await (contextFactory as Function)() : {}
+
+    // If parent ctx passed, record a span on the parent request's trace
+    const parentTrace = (opts?.ctx as any)?.__analyticsTrace
+    const spanStart = parentTrace ? performance.now() : 0
 
     // Inject RequestTrace so trace() calls inside the task produce spans
     let reqTrace: any = null
@@ -136,11 +141,35 @@ export function createTaskDef(contextFactory: (() => unknown | Promise<unknown>)
     const t0 = performance.now()
     try {
       const output = await resolve({ input, ctx, name, scheduledTime: undefined })
+
+      // Add span to parent request trace
+      if (parentTrace) {
+        parentTrace.spans.push({
+          name: `task:${name}`,
+          kind: 'queue',
+          durationMs: Math.round((performance.now() - spanStart) * 100) / 100,
+          startOffsetMs: Math.round((spanStart - parentTrace.t0) * 100) / 100,
+          detail: `dispatch ${name}`,
+        })
+      }
+
       if (_onTaskComplete) {
         _onTaskComplete({ taskName: name, trigger: 'dispatch', timestamp: Date.now(), durationMs: Math.round((performance.now() - t0) * 100) / 100, status: 'success', input, output, spans: reqTrace?.spans })
       }
       return output
     } catch (err) {
+      // Add error span to parent request trace
+      if (parentTrace) {
+        parentTrace.spans.push({
+          name: `task:${name}`,
+          kind: 'queue',
+          durationMs: Math.round((performance.now() - spanStart) * 100) / 100,
+          startOffsetMs: Math.round((spanStart - parentTrace.t0) * 100) / 100,
+          detail: `dispatch ${name}`,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+
       if (_onTaskComplete) {
         _onTaskComplete({ taskName: name, trigger: 'dispatch', timestamp: Date.now(), durationMs: Math.round((performance.now() - t0) * 100) / 100, status: 'error', error: err instanceof Error ? err.message : String(err), input, spans: reqTrace?.spans })
       }
