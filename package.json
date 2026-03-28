@@ -83,6 +83,10 @@
       "import": "./dist/integrations/tanstack-query/index.mjs",
       "types": "./dist/integrations/tanstack-query/index.d.mts"
     },
+    "./pinia-colada": {
+      "import": "./dist/integrations/pinia-colada/index.mjs",
+      "types": "./dist/integrations/pinia-colada/index.d.mts"
+    },
     "./drizzle": {
       "import": "./dist/integrations/drizzle/index.mjs",
       "types": "./dist/integrations/drizzle/index.d.mts"
@@ -261,6 +265,7 @@
     "@orpc/client": "^1.13.9",
     "@orpc/contract": "^1.13.9",
     "@orpc/server": "^1.13.9",
+    "@pinia/colada": "^1.0.0",
     "@trpc/client": "^11.14.1",
     "@trpc/server": "^11.14.1",
     "@types/express": "^5.0.6",
@@ -281,18 +286,28 @@
     "obuild": "^0.4.32",
     "oxfmt": "^0.41.0",
     "oxlint": "^1.56.0",
+    "pinia": "^3.0.4",
     "rou3": "^0.8.1",
     "tsdown": "^0.21.4",
     "typescript": "^6.0.2",
     "vitest": "^4.1.0",
+    "vue": "^3.5.31",
     "ws": "^8.19.0",
     "zod": "^4.3.6"
   },
   "peerDependencies": {
-    "@scalar/api-reference": ">=1.0.0"
+    "@pinia/colada": ">=0.16.0",
+    "@scalar/api-reference": ">=1.0.0",
+    "vue": ">=3.3.0"
   },
   "peerDependenciesMeta": {
     "@scalar/api-reference": {
+      "optional": true
+    },
+    "@pinia/colada": {
+      "optional": true
+    },
+    "vue": {
       "optional": true
     }
   },
