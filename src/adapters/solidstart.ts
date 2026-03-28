@@ -4,10 +4,10 @@
  * @example
  * ```ts
  * // src/routes/api/rpc/[...path].ts
- * import { silgiSolidStart } from "silgi/solidstart"
+ * import { createHandler } from "silgi/solidstart"
  * import { appRouter } from "~/server/rpc"
  *
- * const handler = silgiSolidStart(appRouter, {
+ * const handler = createHandler(appRouter, {
  *   prefix: "/api/rpc",
  *   context: (event) => ({ db: getDB() }),
  * })
@@ -30,7 +30,7 @@ export interface SolidStartAdapterOptions<
  * Create a SolidStart API route handler.
  * SolidStart uses Fetch API events — uses Silgi's handler().
  */
-export function silgiSolidStart<TCtx extends Record<string, unknown>>(
+export function createHandler<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: SolidStartAdapterOptions<TCtx> = {},
 ): (event: any) => Response | Promise<Response> {

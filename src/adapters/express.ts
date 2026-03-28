@@ -4,10 +4,10 @@
  * @example
  * ```ts
  * import express from "express"
- * import { silgiExpress } from "silgi/express"
+ * import { createHandler } from "silgi/express"
  *
  * const app = express()
- * app.use("/rpc", silgiExpress(appRouter, {
+ * app.use("/rpc", createHandler(appRouter, {
  *   context: (req) => ({ db: getDB(), user: req.user }),
  * }))
  * app.listen(3000)
@@ -31,7 +31,7 @@ export interface ExpressAdapterOptions<TCtx extends Record<string, unknown>> {
  * Mount at a prefix — the remainder of the path is the procedure name.
  * Requires `express.json()` middleware for POST body parsing.
  */
-export function silgiExpress<TCtx extends Record<string, unknown>>(
+export function createHandler<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: ExpressAdapterOptions<TCtx> = {},
 ): (req: any, res: any, next: any) => void {

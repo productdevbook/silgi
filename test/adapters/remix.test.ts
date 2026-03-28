@@ -15,10 +15,10 @@ const testRouter = k.router({
   }),
 })
 
-describe('silgiRemix() — real Request/Response', () => {
+describe('createHandler() — real Request/Response', () => {
   it('handles real Fetch API requests', async () => {
-    const { silgiRemix } = await import('#src/adapters/remix.ts')
-    const handler = silgiRemix(testRouter, { prefix: '/rpc' })
+    const { createHandler } = await import('#src/adapters/remix.ts')
+    const handler = createHandler(testRouter, { prefix: '/rpc' })
 
     const r1 = await handler({
       request: new Request('http://localhost/rpc/health', { method: 'POST' }),

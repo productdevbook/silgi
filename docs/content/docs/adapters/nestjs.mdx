@@ -13,10 +13,10 @@ Register Silgi as a NestJS controller. Works with both Express and Fastify adapt
 // @noErrors
 // rpc.controller.ts
 import { Controller, All, Req, Res } from '@nestjs/common'
-import { silgiNestHandler } from 'silgi/nestjs'
+import { createHandler } from 'silgi/nestjs'
 import { appRouter } from './rpc'
 
-const rpcHandler = silgiNestHandler(appRouter, {
+const rpcHandler = createHandler(appRouter, {
   context: (req) => ({ db: getDB(), user: req.user }),
 })
 
@@ -42,7 +42,7 @@ The context factory receives the Express/Fastify request. Access guards, pipes, 
 
 ```ts twoslash
 // @noErrors
-silgiNestHandler(appRouter, {
+createHandler(appRouter, {
   context: (req) => ({
     user: req.user, // from NestJS AuthGuard
     ip: req.ip,

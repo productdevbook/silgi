@@ -1,19 +1,19 @@
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
 
-import { silgiLambda } from '#src/adapters/aws-lambda.ts'
+import { createHandler } from '#src/adapters/aws-lambda.ts'
 import { silgi } from '#src/silgi.ts'
 
 const k = silgi({ context: () => ({ db: 'test' }) })
 
-describe('silgiLambda()', () => {
+describe('createHandler()', () => {
   it('handles Lambda events', async () => {
     const router = k.router({
       health: k.$resolve(() => ({ status: 'ok' })),
       echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
     })
 
-    const handler = silgiLambda(router, { context: () => ({}) })
+    const handler = createHandler(router, { context: () => ({}) })
 
     const result = await handler({
       httpMethod: 'POST',
@@ -29,7 +29,7 @@ describe('silgiLambda()', () => {
 
   it('returns 404 for unknown procedures', async () => {
     const router = k.router({ health: k.$resolve(() => 'ok') })
-    const handler = silgiLambda(router, { context: () => ({}) })
+    const handler = createHandler(router, { context: () => ({}) })
 
     const result = await handler({
       httpMethod: 'POST',
@@ -44,7 +44,7 @@ describe('silgiLambda()', () => {
 
   it('strips prefix', async () => {
     const router = k.router({ health: k.$resolve(() => ({ ok: true })) })
-    const handler = silgiLambda(router, { prefix: '/rpc', context: () => ({}) })
+    const handler = createHandler(router, { prefix: '/rpc', context: () => ({}) })
 
     const result = await handler({
       httpMethod: 'POST',

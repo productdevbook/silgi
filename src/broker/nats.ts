@@ -8,14 +8,14 @@
  * ```ts
  * import { connect } from "nats"
  * import { natsBroker } from "silgi/broker/nats"
- * import { silgiBroker, BrokerLink } from "silgi/broker"
+ * import { createBroker, BrokerLink } from "silgi/broker"
  * import { createClient } from "silgi/client"
  *
  * const nc = await connect({ servers: "localhost:4222" })
  * const driver = natsBroker(nc, { queue: "myapp-workers" })
  *
  * // Server
- * const dispose = await silgiBroker(appRouter, driver)
+ * const dispose = await createBroker(appRouter, driver)
  *
  * // Client
  * const client = createClient<AppRouter>(new BrokerLink(driver))

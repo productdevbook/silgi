@@ -5,10 +5,10 @@
  * ```ts
  * // rpc.controller.ts
  * import { Controller, All, Req, Res } from "@nestjs/common"
- * import { silgiNestHandler } from "silgi/nestjs"
+ * import { createHandler } from "silgi/nestjs"
  * import { appRouter } from "./rpc"
  *
- * const rpcHandler = silgiNestHandler(appRouter, {
+ * const rpcHandler = createHandler(appRouter, {
  *   context: (req) => ({ db: getDB(), user: req.user }),
  * })
  *
@@ -38,7 +38,7 @@ export interface NestAdapterOptions<TCtx extends Record<string, unknown>> {
  * Use inside a `@Controller` with `@All("*")`.
  * Handles routing internally — NestJS only needs to mount the prefix.
  */
-export function silgiNestHandler<TCtx extends Record<string, unknown>>(
+export function createHandler<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: NestAdapterOptions<TCtx> = {},
 ): (req: any, res: any) => Promise<void> {
@@ -83,7 +83,7 @@ export function silgiNestHandler<TCtx extends Record<string, unknown>>(
  *
  * Returns an object that can be used with NestJS's dynamic module pattern.
  */
-export function createSilgiModule(router: RouterDef, options: NestAdapterOptions<any> = {}) {
-  const handler = silgiNestHandler(router, options)
+export function createModule(router: RouterDef, options: NestAdapterOptions<any> = {}) {
+  const handler = createHandler(router, options)
   return { handler, router }
 }

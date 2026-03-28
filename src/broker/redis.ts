@@ -8,7 +8,7 @@
  * ```ts
  * import Redis from "ioredis"
  * import { redisBroker, ioredisTransport } from "silgi/broker/redis"
- * import { silgiBroker, BrokerLink } from "silgi/broker"
+ * import { createBroker, BrokerLink } from "silgi/broker"
  * import { createClient } from "silgi/client"
  *
  * const redis = new Redis()
@@ -16,7 +16,7 @@
  * const driver = redisBroker(transport)
  *
  * // Server
- * const dispose = await silgiBroker(appRouter, driver)
+ * const dispose = await createBroker(appRouter, driver)
  *
  * // Client
  * const client = createClient<AppRouter>(new BrokerLink(driver))

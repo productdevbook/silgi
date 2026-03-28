@@ -3,9 +3,9 @@
  *
  * @example
  * ```ts
- * import { silgiLambda } from "silgi/aws-lambda"
+ * import { createHandler } from "silgi/aws-lambda"
  *
- * export const handler = silgiLambda(appRouter, {
+ * export const handler = createHandler(appRouter, {
  *   context: (event) => ({ db: getDB(), userId: event.requestContext?.authorizer?.userId }),
  * })
  * ```
@@ -56,7 +56,7 @@ interface LambdaResponse {
  *
  * Supports API Gateway v1 (REST) and v2 (HTTP) event formats.
  */
-export function silgiLambda<TCtx extends Record<string, unknown>>(
+export function createHandler<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: LambdaAdapterOptions<TCtx> = {},
 ): (event: LambdaEvent, context?: LambdaContext) => Promise<LambdaResponse> {

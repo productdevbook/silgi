@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { instrumentDrizzle, withSilgiCtx } from '#src/integrations/drizzle/index.ts'
+import { instrumentDrizzle, withCtx } from '#src/integrations/drizzle/index.ts'
 import { RequestTrace } from '#src/plugins/analytics.ts'
 
 // ── Mock DB Factory ─────────────────────────────────
@@ -90,7 +90,7 @@ describe('instrumentDrizzle', () => {
     expect(db.session.prepareQuery).toBe(firstPrepareQuery)
   })
 
-  it('without withSilgiCtx — no spans recorded (noop passthrough)', async () => {
+  it('without withCtx — no spans recorded (noop passthrough)', async () => {
     const { db } = createMockDb([{ id: 42 }])
     instrumentDrizzle(db)
 
@@ -101,13 +101,13 @@ describe('instrumentDrizzle', () => {
     // No context, so no spans would be recorded anywhere
   })
 
-  it('with withSilgiCtx — spans recorded with correct name, kind, duration', async () => {
+  it('with withCtx — spans recorded with correct name, kind, duration', async () => {
     const { db } = createMockDb([{ id: 1 }])
     instrumentDrizzle(db)
     const reqTrace = new RequestTrace()
     const ctx = { __analyticsTrace: reqTrace }
 
-    await withSilgiCtx(ctx, async () => {
+    await withCtx(ctx, async () => {
       const prepared = db.session.prepareQuery({ sql: 'SELECT * FROM "user"' })
       return prepared.execute()
     })
@@ -126,7 +126,7 @@ describe('instrumentDrizzle', () => {
     instrumentDrizzle(db)
     const reqTrace = new RequestTrace()
 
-    await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
       const prepared = db.session.prepareQuery({ sql: 'SELECT * FROM "user" WHERE id = $1' })
       return prepared.execute()
     })
@@ -139,7 +139,7 @@ describe('instrumentDrizzle', () => {
     instrumentDrizzle(db)
     const reqTrace = new RequestTrace()
 
-    await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
       const prepared = db.session.prepareQuery({ sql: 'INSERT INTO "session" (id, userId) VALUES ($1, $2)' })
       return prepared.execute()
     })
@@ -152,7 +152,7 @@ describe('instrumentDrizzle', () => {
     instrumentDrizzle(db)
     const reqTrace = new RequestTrace()
 
-    await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
       const prepared = db.session.prepareQuery({ sql: 'UPDATE "order" SET status = $1 WHERE id = $2' })
       return prepared.execute()
     })
@@ -165,7 +165,7 @@ describe('instrumentDrizzle', () => {
     instrumentDrizzle(db)
     const reqTrace = new RequestTrace()
 
-    await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
       const prepared = db.session.prepareQuery({ sql: 'DELETE FROM "token" WHERE expired = true' })
       return prepared.execute()
     })
@@ -178,7 +178,7 @@ describe('instrumentDrizzle', () => {
     instrumentDrizzle(db, { dbName: 'ecommerce' })
     const reqTrace = new RequestTrace()
 
-    await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
       const prepared = db.session.prepareQuery({ sql: 'SELECT 1' })
       return prepared.execute()
     })
@@ -191,7 +191,7 @@ describe('instrumentDrizzle', () => {
     instrumentDrizzle(db, { dbSystem: 'mysql' })
     const reqTrace = new RequestTrace()
 
-    await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
       const prepared = db.session.prepareQuery({ sql: 'SELECT 1' })
       return prepared.execute()
     })
@@ -204,7 +204,7 @@ describe('instrumentDrizzle', () => {
     instrumentDrizzle(db)
     const reqTrace = new RequestTrace()
 
-    await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
       const prepared = db.session.prepareQuery({ sql: 'SELECT 1' })
       return prepared.execute()
     })
@@ -217,7 +217,7 @@ describe('instrumentDrizzle', () => {
     instrumentDrizzle(db, { captureQueryText: false })
     const reqTrace = new RequestTrace()
 
-    await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
       const prepared = db.session.prepareQuery({ sql: 'SELECT * FROM "user"' })
       return prepared.execute()
     })
@@ -233,7 +233,7 @@ describe('instrumentDrizzle', () => {
     const reqTrace = new RequestTrace()
     const longQuery = 'SELECT * FROM "user" WHERE name = $1 AND email = $2 AND status = $3'
 
-    await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
       const prepared = db.session.prepareQuery({ sql: longQuery })
       return prepared.execute()
     })
@@ -249,7 +249,7 @@ describe('instrumentDrizzle', () => {
     instrumentDrizzle(db)
     const reqTrace = new RequestTrace()
 
-    await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
       return db.session.transaction(async (tx: any) => {
         const prepared = tx.session.prepareQuery({ sql: 'INSERT INTO "order" (id) VALUES ($1)' })
         return prepared.execute()
@@ -285,7 +285,7 @@ describe('instrumentDrizzle', () => {
     const reqTrace = new RequestTrace()
 
     await expect(
-      withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+      withCtx({ __analyticsTrace: reqTrace }, async () => {
         const prepared = db.session.prepareQuery({ sql: 'SELECT 1' })
         return prepared.execute()
       }),
@@ -304,7 +304,7 @@ describe('instrumentDrizzle', () => {
     instrumentDrizzle(db)
     const reqTrace = new RequestTrace()
 
-    const result = await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    const result = await withCtx({ __analyticsTrace: reqTrace }, async () => {
       return db.session.query('SELECT COUNT(*) FROM "product"', [])
     })
 
@@ -318,7 +318,7 @@ describe('instrumentDrizzle', () => {
     instrumentDrizzle(db)
     const reqTrace = new RequestTrace()
 
-    const result = await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    const result = await withCtx({ __analyticsTrace: reqTrace }, async () => {
       return db.$client.query('SELECT * FROM "store"')
     })
 
@@ -332,7 +332,7 @@ describe('instrumentDrizzle', () => {
     instrumentDrizzle(db)
     const reqTrace = new RequestTrace()
 
-    const result = await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    const result = await withCtx({ __analyticsTrace: reqTrace }, async () => {
       return db._.session.execute('SELECT * FROM "warehouse"')
     })
 
@@ -346,7 +346,7 @@ describe('instrumentDrizzle', () => {
     instrumentDrizzle(db, { peerName: 'db.example.com', peerPort: 5432 })
     const reqTrace = new RequestTrace()
 
-    await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
       const prepared = db.session.prepareQuery({ sql: 'SELECT 1' })
       return prepared.execute()
     })
@@ -361,7 +361,7 @@ describe('instrumentDrizzle', () => {
     instrumentDrizzle(db)
     const reqTrace = new RequestTrace()
 
-    await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
       const prepared = db.session.prepareQuery({ sql: 'INSERT INTO "item" (name) VALUES ($1)' })
       return prepared.execute()
     })
@@ -408,7 +408,7 @@ describe('extractOperationInfo (via span names)', () => {
       instrumentDrizzle(db)
       const reqTrace = new RequestTrace()
 
-      await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+      await withCtx({ __analyticsTrace: reqTrace }, async () => {
         const prepared = db.session.prepareQuery({ sql })
         return prepared.execute()
       })
@@ -422,7 +422,7 @@ describe('extractOperationInfo (via span names)', () => {
     instrumentDrizzle(db)
     const reqTrace = new RequestTrace()
 
-    await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
       const prepared = db.session.prepareQuery({ sql: 'EXPLAIN ANALYZE SELECT 1' })
       return prepared.execute()
     })
@@ -453,7 +453,7 @@ describe('extractOperationInfo (via span names)', () => {
     instrumentDrizzle(db)
     const reqTrace = new RequestTrace()
 
-    await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
       const prepared = db.session.prepareQuery({})
       return prepared.execute()
     })
@@ -473,7 +473,7 @@ describe('query text extraction formats', () => {
     instrumentDrizzle(db)
     const reqTrace = new RequestTrace()
 
-    await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
       const prepared = db.session.prepareQuery({ text: 'SELECT * FROM "catalog"' })
       return prepared.execute()
     })
@@ -486,7 +486,7 @@ describe('query text extraction formats', () => {
     instrumentDrizzle(db)
     const reqTrace = new RequestTrace()
 
-    await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
       return db.session.query('DELETE FROM "expired_token"', [])
     })
 
@@ -495,7 +495,7 @@ describe('query text extraction formats', () => {
 })
 
 describe('concurrent context isolation', () => {
-  it('different withSilgiCtx calls record to separate traces', async () => {
+  it('different withCtx calls record to separate traces', async () => {
     const { db } = createMockDb()
     instrumentDrizzle(db)
 
@@ -503,11 +503,11 @@ describe('concurrent context isolation', () => {
     const trace2 = new RequestTrace()
 
     await Promise.all([
-      withSilgiCtx({ __analyticsTrace: trace1 }, async () => {
+      withCtx({ __analyticsTrace: trace1 }, async () => {
         const p = db.session.prepareQuery({ sql: 'SELECT * FROM "user"' })
         return p.execute()
       }),
-      withSilgiCtx({ __analyticsTrace: trace2 }, async () => {
+      withCtx({ __analyticsTrace: trace2 }, async () => {
         const p = db.session.prepareQuery({ sql: 'INSERT INTO "order" (id) VALUES ($1)' })
         return p.execute()
       }),

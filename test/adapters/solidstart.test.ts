@@ -15,10 +15,10 @@ const testRouter = k.router({
   }),
 })
 
-describe('silgiSolidStart() — real Request/Response', () => {
+describe('createHandler() — real Request/Response', () => {
   it('handles real Fetch API requests', async () => {
-    const { silgiSolidStart } = await import('#src/adapters/solidstart.ts')
-    const handler = silgiSolidStart(testRouter, { prefix: '/api/rpc' })
+    const { createHandler } = await import('#src/adapters/solidstart.ts')
+    const handler = createHandler(testRouter, { prefix: '/api/rpc' })
 
     const r1 = await handler({
       request: new Request('http://localhost/api/rpc/health', { method: 'POST' }),

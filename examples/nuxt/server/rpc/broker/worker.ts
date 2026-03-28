@@ -5,7 +5,7 @@
  * Run:   npx tsx server/rpc/broker/worker.ts
  */
 import { connect } from 'nats'
-import { silgiBroker } from 'silgi/broker'
+import { createBroker } from 'silgi/broker'
 import { natsBroker } from 'silgi/broker/nats'
 
 import { workerRouter } from './index'
@@ -13,6 +13,6 @@ import { workerRouter } from './index'
 const nc = await connect({ servers: process.env.NATS_URL ?? 'localhost:4222' })
 const driver = natsBroker(nc, { queue: 'workers' })
 
-await silgiBroker(workerRouter, driver, { subject: 'worker.rpc' })
+await createBroker(workerRouter, driver, { subject: 'worker.rpc' })
 
 console.log('Worker listening on NATS subject: worker.rpc')

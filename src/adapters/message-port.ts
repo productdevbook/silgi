@@ -7,9 +7,9 @@
  * @example
  * ```ts
  * // Worker / Electron main
- * import { silgiMessagePort } from "silgi/message-port"
+ * import { createHandler } from "silgi/message-port"
  *
- * const dispose = silgiMessagePort(appRouter, port, {
+ * const dispose = createHandler(appRouter, port, {
  *   context: () => ({ db: getDB() }),
  * })
  *
@@ -54,7 +54,7 @@ interface RPCResponse {
  * Listens for RPC messages and responds with results.
  * Returns a dispose function to stop listening.
  */
-export function silgiMessagePort<TCtx extends Record<string, unknown>>(
+export function createHandler<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   port: {
     postMessage(msg: unknown): void

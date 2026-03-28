@@ -11,12 +11,12 @@ Attach your router to a port:
 
 ```ts twoslash
 // @noErrors
-import { silgiMessagePort } from 'silgi/message-port'
+import { createHandler } from 'silgi/message-port'
 import { appRouter } from './router'
 
 const port = getPort() // MessagePort, Worker, chrome.runtime.Port, etc.
 
-silgiMessagePort(appRouter, port, {
+createHandler(appRouter, port, {
   context: () => ({
     db: getDB(),
   }),
@@ -47,11 +47,11 @@ const users = await client.users.list()
 ```ts twoslash
 // @noErrors
 // main.ts (main process)
-import { silgiMessagePort } from 'silgi/message-port'
+import { createHandler } from 'silgi/message-port'
 
 ipcMain.handle('rpc-port', (event) => {
   const { port1, port2 } = new MessageChannelMain()
-  silgiMessagePort(appRouter, port1, { context: () => ({}) })
+  createHandler(appRouter, port1, { context: () => ({}) })
   event.senderFrame.postMessage('rpc-port', null, [port2])
 })
 ```

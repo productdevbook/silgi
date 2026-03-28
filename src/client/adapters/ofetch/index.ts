@@ -13,7 +13,7 @@ import { SilgiError, isSilgiErrorJSON, fromSilgiErrorJSON } from '../../../core/
 import type { ClientLink, ClientContext, ClientOptions } from '../../types.ts'
 import type { FetchOptions, FetchContext } from 'ofetch'
 
-export interface SilgiLinkOptions<TClientContext extends ClientContext = ClientContext> {
+export interface LinkOptions<TClientContext extends ClientContext = ClientContext> {
   /** Server base URL (e.g. "http://localhost:3000") */
   url: string
 
@@ -71,7 +71,7 @@ export interface SilgiLinkOptions<TClientContext extends ClientContext = ClientC
  * ```
  */
 export function createLink<TClientContext extends ClientContext = ClientContext>(
-  options: SilgiLinkOptions<TClientContext>,
+  options: LinkOptions<TClientContext>,
 ): ClientLink<TClientContext> {
   const baseUrl = options.url.endsWith('/') ? options.url.slice(0, -1) : options.url
   const defaultTimeout = options.timeout ?? 30_000

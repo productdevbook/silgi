@@ -4,10 +4,10 @@
  * @example
  * ```ts
  * // app/api/rpc/[...path]/route.ts
- * import { silgiNextjs } from "silgi/nextjs"
+ * import { createHandler } from "silgi/nextjs"
  * import { appRouter } from "~/server/rpc"
  *
- * const handler = silgiNextjs(appRouter, {
+ * const handler = createHandler(appRouter, {
  *   context: (req) => ({ db: getDB() }),
  * })
  *
@@ -28,7 +28,7 @@ export interface NextjsAdapterOptions<TCtx extends Record<string, unknown>> exte
  * Uses Silgi's handler() internally — full Fetch API support
  * including content negotiation (JSON, MessagePack, devalue).
  */
-export function silgiNextjs<TCtx extends Record<string, unknown>>(
+export function createHandler<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: NextjsAdapterOptions<TCtx> = {},
 ): (req: Request) => Response | Promise<Response> {

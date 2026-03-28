@@ -35,7 +35,7 @@ import { defineCachedFunction, setStorage, useStorage as useOcacheStorage } from
 import { hash } from 'ohash'
 
 import { RAW_INPUT } from '../compile.ts'
-import { useStorage as useSilgiStorage } from '../core/storage.ts'
+import { useStorage } from '../core/storage.ts'
 
 import type { WrapDef } from '../types.ts'
 import type { CacheEntry, CacheOptions, StorageInterface } from 'ocache'
@@ -50,7 +50,7 @@ function ensureStorageConnected(): void {
   _storageConnected = true
   try {
     // Connect ocache to silgi's storage under the 'cache' mount
-    const storage = useSilgiStorage('cache')
+    const storage = useStorage('cache')
     setStorage({
       get: <T>(key: string) => storage.getItem(key) as Promise<T | null>,
       set: <T>(key: string, value: T, opts?: { ttl?: number }) => {

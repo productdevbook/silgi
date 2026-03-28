@@ -24,7 +24,7 @@ async function post(url: string, body?: unknown): Promise<{ status: number; data
   return { status: res.status, data: await res.json() }
 }
 
-describe('silgiExpress() — real Express', () => {
+describe('createHandler() — real Express', () => {
   let url: string
   let close: () => void
 
@@ -32,11 +32,11 @@ describe('silgiExpress() — real Express', () => {
 
   it('starts and handles requests', async () => {
     const express = (await import('express')).default
-    const { silgiExpress } = await import('#src/adapters/express.ts')
+    const { createHandler } = await import('#src/adapters/express.ts')
 
     const app = express()
     app.use(express.json())
-    app.use('/rpc', silgiExpress(testRouter))
+    app.use('/rpc', createHandler(testRouter))
 
     const server = app.listen(5101, '127.0.0.1')
     url = 'http://127.0.0.1:5101'

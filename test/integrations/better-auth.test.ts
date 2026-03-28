@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest'
 
-import { instrumentBetterAuth, silgiTracing, withSilgiCtx } from '#src/integrations/better-auth/index.ts'
+import { instrumentBetterAuth, tracing, withCtx } from '#src/integrations/better-auth/index.ts'
 import { RequestTrace } from '#src/plugins/analytics.ts'
 
-// ── silgiTracing() plugin ────────────────────────────
+// ── tracing() plugin ────────────────────────────
 
-describe('silgiTracing() — plugin factory', () => {
+describe('tracing() — plugin factory', () => {
   it('returns object with id: "silgi-tracing"', () => {
-    const plugin = silgiTracing()
+    const plugin = tracing()
     expect(plugin.id).toBe('silgi-tracing')
   })
 
   it('has onRequest and hooks.after properties', () => {
-    const plugin = silgiTracing()
+    const plugin = tracing()
     expect(typeof plugin.onRequest).toBe('function')
     expect(plugin.hooks).toBeDefined()
     expect(Array.isArray(plugin.hooks.after)).toBe(true)
@@ -22,14 +22,14 @@ describe('silgiTracing() — plugin factory', () => {
   })
 
   it('matcher returns true for all requests', () => {
-    const plugin = silgiTracing()
+    const plugin = tracing()
     expect(plugin.hooks.after[0].matcher()).toBe(true)
   })
 })
 
-describe('silgiTracing() — path matching', () => {
+describe('tracing() — path matching', () => {
   async function matchPath(path: string) {
-    const plugin = silgiTracing()
+    const plugin = tracing()
     const request = new Request(`http://localhost${path}`)
     await plugin.onRequest(request, {})
 
@@ -113,9 +113,9 @@ describe('silgiTracing() — path matching', () => {
   })
 })
 
-describe('silgiTracing() — hooks.after span recording', () => {
+describe('tracing() — hooks.after span recording', () => {
   it('records span with correct attributes', async () => {
-    const plugin = silgiTracing()
+    const plugin = tracing()
     const request = new Request('http://localhost/api/auth/sign-in/email', { method: 'POST' })
     await plugin.onRequest(request, {})
 
@@ -148,7 +148,7 @@ describe('silgiTracing() — hooks.after span recording', () => {
   })
 
   it('extracts user.id and session.id from returned data', async () => {
-    const plugin = silgiTracing()
+    const plugin = tracing()
     const request = new Request('http://localhost/api/auth/get-session')
     await plugin.onRequest(request, {})
 
@@ -176,7 +176,7 @@ describe('silgiTracing() — hooks.after span recording', () => {
   })
 
   it('extracts from newSession when returned has no user', async () => {
-    const plugin = silgiTracing()
+    const plugin = tracing()
     const request = new Request('http://localhost/api/auth/sign-up/email', { method: 'POST' })
     await plugin.onRequest(request, {})
 
@@ -203,7 +203,7 @@ describe('silgiTracing() — hooks.after span recording', () => {
   })
 
   it('writes procedureInput and procedureOutput', async () => {
-    const plugin = silgiTracing()
+    const plugin = tracing()
     const request = new Request('http://localhost/api/auth/sign-in/email', { method: 'POST' })
     await plugin.onRequest(request, {})
 
@@ -225,7 +225,7 @@ describe('silgiTracing() — hooks.after span recording', () => {
   })
 
   it('captureInput: false suppresses input', async () => {
-    const plugin = silgiTracing({ captureInput: false })
+    const plugin = tracing({ captureInput: false })
     const request = new Request('http://localhost/api/auth/sign-in/email', { method: 'POST' })
     await plugin.onRequest(request, {})
 
@@ -244,7 +244,7 @@ describe('silgiTracing() — hooks.after span recording', () => {
   })
 
   it('captureOutput: false suppresses output', async () => {
-    const plugin = silgiTracing({ captureOutput: false })
+    const plugin = tracing({ captureOutput: false })
     const request = new Request('http://localhost/api/auth/sign-in/email', { method: 'POST' })
     await plugin.onRequest(request, {})
 
@@ -265,7 +265,7 @@ describe('silgiTracing() — hooks.after span recording', () => {
   })
 
   it('records auth.success: false when returned has error', async () => {
-    const plugin = silgiTracing()
+    const plugin = tracing()
     const request = new Request('http://localhost/api/auth/sign-in/email', { method: 'POST' })
     await plugin.onRequest(request, {})
 
@@ -285,7 +285,7 @@ describe('silgiTracing() — hooks.after span recording', () => {
   })
 
   it('records error.message from error object', async () => {
-    const plugin = silgiTracing()
+    const plugin = tracing()
     const request = new Request('http://localhost/api/auth/sign-in/email', { method: 'POST' })
     await plugin.onRequest(request, {})
 
@@ -303,7 +303,7 @@ describe('silgiTracing() — hooks.after span recording', () => {
   })
 
   it('skips tracing when no __silgiCtx on request', async () => {
-    const plugin = silgiTracing()
+    const plugin = tracing()
     const request = new Request('http://localhost/api/auth/get-session')
     await plugin.onRequest(request, {})
 
@@ -318,7 +318,7 @@ describe('silgiTracing() — hooks.after span recording', () => {
   })
 
   it('skips tracing when no __analyticsTrace on ctx', async () => {
-    const plugin = silgiTracing()
+    const plugin = tracing()
     const request = new Request('http://localhost/api/auth/get-session')
     await plugin.onRequest(request, {})
     ;(request as any).__silgiCtx = {} // no __analyticsTrace
@@ -403,7 +403,7 @@ describe('instrumentBetterAuth()', () => {
     expect(calls.some((c) => c.method === 'getSession')).toBe(true)
   })
 
-  it('without withSilgiCtx — no spans (passthrough)', async () => {
+  it('without withCtx — no spans (passthrough)', async () => {
     const { auth } = createMockAuth()
     instrumentBetterAuth(auth)
 
@@ -412,12 +412,12 @@ describe('instrumentBetterAuth()', () => {
     // No trace context — no way to record spans, but call still succeeds
   })
 
-  it('with withSilgiCtx — records span with operation, user.id, session.id', async () => {
+  it('with withCtx — records span with operation, user.id, session.id', async () => {
     const { auth } = createMockAuth()
     instrumentBetterAuth(auth)
     const reqTrace = new RequestTrace()
 
-    const result = await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    const result = await withCtx({ __analyticsTrace: reqTrace }, async () => {
       return auth.api.getSession({ headers: {} })
     })
 
@@ -440,7 +440,7 @@ describe('instrumentBetterAuth()', () => {
     instrumentBetterAuth(auth)
     const reqTrace = new RequestTrace()
 
-    await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
       return auth.api.signInEmail({ body: { email: 'login@test.com', password: 'pass' } })
     })
 
@@ -456,7 +456,7 @@ describe('instrumentBetterAuth()', () => {
     instrumentBetterAuth(auth)
     const reqTrace = new RequestTrace()
 
-    await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
       return auth.api.signUpEmail({ body: { email: 'signup@test.com', password: 'pass' } })
     })
 
@@ -472,7 +472,7 @@ describe('instrumentBetterAuth()', () => {
     const reqTrace = new RequestTrace()
 
     await expect(
-      withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+      withCtx({ __analyticsTrace: reqTrace }, async () => {
         return auth.api.failingMethod()
       }),
     ).rejects.toThrow('Auth service unavailable')
@@ -489,7 +489,7 @@ describe('instrumentBetterAuth()', () => {
     instrumentBetterAuth(auth)
     const reqTrace = new RequestTrace()
 
-    const result = await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    const result = await withCtx({ __analyticsTrace: reqTrace }, async () => {
       return auth.api.errorReturn()
     })
 
@@ -505,7 +505,7 @@ describe('instrumentBetterAuth()', () => {
     instrumentBetterAuth(auth)
     const reqTrace = new RequestTrace()
 
-    await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
       return auth.api.customEndpoint()
     })
 
@@ -549,7 +549,7 @@ describe('instrumentBetterAuth()', () => {
     instrumentBetterAuth(auth)
     const reqTrace = new RequestTrace()
 
-    await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
       return auth.api.signOut()
     })
 
@@ -562,7 +562,7 @@ describe('instrumentBetterAuth()', () => {
     instrumentBetterAuth(auth)
     const reqTrace = new RequestTrace()
 
-    await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
       await auth.api.getSession({ headers: {} })
       await auth.api.signOut()
       await auth.api.updateUser({ body: { name: 'Alice' } })
@@ -589,7 +589,7 @@ describe('instrumentBetterAuth()', () => {
     instrumentBetterAuth(auth)
     const reqTrace = new RequestTrace()
 
-    await withSilgiCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
       return auth.api.getSession()
     })
 
@@ -601,7 +601,7 @@ describe('instrumentBetterAuth()', () => {
 })
 
 describe('concurrent context isolation', () => {
-  it('different withSilgiCtx calls record to separate traces', async () => {
+  it('different withCtx calls record to separate traces', async () => {
     const { auth } = createMockAuth()
     instrumentBetterAuth(auth)
 
@@ -609,10 +609,10 @@ describe('concurrent context isolation', () => {
     const trace2 = new RequestTrace()
 
     await Promise.all([
-      withSilgiCtx({ __analyticsTrace: trace1 }, async () => {
+      withCtx({ __analyticsTrace: trace1 }, async () => {
         return auth.api.getSession({ headers: {} })
       }),
-      withSilgiCtx({ __analyticsTrace: trace2 }, async () => {
+      withCtx({ __analyticsTrace: trace2 }, async () => {
         return auth.api.signInEmail({ body: {} })
       }),
     ])

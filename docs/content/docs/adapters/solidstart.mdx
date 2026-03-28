@@ -12,10 +12,10 @@ Create a catch-all API route:
 ```ts twoslash
 // @noErrors
 // src/routes/api/rpc/[...path].ts
-import { silgiSolidStart } from 'silgi/solidstart'
+import { createHandler } from 'silgi/solidstart'
 import { appRouter } from '~/server/rpc'
 
-const handler = silgiSolidStart(appRouter, {
+const handler = createHandler(appRouter, {
   prefix: '/api/rpc',
   context: (event) => ({
     db: getDB(),
@@ -41,7 +41,7 @@ Access middleware data through the event object:
 
 ```ts twoslash
 // @noErrors
-silgiSolidStart(appRouter, {
+createHandler(appRouter, {
   context: (event) => ({
     user: event.locals.user,
   }),

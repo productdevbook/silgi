@@ -21,7 +21,7 @@
 
 import { createClient } from '../client/client.ts'
 
-import { silgiMessagePort, MessagePortLink } from './message-port.ts'
+import { createHandler, MessagePortLink } from './message-port.ts'
 
 import type { RouterDef } from '../types.ts'
 
@@ -49,7 +49,7 @@ export function createPeer(
   },
   options: PeerOptions<Record<string, unknown>> = {},
 ): Peer {
-  const dispose = silgiMessagePort(localRouter, port, options)
+  const dispose = createHandler(localRouter, port, options)
   const link = new MessagePortLink(port)
   const client = createClient(link)
 

@@ -4,10 +4,10 @@
  * @example
  * ```ts
  * // src/routes/api/rpc/[...path]/+server.ts
- * import { silgiSvelteKit } from "silgi/sveltekit"
+ * import { createHandler } from "silgi/sveltekit"
  * import { appRouter } from "$lib/server/rpc"
  *
- * const handler = silgiSvelteKit(appRouter, {
+ * const handler = createHandler(appRouter, {
  *   context: (event) => ({ db: getDB(), user: event.locals.user }),
  * })
  *
@@ -31,7 +31,7 @@ export interface SvelteKitAdapterOptions<
  * SvelteKit passes a RequestEvent with `.request` (standard Request).
  * The handler uses Silgi's handler() for full protocol support.
  */
-export function silgiSvelteKit<TCtx extends Record<string, unknown>>(
+export function createHandler<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: SvelteKitAdapterOptions<TCtx> = {},
 ): (event: any) => Response | Promise<Response> {

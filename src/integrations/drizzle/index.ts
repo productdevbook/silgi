@@ -16,7 +16,7 @@
  *
  * @example
  * ```ts
- * import { instrumentDrizzle, withSilgiCtx } from 'silgi/drizzle'
+ * import { instrumentDrizzle, withCtx } from 'silgi/drizzle'
  *
  * const db = instrumentDrizzle(drizzle(url, { schema }), {
  *   dbName: 'ecommerce',
@@ -25,7 +25,7 @@
  * })
  *
  * const listUsers = s.$resolve(async ({ ctx }) => {
- *   return withSilgiCtx(ctx, () => db.select().from(users))
+ *   return withCtx(ctx, () => db.select().from(users))
  * })
  * ```
  */
@@ -98,7 +98,7 @@ export function instrumentDrizzle<T extends Record<string, any>>(db: T, config?:
  * Run a function with silgi context available to instrumented Drizzle instances.
  * All Drizzle queries inside `fn` will be recorded as trace spans.
  */
-export function withSilgiCtx<T>(ctx: Record<string, unknown>, fn: () => T): T {
+export function withCtx<T>(ctx: Record<string, unknown>, fn: () => T): T {
   return ctxStorage.run(ctx, fn)
 }
 

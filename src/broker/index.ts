@@ -7,10 +7,10 @@
  * @example
  * ```ts
  * // Server
- * import { silgiBroker, memoryBroker } from "silgi/broker"
+ * import { createBroker, memoryBroker } from "silgi/broker"
  *
  * const driver = memoryBroker()
- * const dispose = await silgiBroker(appRouter, driver, {
+ * const dispose = await createBroker(appRouter, driver, {
  *   subject: "myapp.rpc",
  *   context: () => ({ db: getDB() }),
  * })
@@ -91,7 +91,7 @@ export interface BrokerOptions<TCtx extends Record<string, unknown>> {
  *
  * Returns a cleanup function to stop listening.
  */
-export async function silgiBroker<TCtx extends Record<string, unknown>>(
+export async function createBroker<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   driver: BrokerDriver,
   options: BrokerOptions<TCtx> = {},

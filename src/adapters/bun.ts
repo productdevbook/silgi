@@ -3,9 +3,9 @@
  *
  * @example
  * ```ts
- * import { silgiBun } from "silgi/bun"
+ * import { createHandler } from "silgi/bun"
  *
- * Bun.serve(silgiBun(appRouter, { context: () => ({ db }) }))
+ * Bun.serve(createHandler(appRouter, { context: () => ({ db }) }))
  * ```
  */
 
@@ -26,7 +26,7 @@ export interface BunAdapterOptions<TCtx extends Record<string, unknown>> {
 /**
  * Create a Bun.serve() config with Silgi handler.
  */
-export function silgiBun<TCtx extends Record<string, unknown>>(
+export function createHandler<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: BunAdapterOptions<TCtx> = {},
 ): { port: number; hostname: string; fetch: FetchHandler } {

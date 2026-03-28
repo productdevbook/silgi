@@ -10,10 +10,10 @@ description: Use Silgi with SvelteKit API routes — catch-all endpoint with ful
 ```ts twoslash
 // @noErrors
 // src/routes/api/rpc/[...path]/+server.ts
-import { silgiSvelteKit } from 'silgi/sveltekit'
+import { createHandler } from 'silgi/sveltekit'
 import { appRouter } from '$lib/server/rpc'
 
-const handler = silgiSvelteKit(appRouter, {
+const handler = createHandler(appRouter, {
   prefix: '/api/rpc',
   context: (event) => ({
     db: getDB(),
@@ -41,7 +41,7 @@ export async function handle({ event, resolve }) {
 ```ts twoslash
 // @noErrors
 // src/routes/api/rpc/[...path]/+server.ts
-const handler = silgiSvelteKit(appRouter, {
+const handler = createHandler(appRouter, {
   context: (event) => ({
     user: event.locals.user,
   }),

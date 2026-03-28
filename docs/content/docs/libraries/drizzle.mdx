@@ -18,12 +18,12 @@ Install both packages:
   <Tab value='bun'>```bash bun add silgi drizzle-orm ```</Tab>
 </Tabs>
 
-Wrap your Drizzle instance with `instrumentDrizzle`, then use `withSilgiCtx` inside procedures to connect queries to the current request trace:
+Wrap your Drizzle instance with `instrumentDrizzle`, then use `withCtx` inside procedures to connect queries to the current request trace:
 
 ```ts twoslash title="server.ts"
 // @noErrors
 import { silgi } from 'silgi'
-import { instrumentDrizzle, withSilgiCtx } from 'silgi/drizzle'
+import { instrumentDrizzle, withCtx } from 'silgi/drizzle'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import * as schema from './schema'
 
@@ -32,7 +32,7 @@ const db = instrumentDrizzle(drizzle(process.env.DATABASE_URL!, { schema }), { d
 const s = silgi()
 
 const listUsers = s.$resolve(async ({ ctx }) => {
-  return withSilgiCtx(ctx, () => db.select().from(schema.users))
+  return withCtx(ctx, () => db.select().from(schema.users))
 })
 
 export default { fetch: s.handler(s.router({ users: { list: listUsers } })) }
@@ -110,10 +110,10 @@ Transaction queries are automatically detected. They get a `db.tx.` prefix in th
 
 ```ts twoslash title="server.ts"
 // @noErrors
-import { withSilgiCtx } from 'silgi/drizzle'
+import { withCtx } from 'silgi/drizzle'
 
 const createOrder = s.$resolve(async ({ ctx, input }) => {
-  return withSilgiCtx(ctx, () =>
+  return withCtx(ctx, () =>
     db.transaction(async (tx) => {
       // span: db.tx.insert.order
       const [order] = await tx.insert(schema.orders).values(input).returning()
@@ -143,5 +143,5 @@ const db = instrumentDrizzle(drizzle(process.env.DATABASE_URL!), {
 You still get span names, durations, and operation types — just not the raw SQL.
 
 <Callout type='warn'>
-  `withSilgiCtx` is required. Without it, queries execute normally but are invisible to silgi analytics. Always wrap your database calls inside `withSilgiCtx(ctx, () => ...)` in your procedures.
+  `withCtx` is required. Without it, queries execute normally but are invisible to silgi analytics. Always wrap your database calls inside `withCtx(ctx, () => ...)` in your procedures.
 </Callout>

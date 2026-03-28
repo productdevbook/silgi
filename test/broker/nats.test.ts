@@ -1,7 +1,7 @@
 import { afterAll, describe, it, expect } from 'vitest'
 import { z } from 'zod'
 
-import { silgiBroker, BrokerLink } from '#src/broker/index.ts'
+import { createBroker, BrokerLink } from '#src/broker/index.ts'
 import { natsBroker } from '#src/broker/nats.ts'
 import { createClient } from '#src/client/client.ts'
 import { SilgiError } from '#src/core/error.ts'
@@ -63,7 +63,7 @@ describe.skipIf(!available)('Broker adapter (NATS)', () => {
   it('handles basic RPC call', async () => {
     const subject = uniqueSubject()
     const driver = natsBroker(nc!)
-    const dispose = await silgiBroker(testRouter, driver, { subject })
+    const dispose = await createBroker(testRouter, driver, { subject })
     const client = createClient<typeof testRouter>(new BrokerLink(driver, { subject }))
 
     const result = await client.health()
@@ -74,7 +74,7 @@ describe.skipIf(!available)('Broker adapter (NATS)', () => {
   it('passes input and validates schema', async () => {
     const subject = uniqueSubject()
     const driver = natsBroker(nc!)
-    const dispose = await silgiBroker(testRouter, driver, { subject })
+    const dispose = await createBroker(testRouter, driver, { subject })
     const client = createClient<typeof testRouter>(new BrokerLink(driver, { subject }))
 
     const result = await client.echo({ msg: 'nats-hello' })
@@ -85,7 +85,7 @@ describe.skipIf(!available)('Broker adapter (NATS)', () => {
   it('handles numeric computation', async () => {
     const subject = uniqueSubject()
     const driver = natsBroker(nc!)
-    const dispose = await silgiBroker(testRouter, driver, { subject })
+    const dispose = await createBroker(testRouter, driver, { subject })
     const client = createClient<typeof testRouter>(new BrokerLink(driver, { subject }))
 
     const result = await client.add({ a: 10, b: 20 })
@@ -96,7 +96,7 @@ describe.skipIf(!available)('Broker adapter (NATS)', () => {
   it('resolves nested procedures', async () => {
     const subject = uniqueSubject()
     const driver = natsBroker(nc!)
-    const dispose = await silgiBroker(testRouter, driver, { subject })
+    const dispose = await createBroker(testRouter, driver, { subject })
     const client = createClient<typeof testRouter>(new BrokerLink(driver, { subject }))
 
     const result = await client.nested.deep.value()
@@ -107,7 +107,7 @@ describe.skipIf(!available)('Broker adapter (NATS)', () => {
   it('returns SilgiError for thrown errors', async () => {
     const subject = uniqueSubject()
     const driver = natsBroker(nc!)
-    const dispose = await silgiBroker(testRouter, driver, { subject })
+    const dispose = await createBroker(testRouter, driver, { subject })
     const client = createClient<typeof testRouter>(new BrokerLink(driver, { subject }))
 
     await expect(client.fail()).rejects.toMatchObject({
@@ -121,7 +121,7 @@ describe.skipIf(!available)('Broker adapter (NATS)', () => {
   it('returns NOT_FOUND for unknown procedure', async () => {
     const subject = uniqueSubject()
     const driver = natsBroker(nc!)
-    const dispose = await silgiBroker(testRouter, driver, { subject })
+    const dispose = await createBroker(testRouter, driver, { subject })
     const client = createClient<typeof testRouter>(new BrokerLink(driver, { subject }))
 
     await expect((client as any).nonexistent()).rejects.toMatchObject({
@@ -134,7 +134,7 @@ describe.skipIf(!available)('Broker adapter (NATS)', () => {
   it('handles concurrent requests', async () => {
     const subject = uniqueSubject()
     const driver = natsBroker(nc!)
-    const dispose = await silgiBroker(testRouter, driver, { subject })
+    const dispose = await createBroker(testRouter, driver, { subject })
     const client = createClient<typeof testRouter>(new BrokerLink(driver, { subject }))
 
     const results = await Promise.all([
@@ -152,7 +152,7 @@ describe.skipIf(!available)('Broker adapter (NATS)', () => {
   it('handles async procedures', async () => {
     const subject = uniqueSubject()
     const driver = natsBroker(nc!)
-    const dispose = await silgiBroker(testRouter, driver, { subject })
+    const dispose = await createBroker(testRouter, driver, { subject })
     const client = createClient<typeof testRouter>(new BrokerLink(driver, { subject }))
 
     const result = await client.slow()
@@ -167,8 +167,8 @@ describe.skipIf(!available)('Broker adapter (NATS)', () => {
     const driver1 = natsBroker(nc!, { queue: 'workers' })
     const driver2 = natsBroker(nc!, { queue: 'workers' })
 
-    const dispose1 = await silgiBroker(testRouter, driver1, { subject })
-    const dispose2 = await silgiBroker(testRouter, driver2, { subject })
+    const dispose1 = await createBroker(testRouter, driver1, { subject })
+    const dispose2 = await createBroker(testRouter, driver2, { subject })
 
     // Client uses either driver (they share the NATS connection)
     const clientDriver = natsBroker(nc!)
@@ -190,8 +190,8 @@ describe.skipIf(!available)('Broker adapter (NATS)', () => {
     const subject2 = uniqueSubject()
     const driver = natsBroker(nc!)
 
-    const dispose1 = await silgiBroker(testRouter, driver, { subject: subject1 })
-    const dispose2 = await silgiBroker(testRouter, driver, { subject: subject2 })
+    const dispose1 = await createBroker(testRouter, driver, { subject: subject1 })
+    const dispose2 = await createBroker(testRouter, driver, { subject: subject2 })
 
     const client1 = createClient<typeof testRouter>(new BrokerLink(driver, { subject: subject1 }))
     const client2 = createClient<typeof testRouter>(new BrokerLink(driver, { subject: subject2 }))

@@ -13,14 +13,14 @@ const testRouter = k.router({
 
 describe('MessagePort adapter', () => {
   it('handles RPC over message port', async () => {
-    const { silgiMessagePort, MessagePortLink } = await import('#src/adapters/message-port.ts')
+    const { createHandler, MessagePortLink } = await import('#src/adapters/message-port.ts')
     const { createClient } = await import('#src/client/client.ts')
 
     // Create a mock MessageChannel
     const channel = new MessageChannel()
 
     // Server side
-    const dispose = silgiMessagePort(testRouter, channel.port1, {
+    const dispose = createHandler(testRouter, channel.port1, {
       context: () => ({ db: 'test' }),
     })
 
@@ -40,11 +40,11 @@ describe('MessagePort adapter', () => {
   })
 
   it('returns error for unknown procedure', async () => {
-    const { silgiMessagePort, MessagePortLink } = await import('#src/adapters/message-port.ts')
+    const { createHandler, MessagePortLink } = await import('#src/adapters/message-port.ts')
     const { createClient } = await import('#src/client/client.ts')
 
     const channel = new MessageChannel()
-    const dispose = silgiMessagePort(testRouter, channel.port1, {
+    const dispose = createHandler(testRouter, channel.port1, {
       context: () => ({}),
     })
 

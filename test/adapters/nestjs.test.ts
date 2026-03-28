@@ -24,7 +24,7 @@ async function post(url: string, body?: unknown): Promise<{ status: number; data
   return { status: res.status, data: await res.json() }
 }
 
-describe('silgiNestHandler() — real Express server', () => {
+describe('createHandler() — real Express server', () => {
   let url: string
   let close: () => void
 
@@ -32,9 +32,9 @@ describe('silgiNestHandler() — real Express server', () => {
 
   it('starts and handles requests like a NestJS controller', async () => {
     const express = (await import('express')).default
-    const { silgiNestHandler } = await import('#src/adapters/nestjs.ts')
+    const { createHandler } = await import('#src/adapters/nestjs.ts')
 
-    const rpcHandler = silgiNestHandler(testRouter, {
+    const rpcHandler = createHandler(testRouter, {
       context: (req: any) => ({ ip: req.ip }),
     })
 

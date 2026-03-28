@@ -9,11 +9,11 @@
  *
  * @example
  * ```ts
- * import { silgiTracing } from 'silgi/better-auth'
+ * import { tracing } from 'silgi/better-auth'
  *
  * const auth = betterAuth({
  *   plugins: [
- *     silgiTracing(),  // auto-traces all auth operations
+ *     tracing(),  // auto-traces all auth operations
  *   ],
  * })
  * ```
@@ -28,7 +28,7 @@ const ctxStorage = new AsyncLocalStorage<Record<string, unknown>>()
 
 // ── Types ────────────────────────────────────────────
 
-export interface SilgiTracingConfig {
+export interface TracingConfig {
   /** Capture request body as span input (default: true) */
   captureInput?: boolean
   /** Capture response data as span output (default: true) */
@@ -169,7 +169,7 @@ const requestMetas = new WeakMap<Request, RequestMeta>()
  * @param config - Optional configuration
  * @returns A Better Auth plugin (typed as `any` to avoid requiring better-auth types at build time)
  */
-export function silgiTracing(config?: SilgiTracingConfig): any {
+export function tracing(config?: TracingConfig): any {
   const captureInput = config?.captureInput ?? true
   const captureOutput = config?.captureOutput ?? true
   const wrapMiddleware = config?.createAuthMiddleware ?? ((fn: any) => fn)
@@ -306,18 +306,18 @@ const AUTH_INSTRUMENTED = '__silgiBetterAuthInstrumented'
 
 /**
  * Instrument a Better Auth instance to trace all `auth.api.*` method calls.
- * Works with `withSilgiCtx` — programmatic calls from background jobs,
+ * Works with `withCtx` — programmatic calls from background jobs,
  * server-side session fetches etc. are traced when context is available.
  *
  * @example
  * ```ts
- * import { instrumentBetterAuth, withSilgiCtx } from 'silgi/better-auth'
+ * import { instrumentBetterAuth, withCtx } from 'silgi/better-auth'
  *
  * const auth = instrumentBetterAuth(betterAuth({ ... }))
  *
  * // In a silgi procedure:
  * const me = s.$resolve(async ({ ctx }) => {
- *   return withSilgiCtx(ctx, () => auth.api.getSession({ headers: ctx.headers }))
+ *   return withCtx(ctx, () => auth.api.getSession({ headers: ctx.headers }))
  * })
  * ```
  */
@@ -356,7 +356,7 @@ export function instrumentBetterAuth<T extends Record<string, any>>(auth: T): T 
 /**
  * Run a function with silgi context available to instrumented Better Auth API calls.
  */
-export function withSilgiCtx<T>(ctx: Record<string, unknown>, fn: () => T): T {
+export function withCtx<T>(ctx: Record<string, unknown>, fn: () => T): T {
   return ctxStorage.run(ctx, fn)
 }
 

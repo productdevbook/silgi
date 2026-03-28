@@ -54,10 +54,10 @@ Pass your router and the driver. This is identical to how you'd use `handler()` 
 
 ```ts twoslash
 // @noErrors
-import { silgiBroker } from 'silgi/broker'
+import { createBroker } from 'silgi/broker'
 import { appRouter } from './router'
 
-await silgiBroker(appRouter, driver, {
+await createBroker(appRouter, driver, {
   context: () => ({ db: getDB() }),
 })
 ```
@@ -129,10 +129,10 @@ const driver = redisBroker(ioredisTransport(redis, redis.duplicate()))
 
 ```ts twoslash
 // @noErrors
-import { silgiBroker } from 'silgi/broker'
+import { createBroker } from 'silgi/broker'
 import { appRouter } from './router'
 
-await silgiBroker(appRouter, driver, {
+await createBroker(appRouter, driver, {
   context: () => ({ db: getDB() }),
 })
 ```
@@ -187,11 +187,11 @@ Use `memoryBroker()` in your tests — it works the same way but runs in-memory,
 
 ```ts twoslash
 // @noErrors
-import { silgiBroker, BrokerLink, memoryBroker } from 'silgi/broker'
+import { createBroker, BrokerLink, memoryBroker } from 'silgi/broker'
 import { createClient } from 'silgi/client'
 
 const driver = memoryBroker()
-await silgiBroker(appRouter, driver)
+await createBroker(appRouter, driver)
 const client = createClient<AppRouter>(new BrokerLink(driver))
 
 // now test as usual

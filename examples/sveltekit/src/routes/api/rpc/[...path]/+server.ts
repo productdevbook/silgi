@@ -1,7 +1,7 @@
 import { appRouter } from '$lib/server/rpc'
-import { silgiSvelteKit } from 'silgi/sveltekit'
+import { createHandler } from 'silgi/sveltekit'
 
-const handler = silgiSvelteKit(appRouter, {
+const handler = createHandler(appRouter, {
   prefix: '/api/rpc',
   context: () => ({ db: 'sveltekit-db' }),
 })

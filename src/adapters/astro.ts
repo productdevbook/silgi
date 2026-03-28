@@ -4,10 +4,10 @@
  * @example
  * ```ts
  * // src/pages/api/rpc/[...path].ts
- * import { silgiAstro } from "silgi/astro"
+ * import { createHandler } from "silgi/astro"
  * import { appRouter } from "~/server/rpc"
  *
- * const handler = silgiAstro(appRouter, {
+ * const handler = createHandler(appRouter, {
  *   prefix: "/api/rpc",
  *   context: (req) => ({ db: getDB() }),
  * })
@@ -29,7 +29,7 @@ export interface AstroAdapterOptions<TCtx extends Record<string, unknown>> exten
  * Create an Astro API route handler.
  * Astro passes { request, params } — we extract request and delegate.
  */
-export function silgiAstro<TCtx extends Record<string, unknown>>(
+export function createHandler<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: AstroAdapterOptions<TCtx> = {},
 ): (ctx: { request: Request; params: Record<string, string> }) => Response | Promise<Response> {

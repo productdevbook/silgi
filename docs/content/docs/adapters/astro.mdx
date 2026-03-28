@@ -12,10 +12,10 @@ Create a catch-all API route:
 ```ts twoslash
 // @noErrors
 // src/pages/api/rpc/[...path].ts
-import { silgiAstro } from 'silgi/astro'
+import { createHandler } from 'silgi/astro'
 import { appRouter } from '~/server/rpc'
 
-const handler = silgiAstro(appRouter, {
+const handler = createHandler(appRouter, {
   prefix: '/api/rpc',
   context: (ctx) => ({
     db: getDB(),

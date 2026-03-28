@@ -12,10 +12,10 @@ Create a catch-all route:
 ```ts twoslash
 // @noErrors
 // app/routes/rpc.$.tsx
-import { silgiRemix } from 'silgi/remix'
+import { createHandler } from 'silgi/remix'
 import { appRouter } from '~/server/rpc'
 
-const handler = silgiRemix(appRouter, {
+const handler = createHandler(appRouter, {
   prefix: '/rpc',
   context: (args) => ({
     db: getDB(),
@@ -41,7 +41,7 @@ The `context` function receives the standard Remix `LoaderFunctionArgs` / `Actio
 
 ```ts twoslash
 // @noErrors
-silgiRemix(appRouter, {
+createHandler(appRouter, {
   context: (args) => ({
     user: args.context.user, // from Remix server context
     params: args.params,

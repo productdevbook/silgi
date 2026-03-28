@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
 
-import { silgiBroker, BrokerLink, memoryBroker } from '#src/broker/index.ts'
+import { createBroker, BrokerLink, memoryBroker } from '#src/broker/index.ts'
 import { createClient } from '#src/client/client.ts'
 import { SilgiError } from '#src/core/error.ts'
 import { silgi } from '#src/silgi.ts'
@@ -38,7 +38,7 @@ const testRouter = k.router({
 
 async function setup(options?: { subject?: string }) {
   const driver = memoryBroker()
-  const dispose = await silgiBroker(testRouter, driver, {
+  const dispose = await createBroker(testRouter, driver, {
     subject: options?.subject,
     context: () => ({ db: 'test-db', token: 'valid' }),
   })
@@ -114,7 +114,7 @@ describe('Broker adapter (memoryBroker)', () => {
 
   it('propagates guard errors', async () => {
     const driver = memoryBroker()
-    const dispose = await silgiBroker(testRouter, driver, {
+    const dispose = await createBroker(testRouter, driver, {
       context: () => ({ db: 'test-db', token: 'invalid' }),
     })
     const client = createClient<typeof testRouter>(new BrokerLink(driver))
@@ -182,10 +182,10 @@ describe('Broker adapter (memoryBroker)', () => {
   it('multiple servers on same subject — routes to first', async () => {
     const driver = memoryBroker()
 
-    const dispose1 = await silgiBroker(testRouter, driver, {
+    const dispose1 = await createBroker(testRouter, driver, {
       context: () => ({ db: 'server-1', token: 'valid' }),
     })
-    const dispose2 = await silgiBroker(testRouter, driver, {
+    const dispose2 = await createBroker(testRouter, driver, {
       context: () => ({ db: 'server-2', token: 'valid' }),
     })
 
@@ -201,7 +201,7 @@ describe('Broker adapter (memoryBroker)', () => {
 
   it('fails gracefully on malformed JSON payload', async () => {
     const driver = memoryBroker()
-    await silgiBroker(testRouter, driver)
+    await createBroker(testRouter, driver)
 
     // Manually send malformed payload
     const raw = await driver.request('silgi', '{{not-json}}')

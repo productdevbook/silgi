@@ -12,7 +12,7 @@ If you have an existing Express application, Silgi can be mounted as middleware 
 ```ts twoslash
 // @noErrors
 import express from 'express'
-import { silgiExpress } from 'silgi/express'
+import { createHandler } from 'silgi/express'
 
 const app = express()
 app.use(express.json()) // Required for POST body parsing
@@ -23,7 +23,7 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }))
 // Silgi RPC under /rpc
 app.use(
   '/rpc',
-  silgiExpress(appRouter, {
+  createHandler(appRouter, {
     context: (req) => ({
       db: getDB(),
       user: req.user,
@@ -41,7 +41,7 @@ The `context` function receives the Express request object. Bridge your existing
 
 ```ts twoslash
 // @noErrors
-silgiExpress(appRouter, {
+createHandler(appRouter, {
   context: (req) => ({
     user: req.user, // from passport or similar
     ip: req.ip,
