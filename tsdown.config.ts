@@ -18,6 +18,7 @@ export default defineConfig({
     'src/integrations/tanstack-query/index.ts',
     'src/integrations/tanstack-query/ssr.ts',
     'src/integrations/pinia-colada/index.ts',
+    'src/integrations/hey-api/index.ts',
     'src/integrations/react/index.ts',
     'src/integrations/drizzle/index.ts',
     'src/integrations/ai/index.ts',

@@ -87,6 +87,10 @@
       "import": "./dist/integrations/pinia-colada/index.mjs",
       "types": "./dist/integrations/pinia-colada/index.d.mts"
     },
+    "./hey-api": {
+      "import": "./dist/integrations/hey-api/index.mjs",
+      "types": "./dist/integrations/hey-api/index.d.mts"
+    },
     "./drizzle": {
       "import": "./dist/integrations/drizzle/index.mjs",
       "types": "./dist/integrations/drizzle/index.d.mts"
