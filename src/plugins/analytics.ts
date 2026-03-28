@@ -924,6 +924,10 @@ export function analyticsAuthResponse(pathname: string): Response {
   return new Response(analyticsLoginHTML, { status: 401, headers: { 'content-type': 'text/html' } })
 }
 
+function jsonResponse(data: unknown, headers: HeadersInit): Response {
+  return new Response(JSON.stringify(data), { headers })
+}
+
 /** Serve analytics dashboard and API routes. */
 export async function serveAnalyticsRoute(
   pathname: string,
@@ -934,15 +938,15 @@ export async function serveAnalyticsRoute(
   const mdHeaders = { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-cache' }
 
   if (pathname === 'analytics/_api/stats') {
-    return new Response(JSON.stringify(collector.toJSON()), { headers: jsonCacheHeaders })
+    return jsonResponse(collector.toJSON(), jsonCacheHeaders)
   }
   if (pathname === 'analytics/_api/errors') {
     const errors = await collector.getErrors()
-    return new Response(JSON.stringify(errors), { headers: jsonCacheHeaders })
+    return jsonResponse(errors, jsonCacheHeaders)
   }
   if (pathname === 'analytics/_api/requests') {
     const requests = await collector.getRequests()
-    return new Response(JSON.stringify(requests), { headers: jsonCacheHeaders })
+    return jsonResponse(requests, jsonCacheHeaders)
   }
   if (pathname.startsWith('analytics/_api/requests/') && pathname.endsWith('/md')) {
     const id = Number(pathname.slice('analytics/_api/requests/'.length, -'/md'.length))

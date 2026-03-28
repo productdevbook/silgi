@@ -236,6 +236,7 @@
     "bench:http": "node --experimental-strip-types bench/http.ts",
     "bench:http:bun": "bun bench/http-bun.ts",
     "bench:memory": "node --expose-gc --experimental-strip-types bench/memory.ts",
+    "bench:types": "tsx bench/types.ts",
     "bench:bun": "bun test/bun-compat.ts",
     "play": "pnpm build && pnpm --filter silgi-playground dev",
     "lint": "oxlint . && oxfmt --check --ignore-path .oxfmtignore .",
@@ -264,6 +265,7 @@
     "unstorage": "^2.0.0-alpha.7"
   },
   "devDependencies": {
+    "@ark/attest": "^0.56.0",
     "@hono/node-server": "^1.19.11",
     "@nuxt/test-utils": "^4.0.0",
     "@orpc/client": "^1.13.9",
