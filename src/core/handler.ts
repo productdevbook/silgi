@@ -10,6 +10,7 @@
 
 import { createContext, releaseContext } from '../compile.ts'
 import { compileRouter } from '../compile.ts'
+import { analyticsTraceMap } from '../plugins/analytics.ts'
 
 import { detectResponseFormat, encodeResponse, makeErrorResponse } from './codec.ts'
 import { applyContext } from './dispatch.ts'
@@ -162,6 +163,10 @@ export function createFetchHandler(
       const baseCtx = baseCtxResult instanceof Promise ? await baseCtxResult : baseCtxResult
       applyContext(ctx, baseCtx)
       if (match.params) ctx.params = match.params
+
+      // Inject analytics trace into context (bridges Drizzle/Better Auth tracing)
+      const reqTrace = analyticsTraceMap.get(request)
+      if (reqTrace) ctx.__analyticsTrace = reqTrace
 
       // Input
       if (!route.passthrough) rawInput = await parseInput(request, url, qMark)
