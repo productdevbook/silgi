@@ -509,8 +509,8 @@ const createUserWithEmail = s
       { kind: 'db', detail: `INSERT INTO users (name, email) VALUES ('${input.name}', '${input.email}')` },
     )
 
-    // Pass { ctx } — automatically adds span to parent request trace
-    sendWelcomeEmail.dispatch({ userId: user.id, email: user.email }, { ctx })
+    // Pass ctx — automatically adds span to parent request trace
+    sendWelcomeEmail.dispatch({ userId: user.id, email: user.email }, ctx)
 
     return user
   })

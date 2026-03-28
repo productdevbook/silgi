@@ -31,9 +31,10 @@ export interface TaskDef<TInput = unknown, TOutput = unknown> {
   readonly route: { summary?: string; tags?: string[] } | null
   readonly meta: null
   readonly _contextFactory: (() => unknown | Promise<unknown>) | null
+  /** Dispatch the task. Pass ctx from a procedure to auto-record a trace span. */
   dispatch: undefined extends TInput
-    ? (input?: TInput, options?: { ctx?: Record<string, unknown> }) => Promise<TOutput>
-    : (input: TInput, options?: { ctx?: Record<string, unknown> }) => Promise<TOutput>
+    ? (input?: TInput, ctx?: Record<string, unknown>) => Promise<TOutput>
+    : (input: TInput, ctx?: Record<string, unknown>) => Promise<TOutput>
 }
 
 // ── Analytics callback ───────────────────────────────
@@ -81,12 +82,12 @@ export function createTaskFromProcedure(
   }
 
   // Programmatic dispatch
-  const dispatch = async (rawInput?: unknown, opts?: { ctx?: Record<string, unknown> }) => {
+  const dispatch = async (rawInput?: unknown, parentCtx?: Record<string, unknown>) => {
     const input = inputSchema ? await validateSchema(inputSchema, rawInput) : rawInput
     const ctx: any = contextFactory ? await (contextFactory as Function)() : {}
 
     // If parent ctx passed, record span on parent request trace
-    const parentTrace = (opts?.ctx as any)?.__analyticsTrace
+    const parentTrace = (parentCtx as any)?.__analyticsTrace
     const spanStart = parentTrace ? performance.now() : 0
 
     // Inject RequestTrace for trace() calls inside the task

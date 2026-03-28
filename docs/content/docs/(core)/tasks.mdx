@@ -60,13 +60,13 @@ await sendEmail.dispatch({ to: 'alice@example.com', subject: 'Welcome' })
 
 ### From a procedure — pass `{ ctx }` for tracing
 
-When you dispatch a task from inside a procedure, pass `{ ctx }`. This automatically adds a span to the parent request's trace timeline:
+When you dispatch a task from inside a procedure, pass `ctx` as the second argument. This automatically adds a span to the parent request's trace timeline:
 
 ```ts
 const createUser = s.$input(z.object({ name: z.string(), email: z.string() })).$resolve(async ({ input, ctx }) => {
   const user = await ctx.db.users.create(input)
 
-  sendEmail.dispatch({ to: input.email, subject: 'Welcome' }, { ctx })
+  sendEmail.dispatch({ to: input.email, subject: 'Welcome' }, ctx)
 
   return user
 })
@@ -81,7 +81,7 @@ users/create — 2 spans, 4.2ms total
 ```
 
 <Callout>
-  `{ctx}` is optional. Without it, the task still runs and tracks analytics, but no span appears on the parent request.
+  `ctx` is optional. Without it, the task still runs and tracks analytics, but no span appears on the parent request.
 </Callout>
 
 ## Mounting on router
