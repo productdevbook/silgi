@@ -6,6 +6,7 @@ import { RequestDetailPage } from '@/components/request-detail-page'
 import { Requests } from '@/components/requests'
 import { SessionDetailPage } from '@/components/session-detail-page'
 import { Sessions } from '@/components/sessions'
+import { TaskDetailPage } from '@/components/task-detail-page'
 import { Tasks } from '@/components/Tasks'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -88,8 +89,11 @@ export default function App() {
           {route.page === 'requests' && route.id && (
             <RequestDetailPage requests={analytics.requests} id={route.id} navigate={navigate} />
           )}
-          {route.page === 'tasks' && (
-            <Tasks data={analytics.data} taskExecutions={analytics.taskExecutions} scheduledTasks={analytics.scheduledTasks} />
+          {route.page === 'tasks' && !route.id && (
+            <Tasks data={analytics.data} taskExecutions={analytics.taskExecutions} scheduledTasks={analytics.scheduledTasks} navigate={navigate} />
+          )}
+          {route.page === 'tasks' && route.id && (
+            <TaskDetailPage taskExecutions={analytics.taskExecutions} id={route.id} navigate={navigate} />
           )}
           {route.page === 'sessions' && !route.id && <Sessions requests={analytics.requests} navigate={navigate} />}
           {route.page === 'sessions' && route.id && (
