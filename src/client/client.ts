@@ -4,19 +4,23 @@
  * Sub-proxies are cached in a Map for O(1) repeated access.
  */
 
-import type { InferClient } from '../types.ts'
-import type { ClientLink, ClientContext, ClientOptions } from './types.ts'
+import type { InferClient, RouterDef } from '../types.ts'
+import type { ClientLink, ClientContext, ClientOptions, NestedClient } from './types.ts'
 
 /**
  * Create a type-safe client from a link.
  *
  * ```ts
+ * // From router type (recommended)
  * const client = createClient<typeof appRouter>(link)
+ *
+ * // From pre-inferred client type
+ * const client = createClient<Client>(link)
  * ```
  */
 export function createClient<T, TClientContext extends ClientContext = Record<never, never>>(
   link: ClientLink<TClientContext>,
-): InferClient<T> {
+): T extends RouterDef ? InferClient<T> : T {
   return createClientProxy(link, []) as any
 }
 

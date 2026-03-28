@@ -16,7 +16,8 @@
     "outDir": "dist",
     "paths": {
       "silgi": ["./src/index.ts"],
-      "silgi/*": ["./src/*/index.ts"]
+      "silgi/*": ["./src/*/index.ts"],
+      "#src/*": ["./src/*"]
     }
   },
   "include": ["src"]
