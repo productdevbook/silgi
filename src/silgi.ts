@@ -281,7 +281,11 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
 
     $resolve: ((fn: any) => createProcedure('query', fn)) as any,
     $input: ((schema: any) => createProcedureBuilder('query').$input(schema)) as any,
-    $use: ((...middleware: any[]) => createProcedureBuilder('query').$use(...middleware)) as any,
+    $use: ((...middleware: any[]) => {
+      const b = createProcedureBuilder('query') as any
+      for (const m of middleware) b.$use(m)
+      return b
+    }) as any,
     $output: ((schema: any) => createProcedureBuilder('query').$output(schema)) as any,
     $errors: ((errors: any) => createProcedureBuilder('query').$errors(errors)) as any,
     $route: ((route: any) => createProcedureBuilder('query').$route(route)) as any,

@@ -7,23 +7,16 @@
 import type { InferClient } from '../types.ts'
 import type { ClientLink, ClientContext, ClientOptions } from './types.ts'
 
-type ResolveClient<T> = InferClient<T> extends never ? T : InferClient<T>
-
 /**
  * Create a type-safe client from a link.
  *
- * Accepts either a router type (auto-inferred) or a pre-inferred client type:
  * ```ts
- * // Recommended — pass AppRouter directly
- * const client = createClient<AppRouter>(link)
- *
- * // Also works — explicit InferClient
- * const client = createClient<InferClient<AppRouter>>(link)
+ * const client = createClient<typeof appRouter>(link)
  * ```
  */
 export function createClient<T, TClientContext extends ClientContext = Record<never, never>>(
   link: ClientLink<TClientContext>,
-): ResolveClient<T> {
+): InferClient<T> {
   return createClientProxy(link, []) as any
 }
 

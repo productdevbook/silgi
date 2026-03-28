@@ -12,7 +12,7 @@
  */
 
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
-import type { ProcedureDef, ProcedureType, ErrorDef, MiddlewareDef, ResolveContext, Route, Meta } from './types.ts'
+import type { ProcedureDef, ProcedureType, ErrorDef, GuardDef, WrapDef, MiddlewareDef, ResolveContext, Route, Meta } from './types.ts'
 
 // ── Builder Interfaces ──────────────────────────────
 
@@ -24,10 +24,13 @@ export interface ProcedureBuilder<
   TInput = undefined,
   TErrors extends ErrorDef = {},
 > {
-  /** Add middleware (guards and wraps) */
-  $use<_TReturn extends Record<string, unknown> | void>(
-    ...middleware: readonly MiddlewareDef[]
-  ): ProcedureBuilder<TType, TBaseCtx, TCtx, TInput, TErrors>
+  /** Add a guard — enriches context with guard return type */
+  $use<TReturn extends Record<string, unknown> | void, TGErrors extends ErrorDef = {}>(
+    guard: GuardDef<TCtx, TReturn, TGErrors>,
+  ): ProcedureBuilder<TType, TBaseCtx, TReturn extends Record<string, unknown> ? TCtx & TReturn : TCtx, TInput, TGErrors & TErrors>
+
+  /** Add a wrap middleware — does not change context type */
+  $use(wrap: WrapDef<TCtx>): ProcedureBuilder<TType, TBaseCtx, TCtx, TInput, TErrors>
 
   /** Set input schema */
   $input<TSchema extends AnySchema>(
@@ -67,10 +70,13 @@ export interface ProcedureBuilderWithOutput<
   TOutputResolved,
   TErrors extends ErrorDef,
 > {
-  /** Add middleware */
-  $use(
-    ...middleware: readonly MiddlewareDef[]
-  ): ProcedureBuilderWithOutput<TType, TBaseCtx, TCtx, TInput, TOutputResolved, TErrors>
+  /** Add a guard — enriches context with guard return type */
+  $use<TReturn extends Record<string, unknown> | void, TGErrors extends ErrorDef = {}>(
+    guard: GuardDef<TCtx, TReturn, TGErrors>,
+  ): ProcedureBuilderWithOutput<TType, TBaseCtx, TReturn extends Record<string, unknown> ? TCtx & TReturn : TCtx, TInput, TOutputResolved, TGErrors & TErrors>
+
+  /** Add a wrap middleware — does not change context type */
+  $use(wrap: WrapDef<TCtx>): ProcedureBuilderWithOutput<TType, TBaseCtx, TCtx, TInput, TOutputResolved, TErrors>
 
   /** Set typed errors */
   $errors<TNewErrors extends ErrorDef>(
@@ -115,7 +121,7 @@ class ProcBuilder {
 
   $use(...middleware: MiddlewareDef[]) {
     if (this.use) (this.use as MiddlewareDef[]).push(...middleware)
-    else this.use = middleware
+    else this.use = [...middleware]
     return this
   }
 
@@ -148,6 +154,12 @@ class ProcBuilder {
     this.resolve = fn
     return this as unknown as ProcedureDef
   }
+}
+
+// Compile-time guard: ProcBuilder properties must match ProcedureDef shape.
+// If ProcedureDef gains a property that ProcBuilder lacks, this line will error.
+type _AssertShape = {
+  [K in keyof ProcedureDef]: K extends keyof ProcBuilder ? ProcBuilder[K] : never
 }
 
 export function createProcedureBuilder<TType extends ProcedureType, TBaseCtx extends Record<string, unknown>>(
