@@ -1,8 +1,86 @@
 ---
 title: 0.1.0-beta.10
-description: Client-side $route resolution, extractRoutes(), path param substitution, createSafeClient, OTel tracing, SSE consumption, WebSocket client, and 8 more client features.
+description: Type-safe background tasks with cron scheduling, dispatch tracing, analytics dashboard, client $route resolution, extractRoutes(), and 8 more client features.
 version: 0.1.0-beta.10
 date: 2026-03-29
+---
+
+## Type-safe background tasks
+
+New task system with the same builder chain as procedures — `$use()`, `$input()`, `$errors()`, `$task()`:
+
+```ts
+const sendEmail = s.$input(z.object({ to: z.string(), subject: z.string(), body: z.string() })).$task({
+  name: 'send-email',
+  resolve: async ({ input, ctx }) => {
+    await ctx.mailer.send(input)
+    return { sent: true }
+  },
+})
+```
+
+### Dispatch from procedures
+
+Call `task.dispatch(input, ctx)` from inside a procedure. Passing `ctx` links the task to the parent request's trace:
+
+```ts
+const createUser = s.$resolve(async ({ input, ctx }) => {
+  const user = await ctx.db.users.create(input)
+  sendEmail.dispatch({ to: input.email, subject: 'Welcome' }, ctx)
+  return user
+})
+```
+
+The analytics dashboard shows the task as a `queue` span on the parent request's waterfall:
+
+```
+users/create — 2 spans, 4.2ms total
+├─ db.users.create     (db)     1.1ms
+└─ task:send-email     (queue)  92.3ms
+```
+
+### Cron scheduling
+
+Add `cron` to `$task()` for automatic scheduling. Tasks are auto-discovered when the router is served:
+
+```ts
+const dailyReport = s.$task({
+  name: 'daily-report',
+  cron: '0 9 * * *',
+  resolve: async ({ ctx }) => ctx.db.reports.generateDaily(),
+})
+```
+
+### trace() inside tasks
+
+Tasks get their own `RequestTrace` instance. Use `ctx.trace()` to record spans that appear in the analytics dashboard:
+
+```ts
+const syncInventory = s.$task({
+  name: 'sync-inventory',
+  cron: '*/10 * * * *',
+  resolve: async ({ ctx }) => {
+    const items = await ctx.trace('api.fetch', () => fetchExternalAPI())
+    await ctx.trace('db.upsert', () => ctx.db.inventory.upsertMany(items))
+    return { synced: items.length }
+  },
+})
+```
+
+### Analytics dashboard
+
+The analytics dashboard now includes:
+
+- **Task list** — runs, errors, avg duration per task
+- **Scheduled tasks panel** — cron expression, next/last run, run count, error count
+- **Execution detail** — click any run to see input, output, error, and trace spans
+
+See [Tasks docs](/docs/tasks) and [Analytics docs](/docs/analytics) for the full guide.
+
+### `dispatch(input, ctx)` API
+
+The dispatch signature changed from `dispatch(input, { ctx })` to `dispatch(input, ctx)` — simpler and consistent with how context flows through the framework.
+
 ---
 
 ## `$route({ path })` now works with the client
