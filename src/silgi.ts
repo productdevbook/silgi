@@ -353,12 +353,22 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
       const server = await createServeHandler(routerDef, contextFactory, hooks, options)
 
       // Auto-discover and start cron tasks from router
-      const { collectCronTasks, startCronJobs } = await import('./core/task.ts')
+      const { collectCronTasks, startCronJobs, stopCronJobs } = await import('./core/task.ts')
       const cronTasks = collectCronTasks(routerDef)
       if (cronTasks.length > 0) {
         await startCronJobs(cronTasks)
         console.log(`  ${cronTasks.length} cron task(s) scheduled`)
       }
+
+      // Stop cron jobs on server close and process signals
+      const originalClose = server.close.bind(server)
+      server.close = async (force?: boolean) => {
+        stopCronJobs()
+        return originalClose(force)
+      }
+      const onSignal = () => stopCronJobs()
+      process.once('SIGINT', onSignal)
+      process.once('SIGTERM', onSignal)
 
       return server
     },
