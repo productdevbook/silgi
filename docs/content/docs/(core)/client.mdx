@@ -130,11 +130,11 @@ The `createLink` function accepts these options:
 | `retryDelay` | `number \| (ctx) => number`          | `0`         | Delay between retries in milliseconds                         |
 | `timeout`    | `number`                             | `30000`     | Request timeout in milliseconds                               |
 | `protocol`   | `'json' \| 'messagepack' \| 'devalue'` | `'json'`  | Wire protocol for encoding                                    |
-| `router`     | `RouterDef`                          | `undefined` | Router definition — resolves `$route({ path })` on the client |
+| `router`     | `RouterDef`                          | `undefined` | Router definition — **required** when procedures use `$route({ path })` |
 
 ### Route resolution
 
-When procedures use `$route({ path, method })`, pass the router definition to the link so the client calls the correct URL:
+When any procedure uses `$route({ path, method })`, you **must** pass the router definition to the link. Without it, the client sends requests to the tree path (e.g. `POST /commerce/orders/list`) which doesn't exist on the server — only the custom path (`GET /api/orders`) is registered.
 
 ```ts twoslash
 // @noErrors
@@ -143,22 +143,22 @@ import { appRouter } from './server'
 
 const link = createLink({
   url: 'http://localhost:3000',
-  router: appRouter,
+  router: appRouter, // required when using $route({ path })
 })
 ```
 
-Now `client.commerce.orders.list()` sends `GET /api/orders` instead of `POST /commerce/orders/list`. Path parameters like `:id` are automatically extracted from the input and substituted into the URL:
+Now `client.commerce.orders.list()` correctly sends `GET /api/orders`. Path parameters like `:id` are automatically extracted from the input and substituted into the URL:
 
 ```ts twoslash
 // @noErrors
 // Server: .$route({ method: 'GET', path: '/api/users/:id' })
 // Client call:
 const user = await client.users.byId({ id: '42' })
-// → GET /api/users/42
+// → GET /api/users/42 (id is extracted from input and placed in the URL)
 ```
 
-<Callout type='info'>
-  Without the `router` option, the client falls back to the default tree path (`POST /commerce/orders/list`). The `router` option is only needed when procedures use `$route({ path })`.
+<Callout type='warn'>
+  If you use `$route({ path })` on any procedure but forget to pass `router` to the link, the client will get 404 errors. The `router` option is only optional when **no** procedures use custom paths.
 </Callout>
 
 ### Authentication headers
