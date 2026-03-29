@@ -25,14 +25,12 @@ This serves:
 
 ## Procedure metadata
 
-Use `$route()` to add OpenAPI metadata to any procedure:
+Use `$route()` to enrich the generated OpenAPI spec with metadata. Paths are auto-generated from the router tree — you only need `$route()` for documentation metadata like tags, summary, and description:
 
 ```ts twoslash
 // @noErrors
 const getUser = s
   .$route({
-    method: 'GET',
-    path: '/users/:id',
     summary: 'Get user by ID',
     description: 'Returns a single user by their numeric ID.',
     tags: ['Users'],
@@ -49,8 +47,6 @@ const getUser = s
 
 | Option               | Type       | Default                 | Description                                                |
 | -------------------- | ---------- | ----------------------- | ---------------------------------------------------------- |
-| `method`             | `string`   | `'POST'`                | HTTP method (`GET`, `POST`, `PUT`, `DELETE`, etc.)         |
-| `path`               | `string`   | auto from router        | Custom URL path (supports `:param`, `:param(regex)`, `**`) |
 | `summary`            | `string`   | —                       | Short summary shown in API docs                            |
 | `description`        | `string`   | —                       | Detailed description (supports markdown)                   |
 | `tags`               | `string[]` | auto from router        | Tags for grouping operations                               |
@@ -58,28 +54,32 @@ const getUser = s
 | `deprecated`         | `boolean`  | —                       | Mark as deprecated                                         |
 | `successStatus`      | `number`   | `200`                   | HTTP status code for success response                      |
 | `successDescription` | `string`   | `'Successful response'` | Description for success response                           |
+| `method`             | `string`   | `'POST'`                | HTTP method — used for special cases like auth passthrough  |
+| `path`               | `string`   | auto from router        | Custom URL path — used for special cases like auth passthrough |
 
-## Path parameters
+<Callout type='info'>
+  The `method` and `path` fields exist for special cases like wildcard passthrough handlers (e.g. `.$route({ method: '*', path: '/api/auth/**' })`). For normal procedures, paths are auto-generated from the router tree structure.
+</Callout>
 
-`:param` syntax is automatically converted to OpenAPI `{param}` format with proper parameter declarations:
+## Auto-generated paths
+
+OpenAPI paths are generated automatically from the router tree structure. Each procedure's position in the router becomes its path:
 
 ```ts twoslash
 // @noErrors
-const getUser = s
-  .$route({ method: 'GET', path: '/users/:id' })
-  .$input(z.object({ id: z.number() }))
-  .$resolve(...)
-
-// Spec: GET /users/{id}
-// parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }]
+const appRouter = s.router({
+  users: {
+    list: listUsers,     // → POST /users/list
+    create: createUser,  // → POST /users/create
+    get: getUser,        // → POST /users/get
+  },
+  orders: {
+    list: listOrders,    // → POST /orders/list
+  },
+})
 ```
 
-Supported patterns:
-
-- `:id` — required path parameter
-- `:id(\\d+)` — parameter with regex constraint
-- `:id?` — optional parameter
-- `**` — catch-all wildcard (becomes `{path}`)
+No manual path definitions needed — the spec reflects your router structure exactly.
 
 ## Security
 

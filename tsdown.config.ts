@@ -14,8 +14,6 @@ export default defineConfig({
     'src/codec/msgpack.ts',
     'src/codec/devalue.ts',
     'src/ws.ts',
-    'src/contract.ts',
-    'src/vite.ts',
     'src/trpc-interop.ts',
     'src/integrations/zod/index.ts',
     'src/integrations/tanstack-query/index.ts',

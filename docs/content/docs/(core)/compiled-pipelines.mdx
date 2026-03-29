@@ -75,7 +75,7 @@ The procedure tree (nested objects from `s.router()`) is compiled into a **radix
 
 <Mermaid chart='graph TD\n  R[s.router] --> W[Walk tree]\n  W --> U1[users.list]\n  W --> U2[users.get]\n  W --> U3[users.:id]\n  U1 --> RT[rou3 radix tree]\n  U2 --> RT\n  U3 --> RT\n  RT --> M[findRoute]' />
 
-Route matching is O(path length), not O(route count). Custom routes defined with `.$route({ path: '/users/:id', method: 'GET' })` are also compiled into the same tree, including wildcard and parameterized segments.
+Route matching is O(path length), not O(route count). Special-case routes defined with `.$route({ path, method })` (e.g. auth passthrough wildcards) are also compiled into the same tree.
 
 ## What this means for you
 

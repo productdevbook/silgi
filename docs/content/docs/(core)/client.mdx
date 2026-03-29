@@ -1,6 +1,6 @@
 ---
 title: Client
-description: Set up the type-safe client with createLink and createClient — including route resolution, safe clients, streaming, interceptors, and type inference.
+description: Set up the type-safe client with createLink and createClient — safe clients, streaming, interceptors, and type inference.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
@@ -130,46 +130,8 @@ The `createLink` function accepts these options:
 | `retryDelay` | `number \| (ctx) => number`            | `0`         | Delay between retries in milliseconds                                              |
 | `timeout`    | `number`                               | `30000`     | Request timeout in milliseconds                                                    |
 | `protocol`   | `'json' \| 'messagepack' \| 'devalue'` | `'json'`    | Wire protocol for encoding                                                         |
-| `routes`     | `ExtractedRoutes`                      | `undefined` | Route metadata from `extractRoutes()` — **required** when using `$route({ path })` |
 
-### Route resolution
-
-When any procedure uses `$route({ path, method })`, you **must** pass route metadata to the link. Use `extractRoutes()` on the server to generate a lightweight object that contains only path and method info — no server code leaks into the client bundle.
-
-```ts twoslash
-// @noErrors
-// server/routes.ts — safe to import on the client
-import { extractRoutes } from 'silgi'
-import { appRouter } from './router'
-export const routes = extractRoutes(appRouter)
-```
-
-```ts twoslash
-// @noErrors
-// client.ts
-import { createLink } from 'silgi/client/ofetch'
-import { routes } from './server/routes'
-
-const link = createLink({
-  url: 'http://localhost:3000',
-  routes, // required when using $route({ path })
-})
-```
-
-Now `client.commerce.orders.list()` correctly sends `GET /api/orders`. Path parameters like `:id` are automatically extracted from the input and substituted into the URL:
-
-```ts twoslash
-// @noErrors
-// Server: .$route({ method: 'GET', path: '/api/users/:id' })
-// Client call:
-const user = await client.users.byId({ id: '42' })
-// → GET /api/users/42 (id is extracted from input and placed in the URL)
-```
-
-<Callout type='warn'>
-  If you use `$route({path})` on any procedure but forget to pass `routes` to the link, the client will get 404 errors.
-  The `routes` option is only optional when **no** procedures use custom paths.
-</Callout>
+The client always uses POST and resolves procedure paths from the router tree structure (e.g. `client.users.list()` sends `POST /users/list`). No route metadata is needed.
 
 ### Authentication headers
 

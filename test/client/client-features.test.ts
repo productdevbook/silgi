@@ -8,102 +8,9 @@ import { DynamicLink } from '#src/client/dynamic-link.ts'
 import { withOtel } from '#src/client/plugins/otel.ts'
 import { withRetry } from '#src/client/plugins/retry.ts'
 import { createServerClient } from '#src/client/server.ts'
-import { extractRoutes, resolveRoute, substituteParams } from '#src/core/router-utils.ts'
 import { silgi } from '#src/silgi.ts'
 
 const k = silgi({ context: () => ({}) })
-
-// ── Path Param Substitution ────────────────────────
-
-describe('substituteParams()', () => {
-  it('replaces :param with input values', () => {
-    const result = substituteParams('/users/:id/posts/:postId', { id: 42, postId: 99, extra: 'keep' })
-    expect(result.url).toBe('/users/42/posts/99')
-    expect(result.remainingInput).toEqual({ extra: 'keep' })
-  })
-
-  it('removes input entirely when all params used', () => {
-    const result = substituteParams('/users/:id', { id: 42 })
-    expect(result.url).toBe('/users/42')
-    expect(result.remainingInput).toBeUndefined()
-  })
-
-  it('passes through non-object input', () => {
-    const result = substituteParams('/users/:id', 'hello')
-    expect(result.url).toBe('/users/:id')
-    expect(result.remainingInput).toBe('hello')
-  })
-
-  it('encodes param values', () => {
-    const result = substituteParams('/files/:name', { name: 'hello world.txt' })
-    expect(result.url).toBe('/files/hello%20world.txt')
-  })
-})
-
-describe('extractRoutes()', () => {
-  it('extracts only route metadata, no server code', () => {
-    const router = k.router({
-      commerce: {
-        orders: {
-          list: k.$route({ method: 'GET', path: '/api/orders' }).$resolve(() => []),
-        },
-      },
-      health: k.$resolve(() => 'ok'),
-    })
-
-    const routes = extractRoutes(router)
-
-    // Only $route procedures are included
-    expect(routes).toEqual({
-      commerce: {
-        orders: {
-          list: { path: '/api/orders', method: 'GET' },
-        },
-      },
-    })
-
-    // No resolve functions leaked
-    expect((routes as any).commerce.orders.list.resolve).toBeUndefined()
-    // health has no $route, not included
-    expect((routes as any).health).toBeUndefined()
-  })
-
-  it('works with resolveRoute()', () => {
-    const router = k.router({
-      users: {
-        byId: k.$route({ method: 'GET', path: '/api/users/:id' }).$resolve(() => null),
-      },
-    })
-
-    const routes = extractRoutes(router)
-    const resolved = resolveRoute(routes, ['users', 'byId'])
-    expect(resolved).toEqual({ path: '/api/users/:id', method: 'GET' })
-  })
-})
-
-describe('path param substitution in RPCLink', () => {
-  it('substitutes :id in custom route path from input', async () => {
-    const router = k.router({
-      users: {
-        byId: k
-          .$route({ method: 'GET', path: '/api/users/:id' })
-          .$resolve(({ params }: any) => ({ userId: params.id })),
-      },
-    })
-    const handle = k.handler(router)
-
-    // Use extractRoutes for client-safe route metadata
-    const routes = extractRoutes(router)
-    const link = new RPCLink({
-      url: 'http://localhost',
-      routes,
-      fetch: (req) => handle(req instanceof Request ? req : new Request(req)),
-    })
-
-    const result = await link.call(['users', 'byId'], { id: '42' }, {})
-    expect(result).toEqual({ userId: '42' })
-  })
-})
 
 // ── createSafeClient ───────────────────────────────
 
@@ -300,13 +207,13 @@ describe('mapIterator()', () => {
   })
 })
 
-// ── createServerClient with $route ─────────────────
+// ── createServerClient ────────────────────────────
 
-describe('createServerClient $route resolution', () => {
-  it('resolves $route paths for server client', async () => {
+describe('createServerClient', () => {
+  it('calls procedures via tree path', async () => {
     const router = k.router({
       auth: {
-        login: k.$route({ path: '/api/login' }).$resolve(() => ({ token: 'abc' })),
+        login: k.$resolve(() => ({ token: 'abc' })),
       },
     })
     const client = createServerClient(router, { context: () => ({}) })

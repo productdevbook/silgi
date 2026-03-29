@@ -1,28 +1,25 @@
 ---
 title: Monorepo Setup
-description: Share types between frontend and backend in a monorepo using contracts.
+description: Share types between frontend and backend in a monorepo — pure RPC, no route metadata.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
 import { File, Folder, Files } from 'fumadocs-ui/components/files'
 
-The contract-first pattern lets your frontend import types from a shared package without pulling in any server code.
+Silgi works like tRPC — the client uses the router's tree structure to call procedures directly. You only need to share the router **type** between packages. No route metadata, no JSON files, no build-time extraction.
 
 ## Project structure
 
 <Files>
   <Folder name='packages' defaultOpen>
-    <Folder name='api-contract' defaultOpen>
-      <File name='src/index.ts' />
-      <File name='package.json' />
-    </Folder>
     <Folder name='api-server' defaultOpen>
+      <File name='src/rpc.ts' />
+      <File name='src/router.ts' />
       <File name='src/server.ts' />
       <File name='package.json' />
     </Folder>
     <Folder name='frontend' defaultOpen>
       <File name='src/client.ts' />
-      <File name='src/routes.json' />
       <File name='package.json' />
     </Folder>
   </Folder>
@@ -30,124 +27,82 @@ The contract-first pattern lets your frontend import types from a shared package
   <File name='pnpm-workspace.yaml' />
 </Files>
 
-Three packages, each with a single responsibility:
+Two packages. The server defines procedures and exports the router type. The frontend imports only the type.
 
-| Package        | Responsibility           | Dependencies                   |
-| -------------- | ------------------------ | ------------------------------ |
-| `api-contract` | Shared types and schemas | `silgi`, `zod`                 |
-| `api-server`   | Implements the contract  | `api-contract`, `silgi`, `zod` |
-| `frontend`     | Consumes the API         | `api-contract`, `silgi`        |
+| Package      | Responsibility          | Dependencies          |
+| ------------ | ----------------------- | --------------------- |
+| `api-server` | Procedures and router   | `silgi`, `zod`        |
+| `frontend`   | Consumes the API        | `silgi` (client only) |
 
-## 1. Define the contract
+## 1. Define the server
 
-The contract package exports API shape definitions — input/output schemas, route metadata, and error codes. No server logic.
-
-```ts title="packages/api-contract/src/index.ts"
-import { contract } from 'silgi/contract'
-import { z } from 'zod'
-
-export const UserSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  email: z.string().email(),
-})
-
-export const api = contract({
-  users: {
-    list: {
-      type: 'query',
-      input: z.object({ limit: z.number().min(1).max(100).optional() }),
-      output: z.array(UserSchema),
-      route: { method: 'GET', path: '/api/users' },
-    },
-    create: {
-      type: 'mutation',
-      input: z.object({ name: z.string().min(1), email: z.string().email() }),
-      output: UserSchema,
-      errors: { CONFLICT: 409 },
-      route: { method: 'POST', path: '/api/users' },
-    },
-  },
-})
-
-export type AppContract = typeof api
-```
-
-<Callout>
-The contract uses `contract()` from `silgi/contract` — a lightweight function that returns the definition as-is, providing type inference without any runtime behavior.
-</Callout>
-
-## 2. Implement on the server
-
-The server package imports the contract and provides real implementations. Types are enforced at compile time.
-
-```ts title="packages/api-server/src/server.ts"
+```ts title="packages/api-server/src/rpc.ts"
 import { silgi } from 'silgi'
-import { implement } from 'silgi/contract'
-import { api } from 'api-contract'
 
-const s = silgi({
+export const s = silgi({
   context: (req) => ({
     db: getDB(),
     headers: Object.fromEntries(req.headers),
   }),
 })
+```
 
-// implement() ensures your handlers match the contract's types
-const router = implement(api, {
+```ts title="packages/api-server/src/router.ts"
+import { z } from 'zod'
+import { s } from './rpc'
+
+const listUsers = s
+  .$input(z.object({ limit: z.number().min(1).max(100).optional() }))
+  .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit ?? 10 }))
+
+const createUser = s
+  .$input(z.object({ name: z.string().min(1), email: z.string().email() }))
+  .$errors({ CONFLICT: 409 })
+  .$resolve(({ input, ctx, fail }) => {
+    if (ctx.db.users.exists(input.email)) fail('CONFLICT')
+    return ctx.db.users.create(input)
+  })
+
+export const appRouter = s.router({
   users: {
-    list: async ({ input, ctx }) => {
-      return ctx.db.users.findMany({ take: input.limit ?? 10 })
-    },
-    create: async ({ input, ctx, fail }) => {
-      if (await ctx.db.users.exists(input.email)) fail('CONFLICT')
-      return ctx.db.users.create(input)
-    },
+    list: listUsers,
+    create: createUser,
   },
 })
 
-s.serve(router, { port: 3000 })
+// Export the type — this is all the frontend needs
+export type AppRouter = typeof appRouter
 ```
 
-## 3. Generate route metadata
+```ts title="packages/api-server/src/server.ts"
+import { s } from './rpc'
+import { appRouter } from './router'
 
-For REST-style routing, generate a `routes.json` at build time:
-
-```ts title="packages/api-server/scripts/extract-routes.ts"
-import { minifyContractRouter } from 'silgi/contract'
-import { api } from 'api-contract'
-import { writeFileSync } from 'fs'
-
-const routes = minifyContractRouter(api)
-writeFileSync('../frontend/src/routes.json', JSON.stringify(routes, null, 2))
-console.log('✓ Routes extracted')
+s.serve(appRouter, { port: 3000, scalar: true })
 ```
 
-This outputs only `{ path, method }` metadata — zero business logic.
+## 2. Consume on the frontend
 
-## 4. Consume on the frontend
-
-The frontend imports the contract type and the routes JSON. No server code in the bundle.
+The frontend imports only the router **type**. No server code, no route metadata — just the type for autocomplete and type checking.
 
 ```ts title="packages/frontend/src/client.ts"
 import { createClient } from 'silgi/client'
 import { createLink } from 'silgi/client/ofetch'
-import type { AppContract } from 'api-contract'
-import routes from './routes.json'
+import type { AppRouter } from 'api-server/src/router' // type-only, erased at build
 
 const link = createLink({
   url: 'http://localhost:3000',
-  routes, // Enables REST path resolution (GET /api/users, POST /api/users)
 })
 
-const client = createClient<AppContract>(link)
+const client = createClient<AppRouter>(link)
 
-// Full autocomplete and type checking
+// Full autocomplete and type checking — calls use POST + tree path
 const users = await client.users.list({ limit: 10 })
+// → POST /users/list
 ```
 
 <Callout type='info'>
-Use `import type` for the contract. This ensures the import is erased at build time — no server code is bundled into the frontend.
+Use `import type` for the router. This ensures the import is erased at build time — no server code is bundled into the frontend.
 </Callout>
 
 ## Workspace configuration
@@ -160,12 +115,7 @@ packages:
 ```json title="packages/api-server/package.json"
 {
   "name": "api-server",
-  "scripts": {
-    "routes:extract": "tsx scripts/extract-routes.ts",
-    "prebuild": "pnpm run routes:extract"
-  },
   "dependencies": {
-    "api-contract": "workspace:*",
     "silgi": "latest",
     "zod": "latest"
   }
@@ -176,7 +126,6 @@ packages:
 {
   "name": "frontend",
   "dependencies": {
-    "api-contract": "workspace:*",
     "silgi": "latest"
   }
 }
@@ -184,7 +133,6 @@ packages:
 
 ## What's next?
 
-- [Contract-First](/docs/contract) — full contract API reference
 - [Client](/docs/client) — client setup with links, interceptors, and binary mode
-- [Testing](/docs/best-practices/testing) — test procedures from the shared contract
+- [Testing](/docs/best-practices/testing) — test procedures with the server client
 - [SSR Optimization](/docs/best-practices/ssr) — prefetch data server-side

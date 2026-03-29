@@ -47,10 +47,6 @@
       "import": "./dist/index.mjs",
       "types": "./dist/index.d.mts"
     },
-    "./vite": {
-      "import": "./dist/vite.mjs",
-      "types": "./dist/vite.d.mts"
-    },
     "./client": {
       "import": "./dist/client/index.mjs",
       "types": "./dist/client/index.d.mts"
@@ -142,10 +138,6 @@
     "./better-auth": {
       "import": "./dist/integrations/better-auth/index.mjs",
       "types": "./dist/integrations/better-auth/index.d.mts"
-    },
-    "./contract": {
-      "import": "./dist/contract.mjs",
-      "types": "./dist/contract.d.mts"
     },
     "./react": {
       "import": "./dist/integrations/react/index.mjs",

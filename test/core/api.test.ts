@@ -5,7 +5,6 @@ import { RPCLink } from '#src/client/adapters/fetch/index.ts'
 import { createServerClient } from '#src/client/server.ts'
 import { compileProcedure } from '#src/compile.ts'
 import { SilgiError } from '#src/core/error.ts'
-import { extractRoutes } from '#src/core/router-utils.ts'
 import { silgi } from '#src/silgi.ts'
 
 // ── Setup ───────────────────────────────────────────
@@ -523,7 +522,7 @@ describe('URL params from route patterns', () => {
 describe('$route({ path }) resolves on client via router', () => {
   const k4 = silgi({ context: () => ({}) })
 
-  it('client calls custom REST path instead of tree path', async () => {
+  it('$route handler responds at custom REST path', async () => {
     const router = k4.router({
       commerce: {
         orders: {
@@ -537,15 +536,6 @@ describe('$route({ path }) resolves on client via router', () => {
     const restRes = await handle(new Request('http://localhost/api/orders', { method: 'GET' }))
     expect(restRes.status).toBe(200)
     expect(await restRes.json()).toEqual([{ id: '1', name: 'Order 1' }])
-
-    // Client with extracted routes resolves to custom path
-    const link = new RPCLink({
-      url: 'http://localhost',
-      routes: extractRoutes(router),
-      fetch: (req) => handle(req instanceof Request ? req : new Request(req)),
-    })
-    const result = await link.call(['commerce', 'orders', 'list'], undefined, {})
-    expect(result).toEqual([{ id: '1', name: 'Order 1' }])
   })
 
   it('client without router falls back to tree path', async () => {
@@ -562,10 +552,10 @@ describe('$route({ path }) resolves on client via router', () => {
     expect(result).toEqual({ status: 'ok' })
   })
 
-  it('createServerClient resolves $route paths', async () => {
+  it('createServerClient calls procedures via tree path', async () => {
     const router = k4.router({
       auth: {
-        login: k4.$route({ path: '/api/login' }).$resolve(() => ({ token: 'abc' })),
+        login: k4.$resolve(() => ({ token: 'abc' })),
       },
     })
     const client = createServerClient(router, { context: () => ({}) })

@@ -55,7 +55,7 @@ const createUser = s
 | `.$output(schema)` | No       | A schema that validates the return value.                                       |
 | `.$use(...mw)`     | No       | Add guards and wraps to run before the procedure.                               |
 | `.$errors({...})`  | No       | A map of error codes to HTTP status codes. Enables the typed `fail()` function. |
-| `.$route({...})`   | No       | HTTP route metadata (method, path, description). Used by OpenAPI.               |
+| `.$route({...})`   | No       | OpenAPI metadata (tags, summary, description). Also used for special-case passthrough routes. |
 | `.$meta({...})`    | No       | Set custom metadata.                                                            |
 
 <Callout type='info'>
@@ -76,23 +76,19 @@ const myProcedure = s.$resolve(({ input, ctx, fail, signal }) => {
 })
 ```
 
-## HTTP method
+## OpenAPI metadata
 
-By default, all procedures use POST. To use GET (for cacheable reads), set the method via `$route()`:
+Use `$route()` to enrich the generated OpenAPI spec with tags, summary, and description. This metadata is purely for documentation — the client always calls procedures via POST on the tree path.
 
 ```ts twoslash
 // @noErrors
 const listUsers = s
-  .$route({ method: 'GET' })
+  .$route({ tags: ['Users'], summary: 'List users' })
   .$input(z.object({ limit: z.number().optional() }))
   .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))
 ```
 
-The method distinction helps with:
-
-- **Caching**: GET procedures can be cached by browsers and CDNs. POST procedures should not.
-- **Retries**: GET procedures are safe to retry. POST procedures might not be.
-- **OpenAPI**: GET procedures map to GET endpoints, POST to POST endpoints.
+See the [OpenAPI](/docs/openapi) page for all available metadata options.
 
 ## Subscriptions
 

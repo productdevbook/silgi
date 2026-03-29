@@ -18,7 +18,6 @@
  */
 
 import { compileRouter } from '../compile.ts'
-import { resolveRoute } from '../core/router-utils.ts'
 
 import type { CompiledRouterFn } from '../compile.ts'
 import type { RouterDef, InferClient } from '../types.ts'
@@ -51,11 +50,8 @@ function createServerProxy(
   const cache = new Map<string, unknown>()
 
   const callProcedure = async (input?: unknown) => {
-    // Resolve custom $route({ path, method }) if present
-    const resolved = resolveRoute(router, path)
-    const routePath = resolved?.path ?? '/' + path.join('/')
-    const method = resolved?.method ?? 'POST'
-    const route = flatRouter(method, routePath)?.data
+    const routePath = '/' + path.join('/')
+    const route = flatRouter('POST', routePath)?.data
     if (!route) throw new Error(`Procedure not found: ${path.join('/')}`)
     const ctx: Record<string, unknown> = Object.create(null)
     const baseCtx = await contextFactory()

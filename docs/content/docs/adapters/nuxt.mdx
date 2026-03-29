@@ -78,7 +78,7 @@ import { s } from '../instance'
 import { CreateTodoSchema, TodoIdSchema, TodoListSchema, TodoSchema } from './schema'
 
 export const list = s
-  .$route({ method: 'GET' })
+  .$route({ tags: ['Todos'], summary: 'List all todos' })
   .$output(TodoListSchema)
   .$resolve(async ({ ctx }) => {
     return trace(ctx, 'db.todos.findMany', () => [...ctx.todos])

@@ -67,7 +67,7 @@ export { s }
 
 ### Define your procedures
 
-A **procedure** is a single API endpoint. All procedures default to POST. Use `.$route({ method: 'GET' })` for read-only endpoints.
+A **procedure** is a single API endpoint. The client calls all procedures via POST using the router tree path.
 
 ```ts twoslash title="src/server.ts"
 // @noErrors

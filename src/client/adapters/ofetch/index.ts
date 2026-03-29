@@ -9,7 +9,6 @@ import { ofetch, FetchError } from 'ofetch'
 
 import { encode as msgpackEncode, decode as msgpackDecode, MSGPACK_CONTENT_TYPE } from '../../../codec/msgpack.ts'
 import { SilgiError, isSilgiErrorJSON, fromSilgiErrorJSON } from '../../../core/error.ts'
-import { resolveRoute, substituteParams } from '../../../core/router-utils.ts'
 
 import type { ClientLink, ClientContext, ClientOptions } from '../../types.ts'
 import type { FetchOptions, FetchContext } from 'ofetch'
@@ -56,9 +55,6 @@ export interface LinkOptions<TClientContext extends ClientContext = ClientContex
   onResponse?: FetchOptions['onResponse']
   onRequestError?: FetchOptions['onRequestError']
   onResponseError?: FetchOptions['onResponseError']
-
-  /** Route metadata — pass extractRoutes(router), the full router, or a Promise that resolves to routes. Required when procedures use $route({ path }) */
-  routes?: unknown | Promise<unknown>
 }
 
 /**
@@ -88,32 +84,9 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
     (options.devalue ? 'devalue' : undefined) ??
     'json'
 
-  let resolvedRoutes: unknown = undefined
-  const routesOption = options.routes
-
-  // Resolve routes (supports both sync and async/Promise)
-  if (routesOption && typeof (routesOption as any)?.then === 'function') {
-    ;(routesOption as Promise<unknown>).then(r => { resolvedRoutes = r })
-  } else {
-    resolvedRoutes = routesOption
-  }
-
   return {
     async call(path, input, callOptions) {
-      // Wait for routes if still loading
-      if (routesOption && !resolvedRoutes && typeof (routesOption as any)?.then === 'function') {
-        resolvedRoutes = await (routesOption as Promise<unknown>)
-      }
-      // Resolve custom $route({ path, method }) from router if available
-      const resolved = resolvedRoutes ? resolveRoute(resolvedRoutes, path) : undefined
-      let urlPath = resolved ? resolved.path : '/' + path.map(encodeURIComponent).join('/')
-      // Substitute :param placeholders with values from input
-      if (resolved) {
-        const sub = substituteParams(urlPath, input)
-        urlPath = sub.url
-        input = sub.remainingInput
-      }
-      const url = `${baseUrl}${urlPath}`
+      const url = `${baseUrl}/${ path.map(encodeURIComponent).join('/')}`
 
       // Resolve headers
       const headers: Record<string, string> = {
@@ -137,7 +110,7 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
 
       try {
         const data = await ofetch(url, {
-          method: (resolved?.method ?? 'POST') as string,
+          method: 'POST',
           headers,
           body,
           signal: callOptions.signal,
