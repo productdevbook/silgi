@@ -76,17 +76,17 @@ describe('silgi + srvx universal server', () => {
     expect(res.headers.get('content-type')).toBe('application/x-msgpack')
   })
 
-  it('handler with scalar option serves /openapi.json', async () => {
+  it('handler with scalar option serves /api/openapi.json', async () => {
     const scalarHandler = s.handler(appRouter, { scalar: true })
     const scalarServer = await serve({ port: 0, fetch: scalarHandler })
     const scalarUrl = scalarServer.url!.replace(/\/$/, '')
 
-    const res = await fetch(`${scalarUrl}/openapi.json`)
+    const res = await fetch(`${scalarUrl}/api/openapi.json`)
     expect(res.status).toBe(200)
     const spec = await res.json()
     expect(spec.openapi).toBe('3.1.0')
 
-    const refRes = await fetch(`${scalarUrl}/reference`)
+    const refRes = await fetch(`${scalarUrl}/api/reference`)
     expect(refRes.status).toBe(200)
     expect(refRes.headers.get('content-type')).toBe('text/html')
 

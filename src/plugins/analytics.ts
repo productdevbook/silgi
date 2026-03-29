@@ -8,7 +8,7 @@
  * - HTTP-level request tracking with procedure grouping (batch support)
  * - Unique request IDs via `x-request-id` response header
  *
- * Dashboard at /analytics, JSON API at /analytics/api, errors at /analytics/errors.
+ * Dashboard at /api/analytics, JSON API at /api/analytics/stats, errors at /api/analytics/errors.
  */
 
 import { readFileSync } from 'node:fs'
@@ -972,8 +972,8 @@ document.getElementById('f').onsubmit=function(e){
 e.preventDefault();
 var t=document.getElementById('t').value.trim();
 if(!t)return;
-document.cookie='silgi-auth='+encodeURIComponent(t)+';path=/analytics;samesite=strict';
-fetch('/analytics/_api/stats',{headers:{'cookie':'silgi-auth='+encodeURIComponent(t)}}).then(function(){
+document.cookie='silgi-auth='+encodeURIComponent(t)+';path=/api/analytics;samesite=strict';
+fetch('/api/analytics/stats',{headers:{'cookie':'silgi-auth='+encodeURIComponent(t)}}).then(function(){
 location.reload();
 }).catch(function(){location.reload()});
 };
@@ -984,7 +984,7 @@ location.reload();
 /** Return auth-failure response for analytics routes. */
 export function analyticsAuthResponse(pathname: string): Response {
   const jsonHeaders = { 'content-type': 'application/json' }
-  if (pathname.includes('_api/')) {
+  if (pathname !== 'api/analytics') {
     return new Response(JSON.stringify({ code: 'UNAUTHORIZED', status: 401, message: 'Invalid token' }), {
       status: 401,
       headers: jsonHeaders,
@@ -1006,40 +1006,40 @@ export async function serveAnalyticsRoute(
   const jsonCacheHeaders = { 'content-type': 'application/json', 'cache-control': 'no-cache' }
   const mdHeaders = { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-cache' }
 
-  if (pathname === 'analytics/_api/stats') {
+  if (pathname === 'api/analytics/stats') {
     return jsonResponse(collector.toJSON(), jsonCacheHeaders)
   }
-  if (pathname === 'analytics/_api/errors') {
+  if (pathname === 'api/analytics/errors') {
     const errors = await collector.getErrors()
     return jsonResponse(errors, jsonCacheHeaders)
   }
-  if (pathname === 'analytics/_api/requests') {
+  if (pathname === 'api/analytics/requests') {
     const requests = await collector.getRequests()
     return jsonResponse(requests, jsonCacheHeaders)
   }
-  if (pathname === 'analytics/_api/tasks') {
+  if (pathname === 'api/analytics/tasks') {
     const tasks = await collector.getTaskExecutions()
     return jsonResponse(tasks, jsonCacheHeaders)
   }
-  if (pathname === 'analytics/_api/scheduled') {
+  if (pathname === 'api/analytics/scheduled') {
     const { getScheduledTasks } = await import('../core/task.ts')
     return jsonResponse(getScheduledTasks(), jsonCacheHeaders)
   }
-  if (pathname.startsWith('analytics/_api/requests/') && pathname.endsWith('/md')) {
-    const id = Number(pathname.slice('analytics/_api/requests/'.length, -'/md'.length))
+  if (pathname.startsWith('api/analytics/requests/') && pathname.endsWith('/md')) {
+    const id = Number(pathname.slice('api/analytics/requests/'.length, -'/md'.length))
     const requests = await collector.getRequests()
     const entry = requests.find((r) => r.id === id)
     if (entry) return new Response(requestToMarkdown(entry), { headers: mdHeaders })
     return new Response('not found', { status: 404 })
   }
-  if (pathname.startsWith('analytics/_api/errors/') && pathname.endsWith('/md')) {
-    const id = Number(pathname.slice('analytics/_api/errors/'.length, -'/md'.length))
+  if (pathname.startsWith('api/analytics/errors/') && pathname.endsWith('/md')) {
+    const id = Number(pathname.slice('api/analytics/errors/'.length, -'/md'.length))
     const errors = await collector.getErrors()
     const entry = errors.find((e) => e.id === id)
     if (entry) return new Response(errorToMarkdown(entry), { headers: mdHeaders })
     return new Response('not found', { status: 404 })
   }
-  if (pathname === 'analytics/_api/errors/md') {
+  if (pathname === 'api/analytics/errors/md') {
     const errors = await collector.getErrors()
     const md =
       errors.length === 0
@@ -1079,7 +1079,7 @@ export function wrapWithAnalytics(handler: FetchHandler, options: AnalyticsOptio
     const pathname = fullPath.length > 1 ? fullPath.slice(1) : ''
 
     // Analytics dashboard routes
-    if (pathname.startsWith('analytics')) {
+    if (pathname.startsWith('api/analytics')) {
       if (auth) {
         const authResult = checkAnalyticsAuth(request, auth)
         const ok = authResult instanceof Promise ? await authResult : authResult

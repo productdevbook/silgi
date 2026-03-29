@@ -54,7 +54,7 @@ await server.close()
 s.serve(appRouter, {
   port: 3000, // auto-finds next available if busy
   hostname: '0.0.0.0', // bind to all interfaces
-  scalar: true, // API docs at /reference
+  scalar: true, // API docs at /api/reference
   ws: true, // WebSocket RPC on the same port
   http2: {
     // HTTP/2 with TLS
@@ -69,7 +69,7 @@ s.serve(appRouter, {
 | ------------------ | ---------------------------------------- | ------------- | -------------------------------------------------------------------------------------------- |
 | `port`             | `number`                                 | `3000`        | Port to listen on. If it's taken, Silgi automatically picks the next free port in 3000-3100. |
 | `hostname`         | `string`                                 | `"127.0.0.1"` | Network interface. Use `"0.0.0.0"` to accept connections from other machines.                |
-| `scalar`           | `boolean \| ScalarOptions`               | `false`       | Enable auto-generated API docs at `/reference`.                                              |
+| `scalar`           | `boolean \| ScalarOptions`               | `false`       | Enable auto-generated API docs at `/api/reference`.                                          |
 | `ws`               | `boolean \| WSAdapterOptions`            | `false`       | Enable WebSocket RPC on the same port. Pass an object for [WS options](#websocket-options).  |
 | `http2`            | `{ cert, key }`                          | `undefined`   | Enable HTTP/2 with TLS certificates. Falls back to HTTP/1.1 for older clients.               |
 | `gracefulShutdown` | `boolean \| { timeout?, forceTimeout? }` | `true`        | Handle SIGINT/SIGTERM for clean shutdown. See [graceful shutdown](#graceful-shutdown).       |
@@ -110,13 +110,13 @@ You can pass options to enable API docs:
 ```ts twoslash
 // @noErrors
 const handle = s.handler(appRouter, {
-  scalar: true, // serves /openapi.json and /reference
+  scalar: true, // serves /api/openapi.json and /api/reference
 })
 ```
 
 | Option   | Type                       | Default | Description                                                |
 | -------- | -------------------------- | ------- | ---------------------------------------------------------- |
-| `scalar` | `boolean \| ScalarOptions` | `false` | Enable Scalar API docs at `/reference` and `/openapi.json` |
+| `scalar` | `boolean \| ScalarOptions` | `false` | Enable Scalar API docs at `/api/reference` and `/api/openapi.json` |
 
 <Callout type='info'>
   Both `serve()` and `handler()` support content negotiation automatically. If the client sends an `Accept:
@@ -149,8 +149,8 @@ s.serve(appRouter, {
 
 This gives you two extra routes:
 
-- **`/reference`** — interactive API documentation UI
-- **`/openapi.json`** — the raw OpenAPI specification
+- **`/api/reference`** — interactive API documentation UI
+- **`/api/openapi.json`** — the raw OpenAPI specification
 
 The spec is generated once at startup, so there is no per-request cost.
 

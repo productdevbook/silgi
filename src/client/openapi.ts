@@ -11,7 +11,7 @@
  *
  * const link = new OpenAPILink({
  *   url: "https://api.example.com",
- *   spec: await fetch("/openapi.json").then(r => r.json()),
+ *   spec: await fetch("/api/openapi.json").then(r => r.json()),
  * })
  *
  * const client = createClient<ExternalAPI>(link)

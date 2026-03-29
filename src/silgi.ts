@@ -132,9 +132,9 @@ export interface SilgiInstance<TBaseCtx extends Record<string, unknown>> {
   handler: (
     router: RouterDef,
     options?: {
-      /** Enable Scalar API Reference UI at /reference and /openapi.json */
+      /** Enable Scalar API Reference UI at /api/reference and /api/openapi.json */
       scalar?: boolean | ScalarOptions
-      /** Enable analytics dashboard at /analytics */
+      /** Enable analytics dashboard at /api/analytics */
       analytics?: boolean | AnalyticsOptions
     },
   ) => (request: Request) => Response | Promise<Response>

@@ -34,9 +34,9 @@ export interface SilgiServer {
 export interface ServeOptions {
   port?: number
   hostname?: string
-  /** Enable Scalar API Reference UI at /reference and /openapi.json */
+  /** Enable Scalar API Reference UI at /api/reference and /api/openapi.json */
   scalar?: boolean | ScalarOptions
-  /** Enable analytics dashboard at /analytics */
+  /** Enable analytics dashboard at /api/analytics */
   analytics?: boolean | AnalyticsOptions
   /** Enable WebSocket RPC (requires crossws) */
   ws?: boolean | WSAdapterOptions
@@ -139,8 +139,8 @@ export async function createServeHandler(
   console.log(`\nSilgi server running at ${url}`)
   if (options?.http2) console.log(`  HTTP/2 enabled (with HTTP/1.1 fallback)`)
   if (options?.ws) console.log(`  WebSocket RPC at ws://${hostname}:${resolvedPort}`)
-  if (options?.scalar) console.log(`  Scalar API Reference at ${url}/reference`)
-  if (options?.analytics) console.log(`  Analytics dashboard at ${url}/analytics`)
+  if (options?.scalar) console.log(`  Scalar API Reference at ${url}/api/reference`)
+  if (options?.analytics) console.log(`  Analytics dashboard at ${url}/api/analytics`)
   console.log()
 
   await hooks.callHook('serve:start', { url, port: resolvedPort, hostname })

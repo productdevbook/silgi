@@ -2,7 +2,7 @@
  * Scalar API Reference — v2 OpenAPI integration.
  *
  * Generates OpenAPI 3.1.0 spec from v2 RouterDef and serves
- * Scalar UI at /reference + spec at /openapi.json.
+ * Scalar UI at /api/reference + spec at /api/openapi.json.
  */
 
 import type { AnySchema } from './core/schema.ts'
@@ -445,12 +445,12 @@ function objectSchemaToParams(schema: JSONSchema): Record<string, unknown>[] {
 import type { FetchHandler } from './core/handler.ts'
 
 /**
- * Wrap a fetch handler to serve Scalar API Reference at /reference and /openapi.json.
+ * Wrap a fetch handler to serve Scalar API Reference at /api/reference and /api/openapi.json.
  * Scalar routes are intercepted before the handler — zero overhead for normal requests.
  */
 export function wrapWithScalar(handler: FetchHandler, routerDef: RouterDef, options: ScalarOptions = {}): FetchHandler {
   const specJson = JSON.stringify(generateOpenAPI(routerDef, options))
-  const specHtml = scalarHTML('/openapi.json', options)
+  const specHtml = scalarHTML('/api/openapi.json', options)
 
   return (request: Request): Response | Promise<Response> => {
     const url = request.url
@@ -459,10 +459,10 @@ export function wrapWithScalar(handler: FetchHandler, routerDef: RouterDef, opti
     const fullPath = qMark === -1 ? url.slice(pathStart) : url.slice(pathStart, qMark)
     const pathname = fullPath.length > 1 ? fullPath.slice(1) : ''
 
-    if (pathname === 'openapi.json') {
+    if (pathname === 'api/openapi.json') {
       return new Response(specJson, { headers: { 'content-type': 'application/json' } })
     }
-    if (pathname === 'reference') {
+    if (pathname === 'api/reference') {
       return new Response(specHtml, { headers: { 'content-type': 'text/html' } })
     }
 

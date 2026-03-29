@@ -19,7 +19,7 @@ s.serve(appRouter, {
 })
 ```
 
-Open `http://localhost:3000/analytics` in your browser.
+Open `http://localhost:3000/api/analytics` in your browser.
 
 ## What it tracks
 
@@ -39,7 +39,7 @@ All data lives in memory. No disk I/O, no network calls, no serialization until 
 
 ## Dashboard
 
-The dashboard is a self-contained single-file app served at `/analytics`. It auto-refreshes every 2 seconds and groups the most important signals into overview, request, session, and error workflows.
+The dashboard is a self-contained single-file app served at `/api/analytics`. It auto-refreshes every 2 seconds and groups the most important signals into overview, request, session, and error workflows.
 
 **Overview tab:**
 
@@ -282,7 +282,7 @@ Works the same way when using `s.handler()` instead of `s.serve()`:
 const handle = s.handler(appRouter, { analytics: true })
 
 Bun.serve({ port: 3000, fetch: handle })
-// Dashboard at /analytics
+// Dashboard at /api/analytics
 ```
 
 ## JSON API
@@ -291,9 +291,9 @@ The dashboard reads from three JSON endpoints. You can also query them directly 
 
 | Endpoint                   | Description                                            |
 | -------------------------- | ------------------------------------------------------ |
-| `/analytics/_api/stats`    | Procedure metrics, latency percentiles, time-series    |
-| `/analytics/_api/errors`   | Full error log with input, headers, stack trace, spans |
-| `/analytics/_api/requests` | Recent requests with trace spans and session IDs       |
+| `/api/analytics/stats`    | Procedure metrics, latency percentiles, time-series    |
+| `/api/analytics/errors`   | Full error log with input, headers, stack trace, spans |
+| `/api/analytics/requests` | Recent requests with trace spans and session IDs       |
 
 All endpoints return JSON with `cache-control: no-cache`.
 

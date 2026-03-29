@@ -1,0 +1,214 @@
+---
+title: 0.1.0-beta.12
+description: Background tasks with cron, minifyContractRouter, REST path params merge, async route loading, client improvements.
+version: 0.1.0-beta.12
+date: 2026-03-29
+---
+
+## Type-safe background tasks
+
+New task system with the same builder chain as procedures — `$use()`, `$input()`, `$errors()`, `$task()`:
+
+```ts
+const sendEmail = s.$input(z.object({ to: z.string(), subject: z.string(), body: z.string() })).$task({
+  name: 'send-email',
+  resolve: async ({ input, ctx }) => {
+    await ctx.mailer.send(input)
+    return { sent: true }
+  },
+})
+```
+
+### Dispatch from procedures
+
+Call `task.dispatch(input, ctx)` from inside a procedure. Passing `ctx` links the task to the parent request's trace:
+
+```ts
+const createUser = s.$resolve(async ({ input, ctx }) => {
+  const user = await ctx.db.users.create(input)
+  sendEmail.dispatch({ to: input.email, subject: 'Welcome' }, ctx)
+  return user
+})
+```
+
+The analytics dashboard shows the task as a `queue` span on the parent request's waterfall:
+
+```
+users/create — 2 spans, 4.2ms total
+├─ db.users.create     (db)     1.1ms
+└─ task:send-email     (queue)  92.3ms
+```
+
+### Cron scheduling
+
+Add `cron` to `$task()` for automatic scheduling. Tasks are auto-discovered when the router is served:
+
+```ts
+const dailyReport = s.$task({
+  name: 'daily-report',
+  cron: '0 9 * * *',
+  resolve: async ({ ctx }) => ctx.db.reports.generateDaily(),
+})
+```
+
+### Task tracing
+
+Tasks get their own `RequestTrace` instance. Use `ctx.trace()` to record spans visible in the analytics dashboard.
+
+See [Tasks docs](/docs/tasks) and [Analytics docs](/docs/analytics) for the full guide.
+
+---
+
+## `minifyContractRouter()`
+
+New utility in `silgi/contract` that strips all business logic from a router, keeping only `{ path, method }` metadata. Safe to serialize as JSON and ship to client bundles.
+
+```ts
+import { minifyContractRouter } from 'silgi/contract'
+import { appRouter } from './server/router'
+import { writeFileSync } from 'fs'
+
+const routes = minifyContractRouter(appRouter)
+writeFileSync('routes.json', JSON.stringify(routes))
+```
+
+```json
+{
+  "users": {
+    "list":   { "path": "/api/users",     "method": "GET"  },
+    "create": { "path": "/api/users",     "method": "POST" },
+    "get":    { "path": "/api/users/:id", "method": "GET"  }
+  }
+}
+```
+
+Client imports this JSON to resolve `$route({ path })` REST paths:
+
+```ts
+import { createLink } from 'silgi/client/ofetch'
+import routes from './routes.json'
+
+const link = createLink({ url: 'http://localhost:3000', routes })
+```
+
+See [Route Metadata docs](/docs/route-metadata) for the full guide.
+
+---
+
+## `$route({ path })` now works with the client
+
+Previously, procedures using `$route({ path })` were only reachable via the custom REST path. The typed client always called the RPC tree path, which returned 404. [#1](https://github.com/productdevbook/silgi/issues/1)
+
+Now the client resolves custom routes using build-time extracted metadata via `minifyContractRouter()`.
+
+### Path parameter substitution
+
+`:param` placeholders are automatically extracted from input and placed in the URL:
+
+```ts
+// Server
+const get = s
+  .$route({ method: 'GET', path: '/api/users/:id' })
+  .$input(z.object({ id: z.string() }))
+  .$resolve(({ input }) => db.users.find(input.id))
+
+// Client
+const user = await client.users.get({ id: '42' })
+// → GET /api/users/42
+```
+
+## URL path params merge into `$input()`
+
+URL path parameters (`:id`) are now automatically merged into the resolver's `input` object. This enables Zod validation on path parameters:
+
+```ts
+const get = s
+  .$route({ method: 'GET', path: '/api/users/:id' })
+  .$input(z.object({ id: z.string().uuid() }))
+  .$resolve(({ input }) => db.users.find(input.id)) // input.id is validated
+```
+
+## Async route loading
+
+The `routes` option in `createLink()` now accepts `Promise<unknown>`:
+
+```ts
+const link = createLink({
+  url: 'http://localhost:3000',
+  routes: fetch('/routes.json').then(r => r.json()),
+})
+```
+
+First call waits for routes to resolve, subsequent calls use cached result.
+
+---
+
+## `createSafeClient()`
+
+Every procedure returns `{ error, data }` instead of throwing:
+
+```ts
+import { createSafeClient } from 'silgi/client'
+
+const client = createSafeClient<AppRouter>(link)
+const { error, data, isError, isSuccess } = await client.users.list()
+```
+
+## Client-side OpenTelemetry
+
+New `withOtel()` link plugin creates spans for every client call:
+
+```ts
+import { withOtel } from 'silgi/client/plugins'
+
+const link = withOtel(baseLink, {
+  tracer: trace.getTracer('my-frontend'),
+})
+// Spans: rpc.client/users.list, rpc.client/users.create, etc.
+```
+
+## Stream consumption utilities
+
+```ts
+import { consumeWithReconnect } from 'silgi/client/consume'
+
+await consumeWithReconnect({
+  connect: (lastEventId) => client.events.subscribe(undefined, { lastEventId }),
+  onEvent: (data) => updateUI(data),
+  maxReconnects: 10,
+  reconnectDelay: 2000,
+})
+```
+
+## WebSocket client link
+
+```ts
+import { WSLink } from 'silgi/client/ws'
+
+const link = new WSLink({ url: 'ws://localhost:3000/ws' })
+const client = createClient<AppRouter>(link)
+```
+
+## Default routes moved under `/api/`
+
+All built-in routes now live under the `/api/` prefix to avoid collisions with application routes:
+
+| Before | After |
+| --- | --- |
+| `/analytics` | `/api/analytics` |
+| `/analytics/_api/stats` | `/api/analytics/stats` |
+| `/analytics/_api/errors` | `/api/analytics/errors` |
+| `/analytics/_api/requests` | `/api/analytics/requests` |
+| `/reference` | `/api/reference` |
+| `/openapi.json` | `/api/openapi.json` |
+
+The `_api` infix in analytics sub-routes was removed — it's redundant now that everything is under `/api/`.
+
+If you query the JSON API directly, update your URLs accordingly.
+
+## More improvements
+
+- **Async `DynamicLink`**: Selector can return `Promise<ClientLink>`
+- **Retry-After header**: `withRetry` respects `Retry-After` from 429/503 responses
+- **Streaming batch**: `BatchLink` accepts `streaming` option for progressive delivery
+- **Cron cleanup**: `stopCronJobs()` called on `SIGINT`, `SIGTERM`, and `server.close()`

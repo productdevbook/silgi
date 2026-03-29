@@ -4,11 +4,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AnalyticsData, ErrorEntry, RequestEntry, ScheduledTaskInfo, TaskExecution } from '@/lib/types'
 
 const ENDPOINTS = {
-  stats: '/analytics/_api/stats',
-  errors: '/analytics/_api/errors',
-  requests: '/analytics/_api/requests',
-  tasks: '/analytics/_api/tasks',
-  scheduled: '/analytics/_api/scheduled',
+  stats: '/api/analytics/stats',
+  errors: '/api/analytics/errors',
+  requests: '/api/analytics/requests',
+  tasks: '/api/analytics/tasks',
+  scheduled: '/api/analytics/scheduled',
 } as const
 
 export function useAnalytics(intervalMs = 2000) {
