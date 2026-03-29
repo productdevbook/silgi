@@ -5,6 +5,7 @@ import { RPCLink } from '#src/client/adapters/fetch/index.ts'
 import { createServerClient } from '#src/client/server.ts'
 import { compileProcedure } from '#src/compile.ts'
 import { SilgiError } from '#src/core/error.ts'
+import { extractRoutes } from '#src/core/router-utils.ts'
 import { silgi } from '#src/silgi.ts'
 
 // ── Setup ───────────────────────────────────────────
@@ -537,10 +538,10 @@ describe('$route({ path }) resolves on client via router', () => {
     expect(restRes.status).toBe(200)
     expect(await restRes.json()).toEqual([{ id: '1', name: 'Order 1' }])
 
-    // Client with router resolves to custom path
+    // Client with extracted routes resolves to custom path
     const link = new RPCLink({
       url: 'http://localhost',
-      router,
+      routes: extractRoutes(router),
       fetch: (req) => handle(req instanceof Request ? req : new Request(req)),
     })
     const result = await link.call(['commerce', 'orders', 'list'], undefined, {})

@@ -39,19 +39,67 @@ export function assignPaths(def: RouterDef, prefix: string[] = []): RouterDef {
   return result
 }
 
+// ── Route Extraction for Client ──────────────────────
+
+/** Extracted route metadata — safe for client bundles (no server code) */
+export interface ExtractedRoute {
+  path: string
+  method: string
+}
+
+/** Nested route map — mirrors the router tree structure with only route metadata */
+export type ExtractedRoutes = { [key: string]: ExtractedRoute | ExtractedRoutes }
+
+/**
+ * Extract route metadata from a router definition.
+ * Returns a lightweight nested object safe for client bundles — no resolve functions,
+ * no guards, no schemas, no server code.
+ *
+ * ```ts
+ * // server/routes.ts — import this on the client
+ * export const routes = extractRoutes(appRouter)
+ * ```
+ */
+export function extractRoutes(def: unknown, prefix: string[] = []): ExtractedRoutes {
+  const result: ExtractedRoutes = {}
+  if (def == null || typeof def !== 'object') return result
+  for (const [key, value] of Object.entries(def)) {
+    if (isProcedureDef(value)) {
+      const route = value.route as import('../types.ts').Route | undefined
+      if (route?.path) {
+        result[key] = { path: route.path, method: (route.method ?? 'POST').toUpperCase() }
+      }
+    } else if (typeof value === 'object' && value !== null) {
+      const nested = extractRoutes(value, [...prefix, key])
+      if (Object.keys(nested).length > 0) result[key] = nested
+    }
+  }
+  return result
+}
+
+/** Check if a value is an extracted route leaf (has path + method, not a nested object) */
+function isExtractedRoute(value: unknown): value is ExtractedRoute {
+  return typeof value === 'object' && value !== null && 'path' in value && 'method' in value && !('resolve' in value)
+}
+
 // ── Route Resolution for Client ─────────────────────
 
-/** Walk a router tree by path segments and return the procedure's route metadata */
-export function resolveRoute(router: unknown, path: readonly string[]): { path: string; method: string } | undefined {
-  let current: any = router
+/** Walk a route tree by path segments and return the route metadata. Works with both full routers and extracted routes. */
+export function resolveRoute(routes: unknown, path: readonly string[]): { path: string; method: string } | undefined {
+  let current: any = routes
   for (const segment of path) {
     if (current == null || typeof current !== 'object') return undefined
     current = current[segment]
   }
-  if (!isProcedureDef(current)) return undefined
-  const route = current.route as import('../types.ts').Route | undefined
-  if (!route?.path) return undefined
-  return { path: route.path, method: (route.method ?? 'POST').toUpperCase() }
+  // Extracted route: { path, method }
+  if (isExtractedRoute(current)) return current
+  // Full procedure: { route: { path, method }, resolve, ... }
+  if (isProcedureDef(current)) {
+    const route = current.route as import('../types.ts').Route | undefined
+    if (!route?.path) return undefined
+    return { path: route.path, method: (route.method ?? 'POST').toUpperCase() }
+  }
+  return undefined
 }
 
 /**

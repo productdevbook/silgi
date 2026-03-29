@@ -57,8 +57,8 @@ export interface LinkOptions<TClientContext extends ClientContext = ClientContex
   onRequestError?: FetchOptions['onRequestError']
   onResponseError?: FetchOptions['onResponseError']
 
-  /** Router definition — enables $route({ path }) resolution on the client */
-  router?: unknown
+  /** Route metadata — pass extractRoutes(router) or the full router. Required when procedures use $route({ path }) */
+  routes?: unknown
 }
 
 /**
@@ -88,12 +88,12 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
     (options.devalue ? 'devalue' : undefined) ??
     'json'
 
-  const router = options.router
+  const routes = options.routes
 
   return {
     async call(path, input, callOptions) {
       // Resolve custom $route({ path, method }) from router if available
-      const resolved = router ? resolveRoute(router, path) : undefined
+      const resolved = routes ? resolveRoute(routes, path) : undefined
       let urlPath = resolved ? resolved.path : '/' + path.map(encodeURIComponent).join('/')
       // Substitute :param placeholders with values from input
       if (resolved) {

@@ -8,7 +8,7 @@ import { DynamicLink } from '#src/client/dynamic-link.ts'
 import { withOtel } from '#src/client/plugins/otel.ts'
 import { withRetry } from '#src/client/plugins/retry.ts'
 import { createServerClient } from '#src/client/server.ts'
-import { resolveRoute, substituteParams } from '#src/core/router-utils.ts'
+import { extractRoutes, resolveRoute, substituteParams } from '#src/core/router-utils.ts'
 import { silgi } from '#src/silgi.ts'
 
 const k = silgi({ context: () => ({}) })
@@ -40,6 +40,47 @@ describe('substituteParams()', () => {
   })
 })
 
+describe('extractRoutes()', () => {
+  it('extracts only route metadata, no server code', () => {
+    const router = k.router({
+      commerce: {
+        orders: {
+          list: k.$route({ method: 'GET', path: '/api/orders' }).$resolve(() => []),
+        },
+      },
+      health: k.$resolve(() => 'ok'),
+    })
+
+    const routes = extractRoutes(router)
+
+    // Only $route procedures are included
+    expect(routes).toEqual({
+      commerce: {
+        orders: {
+          list: { path: '/api/orders', method: 'GET' },
+        },
+      },
+    })
+
+    // No resolve functions leaked
+    expect((routes as any).commerce.orders.list.resolve).toBeUndefined()
+    // health has no $route, not included
+    expect((routes as any).health).toBeUndefined()
+  })
+
+  it('works with resolveRoute()', () => {
+    const router = k.router({
+      users: {
+        byId: k.$route({ method: 'GET', path: '/api/users/:id' }).$resolve(() => null),
+      },
+    })
+
+    const routes = extractRoutes(router)
+    const resolved = resolveRoute(routes, ['users', 'byId'])
+    expect(resolved).toEqual({ path: '/api/users/:id', method: 'GET' })
+  })
+})
+
 describe('path param substitution in RPCLink', () => {
   it('substitutes :id in custom route path from input', async () => {
     const router = k.router({
@@ -51,9 +92,11 @@ describe('path param substitution in RPCLink', () => {
     })
     const handle = k.handler(router)
 
+    // Use extractRoutes for client-safe route metadata
+    const routes = extractRoutes(router)
     const link = new RPCLink({
       url: 'http://localhost',
-      router,
+      routes,
       fetch: (req) => handle(req instanceof Request ? req : new Request(req)),
     })
 

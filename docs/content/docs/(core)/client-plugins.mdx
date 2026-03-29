@@ -42,15 +42,15 @@ const link = withRetry(baseLink, {
 })
 ```
 
-| Option        | Type                            | Default                          | Description                                                |
-| ------------- | ------------------------------- | -------------------------------- | ---------------------------------------------------------- |
-| `maxRetries`  | `number`                        | `3`                              | Maximum retry attempts                                     |
-| `baseDelay`   | `number \| (attempt) => number` | `1000`                           | Base delay in ms. Actual: `baseDelay * 2^attempt + jitter` |
-| `jitter`      | `boolean`                       | `true`                           | Add 0-25% random delay to prevent thundering herd          |
-| `retryOn`     | `number[]`                      | `[408, 429, 500, 502, 503, 504]` | HTTP status codes that trigger retry                       |
-| `shouldRetry` | `(error, attempt) => boolean`   | —                                | Custom predicate to stop retrying                          |
-| `onRetry`     | `(info) => void`                | —                                | Called before each retry with attempt, delay, error, path  |
-| `respectRetryAfter` | `boolean`                 | `true`                           | Parse `Retry-After` header from 429/503 responses for delay |
+| Option              | Type                            | Default                          | Description                                                 |
+| ------------------- | ------------------------------- | -------------------------------- | ----------------------------------------------------------- |
+| `maxRetries`        | `number`                        | `3`                              | Maximum retry attempts                                      |
+| `baseDelay`         | `number \| (attempt) => number` | `1000`                           | Base delay in ms. Actual: `baseDelay * 2^attempt + jitter`  |
+| `jitter`            | `boolean`                       | `true`                           | Add 0-25% random delay to prevent thundering herd           |
+| `retryOn`           | `number[]`                      | `[408, 429, 500, 502, 503, 504]` | HTTP status codes that trigger retry                        |
+| `shouldRetry`       | `(error, attempt) => boolean`   | —                                | Custom predicate to stop retrying                           |
+| `onRetry`           | `(info) => void`                | —                                | Called before each retry with attempt, delay, error, path   |
+| `respectRetryAfter` | `boolean`                       | `true`                           | Parse `Retry-After` header from 429/503 responses for delay |
 
 Network errors (no status code) are always retried unless `shouldRetry` returns false.
 
@@ -148,10 +148,10 @@ const link = withOtel(baseLink, {
 
 Each call creates a span named `rpc.client/{procedure}` with attributes:
 
-| Attribute      | Value                        |
-| -------------- | ---------------------------- |
-| `rpc.system`   | `silgi`                      |
-| `rpc.method`   | Procedure path (e.g. `users.list`) |
+| Attribute    | Value                              |
+| ------------ | ---------------------------------- |
+| `rpc.system` | `silgi`                            |
+| `rpc.method` | Procedure path (e.g. `users.list`) |
 
 On error, the span records an `exception` event and sets status code 2. The same `Tracer` interface works for both server-side (`otelWrap`) and client-side (`withOtel`).
 

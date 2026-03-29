@@ -87,6 +87,8 @@ export { mapInput } from './map-input.ts'
 
 // ── Advanced ────────────────────────────────────────
 export { compileProcedure, compileRouter, createContext } from './compile.ts'
+export { extractRoutes } from './core/router-utils.ts'
+export type { ExtractedRoutes, ExtractedRoute } from './core/router-utils.ts'
 export { AsyncIteratorClass, mapAsyncIterator } from './core/iterator.ts'
 
 // ── Lazy Loading ────────────────────────────────────

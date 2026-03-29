@@ -14,8 +14,8 @@ export interface RPCLinkOptions<TClientContext extends ClientContext = ClientCon
   fetch?: typeof globalThis.fetch
   method?: 'GET' | 'POST'
   maxUrlLength?: number
-  /** Router definition — enables $route({ path }) resolution on the client */
-  router?: unknown
+  /** Route metadata — pass extractRoutes(router) or the full router. Required when procedures use $route({ path }) */
+  routes?: unknown
 }
 
 export class RPCLink<TClientContext extends ClientContext = ClientContext> implements ClientLink<TClientContext> {
@@ -24,7 +24,7 @@ export class RPCLink<TClientContext extends ClientContext = ClientContext> imple
   #fetch: typeof globalThis.fetch
   #method: 'GET' | 'POST'
   #maxUrlLength: number
-  #router: unknown
+  #routes: unknown
 
   constructor(options: RPCLinkOptions<TClientContext>) {
     this.#baseUrl = typeof options.url === 'string' ? options.url : options.url.href
@@ -35,12 +35,12 @@ export class RPCLink<TClientContext extends ClientContext = ClientContext> imple
     this.#fetch = options.fetch ?? globalThis.fetch.bind(globalThis)
     this.#method = options.method ?? 'POST'
     this.#maxUrlLength = options.maxUrlLength ?? 2083
-    this.#router = options.router
+    this.#routes = options.routes
   }
 
   async call(path: readonly string[], input: unknown, options: ClientOptions<TClientContext>): Promise<unknown> {
     // Resolve custom $route({ path, method }) from router if available
-    const resolved = this.#router ? resolveRoute(this.#router, path) : undefined
+    const resolved = this.#routes ? resolveRoute(this.#routes, path) : undefined
     let urlPath = resolved ? resolved.path : '/' + path.map(encodeURIComponent).join('/')
     // Substitute :param placeholders with values from input
     if (resolved) {

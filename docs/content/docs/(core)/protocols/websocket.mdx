@@ -219,11 +219,11 @@ link.dispose()
 
 `WSLink` handles connection lifecycle automatically — it connects on the first call, reconnects if the connection drops, and multiplexes concurrent calls over a single WebSocket.
 
-| Option      | Type                     | Default              | Description                    |
-| ----------- | ------------------------ | -------------------- | ------------------------------ |
-| `url`       | `string \| URL`          | (required)           | WebSocket server URL           |
-| `protocol`  | `'json' \| 'messagepack'` | `'json'`           | Wire protocol                  |
-| `WebSocket` | `typeof WebSocket`       | `globalThis.WebSocket` | Custom WebSocket constructor |
+| Option      | Type                      | Default                | Description                  |
+| ----------- | ------------------------- | ---------------------- | ---------------------------- |
+| `url`       | `string \| URL`           | (required)             | WebSocket server URL         |
+| `protocol`  | `'json' \| 'messagepack'` | `'json'`               | Wire protocol                |
+| `WebSocket` | `typeof WebSocket`        | `globalThis.WebSocket` | Custom WebSocket constructor |
 
 ### Native WebSocket
 
