@@ -122,14 +122,14 @@ type Client = InferClient<typeof appRouter>
 
 The `createLink` function accepts these options:
 
-| Option       | Type                                   | Default     | Description                                                             |
-| ------------ | -------------------------------------- | ----------- | ----------------------------------------------------------------------- |
-| `url`        | `string`                               | (required)  | Server base URL (e.g. `"http://localhost:3000"`)                        |
-| `headers`    | `Record<string, string>` or function   | `undefined` | Static headers or a function that returns headers per request           |
-| `retry`      | `number \| false`                      | `0`         | Number of retries on failure                                            |
-| `retryDelay` | `number \| (ctx) => number`            | `0`         | Delay between retries in milliseconds                                   |
-| `timeout`    | `number`                               | `30000`     | Request timeout in milliseconds                                         |
-| `protocol`   | `'json' \| 'messagepack' \| 'devalue'` | `'json'`    | Wire protocol for encoding                                              |
+| Option       | Type                                   | Default     | Description                                                                        |
+| ------------ | -------------------------------------- | ----------- | ---------------------------------------------------------------------------------- |
+| `url`        | `string`                               | (required)  | Server base URL (e.g. `"http://localhost:3000"`)                                   |
+| `headers`    | `Record<string, string>` or function   | `undefined` | Static headers or a function that returns headers per request                      |
+| `retry`      | `number \| false`                      | `0`         | Number of retries on failure                                                       |
+| `retryDelay` | `number \| (ctx) => number`            | `0`         | Delay between retries in milliseconds                                              |
+| `timeout`    | `number`                               | `30000`     | Request timeout in milliseconds                                                    |
+| `protocol`   | `'json' \| 'messagepack' \| 'devalue'` | `'json'`    | Wire protocol for encoding                                                         |
 | `routes`     | `ExtractedRoutes`                      | `undefined` | Route metadata from `extractRoutes()` — **required** when using `$route({ path })` |
 
 ### Route resolution
@@ -167,8 +167,8 @@ const user = await client.users.byId({ id: '42' })
 ```
 
 <Callout type='warn'>
-  If you use `$route({ path })` on any procedure but forget to pass `routes` to the link, the client will get 404
-  errors. The `routes` option is only optional when **no** procedures use custom paths.
+  If you use `$route({path})` on any procedure but forget to pass `routes` to the link, the client will get 404 errors.
+  The `routes` option is only optional when **no** procedures use custom paths.
 </Callout>
 
 ### Authentication headers
