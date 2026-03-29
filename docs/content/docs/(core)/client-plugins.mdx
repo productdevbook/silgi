@@ -1,6 +1,6 @@
 ---
 title: Client Plugins
-description: Retry, circuit breaker, timeout, batching, deduplication, and CSRF protection for the Silgi client.
+description: Retry, circuit breaker, timeout, batching, deduplication, CSRF, and OpenTelemetry tracing for the Silgi client.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
@@ -50,8 +50,11 @@ const link = withRetry(baseLink, {
 | `retryOn`     | `number[]`                      | `[408, 429, 500, 502, 503, 504]` | HTTP status codes that trigger retry                       |
 | `shouldRetry` | `(error, attempt) => boolean`   | —                                | Custom predicate to stop retrying                          |
 | `onRetry`     | `(info) => void`                | —                                | Called before each retry with attempt, delay, error, path  |
+| `respectRetryAfter` | `boolean`                 | `true`                           | Parse `Retry-After` header from 429/503 responses for delay |
 
 Network errors (no status code) are always retried unless `shouldRetry` returns false.
+
+When `respectRetryAfter` is enabled (the default), the plugin reads the `Retry-After` header from 429 and 503 responses. It supports both delay-seconds (`Retry-After: 2`) and HTTP-date formats. When present, the header value overrides the exponential backoff delay.
 
 <Callout>
   The retry plugin respects `AbortSignal` — if the signal is aborted during a delay wait, the retry is cancelled
@@ -128,6 +131,29 @@ Recommended order for production:
 1. **withRetry** (outermost) — retries the entire inner chain
 2. **withCircuitBreaker** — blocks when service is down
 3. **withTimeout** (innermost) — aborts slow individual requests
+
+## OpenTelemetry
+
+Wrap any link with automatic span creation for distributed tracing:
+
+```ts twoslash
+// @noErrors
+import { withOtel } from 'silgi/client/plugins'
+import { trace } from '@opentelemetry/api'
+
+const link = withOtel(baseLink, {
+  tracer: trace.getTracer('my-service'),
+})
+```
+
+Each call creates a span named `rpc.client/{procedure}` with attributes:
+
+| Attribute      | Value                        |
+| -------------- | ---------------------------- |
+| `rpc.system`   | `silgi`                      |
+| `rpc.method`   | Procedure path (e.g. `users.list`) |
+
+On error, the span records an `exception` event and sets status code 2. The same `Tracer` interface works for both server-side (`otelWrap`) and client-side (`withOtel`).
 
 ## Other plugins
 

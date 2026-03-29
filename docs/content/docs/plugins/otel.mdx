@@ -103,6 +103,25 @@ Guards (`auth`, `rateLimit`) run before the span wraps around the resolver. If y
   `@opentelemetry/api` yourself, which means Silgi never pins you to a specific OTel version.
 </Callout>
 
+## Client-side tracing
+
+Silgi also provides a client-side OTel plugin that wraps each RPC call in a span:
+
+```ts twoslash
+// @noErrors
+import { withOtel } from 'silgi/client/plugins'
+import { trace } from '@opentelemetry/api'
+
+const link = withOtel(baseLink, {
+  tracer: trace.getTracer('my-frontend'),
+  spanName: 'rpc.client', // optional, default: 'rpc.client'
+})
+```
+
+Each client call creates a span named `rpc.client/{procedure}` (e.g. `rpc.client/users.list`). The span attributes and error recording work identically to the server-side plugin.
+
+Combine server and client tracing for full end-to-end visibility across the network boundary.
+
 ## What's next?
 
 - [Pino Logging](/docs/plugins/pino) — structured logging for requests and responses

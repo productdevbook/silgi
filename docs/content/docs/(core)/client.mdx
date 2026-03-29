@@ -1,6 +1,6 @@
 ---
 title: Client
-description: Set up the type-safe client with createLink and createClient — including binary mode, interceptors, and type inference.
+description: Set up the type-safe client with createLink and createClient — including route resolution, safe clients, streaming, interceptors, and type inference.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
@@ -129,7 +129,37 @@ The `createLink` function accepts these options:
 | `retry`      | `number \| false`                    | `0`         | Number of retries on failure                                  |
 | `retryDelay` | `number \| (ctx) => number`          | `0`         | Delay between retries in milliseconds                         |
 | `timeout`    | `number`                             | `30000`     | Request timeout in milliseconds                               |
-| `binary`     | `boolean`                            | `false`     | Use MessagePack instead of JSON                               |
+| `protocol`   | `'json' \| 'messagepack' \| 'devalue'` | `'json'`  | Wire protocol for encoding                                    |
+| `router`     | `RouterDef`                          | `undefined` | Router definition — resolves `$route({ path })` on the client |
+
+### Route resolution
+
+When procedures use `$route({ path, method })`, pass the router definition to the link so the client calls the correct URL:
+
+```ts twoslash
+// @noErrors
+import { createLink } from 'silgi/client/ofetch'
+import { appRouter } from './server'
+
+const link = createLink({
+  url: 'http://localhost:3000',
+  router: appRouter,
+})
+```
+
+Now `client.commerce.orders.list()` sends `GET /api/orders` instead of `POST /commerce/orders/list`. Path parameters like `:id` are automatically extracted from the input and substituted into the URL:
+
+```ts twoslash
+// @noErrors
+// Server: .$route({ method: 'GET', path: '/api/users/:id' })
+// Client call:
+const user = await client.users.byId({ id: '42' })
+// → GET /api/users/42
+```
+
+<Callout type='info'>
+  Without the `router` option, the client falls back to the default tree path (`POST /commerce/orders/list`). The `router` option is only needed when procedures use `$route({ path })`.
+</Callout>
 
 ### Authentication headers
 
@@ -280,6 +310,18 @@ if (isError) {
 }
 ```
 
+For an entire client that never throws, use `createSafeClient`:
+
+```ts twoslash
+// @noErrors
+import { createSafeClient } from 'silgi/client'
+
+const client = createSafeClient<AppRouter>(link)
+
+const { error, data, isError, isSuccess } = await client.users.list({ limit: 10 })
+// Every call returns SafeResult — no try/catch needed anywhere
+```
+
 See the [Typed Errors](/docs/errors) page for the complete error handling guide, including the `defined` flag for distinguishing business errors from unexpected failures.
 
 ## Server-side client
@@ -323,6 +365,19 @@ const link = new DynamicLink((path, input, options) => {
 const client = createClient<AppRouter>(link)
 ```
 
+The selector can also be async — useful for lazy-loading a link:
+
+```ts twoslash
+// @noErrors
+const link = new DynamicLink(async (path) => {
+  if (path[0] === 'analytics') {
+    const { createLink } = await import('silgi/client/ofetch')
+    return createLink({ url: 'https://analytics.example.com' })
+  }
+  return defaultLink
+})
+```
+
 This is useful when different parts of your API live on different servers, or when you want to swap between real and mock links based on environment.
 
 ## withInterceptors
@@ -347,6 +402,51 @@ const link = withInterceptors(baseLink, {
 ```
 
 All three hooks are optional. `onError` fires on any thrown error — the error still propagates to the caller after the hook runs.
+
+## Consuming streams
+
+For subscription procedures that return async iterators, use the consumption utilities from `silgi/client/consume`:
+
+```ts twoslash
+// @noErrors
+import { consumeIterator } from 'silgi/client/consume'
+
+const iterator = await client.events.subscribe()
+
+await consumeIterator(iterator, {
+  onEvent: (data) => console.log('Event:', data),
+  onError: (err) => console.error('Error:', err),
+  onFinish: () => console.log('Stream ended'),
+  signal: controller.signal, // optional abort
+})
+```
+
+For automatic reconnection with `lastEventId` resumption:
+
+```ts twoslash
+// @noErrors
+import { consumeWithReconnect } from 'silgi/client/consume'
+
+await consumeWithReconnect({
+  connect: (lastEventId) => client.events.subscribe(undefined, { lastEventId }),
+  onEvent: (data) => updateUI(data),
+  onReconnect: (attempt) => console.log(`Reconnecting (#${attempt})...`),
+  maxReconnects: 10,
+  reconnectDelay: 2000,
+})
+```
+
+You can also transform stream values with `mapIterator`:
+
+```ts twoslash
+// @noErrors
+import { mapIterator } from 'silgi/client/consume'
+
+const mapped = mapIterator(iterator, (event) => ({
+  ...event,
+  receivedAt: Date.now(),
+}))
+```
 
 ## What's next?
 

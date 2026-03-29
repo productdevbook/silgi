@@ -196,9 +196,38 @@ For subscription procedures, the server sends multiple `data` messages followed 
 
 The `done: true` message signals that the stream has ended.
 
-## Client example
+## Client
 
-Here's a basic client using the native `WebSocket` API:
+### WSLink
+
+Use the built-in `WSLink` for a type-safe WebSocket client with automatic connection management:
+
+```ts twoslash
+// @noErrors
+import { createClient } from 'silgi/client'
+import { WSLink } from 'silgi/client/ws'
+
+const link = new WSLink({ url: 'ws://localhost:3000/ws' })
+const client = createClient<AppRouter>(link)
+
+// Use it like any other client — connection is established on first call
+const users = await client.users.list({ limit: 10 })
+
+// Clean up when done
+link.dispose()
+```
+
+`WSLink` handles connection lifecycle automatically — it connects on the first call, reconnects if the connection drops, and multiplexes concurrent calls over a single WebSocket.
+
+| Option      | Type                     | Default              | Description                    |
+| ----------- | ------------------------ | -------------------- | ------------------------------ |
+| `url`       | `string \| URL`          | (required)           | WebSocket server URL           |
+| `protocol`  | `'json' \| 'messagepack'` | `'json'`           | Wire protocol                  |
+| `WebSocket` | `typeof WebSocket`       | `globalThis.WebSocket` | Custom WebSocket constructor |
+
+### Native WebSocket
+
+For custom scenarios, here's a basic client using the native `WebSocket` API:
 
 ```ts twoslash
 // @noErrors
