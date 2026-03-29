@@ -9,7 +9,7 @@ import { ofetch, FetchError } from 'ofetch'
 
 import { encode as msgpackEncode, decode as msgpackDecode, MSGPACK_CONTENT_TYPE } from '../../../codec/msgpack.ts'
 import { SilgiError, isSilgiErrorJSON, fromSilgiErrorJSON } from '../../../core/error.ts'
-import { resolveRoute } from '../../../core/router-utils.ts'
+import { resolveRoute, substituteParams } from '../../../core/router-utils.ts'
 
 import type { ClientLink, ClientContext, ClientOptions } from '../../types.ts'
 import type { FetchOptions, FetchContext } from 'ofetch'
@@ -94,7 +94,13 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
     async call(path, input, callOptions) {
       // Resolve custom $route({ path, method }) from router if available
       const resolved = router ? resolveRoute(router, path) : undefined
-      const urlPath = resolved ? resolved.path : '/' + path.map(encodeURIComponent).join('/')
+      let urlPath = resolved ? resolved.path : '/' + path.map(encodeURIComponent).join('/')
+      // Substitute :param placeholders with values from input
+      if (resolved) {
+        const sub = substituteParams(urlPath, input)
+        urlPath = sub.url
+        input = sub.remainingInput
+      }
       const url = `${baseUrl}${urlPath}`
 
       // Resolve headers

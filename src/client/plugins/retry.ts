@@ -36,6 +36,8 @@ export interface RetryOptions {
   shouldRetry?: (error: unknown, attempt: number) => boolean
   /** Called before each retry attempt */
   onRetry?: (info: { attempt: number; delay: number; error: unknown; path: readonly string[] }) => void
+  /** Respect Retry-After header from 429/503 responses (default: true) */
+  respectRetryAfter?: boolean
 }
 
 const DEFAULT_RETRY_CODES = [408, 429, 500, 502, 503, 504]
@@ -53,6 +55,27 @@ function getStatusFromError(error: unknown): number | undefined {
   return undefined
 }
 
+/** Parse Retry-After header value — returns delay in ms, or undefined */
+function parseRetryAfter(error: unknown): number | undefined {
+  if (!error || typeof error !== 'object') return undefined
+  const e = error as Record<string, unknown>
+  // Extract header from response.headers or data.headers
+  const response = e.response as Record<string, unknown> | undefined
+  const headers = (response?.headers ?? e.headers) as Record<string, string> | Headers | undefined
+  if (!headers) return undefined
+  const value =
+    typeof (headers as any).get === 'function'
+      ? (headers as Headers).get('retry-after')
+      : (headers as Record<string, string>)['retry-after']
+  if (!value) return undefined
+  // Retry-After can be seconds (integer) or HTTP-date
+  const seconds = Number(value)
+  if (!Number.isNaN(seconds)) return seconds * 1000
+  const date = Date.parse(value)
+  if (!Number.isNaN(date)) return Math.max(0, date - Date.now())
+  return undefined
+}
+
 export function withRetry<TClientContext extends ClientContext>(
   link: ClientLink<TClientContext>,
   options: RetryOptions = {},
@@ -63,6 +86,7 @@ export function withRetry<TClientContext extends ClientContext>(
   const retryCodes = new Set(options.retryOn ?? DEFAULT_RETRY_CODES)
   const shouldRetry = options.shouldRetry
   const onRetry = options.onRetry
+  const respectRetryAfter = options.respectRetryAfter ?? true
 
   function getDelay(attempt: number): number {
     const base = typeof baseDelay === 'function' ? baseDelay(attempt) : baseDelay * 2 ** attempt
@@ -88,7 +112,8 @@ export function withRetry<TClientContext extends ClientContext>(
           if (callOptions.signal?.aborted) throw error
           if (!isRetryable(error, attempt)) throw error
 
-          const delay = getDelay(attempt)
+          const retryAfterDelay = respectRetryAfter ? parseRetryAfter(error) : undefined
+          const delay = retryAfterDelay ?? getDelay(attempt)
           onRetry?.({ attempt: attempt + 1, delay, error, path })
 
           await new Promise<void>((resolve, reject) => {

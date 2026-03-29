@@ -54,4 +54,30 @@ export function resolveRoute(router: unknown, path: readonly string[]): { path: 
   return { path: route.path, method: (route.method ?? 'POST').toUpperCase() }
 }
 
+/**
+ * Substitute :param placeholders in a route path with values from input.
+ * Returns the resolved URL path and the input with used params removed.
+ */
+export function substituteParams(routePath: string, input: unknown): { url: string; remainingInput: unknown } {
+  if (input == null || typeof input !== 'object' || Array.isArray(input)) {
+    return { url: routePath, remainingInput: input }
+  }
+  const obj = input as Record<string, unknown>
+  const used = new Set<string>()
+  const url = routePath.replace(/:([a-zA-Z_]\w*)/g, (_match, name: string) => {
+    const val = obj[name]
+    if (val !== undefined) {
+      used.add(name)
+      return encodeURIComponent(String(val))
+    }
+    return `:${name}`
+  })
+  if (used.size === 0) return { url, remainingInput: input }
+  const remaining: Record<string, unknown> = {}
+  for (const key of Object.keys(obj)) {
+    if (!used.has(key)) remaining[key] = obj[key]
+  }
+  return { url, remainingInput: Object.keys(remaining).length > 0 ? remaining : undefined }
+}
+
 export { compileRouter }

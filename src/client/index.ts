@@ -1,5 +1,5 @@
-export { createClient, safe } from './client.ts'
-export type { SafeResult } from './client.ts'
+export { createClient, createSafeClient, safe } from './client.ts'
+export type { SafeResult, InferSafeClient } from './client.ts'
 export type {
   ClientContext,
   ClientOptions,

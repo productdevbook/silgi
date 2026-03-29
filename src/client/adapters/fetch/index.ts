@@ -3,7 +3,7 @@
  */
 
 import { SilgiError, isSilgiErrorJSON, fromSilgiErrorJSON, isErrorStatus } from '../../../core/error.ts'
-import { resolveRoute } from '../../../core/router-utils.ts'
+import { resolveRoute, substituteParams } from '../../../core/router-utils.ts'
 import { stringifyJSON, parseEmptyableJSON } from '../../../core/utils.ts'
 
 import type { ClientLink, ClientContext, ClientOptions } from '../../types.ts'
@@ -41,7 +41,13 @@ export class RPCLink<TClientContext extends ClientContext = ClientContext> imple
   async call(path: readonly string[], input: unknown, options: ClientOptions<TClientContext>): Promise<unknown> {
     // Resolve custom $route({ path, method }) from router if available
     const resolved = this.#router ? resolveRoute(this.#router, path) : undefined
-    const urlPath = resolved ? resolved.path : '/' + path.map(encodeURIComponent).join('/')
+    let urlPath = resolved ? resolved.path : '/' + path.map(encodeURIComponent).join('/')
+    // Substitute :param placeholders with values from input
+    if (resolved) {
+      const sub = substituteParams(urlPath, input)
+      urlPath = sub.url
+      input = sub.remainingInput
+    }
     let url = `${this.#baseUrl}${urlPath}`
 
     // Resolve headers

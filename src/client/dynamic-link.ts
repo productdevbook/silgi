@@ -24,11 +24,12 @@ export type LinkSelector<TClientContext extends ClientContext = ClientContext> =
   path: readonly string[],
   input: unknown,
   options: ClientOptions<TClientContext>,
-) => ClientLink<TClientContext>
+) => ClientLink<TClientContext> | Promise<ClientLink<TClientContext>>
 
 /**
  * A link that delegates to other links based on a selector function.
  * The selector runs on every call, so it can use dynamic state.
+ * Supports both sync and async selectors (e.g. lazy-importing a link).
  */
 export class DynamicLink<TClientContext extends ClientContext = ClientContext> implements ClientLink<TClientContext> {
   #selector: LinkSelector<TClientContext>
@@ -38,7 +39,10 @@ export class DynamicLink<TClientContext extends ClientContext = ClientContext> i
   }
 
   call(path: readonly string[], input: unknown, options: ClientOptions<TClientContext>): Promise<unknown> {
-    const link = this.#selector(path, input, options)
-    return link.call(path, input, options)
+    const result = this.#selector(path, input, options)
+    if (result && typeof (result as any).then === 'function') {
+      return (result as Promise<ClientLink<TClientContext>>).then((link) => link.call(path, input, options))
+    }
+    return (result as ClientLink<TClientContext>).call(path, input, options)
   }
 }

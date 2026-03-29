@@ -67,3 +67,49 @@ export async function safe<TOutput, TError = unknown>(promise: Promise<TOutput>)
     return { error: error as TError, data: undefined, isError: true, isSuccess: false }
   }
 }
+
+/**
+ * Create a safe client — every procedure call returns { error, data } instead of throwing.
+ *
+ * ```ts
+ * const safeClient = createSafeClient<typeof appRouter>(link)
+ * const { error, data } = await safeClient.users.list()
+ * if (error) console.error(error)
+ * ```
+ */
+export function createSafeClient<T, TClientContext extends ClientContext = Record<never, never>>(
+  link: ClientLink<TClientContext>,
+): InferSafeClient<T> {
+  return createSafeProxy(link, []) as any
+}
+
+function createSafeProxy<TClientContext extends ClientContext>(
+  link: ClientLink<TClientContext>,
+  path: readonly string[],
+): unknown {
+  const cache = new Map<string, unknown>()
+
+  const procedureClient = (input: unknown, options?: ClientOptions<TClientContext>) =>
+    safe(link.call(path, input, options ?? ({} as ClientOptions<TClientContext>)))
+
+  return new Proxy(procedureClient, {
+    get(_target, prop) {
+      if (prop === 'then') return undefined
+      if (typeof prop !== 'string') return undefined
+      let cached = cache.get(prop)
+      if (!cached) {
+        cached = createSafeProxy(link, [...path, prop])
+        cache.set(prop, cached)
+      }
+      return cached
+    },
+    apply(_target, _thisArg, args) {
+      return procedureClient(args[0], args[1])
+    },
+  })
+}
+
+/** Infer a safe client type where every procedure returns SafeResult */
+export type InferSafeClient<T> = T extends (...args: infer A) => Promise<infer R>
+  ? (...args: A) => Promise<SafeResult<R, import('../core/error.ts').SilgiError>>
+  : { [K in keyof T]: InferSafeClient<T[K]> }

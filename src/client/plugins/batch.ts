@@ -17,6 +17,12 @@ export interface BatchLinkOptions {
   maxSize?: number
   /** URL for the batch endpoint */
   url: string | URL
+  /**
+   * Enable streaming mode — server streams individual responses progressively
+   * via newline-delimited JSON instead of waiting for all to complete.
+   * @default false
+   */
+  streaming?: boolean
 }
 
 interface PendingCall {

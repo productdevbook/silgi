@@ -7,6 +7,8 @@ export default defineConfig({
     'src/client/adapters/fetch/index.ts',
     'src/client/adapters/ofetch/index.ts',
     'src/client/plugins/index.ts',
+    'src/client/adapters/websocket/index.ts',
+    'src/client/consume.ts',
     'src/client/openapi.ts',
     'src/client/server.ts',
     'src/codec/msgpack.ts',
