@@ -39,4 +39,19 @@ export function assignPaths(def: RouterDef, prefix: string[] = []): RouterDef {
   return result
 }
 
+// ── Route Resolution for Client ─────────────────────
+
+/** Walk a router tree by path segments and return the procedure's route metadata */
+export function resolveRoute(router: unknown, path: readonly string[]): { path: string; method: string } | undefined {
+  let current: any = router
+  for (const segment of path) {
+    if (current == null || typeof current !== 'object') return undefined
+    current = current[segment]
+  }
+  if (!isProcedureDef(current)) return undefined
+  const route = current.route as import('../types.ts').Route | undefined
+  if (!route?.path) return undefined
+  return { path: route.path, method: (route.method ?? 'POST').toUpperCase() }
+}
+
 export { compileRouter }

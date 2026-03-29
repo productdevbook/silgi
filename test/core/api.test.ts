@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
 
+import { RPCLink } from '#src/client/adapters/fetch/index.ts'
+import { createServerClient } from '#src/client/server.ts'
 import { compileProcedure } from '#src/compile.ts'
 import { SilgiError } from '#src/core/error.ts'
 import { silgi } from '#src/silgi.ts'
@@ -512,5 +514,61 @@ describe('URL params from route patterns', () => {
     const body = await res.json()
     expect(body.id).toBe('456')
     expect(body.name).toBe('Updated')
+  })
+})
+
+// ── $route({ path }) client resolution ─────────────
+
+describe('$route({ path }) resolves on client via router', () => {
+  const k4 = silgi({ context: () => ({}) })
+
+  it('client calls custom REST path instead of tree path', async () => {
+    const router = k4.router({
+      commerce: {
+        orders: {
+          list: k4.$route({ method: 'GET', path: '/api/orders' }).$resolve(() => [{ id: '1', name: 'Order 1' }]),
+        },
+      },
+    })
+    const handle = k4.handler(router)
+
+    // Custom REST path works via handler
+    const restRes = await handle(new Request('http://localhost/api/orders', { method: 'GET' }))
+    expect(restRes.status).toBe(200)
+    expect(await restRes.json()).toEqual([{ id: '1', name: 'Order 1' }])
+
+    // Client with router resolves to custom path
+    const link = new RPCLink({
+      url: 'http://localhost',
+      router,
+      fetch: (req) => handle(req instanceof Request ? req : new Request(req)),
+    })
+    const result = await link.call(['commerce', 'orders', 'list'], undefined, {})
+    expect(result).toEqual([{ id: '1', name: 'Order 1' }])
+  })
+
+  it('client without router falls back to tree path', async () => {
+    const router = k4.router({
+      health: k4.$resolve(() => ({ status: 'ok' })),
+    })
+    const handle = k4.handler(router)
+
+    const link = new RPCLink({
+      url: 'http://localhost',
+      fetch: (req) => handle(req instanceof Request ? req : new Request(req)),
+    })
+    const result = await link.call(['health'], undefined, {})
+    expect(result).toEqual({ status: 'ok' })
+  })
+
+  it('createServerClient resolves $route paths', async () => {
+    const router = k4.router({
+      auth: {
+        login: k4.$route({ path: '/api/login' }).$resolve(() => ({ token: 'abc' })),
+      },
+    })
+    const client = createServerClient(router, { context: () => ({}) })
+    const result = await (client as any).auth.login()
+    expect(result).toEqual({ token: 'abc' })
   })
 })

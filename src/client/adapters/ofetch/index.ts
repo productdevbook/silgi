@@ -9,6 +9,7 @@ import { ofetch, FetchError } from 'ofetch'
 
 import { encode as msgpackEncode, decode as msgpackDecode, MSGPACK_CONTENT_TYPE } from '../../../codec/msgpack.ts'
 import { SilgiError, isSilgiErrorJSON, fromSilgiErrorJSON } from '../../../core/error.ts'
+import { resolveRoute } from '../../../core/router-utils.ts'
 
 import type { ClientLink, ClientContext, ClientOptions } from '../../types.ts'
 import type { FetchOptions, FetchContext } from 'ofetch'
@@ -55,6 +56,9 @@ export interface LinkOptions<TClientContext extends ClientContext = ClientContex
   onResponse?: FetchOptions['onResponse']
   onRequestError?: FetchOptions['onRequestError']
   onResponseError?: FetchOptions['onResponseError']
+
+  /** Router definition — enables $route({ path }) resolution on the client */
+  router?: unknown
 }
 
 /**
@@ -84,10 +88,14 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
     (options.devalue ? 'devalue' : undefined) ??
     'json'
 
+  const router = options.router
+
   return {
     async call(path, input, callOptions) {
-      const urlPath = path.map(encodeURIComponent).join('/')
-      const url = `${baseUrl}/${urlPath}`
+      // Resolve custom $route({ path, method }) from router if available
+      const resolved = router ? resolveRoute(router, path) : undefined
+      const urlPath = resolved ? resolved.path : '/' + path.map(encodeURIComponent).join('/')
+      const url = `${baseUrl}${urlPath}`
 
       // Resolve headers
       const headers: Record<string, string> = {
@@ -111,7 +119,7 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
 
       try {
         const data = await ofetch(url, {
-          method: 'POST',
+          method: (resolved?.method ?? 'POST') as string,
           headers,
           body,
           signal: callOptions.signal,

@@ -3,6 +3,7 @@
  */
 
 import { SilgiError, isSilgiErrorJSON, fromSilgiErrorJSON, isErrorStatus } from '../../../core/error.ts'
+import { resolveRoute } from '../../../core/router-utils.ts'
 import { stringifyJSON, parseEmptyableJSON } from '../../../core/utils.ts'
 
 import type { ClientLink, ClientContext, ClientOptions } from '../../types.ts'
@@ -13,6 +14,8 @@ export interface RPCLinkOptions<TClientContext extends ClientContext = ClientCon
   fetch?: typeof globalThis.fetch
   method?: 'GET' | 'POST'
   maxUrlLength?: number
+  /** Router definition — enables $route({ path }) resolution on the client */
+  router?: unknown
 }
 
 export class RPCLink<TClientContext extends ClientContext = ClientContext> implements ClientLink<TClientContext> {
@@ -21,6 +24,7 @@ export class RPCLink<TClientContext extends ClientContext = ClientContext> imple
   #fetch: typeof globalThis.fetch
   #method: 'GET' | 'POST'
   #maxUrlLength: number
+  #router: unknown
 
   constructor(options: RPCLinkOptions<TClientContext>) {
     this.#baseUrl = typeof options.url === 'string' ? options.url : options.url.href
@@ -31,19 +35,21 @@ export class RPCLink<TClientContext extends ClientContext = ClientContext> imple
     this.#fetch = options.fetch ?? globalThis.fetch.bind(globalThis)
     this.#method = options.method ?? 'POST'
     this.#maxUrlLength = options.maxUrlLength ?? 2083
+    this.#router = options.router
   }
 
   async call(path: readonly string[], input: unknown, options: ClientOptions<TClientContext>): Promise<unknown> {
-    // Build URL
-    const urlPath = path.map(encodeURIComponent).join('/')
-    let url = `${this.#baseUrl}/${urlPath}`
+    // Resolve custom $route({ path, method }) from router if available
+    const resolved = this.#router ? resolveRoute(this.#router, path) : undefined
+    const urlPath = resolved ? resolved.path : '/' + path.map(encodeURIComponent).join('/')
+    let url = `${this.#baseUrl}${urlPath}`
 
     // Resolve headers
     const headers: Record<string, string> = {
       ...(typeof this.#headers === 'function' ? this.#headers(options) : this.#headers),
     }
 
-    let method = this.#method
+    let method: string = resolved?.method ?? this.#method
     let body: BodyInit | undefined
     const hasInput = input !== undefined && input !== null
 

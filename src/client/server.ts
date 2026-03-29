@@ -18,6 +18,7 @@
  */
 
 import { compileRouter } from '../compile.ts'
+import { resolveRoute } from '../core/router-utils.ts'
 
 import type { CompiledRouterFn } from '../compile.ts'
 import type { RouterDef, InferClient } from '../types.ts'
@@ -38,10 +39,11 @@ export function createServerClient<TRouter extends RouterDef, TCtx extends Recor
   options: ServerClientOptions<TCtx>,
 ): InferClient<TRouter> {
   const flatRouter = compileRouter(router)
-  return createServerProxy(flatRouter, options.context, []) as InferClient<TRouter>
+  return createServerProxy(router, flatRouter, options.context, []) as InferClient<TRouter>
 }
 
 function createServerProxy(
+  router: unknown,
   flatRouter: CompiledRouterFn,
   contextFactory: () => Record<string, unknown> | Promise<Record<string, unknown>>,
   path: string[],
@@ -49,9 +51,12 @@ function createServerProxy(
   const cache = new Map<string, unknown>()
 
   const callProcedure = async (input?: unknown) => {
-    const key = path.join('/')
-    const route = flatRouter('POST', '/' + key)?.data
-    if (!route) throw new Error(`Procedure not found: ${key}`)
+    // Resolve custom $route({ path, method }) if present
+    const resolved = resolveRoute(router, path)
+    const routePath = resolved?.path ?? '/' + path.join('/')
+    const method = resolved?.method ?? 'POST'
+    const route = flatRouter(method, routePath)?.data
+    if (!route) throw new Error(`Procedure not found: ${path.join('/')}`)
     const ctx: Record<string, unknown> = Object.create(null)
     const baseCtx = await contextFactory()
     const keys = Object.keys(baseCtx)
@@ -66,7 +71,7 @@ function createServerProxy(
       if (typeof prop !== 'string') return undefined
       let cached = cache.get(prop)
       if (!cached) {
-        cached = createServerProxy(flatRouter, contextFactory, [...path, prop])
+        cached = createServerProxy(router, flatRouter, contextFactory, [...path, prop])
         cache.set(prop, cached)
       }
       return cached
