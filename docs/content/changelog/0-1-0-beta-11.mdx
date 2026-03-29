@@ -198,3 +198,7 @@ Handles connection lifecycle automatically — connects on first call, multiplex
 - **Async `DynamicLink`**: Selector can now return `Promise<ClientLink>` — useful for lazy-loading links via dynamic `import()`
 - **Retry-After header**: `withRetry` now respects `Retry-After` headers from 429/503 responses by default. Supports both delay-seconds and HTTP-date formats. Disable with `respectRetryAfter: false`
 - **Streaming batch option**: `BatchLink` accepts a `streaming` option for progressive response delivery (server-side NDJSON support coming in a future release)
+
+## Fixes
+
+- **Cron jobs stop on Ctrl+C**: `stopCronJobs()` is now called on `SIGINT`, `SIGTERM`, and `server.close()`. Previously cron tasks kept running after the process was interrupted.
