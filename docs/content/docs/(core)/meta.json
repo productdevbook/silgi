@@ -14,6 +14,7 @@
     "procedures",
     "middleware",
     "errors",
+    "route-metadata",
     "---",
     "server",
     "openapi",

@@ -1,6 +1,6 @@
 {
   "name": "silgi",
-  "version": "0.1.0-beta.10",
+  "version": "0.1.0-beta.12",
   "private": false,
   "description": "The fastest end-to-end type-safe RPC framework for TypeScript — compiled pipelines, single package, every runtime",
   "keywords": [
@@ -46,6 +46,10 @@
     ".": {
       "import": "./dist/index.mjs",
       "types": "./dist/index.d.mts"
+    },
+    "./vite": {
+      "import": "./dist/vite.mjs",
+      "types": "./dist/vite.d.mts"
     },
     "./client": {
       "import": "./dist/client/index.mjs",
@@ -270,6 +274,7 @@
     "ocache": "^0.1.4",
     "ofetch": "2.0.0-alpha.3",
     "ohash": "^2.0.11",
+    "silgi": "link:",
     "srvx": "^0.11.13",
     "unstorage": "^2.0.0-alpha.7"
   },
@@ -333,7 +338,7 @@
   "packageManager": "pnpm@10.33.0",
   "pnpm": {
     "overrides": {
-      "silgi": "workspace:*"
+      "silgi": "link:"
     }
   }
 }

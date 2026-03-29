@@ -1,164 +1,55 @@
 /**
- * Contract-first workflow — define API shape, then implement.
+ * Route metadata utilities for client-server communication.
  *
- * Useful in monorepos where frontend and backend are separate packages.
- * The contract is shared, implementation is enforced by types.
+ * `minifyContractRouter()` extracts `{ path, method }` from a router — safe to
+ * serialize as JSON and ship to client bundles. Zero server code leakage.
  *
  * @example
  * ```ts
- * // packages/api-contract/index.ts (shared)
- * import { contract } from "silgi/contract"
- * import { z } from "zod"
+ * // Build-time script
+ * import { minifyContractRouter } from 'silgi/contract'
+ * import { appRouter } from './server/router'
+ * fs.writeFileSync('routes.json', JSON.stringify(minifyContractRouter(appRouter)))
  *
- * export const api = contract({
- *   users: {
- *     list: {
- *       type: "query",
- *       input: z.object({ limit: z.number().optional() }),
- *       output: z.array(UserSchema),
- *     },
- *     create: {
- *       type: "mutation",
- *       input: z.object({ name: z.string() }),
- *       output: UserSchema,
- *       errors: { CONFLICT: 409 },
- *     },
- *   },
- * })
- *
- * // packages/api-server/index.ts (backend)
- * import { implement } from "silgi/contract"
- * import { api } from "api-contract"
- *
- * const router = implement(api, (k) => ({
- *   users: {
- *     list: k.$resolve(({ input, ctx }) => ctx.db.users.find({ take: input.limit })),
- *     create: k.$resolve(({ input, ctx, fail }) => {
- *       if (exists(input.name)) fail("CONFLICT")
- *       return ctx.db.users.create(input)
- *     }),
- *   },
- * }))
- *
- * // packages/frontend/index.ts (client — no server import!)
- * import type { api } from "api-contract"
- * import type { InferContractClient } from "silgi/contract"
- *
- * type Client = InferContractClient<typeof api>
- * // Client.users.list: (input: { limit?: number }) => Promise<User[]>
- * // Client.users.create: (input: { name: string }) => Promise<User>
+ * // Client
+ * import routes from './routes.json'
+ * const link = createLink({ url: '...', routes })
  * ```
  */
 
-import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
-import type { ProcedureType, ErrorDef, Route } from './types.ts'
+import type { Route } from './types.ts'
 
-// ── Contract Definition Types ───────────────────────
-
-export interface ProcedureContract<
-  TType extends ProcedureType = ProcedureType,
-  TInput extends AnySchema | undefined = AnySchema | undefined,
-  TOutput extends AnySchema | undefined = AnySchema | undefined,
-  TErrors extends ErrorDef = ErrorDef,
-> {
-  type?: TType
-  input?: TInput
-  output?: TOutput
-  errors?: TErrors
-  route?: Route
-  description?: string
-}
-
-export type ContractRouter = {
-  [key: string]: ProcedureContract<any, any, any, any> | ContractRouter
-}
-
-// ── Contract Factory ────────────────────────────────
+// ── Minify Contract Router ─────────────────────────
 
 /**
- * Define an API contract — shared between client and server.
- * Pure type information, no runtime behavior.
+ * Strip all business logic from a router, keeping only `{ path, method }` per procedure.
+ * Safe to serialize as JSON and ship to client bundles.
+ *
+ * Works with routers created via `s.router()`.
  */
-export function contract<T extends ContractRouter>(definition: T): T {
-  return definition
-}
+export function minifyContractRouter(def: unknown): Record<string, unknown> {
+  const result: Record<string, unknown> = {}
+  if (def == null || typeof def !== 'object') return result
 
-// ── Implementation Types ────────────────────────────
+  for (const [key, value] of Object.entries(def)) {
+    if (typeof value !== 'object' || value === null) continue
+    const obj = value as Record<string, unknown>
 
-type ImplementProcedure<T extends ProcedureContract> =
-  T extends ProcedureContract<infer _TType, infer TInput, infer TOutput, infer TErrors>
-    ? (opts: {
-        input: TInput extends AnySchema ? InferSchemaOutput<TInput> : undefined
-        ctx: Record<string, unknown>
-        fail: TErrors extends ErrorDef ? <K extends keyof TErrors & string>(code: K, ...args: any[]) => never : never
-        signal: AbortSignal
-      }) => TOutput extends AnySchema ? InferSchemaOutput<TOutput> | Promise<InferSchemaOutput<TOutput>> : unknown
-    : never
-
-type ImplementRouter<T extends ContractRouter> = {
-  [K in keyof T]: T[K] extends ProcedureContract
-    ? ImplementProcedure<T[K]>
-    : T[K] extends ContractRouter
-      ? ImplementRouter<T[K]>
-      : never
-}
-
-// ── Implement Function ──────────────────────────────
-
-/**
- * Implement a contract — returns a silgi RouterDef.
- * Type-safe: implementation must match the contract.
- */
-export function implement<T extends ContractRouter>(
-  contractDef: T,
-  implementations: ImplementRouter<T>,
-): import('./types.ts').RouterDef {
-  return buildRouter(contractDef, implementations)
-}
-
-function buildRouter(contractDef: ContractRouter, impls: any): any {
-  const router: Record<string, unknown> = {}
-
-  for (const [key, contractEntry] of Object.entries(contractDef)) {
-    const impl = impls[key]
-    if (!impl) continue
-
-    if (isProcedureContract(contractEntry)) {
-      // Build a ProcedureDef from contract + implementation
-      router[key] = {
-        type: contractEntry.type ?? 'query',
-        input: contractEntry.input ?? null,
-        output: contractEntry.output ?? null,
-        errors: contractEntry.errors ?? null,
-        use: null,
-        resolve: impl,
-        route: contractEntry.route ?? null,
-        meta: null,
+    // ProcedureDef: has resolve + route
+    const route = obj.route as Route | undefined
+    if (route?.path) {
+      result[key] = {
+        path: route.path,
+        method: (route.method ?? 'POST').toUpperCase(),
       }
+    } else if ('resolve' in obj || 'type' in obj) {
+      // Procedure without custom route — skip
     } else {
       // Nested router
-      router[key] = buildRouter(contractEntry as ContractRouter, impl)
+      const nested = minifyContractRouter(value)
+      if (Object.keys(nested).length > 0) result[key] = nested
     }
   }
 
-  return router
-}
-
-function isProcedureContract(v: unknown): v is ProcedureContract {
-  if (typeof v !== 'object' || v === null) return false
-  // A procedure contract has input/output/type but no "resolve"
-  return 'input' in v || 'output' in v || 'type' in v || 'errors' in v
-}
-
-// ── Client Type Inference from Contract ─────────────
-
-/** Infer client type from a contract (no server code needed) */
-export type InferContractClient<T extends ContractRouter> = {
-  [K in keyof T]: T[K] extends ProcedureContract<any, infer TInput, infer TOutput>
-    ? TInput extends AnySchema
-      ? (input: InferSchemaInput<TInput>) => Promise<TOutput extends AnySchema ? InferSchemaOutput<TOutput> : unknown>
-      : () => Promise<TOutput extends AnySchema ? InferSchemaOutput<TOutput> : unknown>
-    : T[K] extends ContractRouter
-      ? InferContractClient<T[K]>
-      : never
+  return result
 }

@@ -57,8 +57,8 @@ export interface LinkOptions<TClientContext extends ClientContext = ClientContex
   onRequestError?: FetchOptions['onRequestError']
   onResponseError?: FetchOptions['onResponseError']
 
-  /** Route metadata — pass extractRoutes(router) or the full router. Required when procedures use $route({ path }) */
-  routes?: unknown
+  /** Route metadata — pass extractRoutes(router), the full router, or a Promise that resolves to routes. Required when procedures use $route({ path }) */
+  routes?: unknown | Promise<unknown>
 }
 
 /**
@@ -88,12 +88,24 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
     (options.devalue ? 'devalue' : undefined) ??
     'json'
 
-  const routes = options.routes
+  let resolvedRoutes: unknown = undefined
+  const routesOption = options.routes
+
+  // Resolve routes (supports both sync and async/Promise)
+  if (routesOption && typeof (routesOption as any)?.then === 'function') {
+    ;(routesOption as Promise<unknown>).then(r => { resolvedRoutes = r })
+  } else {
+    resolvedRoutes = routesOption
+  }
 
   return {
     async call(path, input, callOptions) {
+      // Wait for routes if still loading
+      if (routesOption && !resolvedRoutes && typeof (routesOption as any)?.then === 'function') {
+        resolvedRoutes = await (routesOption as Promise<unknown>)
+      }
       // Resolve custom $route({ path, method }) from router if available
-      const resolved = routes ? resolveRoute(routes, path) : undefined
+      const resolved = resolvedRoutes ? resolveRoute(resolvedRoutes, path) : undefined
       let urlPath = resolved ? resolved.path : '/' + path.map(encodeURIComponent).join('/')
       // Substitute :param placeholders with values from input
       if (resolved) {

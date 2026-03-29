@@ -1,6 +1,6 @@
 ---
 title: Monorepo Setup
-description: Share types between frontend and backend in a monorepo.
+description: Share types between frontend and backend in a monorepo using contracts.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout'
@@ -22,6 +22,7 @@ The contract-first pattern lets your frontend import types from a shared package
     </Folder>
     <Folder name='frontend' defaultOpen>
       <File name='src/client.ts' />
+      <File name='src/routes.json' />
       <File name='package.json' />
     </Folder>
   </Folder>
@@ -39,53 +40,51 @@ Three packages, each with a single responsibility:
 
 ## 1. Define the contract
 
-The contract package exports input/output schemas and the router type. No server logic lives here.
+The contract package exports API shape definitions — input/output schemas, route metadata, and error codes. No server logic.
 
-```ts twoslash title="packages/api-contract/src/index.ts"
-// @noErrors
-import { silgi } from "silgi"
-import { z } from "zod"
+```ts title="packages/api-contract/src/index.ts"
+import { contract } from 'silgi/contract'
+import { z } from 'zod'
 
-const s = silgi()
-
-// Input schemas — shared between server and client
-export const UserInput = z.object({
-  name: z.string().min(1),
+export const UserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
   email: z.string().email(),
 })
 
-export const ListInput = z.object({
-  limit: z.number().min(1).max(100).optional(),
+export const api = contract({
+  users: {
+    list: {
+      type: 'query',
+      input: z.object({ limit: z.number().min(1).max(100).optional() }),
+      output: z.array(UserSchema),
+      route: { method: 'GET', path: '/api/users' },
+    },
+    create: {
+      type: 'mutation',
+      input: z.object({ name: z.string().min(1), email: z.string().email() }),
+      output: UserSchema,
+      errors: { CONFLICT: 409 },
+      route: { method: 'POST', path: '/api/users' },
+    },
+  },
 })
 
-// Procedure definitions — schemas only, no implementation
-const listUsers = s
-  .$input(ListInput)
-  .$resolve(() => {} as any)
-const createUser = s
-  .$input(UserInput)
-  .$resolve(() => {} as any)
-
-export const contractRouter = s.router({
-  users: { list: listUsers, create: createUser },
-})
-
-// The type the frontend imports
-export type AppRouter = typeof contractRouter
+export type AppContract = typeof api
 ```
 
 <Callout>
-The contract uses placeholder resolvers (`() => {} as any`). They exist only for type inference — the actual implementation lives in `api-server`.
+The contract uses `contract()` from `silgi/contract` — a lightweight function that returns the definition as-is, providing type inference without any runtime behavior.
 </Callout>
 
 ## 2. Implement on the server
 
-The server package imports the schemas from the contract and provides real implementations.
+The server package imports the contract and provides real implementations. Types are enforced at compile time.
 
-```ts twoslash title="packages/api-server/src/server.ts"
-// @noErrors
+```ts title="packages/api-server/src/server.ts"
 import { silgi } from 'silgi'
-import { ListInput, UserInput } from 'api-contract'
+import { implement } from 'silgi/contract'
+import { api } from 'api-contract'
 
 const s = silgi({
   context: (req) => ({
@@ -94,57 +93,62 @@ const s = silgi({
   }),
 })
 
-const listUsers = s.$input(ListInput).$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit ?? 10 }))
-
-const createUser = s
-  .$use(auth)
-  .$input(UserInput)
-  .$resolve(({ input, ctx }) => ctx.db.users.create(input))
-
-const appRouter = s.router({
-  users: { list: listUsers, create: createUser },
+// implement() ensures your handlers match the contract's types
+const router = implement(api, {
+  users: {
+    list: async ({ input, ctx }) => {
+      return ctx.db.users.findMany({ take: input.limit ?? 10 })
+    },
+    create: async ({ input, ctx, fail }) => {
+      if (await ctx.db.users.exists(input.email)) fail('CONFLICT')
+      return ctx.db.users.create(input)
+    },
+  },
 })
 
-s.serve(appRouter, { port: 3000 })
+s.serve(router, { port: 3000 })
 ```
 
-## 3. Consume on the frontend
+## 3. Generate route metadata
 
-The frontend imports only the `AppRouter` type from the contract. No server code leaks into the client bundle.
+For REST-style routing, generate a `routes.json` at build time:
 
-```ts twoslash title="packages/frontend/src/client.ts"
-// @noErrors
+```ts title="packages/api-server/scripts/extract-routes.ts"
+import { minifyContractRouter } from 'silgi/contract'
+import { api } from 'api-contract'
+import { writeFileSync } from 'fs'
+
+const routes = minifyContractRouter(api)
+writeFileSync('../frontend/src/routes.json', JSON.stringify(routes, null, 2))
+console.log('✓ Routes extracted')
+```
+
+This outputs only `{ path, method }` metadata — zero business logic.
+
+## 4. Consume on the frontend
+
+The frontend imports the contract type and the routes JSON. No server code in the bundle.
+
+```ts title="packages/frontend/src/client.ts"
 import { createClient } from 'silgi/client'
 import { createLink } from 'silgi/client/ofetch'
-import type { AppRouter } from 'api-contract'
+import type { AppContract } from 'api-contract'
+import routes from './routes.json'
 
-const link = createLink({ url: 'http://localhost:3000' })
-const client = createClient<AppRouter>(link)
+const link = createLink({
+  url: 'http://localhost:3000',
+  routes, // Enables REST path resolution (GET /api/users, POST /api/users)
+})
+
+const client = createClient<AppContract>(link)
 
 // Full autocomplete and type checking
 const users = await client.users.list({ limit: 10 })
 ```
 
 <Callout type='info'>
-  Use `import type` for the router. This ensures the import is erased at build time and no server code is bundled into
-  the frontend.
+Use `import type` for the contract. This ensures the import is erased at build time — no server code is bundled into the frontend.
 </Callout>
-
-## InferContractClient
-
-For stricter typing without importing the full router, use `InferContractClient`:
-
-```ts twoslash
-// @noErrors
-import type { InferContractClient } from 'silgi'
-import type { AppRouter } from 'api-contract'
-
-type Client = InferContractClient<AppRouter>
-// Client.users.list: (input: { limit?: number }) => Promise<User[]>
-// Client.users.create: (input: { name: string; email: string }) => Promise<User>
-```
-
-This is useful for typing props, return values, or utility functions that work with the client.
 
 ## Workspace configuration
 
@@ -156,6 +160,10 @@ packages:
 ```json title="packages/api-server/package.json"
 {
   "name": "api-server",
+  "scripts": {
+    "routes:extract": "tsx scripts/extract-routes.ts",
+    "prebuild": "pnpm run routes:extract"
+  },
   "dependencies": {
     "api-contract": "workspace:*",
     "silgi": "latest",
@@ -176,6 +184,7 @@ packages:
 
 ## What's next?
 
-- [Client](/docs/client) — full client setup with links, interceptors, and binary mode
+- [Contract-First](/docs/contract) — full contract API reference
+- [Client](/docs/client) — client setup with links, interceptors, and binary mode
 - [Testing](/docs/best-practices/testing) — test procedures from the shared contract
-- [SSR Optimization](/docs/best-practices/ssr) — prefetch data server-side to avoid waterfalls
+- [SSR Optimization](/docs/best-practices/ssr) — prefetch data server-side

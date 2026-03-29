@@ -64,17 +64,30 @@ export function extractRoutes(def: unknown, prefix: string[] = []): ExtractedRou
   const result: ExtractedRoutes = {}
   if (def == null || typeof def !== 'object') return result
   for (const [key, value] of Object.entries(def)) {
-    if (isProcedureDef(value)) {
-      const route = value.route as import('../types.ts').Route | undefined
-      if (route?.path) {
-        result[key] = { path: route.path, method: (route.method ?? 'POST').toUpperCase() }
-      }
-    } else if (typeof value === 'object' && value !== null) {
+    const route = getRouteFromEntry(value)
+    if (route?.path) {
+      result[key] = { path: route.path, method: (route.method ?? 'POST').toUpperCase() }
+    } else if (typeof value === 'object' && value !== null && !isProcedureDef(value)) {
       const nested = extractRoutes(value, [...prefix, key])
       if (Object.keys(nested).length > 0) result[key] = nested
     }
   }
   return result
+}
+
+/** Extract route metadata from a ProcedureDef or ProcedureContract */
+function getRouteFromEntry(value: unknown): import('../types.ts').Route | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const obj = value as Record<string, unknown>
+  // ProcedureDef: { type, resolve, route }
+  if (isProcedureDef(value)) {
+    return obj.route as import('../types.ts').Route | undefined
+  }
+  // ProcedureContract: { route, input?, output? } — no resolve function
+  if ('route' in obj && typeof obj.route === 'object' && obj.route !== null) {
+    return obj.route as import('../types.ts').Route
+  }
+  return undefined
 }
 
 /** Check if a value is an extracted route leaf (has path + method, not a nested object) */
@@ -93,10 +106,9 @@ export function resolveRoute(routes: unknown, path: readonly string[]): { path: 
   }
   // Extracted route: { path, method }
   if (isExtractedRoute(current)) return current
-  // Full procedure: { route: { path, method }, resolve, ... }
-  if (isProcedureDef(current)) {
-    const route = current.route as import('../types.ts').Route | undefined
-    if (!route?.path) return undefined
+  // Full procedure or contract: extract route metadata
+  const route = getRouteFromEntry(current)
+  if (route?.path) {
     return { path: route.path, method: (route.method ?? 'POST').toUpperCase() }
   }
   return undefined

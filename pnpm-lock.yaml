@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  silgi: workspace:*
+  silgi: 'link:'
 
 importers:
 
@@ -50,6 +50,9 @@ importers:
       ohash:
         specifier: ^2.0.11
         version: 2.0.11
+      silgi:
+        specifier: 'link:'
+        version: 'link:'
       srvx:
         specifier: ^0.11.13
         version: 0.11.13
@@ -278,7 +281,7 @@ importers:
         specifier: ^19.2.4
         version: 19.2.4(react@19.2.4)
       silgi:
-        specifier: workspace:*
+        specifier: link:..
         version: link:..
       tailwind-merge:
         specifier: ^3.5.0
@@ -336,7 +339,7 @@ importers:
   examples/bun:
     dependencies:
       silgi:
-        specifier: workspace:*
+        specifier: link:../..
         version: link:../..
       typescript:
         specifier: ^5
@@ -364,7 +367,7 @@ importers:
         specifier: ^19.2.4
         version: 19.2.4(react@19.2.4)
       silgi:
-        specifier: workspace:*
+        specifier: link:../..
         version: link:../..
     devDependencies:
       '@types/react':
@@ -389,7 +392,7 @@ importers:
         specifier: ^5.2.1
         version: 5.2.1
       silgi:
-        specifier: workspace:*
+        specifier: link:../..
         version: link:../..
       zod:
         specifier: ^4.3.6
@@ -411,7 +414,7 @@ importers:
         specifier: ^19.2.4
         version: 19.2.4(react@19.2.4)
       silgi:
-        specifier: workspace:*
+        specifier: link:../..
         version: link:../..
       zod:
         specifier: ^4.3.6
@@ -430,7 +433,7 @@ importers:
   examples/nitro:
     dependencies:
       silgi:
-        specifier: workspace:*
+        specifier: link:../..
         version: link:../..
       zod:
         specifier: ^4.3.6
@@ -452,7 +455,7 @@ importers:
         specifier: npm:nuxt-nightly@5x
         version: nuxt-nightly@5.0.0-29563820.579db312(@babel/core@7.29.0)(@babel/plugin-syntax-jsx@7.28.6(@babel/core@7.29.0))(@biomejs/biome@2.4.9)(@parcel/watcher@2.5.6)(@pinia/colada@1.0.0(pinia@3.0.4(typescript@6.0.2)(vue@3.5.31(typescript@6.0.2)))(vue@3.5.31(typescript@6.0.2)))(@types/node@25.5.0)(@vue/compiler-sfc@3.5.31)(db0@0.3.4)(dotenv@17.3.1)(esbuild@0.27.4)(giget@3.1.2)(ioredis@5.10.1)(magicast@0.5.2)(nuxt-nightly@5.0.0-29563820.579db312)(oxlint@1.57.0)(pinia@3.0.4(typescript@6.0.2)(vue@3.5.31(typescript@6.0.2)))(rolldown@1.0.0-rc.12)(rollup@4.59.0)(tsx@4.21.0)(typescript@6.0.2)(vite@8.0.3(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))(yaml@2.8.2)
       silgi:
-        specifier: workspace:*
+        specifier: link:../..
         version: link:../..
       tailwindcss:
         specifier: ^4.2.2
@@ -464,7 +467,7 @@ importers:
   examples/standalone:
     dependencies:
       silgi:
-        specifier: workspace:*
+        specifier: link:../..
         version: link:../..
       zod:
         specifier: ^4.3.6
@@ -473,7 +476,7 @@ importers:
   examples/sveltekit:
     dependencies:
       silgi:
-        specifier: workspace:*
+        specifier: link:../..
         version: link:../..
       zod:
         specifier: ^4.3.6
@@ -501,7 +504,7 @@ importers:
   playground:
     dependencies:
       silgi:
-        specifier: workspace:*
+        specifier: link:..
         version: link:..
       zod:
         specifier: ^4.3.6

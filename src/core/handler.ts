@@ -168,8 +168,13 @@ export function createFetchHandler(
       const reqTrace = analyticsTraceMap.get(request)
       if (reqTrace) ctx.__analyticsTrace = reqTrace
 
-      // Input
+      // Input — parse body/query, then merge URL path params
       if (!route.passthrough) rawInput = await parseInput(request, url, qMark)
+      if (match.params && Object.keys(match.params).length > 0) {
+        rawInput = rawInput != null && typeof rawInput === 'object'
+          ? { ...match.params, ...rawInput }
+          : match.params
+      }
 
       callHook('request', { path: pathname, input: rawInput })
 
