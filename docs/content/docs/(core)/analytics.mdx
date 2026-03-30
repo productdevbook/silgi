@@ -52,6 +52,8 @@ The dashboard is a self-contained single-file app served at `/api/analytics`. It
 - Recent traced requests with procedure, status, and latency filters plus sortable columns
 - Clickable session ID badges to navigate to the session detail
 - Per-request detail pages with span waterfall timing, captured input/output payloads, request and response headers, timing breakdown by category (db, cache, http, etc.), and session link
+- Export menu for **Markdown**, **Timing**, **Markdown URL**, **cURL**, and **JSON**
+- Double-click any request row to jump straight to the full detail page
 
 **Sessions tab:**
 
@@ -73,8 +75,10 @@ The dashboard is a self-contained single-file app served at `/api/analytics`. It
 - Filterable error log with procedure, severity, and trace-presence controls
 - Detail pages with full input, headers, stack trace, and traced spans for each error
 - Clickable request ID badge to navigate to the HTTP request that caused the error
-- **Copy for AI (Markdown)** — one click to copy a structured markdown document, paste into any AI assistant
-- **Copy JSON** — raw error data for programmatic use (sensitive headers auto-redacted)
+- Export menu for **Markdown**, **Markdown URL**, **cURL**, and **JSON**
+- Double-click any error row to jump straight to the full detail page
+
+Only API traffic is recorded. Analytics ignores dashboard assets and unrelated browser requests such as `favicon.ico`.
 
 ## Request IDs
 
@@ -197,12 +201,24 @@ This is useful when you want tracing code that compiles cleanly regardless of wh
 
 Both errors and requests support one-click copy for AI debugging:
 
-- **Errors**: Full context with procedure path, error code, input, headers (authorization redacted), stack trace, traced spans, and total duration
+- **Errors**: Full context with procedure path, error code, input, headers, stack trace, traced spans, and total duration
 - **Requests**: HTTP metadata, all procedure calls with input/output, span waterfall with timing breakdown
 - **Timing**: Focused performance view with just the span timeline and timing categories
 - **Sessions**: Full session summary with all requests and their procedures
 
 The markdown format is optimized for pasting into Claude, ChatGPT, or any AI assistant. Each export ends with analysis prompts for performance optimization.
+
+The export menu also includes:
+
+- **Markdown URL** — a direct link to the server-generated markdown endpoint
+- **cURL** — a ready-to-run command that fetches the markdown with `Accept: text/markdown`
+
+For example:
+
+```bash
+curl -L 'http://localhost:3000/api/analytics/requests/<request-id>/md' \
+  -H 'accept: text/markdown'
+```
 
 ## Protecting the dashboard
 
@@ -287,15 +303,31 @@ Bun.serve({ port: 3000, fetch: handle })
 
 ## JSON API
 
-The dashboard reads from three JSON endpoints. You can also query them directly for custom integrations, alerting, or external dashboards:
+The dashboard reads from JSON endpoints. You can also query them directly for custom integrations, alerting, or external dashboards:
 
-| Endpoint                   | Description                                            |
-| -------------------------- | ------------------------------------------------------ |
-| `/api/analytics/stats`    | Procedure metrics, latency percentiles, time-series    |
-| `/api/analytics/errors`   | Full error log with input, headers, stack trace, spans |
-| `/api/analytics/requests` | Recent requests with trace spans and session IDs       |
+| Endpoint                             | Description                                            |
+| ------------------------------------ | ------------------------------------------------------ |
+| `/api/analytics/stats`               | Procedure metrics, latency percentiles, time-series    |
+| `/api/analytics/errors`              | Full error log with input, headers, stack trace, spans |
+| `/api/analytics/errors/:id`          | One error entry as JSON                                |
+| `/api/analytics/requests`            | Recent requests with trace spans and session IDs       |
+| `/api/analytics/requests/:id`        | One request entry as JSON                              |
+| `/api/analytics/requests/:requestId` | One request entry by request ID as JSON                |
 
 All endpoints return JSON with `cache-control: no-cache`.
+
+## Markdown export endpoints
+
+Server-generated markdown is available over HTTP, so bots, LLM tools, Slack jobs, and shell scripts can fetch the same export shown in the dashboard:
+
+| Endpoint                               | Description                        |
+| -------------------------------------- | ---------------------------------- |
+| `/api/analytics/errors/md`             | Entire error log as markdown       |
+| `/api/analytics/errors/:id/md`         | One error as markdown              |
+| `/api/analytics/requests/:id/md`       | One request as markdown            |
+| `/api/analytics/requests/:requestId/md`| One request by request ID          |
+
+These endpoints return `Content-Type: text/markdown; charset=utf-8`.
 
 ### Stats response shape
 
@@ -337,7 +369,7 @@ interface ErrorEntry {
   status: number
   stack: string
   input: unknown
-  headers: Record<string, string> // authorization redacted
+  headers: Record<string, string>
   durationMs: number
   spans: TraceSpan[]
 }
@@ -354,6 +386,7 @@ interface RequestEntry {
   timestamp: number
   durationMs: number
   method: string
+  url: string
   path: string
   ip: string
   headers: Record<string, string>
@@ -403,6 +436,15 @@ const reqMd = requestToMarkdown(requestEntry)
 // Entire session with all requests
 const sesMd = sessionToMarkdown(sessionRequests, sessionId)
 ```
+
+## Privacy behavior
+
+Analytics keeps development debugging convenient while still protecting production by default:
+
+- On `localhost` in the dashboard, sensitive headers such as `cookie`, `authorization`, and `set-cookie` are shown as-is
+- In production builds (`NODE_ENV=production`), those headers are redacted in stored analytics entries, JSON exports, and markdown exports
+
+If you expose analytics outside local development, always enable dashboard auth and assume analytics data may contain request payloads and internal headers.
 
 <Callout type='info'>
   For production monitoring with alerting, long-term storage, and multi-service correlation, use

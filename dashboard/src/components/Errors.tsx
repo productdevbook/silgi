@@ -15,6 +15,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { fmtMs, fmtRelativeTime, fmtTime } from '@/lib/format'
 import { filterErrors, getProcedureOptions } from '@/lib/list-filters'
+import { isSensitiveHeader, shouldRedactSensitiveData } from '@/lib/privacy'
 import { cn } from '@/lib/utils'
 import { Cancel01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
@@ -26,8 +27,6 @@ import type { ErrorEntry } from '@/lib/types'
 // ── Constants ──
 
 type SortKey = 'time' | 'procedure' | 'code' | 'status' | 'duration'
-
-const SENSITIVE_HEADERS = new Set(['authorization', 'cookie', 'x-api-key'])
 
 function getSortValue(entry: ErrorEntry, key: SortKey): string | number {
   switch (key) {
@@ -235,6 +234,7 @@ export function Errors({ errors, navigate, initialProcedure }: ErrorsProps) {
                   selectedIdx === idx && 'bg-destructive/5',
                 )}
                 onClick={() => setSelectedIdx(selectedIdx === idx ? null : idx)}
+                onDoubleClick={() => navigate('errors', String(entry.id))}
               >
                 {/* Left: status indicator */}
                 <span className='mt-1 size-1.5 shrink-0 rounded-full bg-destructive' />
@@ -350,6 +350,7 @@ function ErrorDetailPanel({
   navigate: (page: string, id?: string) => void
 }) {
   const headerEntries = Object.entries(entry.headers ?? {})
+  const shouldRedact = shouldRedactSensitiveData()
 
   return (
     <>
@@ -407,7 +408,7 @@ function ErrorDetailPanel({
               <div key={key} className='flex gap-3 border-b border-dashed py-1 last:border-0'>
                 <span className='w-24 shrink-0 truncate font-mono text-[10px] text-muted-foreground'>{key}</span>
                 <span className='min-w-0 break-all font-mono text-[10px]'>
-                  {SENSITIVE_HEADERS.has(key.toLowerCase()) ? (
+                  {shouldRedact && isSensitiveHeader(key) ? (
                     <span className='text-muted-foreground/40'>[redacted]</span>
                   ) : (
                     value

@@ -130,6 +130,7 @@ export interface RequestEntry {
   timestamp: number
   durationMs: number
   method: string
+  url: string
   path: string
   ip: string
   headers: Record<string, string>
@@ -174,6 +175,190 @@ export interface AnalyticsOptions {
   auth?: string | ((req: Request) => boolean | Promise<boolean>)
   /** Interval in ms between storage flushes (default: 5000) */
   flushInterval?: number
+}
+
+const REDACTED = '[REDACTED]'
+const SENSITIVE_HEADER_KEYS = new Set(['authorization', 'cookie', 'set-cookie', 'x-api-key', 'x-auth-token', 'proxy-authorization'])
+
+function shouldRedactSensitiveData(): boolean {
+  return process.env.NODE_ENV === 'production'
+}
+
+function redactHeaderValue(key: string, value: string): string {
+  return shouldRedactSensitiveData() && SENSITIVE_HEADER_KEYS.has(key.toLowerCase()) ? REDACTED : value
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' ? (value as Record<string, unknown>) : null
+}
+
+function normalizeString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback
+}
+
+function normalizeNumber(value: unknown, fallback = 0): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function normalizeBoolean(value: unknown, fallback = false): boolean {
+  return typeof value === 'boolean' ? value : fallback
+}
+
+function normalizeStringMap(value: unknown): Record<string, string> {
+  const record = asRecord(value)
+  if (!record) return {}
+  const result: Record<string, string> = {}
+  for (const [key, raw] of Object.entries(record)) {
+    if (typeof raw === 'string') result[key] = raw
+  }
+  return result
+}
+
+function normalizeSpanKind(value: unknown): SpanKind {
+  switch (value) {
+    case 'db':
+    case 'http':
+    case 'cache':
+    case 'queue':
+    case 'email':
+    case 'ai':
+    case 'custom':
+      return value
+    default:
+      return 'custom'
+  }
+}
+
+function normalizeTraceSpans(value: unknown): TraceSpan[] {
+  if (!Array.isArray(value)) return []
+  const spans: TraceSpan[] = []
+
+  for (const entry of value) {
+    const span = asRecord(entry)
+    if (!span) continue
+
+    const attributes = asRecord(span.attributes)
+    const normalizedAttributes: Record<string, string | number | boolean> = {}
+    if (attributes) {
+      for (const [key, raw] of Object.entries(attributes)) {
+        if (typeof raw === 'string' || typeof raw === 'number' || typeof raw === 'boolean') {
+          normalizedAttributes[key] = raw
+        }
+      }
+    }
+
+    spans.push({
+      name: normalizeString(span.name, 'unknown'),
+      kind: normalizeSpanKind(span.kind),
+      durationMs: normalizeNumber(span.durationMs),
+      startOffsetMs: typeof span.startOffsetMs === 'number' ? span.startOffsetMs : undefined,
+      detail: typeof span.detail === 'string' ? span.detail : undefined,
+      input: span.input,
+      output: span.output,
+      error: typeof span.error === 'string' ? span.error : undefined,
+      attributes: Object.keys(normalizedAttributes).length > 0 ? normalizedAttributes : undefined,
+    })
+  }
+
+  return spans
+}
+
+function inferPathFromUrl(url: string): string {
+  if (!url) return ''
+  try {
+    return new URL(url).pathname || ''
+  } catch {
+    return ''
+  }
+}
+
+function normalizeProcedureCall(value: unknown, fallback: Pick<RequestEntry, 'path' | 'durationMs' | 'status'>): ProcedureCall {
+  const record = asRecord(value)
+  const procedure =
+    normalizeString(record?.procedure, fallback.path.replace(/^\//, '') || fallback.path || 'request')
+
+  return {
+    procedure,
+    durationMs: normalizeNumber(record?.durationMs, fallback.durationMs),
+    status: normalizeNumber(record?.status, fallback.status),
+    input: record?.input ?? null,
+    output: record?.output ?? null,
+    spans: normalizeTraceSpans(record?.spans),
+    error: typeof record?.error === 'string' ? record.error : undefined,
+  }
+}
+
+function normalizeRequestEntry(value: unknown, fallbackId: number): RequestEntry | null {
+  const record = asRecord(value)
+  if (!record) return null
+
+  const url = normalizeString(record.url)
+  const path = normalizeString(record.path, inferPathFromUrl(url))
+  const method = normalizeString(record.method, 'GET')
+  const status = normalizeNumber(record.status, 200)
+  const durationMs = normalizeNumber(record.durationMs)
+  const procedureFallback = {
+    path: path || '/',
+    durationMs,
+    status,
+  }
+
+  const proceduresRaw = Array.isArray(record.procedures) ? record.procedures : []
+  const procedures = proceduresRaw.length > 0
+    ? proceduresRaw.map((entry) => normalizeProcedureCall(entry, procedureFallback))
+    : [normalizeProcedureCall(null, procedureFallback)]
+
+  return {
+    id: normalizeNumber(record.id, fallbackId),
+    requestId: normalizeString(record.requestId, String(normalizeNumber(record.id, fallbackId))),
+    sessionId: normalizeString(record.sessionId),
+    timestamp: normalizeNumber(record.timestamp),
+    durationMs,
+    method,
+    url: url || path,
+    path,
+    ip: normalizeString(record.ip),
+    headers: normalizeStringMap(record.headers),
+    responseHeaders: normalizeStringMap(record.responseHeaders),
+    userAgent: normalizeString(record.userAgent),
+    status,
+    procedures,
+    isBatch: normalizeBoolean(record.isBatch, procedures.length > 1),
+  }
+}
+
+function normalizeErrorEntry(value: unknown, fallbackId: number): ErrorEntry | null {
+  const record = asRecord(value)
+  if (!record) return null
+
+  return {
+    id: normalizeNumber(record.id, fallbackId),
+    requestId: normalizeString(record.requestId),
+    timestamp: normalizeNumber(record.timestamp),
+    procedure: normalizeString(record.procedure, 'request'),
+    error: normalizeString(record.error, 'Unknown error'),
+    code: normalizeString(record.code, 'INTERNAL_SERVER_ERROR'),
+    status: normalizeNumber(record.status, 500),
+    stack: normalizeString(record.stack),
+    input: record.input ?? null,
+    headers: normalizeStringMap(record.headers),
+    durationMs: normalizeNumber(record.durationMs),
+    spans: normalizeTraceSpans(record.spans),
+  }
+}
+
+function normalizeRequestEntries(value: unknown): RequestEntry[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((entry, index) => normalizeRequestEntry(entry, index + 1))
+    .filter((entry): entry is RequestEntry => entry !== null)
+}
+
+function normalizeErrorEntries(value: unknown): ErrorEntry[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((entry, index) => normalizeErrorEntry(entry, index + 1))
+    .filter((entry): entry is ErrorEntry => entry !== null)
 }
 
 export interface ProcedureSnapshot {
@@ -400,12 +585,14 @@ class AnalyticsStore {
     this.#flushing = true
     try {
       if (requests.length > 0) {
-        const existing = (await this.#storage.getItem<RequestEntry[]>('analytics:requests')) ?? []
+        const existing = normalizeRequestEntries(await this.#storage.getItem('analytics:requests'))
+          .filter((entry) => isTrackedRequestPath(entry.path))
         const merged = [...existing, ...requests].slice(-this.#maxRequests)
         await this.#storage.setItem('analytics:requests', merged)
       }
       if (errors.length > 0) {
-        const existing = (await this.#storage.getItem<ErrorEntry[]>('analytics:errors')) ?? []
+        const existing = normalizeErrorEntries(await this.#storage.getItem('analytics:errors'))
+          .filter((entry) => isTrackedRequestPath(entry.procedure))
         const merged = [...existing, ...errors].slice(-this.#maxErrors)
         await this.#storage.setItem('analytics:errors', merged)
       }
@@ -419,15 +606,19 @@ class AnalyticsStore {
   }
 
   async getRequests(): Promise<RequestEntry[]> {
-    const stored = (await this.#storage.getItem<RequestEntry[]>('analytics:requests')) ?? []
-    if (this.#pendingRequests.length === 0) return stored
-    return [...stored, ...this.#pendingRequests].slice(-this.#maxRequests)
+    const stored = normalizeRequestEntries(await this.#storage.getItem('analytics:requests'))
+      .filter((entry) => isTrackedRequestPath(entry.path))
+    const pending = this.#pendingRequests.filter((entry) => isTrackedRequestPath(entry.path))
+    if (pending.length === 0) return stored
+    return [...stored, ...pending].slice(-this.#maxRequests)
   }
 
   async getErrors(): Promise<ErrorEntry[]> {
-    const stored = (await this.#storage.getItem<ErrorEntry[]>('analytics:errors')) ?? []
-    if (this.#pendingErrors.length === 0) return stored
-    return [...stored, ...this.#pendingErrors].slice(-this.#maxErrors)
+    const stored = normalizeErrorEntries(await this.#storage.getItem('analytics:errors'))
+      .filter((entry) => isTrackedRequestPath(entry.procedure))
+    const pending = this.#pendingErrors.filter((entry) => isTrackedRequestPath(entry.procedure))
+    if (pending.length === 0) return stored
+    return [...stored, ...pending].slice(-this.#maxErrors)
   }
 
   async hydrate(): Promise<{ totalRequests: number; totalErrors: number }> {
@@ -722,14 +913,13 @@ export class RequestAccumulator {
     const durationMs = round(performance.now() - this.t0)
     const headers: Record<string, string> = {}
     this.#request.headers.forEach((v, k) => {
-      headers[k] = k === 'authorization' || k === 'cookie' ? '[REDACTED]' : v
+      headers[k] = redactHeaderValue(k, v)
     })
 
     // Capture actual response headers
     const responseHeaders: Record<string, string> = {}
     res.headers.forEach((v, k) => {
-      // Skip cookie values from response headers for privacy
-      responseHeaders[k] = k === 'set-cookie' ? '[REDACTED]' : v
+      responseHeaders[k] = redactHeaderValue(k, v)
     })
 
     let worstStatus = 200
@@ -749,6 +939,7 @@ export class RequestAccumulator {
       timestamp: Date.now(),
       durationMs,
       method: this.#request.method,
+      url: this.#request.url,
       path,
       ip: headers['x-forwarded-for'] || headers['x-real-ip'] || '',
       headers,
@@ -789,8 +980,7 @@ export function errorToMarkdown(e: ErrorEntry): string {
   if (Object.keys(e.headers).length > 0) {
     md += `### Request Headers\n\n`
     for (const [k, v] of Object.entries(e.headers)) {
-      if (k === 'authorization') md += `- \`${k}\`: \`[REDACTED]\`\n`
-      else md += `- \`${k}\`: \`${v}\`\n`
+      md += `- \`${k}\`: \`${redactHeaderValue(k, v)}\`\n`
     }
     md += '\n'
   }
@@ -819,6 +1009,7 @@ export function requestToMarkdown(r: RequestEntry): string {
   md += `| Request ID | \`${r.requestId}\` |\n`
   md += `| Session ID | \`${r.sessionId}\` |\n`
   md += `| Method | ${r.method} |\n`
+  md += `| URL | \`${r.url}\` |\n`
   md += `| Path | \`${r.path}\` |\n`
   md += `| Status | ${r.status} |\n`
   md += `| Duration | ${r.durationMs}ms |\n`
@@ -835,6 +1026,10 @@ export function requestToMarkdown(r: RequestEntry): string {
 
     if (p.input !== undefined && p.input !== null) {
       md += `#### Input\n\n\`\`\`json\n${safeStringify(p.input)}\n\`\`\`\n\n`
+    }
+
+    if (p.output !== undefined && p.output !== null) {
+      md += `#### Output\n\n\`\`\`json\n${safeStringify(p.output)}\n\`\`\`\n\n`
     }
 
     if (p.spans.length > 0) {
@@ -873,12 +1068,98 @@ export function requestToMarkdown(r: RequestEntry): string {
   return md
 }
 
+async function captureResponseBody(response: Response): Promise<{
+  output: unknown
+  error?: string
+}> {
+  const contentType = response.headers.get('content-type') ?? ''
+  const lowered = contentType.toLowerCase()
+
+  if (
+    !response.body ||
+    lowered.includes('text/event-stream') ||
+    lowered.includes('application/octet-stream')
+  ) {
+    return { output: null }
+  }
+
+  try {
+    const clone = response.clone()
+    const text = await clone.text()
+    if (!text) return { output: null }
+
+    let output: unknown = text
+    if (lowered.includes('application/json') || lowered.includes('+json')) {
+      try {
+        output = JSON.parse(text)
+      } catch {
+        output = text
+      }
+    }
+
+    if (response.status < 400) return { output }
+
+    if (output && typeof output === 'object') {
+      const record = output as Record<string, unknown>
+      const message = typeof record.message === 'string' ? record.message : null
+      const code = typeof record.code === 'string' ? record.code : null
+      if (message && code) return { output, error: `${code}: ${message}` }
+      if (message) return { output, error: message }
+    }
+
+    return { output, error: typeof output === 'string' ? output : safeStringify(output) }
+  } catch {
+    return { output: null }
+  }
+}
+
+function extractResponseError(output: unknown, status: number, fallback?: string): {
+  code: string
+  message: string
+} {
+  if (output && typeof output === 'object') {
+    const record = output as Record<string, unknown>
+    const code = typeof record.code === 'string' ? record.code : null
+    const message = typeof record.message === 'string' ? record.message : null
+    if (code && message) return { code, message }
+    if (message) return { code: `HTTP_${status}`, message }
+  }
+
+  if (fallback) return { code: `HTTP_${status}`, message: fallback }
+  return { code: `HTTP_${status}`, message: `Request failed with status ${status}` }
+}
+
 function safeStringify(v: unknown): string {
   try {
     return JSON.stringify(v, null, 2)
   } catch {
     return String(v)
   }
+}
+
+function isTrackedRequestPath(pathname: string): boolean {
+  const normalized = pathname.startsWith('/') ? pathname.slice(1) : pathname
+  return (
+    normalized === 'api' ||
+    normalized.startsWith('api/') ||
+    normalized === 'graphql' ||
+    normalized.startsWith('graphql/')
+  )
+}
+
+function isAnalyticsPath(pathname: string): boolean {
+  return pathname === 'api/analytics' || pathname.startsWith('api/analytics/')
+}
+
+function parseAnalyticsDetailPath(
+  pathname: string,
+  prefix: 'api/analytics/requests/' | 'api/analytics/errors/',
+): { id: number | null; rawId: string } | null {
+  if (!pathname.startsWith(prefix)) return null
+  const rawId = pathname.slice(prefix.length)
+  if (!rawId || rawId.includes('/')) return null
+  const id = Number(rawId)
+  return { id: Number.isFinite(id) ? id : null, rawId: decodeURIComponent(rawId) }
 }
 
 // ── Dashboard HTML ──────────────────────────────────
@@ -933,9 +1214,8 @@ export function checkAnalyticsAuth(
 
 export function sanitizeHeaders(headers: Headers): Record<string, string> {
   const result: Record<string, string> = {}
-  const sensitiveKeys = new Set(['authorization', 'cookie', 'x-api-key', 'x-auth-token', 'proxy-authorization'])
   headers.forEach((value, key) => {
-    result[key] = sensitiveKeys.has(key.toLowerCase()) ? '[REDACTED]' : value
+    result[key] = redactHeaderValue(key, value)
   })
   return result
 }
@@ -984,7 +1264,7 @@ location.reload();
 /** Return auth-failure response for analytics routes. */
 export function analyticsAuthResponse(pathname: string): Response {
   const jsonHeaders = { 'content-type': 'application/json' }
-  if (pathname !== 'api/analytics') {
+  if (pathname !== 'api/analytics' && pathname !== 'api/analytics/') {
     return new Response(JSON.stringify({ code: 'UNAUTHORIZED', status: 401, message: 'Invalid token' }), {
       status: 401,
       headers: jsonHeaders,
@@ -1006,6 +1286,9 @@ export async function serveAnalyticsRoute(
   const jsonCacheHeaders = { 'content-type': 'application/json', 'cache-control': 'no-cache' }
   const mdHeaders = { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-cache' }
 
+  if (pathname === 'api/analytics' || pathname === 'api/analytics/') {
+    return new Response(dashboardHtml, { headers: { 'content-type': 'text/html' } })
+  }
   if (pathname === 'api/analytics/stats') {
     return jsonResponse(collector.toJSON(), jsonCacheHeaders)
   }
@@ -1026,18 +1309,33 @@ export async function serveAnalyticsRoute(
     return jsonResponse(getScheduledTasks(), jsonCacheHeaders)
   }
   if (pathname.startsWith('api/analytics/requests/') && pathname.endsWith('/md')) {
-    const id = Number(pathname.slice('api/analytics/requests/'.length, -'/md'.length))
+    const rawId = pathname.slice('api/analytics/requests/'.length, -'/md'.length)
+    const parsedId = Number(rawId)
+    const requestId = decodeURIComponent(rawId)
     const requests = await collector.getRequests()
-    const entry = requests.find((r) => r.id === id)
+    const entry = requests.find((r) => r.id === parsedId || r.requestId === requestId)
     if (entry) return new Response(requestToMarkdown(entry), { headers: mdHeaders })
     return new Response('not found', { status: 404 })
   }
+  const requestDetail = parseAnalyticsDetailPath(pathname, 'api/analytics/requests/')
+  if (requestDetail) {
+    const requests = await collector.getRequests()
+    const entry = requests.find((r) => r.id === requestDetail.id || r.requestId === requestDetail.rawId)
+    return entry ? jsonResponse(entry, jsonCacheHeaders) : new Response('not found', { status: 404 })
+  }
   if (pathname.startsWith('api/analytics/errors/') && pathname.endsWith('/md')) {
-    const id = Number(pathname.slice('api/analytics/errors/'.length, -'/md'.length))
+    const rawId = pathname.slice('api/analytics/errors/'.length, -'/md'.length)
+    const id = Number(rawId)
     const errors = await collector.getErrors()
     const entry = errors.find((e) => e.id === id)
     if (entry) return new Response(errorToMarkdown(entry), { headers: mdHeaders })
     return new Response('not found', { status: 404 })
+  }
+  const errorDetail = parseAnalyticsDetailPath(pathname, 'api/analytics/errors/')
+  if (errorDetail) {
+    const errors = await collector.getErrors()
+    const entry = errors.find((e) => e.id === errorDetail.id)
+    return entry ? jsonResponse(entry, jsonCacheHeaders) : new Response('not found', { status: 404 })
   }
   if (pathname === 'api/analytics/errors/md') {
     const errors = await collector.getErrors()
@@ -1047,7 +1345,10 @@ export async function serveAnalyticsRoute(
         : `# Errors (${errors.length})\n\n` + errors.map((e) => errorToMarkdown(e)).join('\n\n---\n\n')
     return new Response(md, { headers: mdHeaders })
   }
-  return new Response(dashboardHtml, { headers: { 'content-type': 'text/html' } })
+  return new Response(JSON.stringify({ code: 'NOT_FOUND', status: 404, message: 'Analytics route not found' }), {
+    status: 404,
+    headers: jsonCacheHeaders,
+  })
 }
 
 // ── Handler Wrapper ─────────────────────────────────
@@ -1079,13 +1380,17 @@ export function wrapWithAnalytics(handler: FetchHandler, options: AnalyticsOptio
     const pathname = fullPath.length > 1 ? fullPath.slice(1) : ''
 
     // Analytics dashboard routes
-    if (pathname.startsWith('api/analytics')) {
+    if (isAnalyticsPath(pathname)) {
       if (auth) {
         const authResult = checkAnalyticsAuth(request, auth)
         const ok = authResult instanceof Promise ? await authResult : authResult
         if (!ok) return analyticsAuthResponse(pathname)
       }
       return serveAnalyticsRoute(pathname, collector, dashboardHtml)
+    }
+
+    if (!isTrackedRequestPath(pathname)) {
+      return handler(request)
     }
 
     // Instrument the request
@@ -1101,16 +1406,39 @@ export function wrapWithAnalytics(handler: FetchHandler, options: AnalyticsOptio
     try {
       response = await handler(request)
       const durationMs = round(performance.now() - t0)
+      const captured = await captureResponseBody(response)
+      const procedureInput = reqTrace.procedureInput ?? null
+      const procedureOutput = reqTrace.procedureOutput ?? captured.output
+      const procedureSpans = reqTrace.spans ?? []
 
       collector.record(pathname, durationMs)
       acc.addProcedure({
         procedure: pathname,
         durationMs,
         status: response.status,
-        input: null,
-        output: null,
-        spans: reqTrace.spans ?? [],
+        input: procedureInput,
+        output: procedureOutput,
+        spans: procedureSpans,
+        error: captured.error,
       })
+
+      if (response.status >= 400) {
+        const { code, message } = extractResponseError(procedureOutput, response.status, captured.error)
+        collector.recordError(pathname, durationMs, message)
+        collector.recordDetailedError({
+          requestId: acc.requestId,
+          timestamp: Date.now(),
+          procedure: pathname,
+          error: message,
+          code,
+          status: response.status,
+          stack: '',
+          input: procedureInput,
+          headers: sanitizeHeaders(request.headers),
+          durationMs,
+          spans: procedureSpans,
+        })
+      }
     } catch (error) {
       const durationMs = round(performance.now() - t0)
       const errorMsg = error instanceof Error ? error.message : String(error)

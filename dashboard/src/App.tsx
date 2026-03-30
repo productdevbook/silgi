@@ -76,6 +76,16 @@ export default function App() {
           </div>
         </header>
         <main className='flex-1 overflow-auto'>
+          {analytics.error && (
+            <div className='border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-900 dark:text-amber-200'>
+              {analytics.error}
+            </div>
+          )}
+          {analytics.isLoading && !analytics.data && analytics.requests.length === 0 && analytics.errors.length === 0 && (
+            <div className='flex min-h-40 items-center justify-center text-sm text-muted-foreground'>
+              Analytics yukleniyor...
+            </div>
+          )}
           {route.page === 'overview' && <Overview data={analytics.data} navigate={navigate} />}
           {route.page === 'errors' && !route.id && (
             <Errors errors={analytics.errors} navigate={navigate} initialProcedure={route.params.procedure} />

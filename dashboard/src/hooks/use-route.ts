@@ -6,22 +6,28 @@ export interface Route {
   params: Record<string, string>
 }
 
+const KNOWN_PAGES = new Set(['overview', 'requests', 'errors', 'tasks', 'sessions'])
+
 function parseHash(): Route {
   const raw = window.location.hash.slice(1) || '/'
-  const [path = '/', search = ''] = raw.split('?')
-  const parts = path.split('/').filter(Boolean)
+  const [path = '/', search = ''] = raw.split('?', 2)
+  const parts = path
+    .split('/')
+    .filter(Boolean)
+    .map((part) => decodeURIComponent(part))
 
   const params: Record<string, string> = {}
-  if (search) {
-    for (const pair of search.split('&')) {
-      const [k, v] = pair.split('=')
-      if (k) params[k] = decodeURIComponent(v ?? '')
-    }
+  const searchParams = new URLSearchParams(search)
+  for (const [key, value] of searchParams.entries()) {
+    params[key] = value
   }
 
   if (parts.length === 0) return { page: 'overview', params }
-  if (parts.length === 2) return { page: parts[0]!, id: parts[1], params }
-  return { page: parts[0]!, params }
+
+  const page = KNOWN_PAGES.has(parts[0]!) ? parts[0]! : 'overview'
+  const id = parts.length >= 2 ? parts[1] : undefined
+
+  return { page, id, params }
 }
 
 export function useRoute() {
@@ -34,12 +40,15 @@ export function useRoute() {
   }, [])
 
   const navigate = useCallback((page: string, id?: string, params?: Record<string, string>) => {
-    let hash = id ? `${page}/${id}` : page
+    const normalizedPage = KNOWN_PAGES.has(page) ? page : 'overview'
+    let hash = id ? `${normalizedPage}/${encodeURIComponent(id)}` : normalizedPage
     if (params) {
-      const qs = Object.entries(params)
-        .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
-        .join('&')
-      if (qs) hash += `?${qs}`
+      const qs = new URLSearchParams()
+      for (const [key, value] of Object.entries(params)) {
+        qs.set(key, value)
+      }
+      const search = qs.toString()
+      if (search) hash += `?${search}`
     }
     window.location.hash = hash
   }, [])

@@ -1,10 +1,11 @@
 import { ErrorDetail } from '@/components/error-detail'
+import { ExportSelect } from '@/components/export-select'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useCopy } from '@/hooks'
 import { fmtMs, fmtTime } from '@/lib/format'
-import { errorToMarkdown, errorToRedactedJson } from '@/lib/markdown'
-import { ArrowLeft01Icon, Copy01Icon, Tick01Icon } from '@hugeicons/core-free-icons'
+import { errorMarkdownCurl, errorMarkdownUrl, errorToMarkdown, errorToRedactedJson } from '@/lib/markdown'
+import { ArrowLeft01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 
 import type { ErrorEntry } from '@/lib/types'
@@ -24,6 +25,13 @@ export function ErrorDetailPage({ errors, id, navigate }: ErrorDetailPageProps) 
       <div className='flex min-h-40 items-center justify-center text-sm text-muted-foreground'>Error not found</div>
     )
   }
+
+  const exportOptions = [
+    { id: `md-${entry.id}`, label: 'Markdown', text: errorToMarkdown(entry), hint: 'full' },
+    { id: `md-url-${entry.id}`, label: 'Markdown URL', text: errorMarkdownUrl(entry), hint: '/md' },
+    { id: `curl-${entry.id}`, label: 'cURL', text: errorMarkdownCurl(entry), hint: 'fetch md' },
+    { id: `json-${entry.id}`, label: 'JSON', text: errorToRedactedJson(entry), hint: 'redacted' },
+  ]
 
   return (
     <div>
@@ -49,33 +57,13 @@ export function ErrorDetailPage({ errors, id, navigate }: ErrorDetailPageProps) 
           </Badge>
         )}
         <span className='text-[11px] text-muted-foreground'>{fmtTime(entry.timestamp)}</span>
-        <div className='ml-auto flex gap-1'>
-          <CopyBtn
-            copied={copiedId === `md-${entry.id}`}
-            onClick={() => copy(`md-${entry.id}`, errorToMarkdown(entry))}
-          >
-            md
-          </CopyBtn>
-          <CopyBtn
-            copied={copiedId === `json-${entry.id}`}
-            onClick={() => copy(`json-${entry.id}`, errorToRedactedJson(entry))}
-          >
-            json
-          </CopyBtn>
+        <div className='ml-auto'>
+          <ExportSelect copiedId={copiedId} onCopy={copy} options={exportOptions} />
         </div>
       </div>
 
       {/* Detail content */}
       <ErrorDetail entry={entry} />
     </div>
-  )
-}
-
-function CopyBtn({ copied, onClick, children }: { copied: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <Button variant={copied ? 'default' : 'outline'} size='xs' onClick={onClick}>
-      <HugeiconsIcon icon={copied ? Tick01Icon : Copy01Icon} data-icon='inline-start' />
-      {copied ? 'copied' : children}
-    </Button>
   )
 }

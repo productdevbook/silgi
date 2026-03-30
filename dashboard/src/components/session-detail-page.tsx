@@ -1,3 +1,4 @@
+import { ExportSelect } from '@/components/export-select'
 import { SpanWaterfall } from '@/components/span-waterfall'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -7,7 +8,7 @@ import { useCopy } from '@/hooks'
 import { fmtMs, fmtRelativeTime, fmtTime } from '@/lib/format'
 import { sessionToMarkdown, sessionToRedactedJson } from '@/lib/markdown'
 import { cn } from '@/lib/utils'
-import { ArrowLeft01Icon, Cancel01Icon, Copy01Icon, Tick01Icon } from '@hugeicons/core-free-icons'
+import { ArrowLeft01Icon, Cancel01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useCallback, useMemo, useState } from 'react'
 import { Bar, BarChart, Cell, Pie, PieChart } from 'recharts'
@@ -66,6 +67,10 @@ export function SessionDetailPage({ requests, sessionId, navigate }: SessionDeta
   const allSpans = sessionRequests.flatMap((r) => r.procedures.flatMap((p) => p.spans))
   const uniqueProcedures = [...new Set(sessionRequests.flatMap((r) => r.procedures.map((p) => p.procedure)))].toSorted()
   const maxDuration = Math.max(...sessionRequests.map((r) => r.durationMs), 0.1)
+  const exportOptions = [
+    { id: `md-${sessionId}`, label: 'Markdown', text: sessionToMarkdown(sessionRequests, sessionId), hint: 'summary' },
+    { id: `json-${sessionId}`, label: 'JSON', text: sessionToRedactedJson(sessionRequests, sessionId), hint: 'redacted' },
+  ]
 
   const byKind = new Map<string, number>()
   for (const s of allSpans) byKind.set(s.kind, (byKind.get(s.kind) ?? 0) + s.durationMs)
@@ -92,19 +97,8 @@ export function SessionDetailPage({ requests, sessionId, navigate }: SessionDeta
         <Badge variant='secondary' className='font-mono text-[10px]'>
           {sessionId.slice(0, 13)}
         </Badge>
-        <div className='ml-auto flex gap-1'>
-          <CopyBtn
-            copied={copiedId === `md-${sessionId}`}
-            onClick={() => copy(`md-${sessionId}`, sessionToMarkdown(sessionRequests, sessionId))}
-          >
-            md
-          </CopyBtn>
-          <CopyBtn
-            copied={copiedId === `json-${sessionId}`}
-            onClick={() => copy(`json-${sessionId}`, sessionToRedactedJson(sessionRequests, sessionId))}
-          >
-            json
-          </CopyBtn>
+        <div className='ml-auto'>
+          <ExportSelect copiedId={copiedId} onCopy={copy} options={exportOptions} />
         </div>
       </div>
 
@@ -569,14 +563,5 @@ function PanelKV({ label, value, danger }: { label: string; value: string; dange
       <span className='text-muted-foreground'>{label}</span>
       <span className={cn('max-w-[60%] truncate font-mono', danger && 'text-destructive')}>{value}</span>
     </div>
-  )
-}
-
-function CopyBtn({ copied, onClick, children }: { copied: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <Button variant={copied ? 'default' : 'outline'} size='xs' onClick={onClick}>
-      <HugeiconsIcon icon={copied ? Tick01Icon : Copy01Icon} data-icon='inline-start' />
-      {copied ? 'copied' : children}
-    </Button>
   )
 }

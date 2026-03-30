@@ -1,10 +1,9 @@
 import { SpanWaterfall } from '@/components/span-waterfall'
 import { fmtMs } from '@/lib/format'
+import { isSensitiveHeader, shouldRedactSensitiveData } from '@/lib/privacy'
 import { cn } from '@/lib/utils'
 
 import type { ErrorEntry } from '@/lib/types'
-
-const SENSITIVE_HEADERS = new Set(['authorization', 'cookie', 'x-api-key'])
 
 interface ErrorDetailProps {
   entry: ErrorEntry
@@ -15,6 +14,7 @@ export function ErrorDetail({ entry }: ErrorDetailProps) {
   const hasInput = entry.input !== undefined && entry.input !== null
   const hasSpans = entry.spans.length > 0
   const hasHeaders = headerEntries.length > 0
+  const shouldRedact = shouldRedactSensitiveData()
 
   return (
     <div className='grid xl:grid-cols-[1.6fr_1fr]'>
@@ -69,7 +69,7 @@ export function ErrorDetail({ entry }: ErrorDetailProps) {
                 <div key={key} className='flex gap-3 border-b border-dashed py-1.5 last:border-0'>
                   <span className='w-28 shrink-0 truncate font-mono text-[11px] text-muted-foreground'>{key}</span>
                   <span className='min-w-0 break-all font-mono text-[11px]'>
-                    {SENSITIVE_HEADERS.has(key.toLowerCase()) ? (
+                    {shouldRedact && isSensitiveHeader(key) ? (
                       <span className='text-muted-foreground/40'>[redacted]</span>
                     ) : (
                       value

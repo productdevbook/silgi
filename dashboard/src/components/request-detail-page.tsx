@@ -1,12 +1,19 @@
+import { ExportSelect } from '@/components/export-select'
 import { SpanWaterfall } from '@/components/span-waterfall'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ChartContainer, ChartTooltip } from '@/components/ui/chart'
 import { useCopy } from '@/hooks'
 import { fmtMs, fmtTime } from '@/lib/format'
-import { requestTimingMarkdown, requestToMarkdown, requestToRedactedJson } from '@/lib/markdown'
+import {
+  requestMarkdownCurl,
+  requestMarkdownUrl,
+  requestTimingMarkdown,
+  requestToMarkdown,
+  requestToRedactedJson,
+} from '@/lib/markdown'
 import { cn } from '@/lib/utils'
-import { ArrowLeft01Icon, Copy01Icon, Tick01Icon } from '@hugeicons/core-free-icons'
+import { ArrowLeft01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 import { useMemo } from 'react'
 import { Cell, Pie, PieChart } from 'recharts'
@@ -46,6 +53,13 @@ export function RequestDetailPage({ requests, id, navigate }: RequestDetailPageP
   }
 
   const totalSpans = entry.procedures.reduce((sum, p) => sum + p.spans.length, 0)
+  const exportOptions = [
+    { id: `md-${entry.id}`, label: 'Markdown', text: requestToMarkdown(entry), hint: 'full' },
+    { id: `timing-${entry.id}`, label: 'Timing', text: requestTimingMarkdown(entry), hint: 'perf md' },
+    { id: `md-url-${entry.id}`, label: 'Markdown URL', text: requestMarkdownUrl(entry), hint: '/md' },
+    { id: `curl-${entry.id}`, label: 'cURL', text: requestMarkdownCurl(entry), hint: 'fetch md' },
+    { id: `json-${entry.id}`, label: 'JSON', text: requestToRedactedJson(entry), hint: 'redacted' },
+  ]
 
   return (
     <div className='flex min-h-full flex-col'>
@@ -63,25 +77,8 @@ export function RequestDetailPage({ requests, id, navigate }: RequestDetailPageP
         {entry.procedures.length > 1 && <Badge variant='outline'>batch x {entry.procedures.length}</Badge>}
         {totalSpans > 0 && <Badge variant='secondary'>{totalSpans} spans</Badge>}
         <span className='text-[11px] text-muted-foreground'>{fmtTime(entry.timestamp)}</span>
-        <div className='ml-auto flex gap-1'>
-          <CopyBtn
-            copied={copiedId === `md-${entry.id}`}
-            onClick={() => copy(`md-${entry.id}`, requestToMarkdown(entry))}
-          >
-            md
-          </CopyBtn>
-          <CopyBtn
-            copied={copiedId === `timing-${entry.id}`}
-            onClick={() => copy(`timing-${entry.id}`, requestTimingMarkdown(entry))}
-          >
-            timing
-          </CopyBtn>
-          <CopyBtn
-            copied={copiedId === `json-${entry.id}`}
-            onClick={() => copy(`json-${entry.id}`, requestToRedactedJson(entry))}
-          >
-            json
-          </CopyBtn>
+        <div className='ml-auto'>
+          <ExportSelect copiedId={copiedId} onCopy={copy} options={exportOptions} />
         </div>
       </div>
 
@@ -105,6 +102,7 @@ export function RequestDetailPage({ requests, id, navigate }: RequestDetailPageP
           <Section label='HTTP Request'>
             <KV label='id' value={String(entry.id)} />
             <KV label='method' value={entry.method} />
+            <KV label='url' value={entry.url} />
             <KV label='path' value={entry.path} />
             <KV label='status' value={String(entry.status)} danger={entry.status >= 400} />
             <KV label='duration' value={fmtMs(entry.durationMs)} />
@@ -322,14 +320,5 @@ function KV({ label, value, danger }: { label: string; value: string; danger?: b
       <span className='text-[11px] text-muted-foreground'>{label}</span>
       <span className={cn('max-w-[60%] truncate font-mono text-[11px]', danger && 'text-destructive')}>{value}</span>
     </div>
-  )
-}
-
-function CopyBtn({ copied, onClick, children }: { copied: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <Button variant={copied ? 'default' : 'outline'} size='xs' onClick={onClick}>
-      <HugeiconsIcon icon={copied ? Tick01Icon : Copy01Icon} data-icon='inline-start' />
-      {copied ? 'copied' : children}
-    </Button>
   )
 }

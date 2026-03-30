@@ -1,10 +1,12 @@
+import { ExportSelect } from '@/components/export-select'
 import { SpanWaterfall } from '@/components/span-waterfall'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useCopy } from '@/hooks'
 import { fmtMs, fmtRelativeTime, fmtTime } from '@/lib/format'
+import { taskToMarkdown } from '@/lib/markdown'
 import { cn } from '@/lib/utils'
-import { ArrowLeft01Icon, Copy01Icon, Tick01Icon } from '@hugeicons/core-free-icons'
+import { ArrowLeft01Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react'
 
 import type { TaskExecution } from '@/lib/types'
@@ -27,7 +29,10 @@ export function TaskDetailPage({ taskExecutions, id, navigate }: TaskDetailPageP
     )
   }
 
-  const jsonExport = JSON.stringify(entry, null, 2)
+  const exportOptions = [
+    { id: `md-${entry.id}`, label: 'Markdown', text: taskToMarkdown(entry), hint: 'summary' },
+    { id: `json-${entry.id}`, label: 'JSON', text: JSON.stringify(entry, null, 2), hint: 'raw' },
+  ]
 
   return (
     <div className='flex min-h-full flex-col'>
@@ -46,14 +51,7 @@ export function TaskDetailPage({ taskExecutions, id, navigate }: TaskDetailPageP
         <span className='text-[11px] text-muted-foreground'>{fmtTime(entry.timestamp)}</span>
         <span className='text-[11px] text-muted-foreground'>({fmtRelativeTime(entry.timestamp)})</span>
         <div className='ml-auto'>
-          <Button
-            variant={copiedId === 'json' ? 'default' : 'outline'}
-            size='xs'
-            onClick={() => copy('json', jsonExport)}
-          >
-            <HugeiconsIcon icon={copiedId === 'json' ? Tick01Icon : Copy01Icon} data-icon='inline-start' />
-            {copiedId === 'json' ? 'copied' : 'json'}
-          </Button>
+          <ExportSelect copiedId={copiedId} onCopy={copy} options={exportOptions} />
         </div>
       </div>
 

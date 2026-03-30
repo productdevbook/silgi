@@ -18,13 +18,8 @@
  * })
  * ```
  */
-
-import { AsyncLocalStorage } from 'node:async_hooks'
-
+import { getCtx, runWithCtx } from '../../core/context-bridge.ts'
 import type { RequestTrace, SpanKind, TraceSpan } from '../../plugins/analytics.ts'
-
-// ── Shared context storage (same as drizzle integration) ──
-const ctxStorage = new AsyncLocalStorage<Record<string, unknown>>()
 
 // ── Types ────────────────────────────────────────────
 
@@ -357,7 +352,7 @@ export function instrumentBetterAuth<T extends Record<string, any>>(auth: T): T 
  * Run a function with silgi context available to instrumented Better Auth API calls.
  */
 export function withCtx<T>(ctx: Record<string, unknown>, fn: () => T): T {
-  return ctxStorage.run(ctx, fn)
+  return runWithCtx(ctx, fn)
 }
 
 function wrapApiMethod(
@@ -366,7 +361,7 @@ function wrapApiMethod(
   method?: string,
 ): (...args: any[]) => Promise<any> {
   return async function instrumented(this: any, ...args: any[]): Promise<any> {
-    const ctx = ctxStorage.getStore()
+    const ctx = getCtx()
     const reqTrace = ctx?.__analyticsTrace as RequestTrace | undefined
 
     if (!reqTrace) return originalFn.apply(this, args)

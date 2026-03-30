@@ -29,13 +29,11 @@
  * })
  * ```
  */
-import { AsyncLocalStorage } from 'node:async_hooks'
-
+import { getCtx, runWithCtx } from '../../core/context-bridge.ts'
 import type { RequestTrace, SpanKind } from '../../plugins/analytics.ts'
 
 // ── Constants ────────────────────────────────────────
 
-const ctxStorage = new AsyncLocalStorage<Record<string, unknown>>()
 const INSTRUMENTED = '__silgiDrizzleInstrumented'
 const DEFAULT_DB_SYSTEM = 'postgresql'
 const DEFAULT_MAX_QUERY_LENGTH = 1000
@@ -99,7 +97,7 @@ export function instrumentDrizzle<T extends Record<string, any>>(db: T, config?:
  * All Drizzle queries inside `fn` will be recorded as trace spans.
  */
 export function withCtx<T>(ctx: Record<string, unknown>, fn: () => T): T {
-  return ctxStorage.run(ctx, fn)
+  return runWithCtx(ctx, fn)
 }
 
 // ── Config Resolution ────────────────────────────────
@@ -144,7 +142,7 @@ function patchSession(session: any, cfg: ResolvedConfig, isTx: boolean): boolean
       const prepared = originalPrepareQuery.apply(this, args)
       if (!prepared || typeof prepared.execute !== 'function') return prepared
 
-      const ctx = ctxStorage.getStore()
+      const ctx = getCtx()
       const reqTrace = ctx?.__analyticsTrace as RequestTrace | undefined
       if (!reqTrace) return prepared
 
@@ -167,7 +165,7 @@ function patchSession(session: any, cfg: ResolvedConfig, isTx: boolean): boolean
     const originalQuery = session.query.bind(session)
 
     session.query = function patchedQuery(this: any, queryString: string, params: any[]) {
-      const ctx = ctxStorage.getStore()
+      const ctx = getCtx()
       const reqTrace = ctx?.__analyticsTrace as RequestTrace | undefined
       if (!reqTrace) return originalQuery.call(this, queryString, params)
 
@@ -221,7 +219,7 @@ function patchRawClient(client: any, cfg: ResolvedConfig): boolean {
   const originalMethod = client[methodName].bind(client)
 
   client[methodName] = function patchedClientMethod(this: any, ...args: any[]) {
-    const ctx = ctxStorage.getStore()
+    const ctx = getCtx()
     const reqTrace = ctx?.__analyticsTrace as RequestTrace | undefined
     if (!reqTrace) return originalMethod.apply(this, args)
 
@@ -244,7 +242,7 @@ function patchSessionExecute(session: any, cfg: ResolvedConfig): boolean {
   const originalExecute = session.execute.bind(session)
 
   session.execute = function patchedDeepExecute(this: any, ...args: any[]) {
-    const ctx = ctxStorage.getStore()
+    const ctx = getCtx()
     const reqTrace = ctx?.__analyticsTrace as RequestTrace | undefined
     if (!reqTrace) return originalExecute.apply(this, args)
 

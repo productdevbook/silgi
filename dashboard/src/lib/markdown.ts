@@ -1,11 +1,5 @@
-import type { ErrorEntry, ProcedureCall, RequestEntry, TraceSpan } from './types'
-
-const REDACTED = '[REDACTED]'
-const SENSITIVE_HEADERS = new Set(['authorization', 'cookie', 'x-api-key'])
-
-function redactHeader(key: string, value: string): string {
-  return SENSITIVE_HEADERS.has(key.toLowerCase()) ? REDACTED : value
-}
+import type { ErrorEntry, ProcedureCall, RequestEntry, TaskExecution, TraceSpan } from './types'
+import { redactHeader } from './privacy'
 
 function safeJson(value: unknown): string {
   try {
@@ -13,6 +7,18 @@ function safeJson(value: unknown): string {
   } catch {
     return String(value)
   }
+}
+
+function toCurlValue(value: string): string {
+  return `'${value.replaceAll("'", `'\"'\"'`)}'`
+}
+
+function getAnalyticsOrigin(): string {
+  return typeof window === 'undefined' ? '' : window.location.origin
+}
+
+function analyticsMarkdownCurl(url: string): string {
+  return ['```bash', `curl -L ${toCurlValue(url)} \\`, `  -H 'accept: text/markdown'`, '```'].join('\n')
 }
 
 // ── Spans markdown ──
@@ -143,14 +149,17 @@ export function requestToMarkdown(entry: RequestEntry): string {
   lines.push('')
   lines.push('| Field | Value |')
   lines.push('|-------|-------|')
+  lines.push(`| Request ID | \`${entry.requestId}\` |`)
+  lines.push(`| Session ID | \`${entry.sessionId}\` |`)
   lines.push(`| Method | ${entry.method} |`)
+  lines.push(`| URL | \`${entry.url}\` |`)
   lines.push(`| Path | \`${entry.path}\` |`)
   lines.push(`| Status | ${entry.status} |`)
   lines.push(`| Duration | ${entry.durationMs}ms |`)
   lines.push(`| Time | ${time} |`)
   lines.push(`| IP | ${entry.ip} |`)
   lines.push(`| Procedures | ${entry.procedures.length} |`)
-  lines.push(`| Batch | ${entry.isBatch ? 'Yes' : 'No'} |`)
+  if (entry.isBatch) lines.push(`| Batch | Yes |`)
   lines.push('')
 
   // Headers
@@ -196,6 +205,23 @@ export function requestTimingMarkdown(entry: RequestEntry): string {
 
   lines.push(aiPrompt(entry.durationMs))
   return lines.join('\n')
+}
+
+export function requestMarkdownUrl(entry: RequestEntry): string {
+  const id = encodeURIComponent(entry.requestId || String(entry.id))
+  return `${getAnalyticsOrigin()}/api/analytics/requests/${id}/md`
+}
+
+export function requestMarkdownCurl(entry: RequestEntry): string {
+  return analyticsMarkdownCurl(requestMarkdownUrl(entry))
+}
+
+export function errorMarkdownUrl(entry: ErrorEntry): string {
+  return `${getAnalyticsOrigin()}/api/analytics/errors/${encodeURIComponent(String(entry.id))}/md`
+}
+
+export function errorMarkdownCurl(entry: ErrorEntry): string {
+  return analyticsMarkdownCurl(errorMarkdownUrl(entry))
 }
 
 export function requestToRedactedJson(entry: RequestEntry): string {
@@ -257,4 +283,36 @@ export function sessionToRedactedJson(requests: RequestEntry[], sessionId: strin
     ),
   }))
   return JSON.stringify({ sessionId, requests: redacted }, null, 2)
+}
+
+export function taskToMarkdown(entry: TaskExecution): string {
+  const lines: string[] = []
+  const time = new Date(entry.timestamp).toISOString()
+  const emoji = entry.status === 'error' ? '💥' : '✅'
+
+  lines.push(`## ${emoji} Task \`${entry.taskName || '(unnamed)'}\``)
+  lines.push('')
+  lines.push('| Field | Value |')
+  lines.push('|-------|-------|')
+  lines.push(`| Status | ${entry.status} |`)
+  lines.push(`| Trigger | ${entry.trigger} |`)
+  lines.push(`| Duration | ${entry.durationMs}ms |`)
+  lines.push(`| Time | ${time} |`)
+  lines.push(`| Spans | ${entry.spans.length} |`)
+  lines.push('')
+
+  if (entry.input !== undefined && entry.input !== null) {
+    lines.push('### Input', '', '```json', safeJson(entry.input), '```', '')
+  }
+  if (entry.output !== undefined && entry.output !== null) {
+    lines.push('### Output', '', '```json', safeJson(entry.output), '```', '')
+  }
+  if (entry.error) {
+    lines.push('### Error', '', '```', entry.error, '```', '')
+  }
+  if (entry.spans.length > 0) {
+    lines.push(spansToMarkdown(entry.spans, entry.durationMs))
+  }
+
+  return lines.join('\n')
 }

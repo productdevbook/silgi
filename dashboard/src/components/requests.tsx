@@ -288,6 +288,7 @@ export function Requests({ requests, navigate, initialProcedure }: RequestsProps
                     selectedIdx === idx && 'bg-primary/5',
                   )}
                   onClick={() => setSelectedIdx(selectedIdx === idx ? null : idx)}
+                  onDoubleClick={() => navigate('requests', String(entry.id))}
                 >
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -437,11 +438,11 @@ function RequestDetailPanel({
           <PanelKV label='time' value={fmtTime(req.timestamp)} />
           <PanelKV label='ip' value={req.ip || '-'} />
         </PanelSection>
-        <div className='px-4 py-3'>
-          <Button variant='outline' size='xs' className='w-full' onClick={() => navigate('requests', String(req.id))}>
-            Open full detail
-          </Button>
-        </div>
+      <div className='px-4 py-3'>
+        <Button variant='outline' size='xs' className='w-full' onClick={() => navigate('requests', String(req.id))}>
+          Open full detail
+        </Button>
+      </div>
       </div>
     </>
   )

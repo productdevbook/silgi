@@ -103,6 +103,7 @@ export interface RequestEntry {
   timestamp: number
   durationMs: number
   method: string
+  url: string
   path: string
   ip: string
   headers: Record<string, string>

@@ -13,6 +13,7 @@ import { compileRouter } from '../compile.ts'
 import { analyticsTraceMap } from '../plugins/analytics.ts'
 
 import { detectResponseFormat, encodeResponse, makeErrorResponse } from './codec.ts'
+import { runWithCtx } from './context-bridge.ts'
 import { applyContext } from './dispatch.ts'
 import { parseInput } from './input.ts'
 import { routerCache } from './router-utils.ts'
@@ -179,7 +180,7 @@ export function createFetchHandler(
       callHook('request', { path: pathname, input: rawInput })
 
       // Pipeline
-      const pipelineResult = route.handler(ctx, rawInput, request.signal)
+      const pipelineResult = runWithCtx(ctx, () => route.handler(ctx, rawInput, request.signal))
       const output = pipelineResult instanceof Promise ? await pipelineResult : pipelineResult
 
       callHook('response', { path: pathname, output, durationMs: 0 })
