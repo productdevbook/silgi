@@ -39,10 +39,11 @@ function _initStorage(config?: StorageConfig): Storage {
   }
 
   const storage = createStorage({})
+  const configKeys = config ? new Set(Object.keys(config)) : null
 
-  // Default mounts — in-memory, overridable via config
-  storage.mount('data', memoryDriver())
-  storage.mount('cache', memoryDriver())
+  // Default mounts — in-memory, skipped if config provides a driver for the same path
+  if (!configKeys?.has('data')) storage.mount('data', memoryDriver())
+  if (!configKeys?.has('cache')) storage.mount('cache', memoryDriver())
 
   if (config) {
     for (const [path, driver] of Object.entries(config as Record<string, Driver>)) {

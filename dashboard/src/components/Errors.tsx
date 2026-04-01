@@ -1,6 +1,7 @@
 import { SearchField } from '@/components/dashboard-shell'
 import { SpanWaterfall } from '@/components/span-waterfall'
 import { Badge } from '@/components/ui/badge'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -227,8 +228,9 @@ export function Errors({ errors, navigate, initialProcedure }: ErrorsProps) {
           {/* Error list */}
           <div className={cn('flex-1 overflow-y-auto', selectedErr && 'hidden xl:block')}>
             {filtered.map((entry, idx) => (
+              <ContextMenu key={entry.id}>
+              <ContextMenuTrigger asChild>
               <div
-                key={entry.id}
                 className={cn(
                   'flex cursor-pointer items-start gap-3 border-b border-dashed px-5 py-2.5 hover:bg-muted/20',
                   selectedIdx === idx && 'bg-destructive/5',
@@ -268,6 +270,25 @@ export function Errors({ errors, navigate, initialProcedure }: ErrorsProps) {
                   </div>
                 </div>
               </div>
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <ContextMenuItem onClick={() => navigate('errors', String(entry.id))}>
+                  View details
+                </ContextMenuItem>
+                <ContextMenuItem
+                  onClick={() => {
+                    fetch('/api/analytics/hidden', {
+                      method: 'POST',
+                      headers: { 'content-type': 'application/json' },
+                      body: JSON.stringify({ path: entry.procedure }),
+                    })
+                  }}
+                  className='text-destructive'
+                >
+                  Hide path
+                </ContextMenuItem>
+              </ContextMenuContent>
+              </ContextMenu>
             ))}
           </div>
 

@@ -1,6 +1,7 @@
 import { SearchField } from '@/components/dashboard-shell'
 import { SpanWaterfall } from '@/components/span-waterfall'
 import { Badge } from '@/components/ui/badge'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { Button } from '@/components/ui/button'
 import { ChartContainer, ChartTooltip } from '@/components/ui/chart'
 import {
@@ -281,8 +282,9 @@ export function Requests({ requests, navigate, initialProcedure }: RequestsProps
               const isError = entry.status >= 400
               const durationPct = (entry.durationMs / maxDuration) * 100
               return (
+                <ContextMenu key={entry.id}>
+                <ContextMenuTrigger asChild>
                 <div
-                  key={entry.id}
                   className={cn(
                     'flex cursor-pointer items-center gap-2 border-b border-dashed px-5 py-2 hover:bg-muted/20',
                     selectedIdx === idx && 'bg-primary/5',
@@ -340,6 +342,28 @@ export function Requests({ requests, navigate, initialProcedure }: RequestsProps
                     {entry.sessionId?.slice(0, 8) ?? '-'}
                   </Badge>
                 </div>
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  <ContextMenuItem onClick={() => navigate('requests', String(entry.id))}>
+                    View details
+                  </ContextMenuItem>
+                  <ContextMenuItem onClick={() => navigate('sessions', entry.sessionId)}>
+                    View session
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    onClick={() => {
+                      fetch('/api/analytics/hidden', {
+                        method: 'POST',
+                        headers: { 'content-type': 'application/json' },
+                        body: JSON.stringify({ path: entry.path }),
+                      })
+                    }}
+                    className='text-destructive'
+                  >
+                    Hide path
+                  </ContextMenuItem>
+                </ContextMenuContent>
+                </ContextMenu>
               )
             })}
           </div>

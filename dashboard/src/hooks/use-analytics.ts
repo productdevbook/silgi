@@ -4,9 +4,9 @@ import type { AnalyticsData, ErrorEntry, RequestEntry, ScheduledTaskInfo, TaskEx
 
 const ENDPOINTS = {
   stats: '/api/analytics/stats',
-  errors: '/api/analytics/errors',
-  requests: '/api/analytics/requests',
-  tasks: '/api/analytics/tasks',
+  errors: '/api/analytics/errors?limit=10000',
+  requests: '/api/analytics/requests?limit=10000',
+  tasks: '/api/analytics/tasks?limit=10000',
   scheduled: '/api/analytics/scheduled',
 } as const
 

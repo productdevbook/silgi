@@ -1334,7 +1334,8 @@ function jsonResponse(data: unknown, headers: HeadersInit): Response {
 
 function paginatedResponse(items: unknown[], params: URLSearchParams, headers: HeadersInit): Response {
   const page = Math.max(1, Number(params.get('page')) || 1)
-  const limit = Math.min(200, Math.max(1, Number(params.get('limit')) || 50))
+  const rawLimit = Number(params.get('limit')) || 50
+  const limit = rawLimit <= 0 ? 50 : rawLimit
   const total = items.length
   const totalPages = Math.ceil(total / limit)
   const start = (page - 1) * limit
@@ -1377,15 +1378,15 @@ export async function serveAnalyticsRoute(
     }
   }
   if (pathname === 'api/analytics/errors') {
-    const errors = (await collector.getErrors()).filter((e) => !collector.isHidden(e.procedure))
+    const errors = (await collector.getErrors()).filter((e) => !collector.isHidden(e.procedure)).reverse()
     return paginatedResponse(errors, url.searchParams, jsonCacheHeaders)
   }
   if (pathname === 'api/analytics/requests') {
-    const requests = (await collector.getRequests()).filter((r) => !collector.isHidden(r.path))
+    const requests = (await collector.getRequests()).filter((r) => !collector.isHidden(r.path)).reverse()
     return paginatedResponse(requests, url.searchParams, jsonCacheHeaders)
   }
   if (pathname === 'api/analytics/tasks') {
-    const tasks = await collector.getTaskExecutions()
+    const tasks = (await collector.getTaskExecutions()).reverse()
     return paginatedResponse(tasks, url.searchParams, jsonCacheHeaders)
   }
   if (pathname === 'api/analytics/scheduled') {
