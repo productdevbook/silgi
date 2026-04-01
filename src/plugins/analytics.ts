@@ -97,6 +97,8 @@ export interface TraceSpan {
   error?: string
   /** Structured key-value attributes (db.name, auth.operation, user.id, etc.) */
   attributes?: Record<string, string | number | boolean>
+  /** Cost metadata for this span (tokens, price, provider). */
+  cost?: import('./analytics-cost.ts').SpanCost
 }
 
 export interface ErrorEntry {
@@ -145,6 +147,10 @@ export interface RequestEntry {
   status: number
   procedures: ProcedureCall[]
   isBatch: boolean
+  /** Trace ID for correlating related requests across services. */
+  traceId?: string
+  /** Parent request ID — links child requests to the originating request. */
+  parentRequestId?: string
 }
 
 /** A background task execution record. */
@@ -332,6 +338,8 @@ function normalizeRequestEntry(value: unknown, fallbackId: number): RequestEntry
     status,
     procedures,
     isBatch: normalizeBoolean(record.isBatch, procedures.length > 1),
+    traceId: normalizeString(record.traceId) || undefined,
+    parentRequestId: normalizeString(record.parentRequestId) || undefined,
   }
 }
 
@@ -956,6 +964,8 @@ const SESSION_MAX_AGE = 365 * 24 * 60 * 60 // 1 year
 export class RequestAccumulator {
   readonly requestId: string
   readonly sessionId: string
+  readonly traceId: string
+  readonly parentRequestId?: string
   /** True if a new session cookie needs to be set. */
   readonly isNewSession: boolean
   t0: number
@@ -963,8 +973,10 @@ export class RequestAccumulator {
   #procedures: ProcedureCall[] = []
   #collector: AnalyticsCollector
 
-  constructor(request: Request, collector: AnalyticsCollector) {
+  constructor(request: Request, collector: AnalyticsCollector, traceId?: string, parentRequestId?: string) {
     this.requestId = generateRequestId()
+    this.traceId = traceId ?? this.requestId
+    this.parentRequestId = parentRequestId
     this.t0 = performance.now()
     this.#request = request
     this.#collector = collector
@@ -1033,6 +1045,8 @@ export class RequestAccumulator {
       status: worstStatus,
       procedures: this.#procedures,
       isBatch: this.#procedures.length > 1,
+      traceId: this.traceId,
+      parentRequestId: this.parentRequestId,
     })
   }
 
@@ -1450,6 +1464,15 @@ export async function serveAnalyticsRoute(
   if (pathname === 'api/analytics/cost') {
     return jsonResponse(collector.costTracker.getSummary(), jsonCacheHeaders)
   }
+  // Trace correlation — find all requests sharing a trace ID
+  if (pathname.startsWith('api/analytics/traces/')) {
+    const traceId = decodeURIComponent(pathname.slice('api/analytics/traces/'.length))
+    if (traceId) {
+      const requests = await collector.getRequests()
+      const related = requests.filter((r) => r.traceId === traceId)
+      return jsonResponse(related, jsonCacheHeaders)
+    }
+  }
   if (pathname.startsWith('api/analytics/requests/') && pathname.endsWith('/md')) {
     const rawId = pathname.slice('api/analytics/requests/'.length, -'/md'.length)
     const parsedId = Number(rawId)
@@ -1535,8 +1558,13 @@ export function wrapWithAnalytics(handler: FetchHandler, options: AnalyticsOptio
       return handler(request)
     }
 
+    // Trace correlation — propagate or generate trace ID
+    const incomingTraceId = request.headers.get('x-trace-id')
+    const parentRequestId = request.headers.get('x-parent-request-id')
+    const traceId = incomingTraceId || generateRequestId()
+
     // Instrument the request
-    const acc = new RequestAccumulator(request, collector)
+    const acc = new RequestAccumulator(request, collector, traceId, parentRequestId ?? undefined)
     const reqTrace = new RequestTrace()
     const t0 = performance.now()
 
@@ -1610,6 +1638,7 @@ export function wrapWithAnalytics(handler: FetchHandler, options: AnalyticsOptio
     // Inject analytics headers
     const headers = new Headers(response.headers)
     headers.set('x-request-id', acc.requestId)
+    headers.set('x-trace-id', traceId)
     const cookie = acc.getSessionCookie()
     if (cookie) headers.append('set-cookie', cookie)
     const injected = new Response(response.body, { status: response.status, statusText: response.statusText, headers })

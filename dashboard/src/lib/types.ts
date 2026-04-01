@@ -37,6 +37,7 @@ export interface TraceSpan {
   output?: unknown
   error?: string
   attributes?: Record<string, string | number | boolean>
+  cost?: { units?: number; amount: number; currency?: string; provider?: string }
 }
 
 export interface ErrorEntry {
@@ -112,4 +113,6 @@ export interface RequestEntry {
   status: number
   procedures: ProcedureCall[]
   isBatch: boolean
+  traceId?: string
+  parentRequestId?: string
 }

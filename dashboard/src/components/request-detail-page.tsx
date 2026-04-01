@@ -76,6 +76,11 @@ export function RequestDetailPage({ requests, id, navigate }: RequestDetailPageP
         <Badge variant='secondary'>{fmtMs(entry.durationMs)}</Badge>
         {entry.procedures.length > 1 && <Badge variant='outline'>batch x {entry.procedures.length}</Badge>}
         {totalSpans > 0 && <Badge variant='secondary'>{totalSpans} spans</Badge>}
+        {entry.traceId && (
+          <Badge variant='outline' className='cursor-pointer font-mono text-[9px]' onClick={() => navigate('requests', `trace:${entry.traceId}`)}>
+            trace:{entry.traceId.slice(0, 8)}
+          </Badge>
+        )}
         <span className='text-[11px] text-muted-foreground'>{fmtTime(entry.timestamp)}</span>
         <div className='ml-auto'>
           <ExportSelect copiedId={copiedId} onCopy={copy} options={exportOptions} />

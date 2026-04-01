@@ -60,10 +60,10 @@ export default function App() {
                 data-icon='inline-start'
                 className={cn(
                   'size-1.5 rounded-full',
-                  analytics.autoRefresh ? 'bg-emerald-500' : 'bg-muted-foreground/40',
+                  analytics.connected ? 'bg-emerald-500 animate-pulse' : analytics.autoRefresh ? 'bg-amber-500' : 'bg-muted-foreground/40',
                 )}
               />
-              {analytics.autoRefresh ? 'Live' : 'Paused'}
+              {analytics.connected ? 'Live' : analytics.autoRefresh ? 'Connecting...' : 'Paused'}
             </Button>
             {analytics.errors.length > 0 && (
               <Badge variant='destructive' className='text-[10px]'>

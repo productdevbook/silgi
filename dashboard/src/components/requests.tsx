@@ -362,6 +362,11 @@ export function Requests({ requests, navigate, initialProcedure }: RequestsProps
                   >
                     Hide path
                   </ContextMenuItem>
+                  {entry.traceId && (
+                    <ContextMenuItem onClick={() => navigate('requests', `trace:${entry.traceId}`)}>
+                      View trace
+                    </ContextMenuItem>
+                  )}
                 </ContextMenuContent>
                 </ContextMenu>
               )
