@@ -42,11 +42,16 @@ export function useAnalytics(intervalMs = 2000) {
 
       if (!apiRes.ok || !errRes.ok || !reqRes.ok || !taskRes.ok) throw new Error('Failed to fetch analytics data')
 
-      const [newData, newErrors, newRequests] = await Promise.all([apiRes.json(), errRes.json(), reqRes.json()])
+      const [newData, errBody, reqBody, taskBody] = await Promise.all([
+        apiRes.json(),
+        errRes.json(),
+        reqRes.json(),
+        taskRes.json(),
+      ])
       setData(newData)
-      setErrors(newErrors)
-      setRequests(newRequests)
-      setTaskExecutions(await taskRes.json())
+      setErrors(errBody.data ?? errBody)
+      setRequests(reqBody.data ?? reqBody)
+      setTaskExecutions(taskBody.data ?? taskBody)
       const schedRes = await fetch(ENDPOINTS.scheduled, { cache: 'no-store' }).catch(() => null)
       if (schedRes?.ok) setScheduledTasks(await schedRes.json())
       setError(null)
