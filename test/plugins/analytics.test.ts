@@ -588,52 +588,49 @@ describe('hiddenPaths (client-side, dashboard only)', () => {
   })
 })
 
-describe('pagination', () => {
-  it('paginates requests with page and limit params', async () => {
+describe('query API', () => {
+  it('paginates requests with cursor and limit', async () => {
     const c = new AnalyticsCollector({ flushInterval: 999_999 })
     for (let i = 0; i < 10; i++) {
-      c.recordDetailedRequest({ timestamp: Date.now(), path: `api/r${i}`, durationMs: 1, status: 200, input: null, spans: [] })
+      c.recordDetailedRequest({ timestamp: Date.now() + i, path: `api/r${i}`, durationMs: 1, status: 200, input: null, spans: [] })
     }
 
-    const req = new Request('http://localhost/api/analytics/requests?page=2&limit=3')
+    const req = new Request('http://localhost/api/analytics/requests?limit=3')
     const res = await serveAnalyticsRoute('api/analytics/requests', req, c, undefined)
     const body = await res.json()
 
     expect(body.total).toBe(10)
-    expect(body.page).toBe(2)
-    expect(body.limit).toBe(3)
-    expect(body.totalPages).toBe(4)
     expect(body.data).toHaveLength(3)
+    expect(body.hasMore).toBe(true)
+    expect(body.nextCursor).toBeTruthy()
     await c.dispose()
   })
 
-  it('returns first page by default', async () => {
+  it('returns all entries with default limit', async () => {
     const c = new AnalyticsCollector({ flushInterval: 999_999 })
     for (let i = 0; i < 5; i++) {
-      c.recordDetailedRequest({ timestamp: Date.now(), path: `api/r${i}`, durationMs: 1, status: 200, input: null, spans: [] })
+      c.recordDetailedRequest({ timestamp: Date.now() + i, path: `api/r${i}`, durationMs: 1, status: 200, input: null, spans: [] })
     }
 
     const req = new Request('http://localhost/api/analytics/requests')
     const res = await serveAnalyticsRoute('api/analytics/requests', req, c, undefined)
     const body = await res.json()
 
-    expect(body.page).toBe(1)
-    expect(body.limit).toBe(50)
     expect(body.total).toBe(5)
     expect(body.data).toHaveLength(5)
     await c.dispose()
   })
 
-  it('paginates errors', async () => {
+  it('filters errors by status', async () => {
     const c = new AnalyticsCollector({ flushInterval: 999_999 })
     for (let i = 0; i < 8; i++) {
       c.recordDetailedError({
         requestId: `req-${i}`,
-        timestamp: Date.now(),
+        timestamp: Date.now() + i,
         procedure: `api/fail${i}`,
         error: 'err',
         code: 'ERR',
-        status: 500,
+        status: i < 4 ? 400 : 500,
         stack: '',
         input: null,
         headers: {},
@@ -642,13 +639,26 @@ describe('pagination', () => {
       })
     }
 
-    const req = new Request('http://localhost/api/analytics/errors?page=1&limit=5')
+    const req = new Request('http://localhost/api/analytics/errors?status=500')
     const res = await serveAnalyticsRoute('api/analytics/errors', req, c, undefined)
     const body = await res.json()
 
-    expect(body.total).toBe(8)
-    expect(body.data).toHaveLength(5)
-    expect(body.totalPages).toBe(2)
+    expect(body.total).toBe(4)
+    expect(body.data).toHaveLength(4)
+    await c.dispose()
+  })
+
+  it('searches requests by text', async () => {
+    const c = new AnalyticsCollector({ flushInterval: 999_999 })
+    c.recordDetailedRequest({ timestamp: Date.now(), path: 'api/users/list', durationMs: 1, status: 200, input: null, spans: [] })
+    c.recordDetailedRequest({ timestamp: Date.now(), path: 'api/products/list', durationMs: 1, status: 200, input: null, spans: [] })
+
+    const req = new Request('http://localhost/api/analytics/requests?search=users')
+    const res = await serveAnalyticsRoute('api/analytics/requests', req, c, undefined)
+    const body = await res.json()
+
+    expect(body.total).toBe(1)
+    expect(body.data[0].path).toBe('api/users/list')
     await c.dispose()
   })
 })

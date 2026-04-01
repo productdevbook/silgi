@@ -49,9 +49,9 @@ export function useAnalytics(intervalMs = 2000) {
         taskRes.json(),
       ])
       setData(newData)
-      setErrors(errBody.data ?? errBody)
-      setRequests(reqBody.data ?? reqBody)
-      setTaskExecutions(taskBody.data ?? taskBody)
+      setErrors(Array.isArray(errBody) ? errBody : (errBody.data ?? []))
+      setRequests(Array.isArray(reqBody) ? reqBody : (reqBody.data ?? []))
+      setTaskExecutions(Array.isArray(taskBody) ? taskBody : (taskBody.data ?? []))
       const schedRes = await fetch(ENDPOINTS.scheduled, { cache: 'no-store' }).catch(() => null)
       if (schedRes?.ok) setScheduledTasks(await schedRes.json())
       setError(null)

@@ -17,6 +17,12 @@ import { fileURLToPath } from 'node:url'
 
 import { parse as parseCookieHeader } from 'cookie-es'
 
+import { AlertEngine } from './analytics-alerts.ts'
+import { CostTracker } from './analytics-cost.ts'
+import { parseQueryParams, queryErrors, queryRequests, queryTasks } from './analytics-query.ts'
+import { AnalyticsSSEHub } from './analytics-sse.ts'
+import { TimeSeriesAggregator } from './analytics-timeseries.ts'
+
 // ── Ring Buffer (fixed memory, no GC pressure) ──────
 
 class RingBuffer {
@@ -173,6 +179,10 @@ export interface AnalyticsOptions {
   retentionDays?: number
   /** Path prefixes to exclude from tracking. Can also be managed at runtime via the dashboard or API. */
   ignorePaths?: string[]
+  /** Alert rules — fire actions when conditions are met within a sliding window. */
+  alerts?: import('./analytics-alerts.ts').AlertRule[]
+  /** Budget rules for cost tracking. */
+  budgets?: import('./analytics-cost.ts').BudgetRule[]
 }
 
 const REDACTED = '[REDACTED]'
@@ -686,12 +696,33 @@ export class AnalyticsCollector {
   #ignorePaths: Set<string>
   /** Client-side hide — from dashboard, filters display only */
   #hiddenPaths: Set<string> = new Set()
+  /** SSE hub for real-time streaming */
+  sseHub: AnalyticsSSEHub
+  /** Multi-tier time-series aggregation */
+  timeseries: TimeSeriesAggregator
+  /** Alert engine */
+  alertEngine: AlertEngine | null = null
+  /** Cost tracker */
+  costTracker: CostTracker
 
   constructor(options: AnalyticsOptions = {}) {
     this.#bufferSize = options.bufferSize ?? 1024
     this.#historySeconds = options.historySeconds ?? 120
     this.#ignorePaths = new Set((options.ignorePaths ?? []).map((p) => p.startsWith('/') ? p.slice(1) : p))
     this.#currentWindow = { time: Math.floor(Date.now() / 1000), count: 0, errors: 0 }
+
+    this.sseHub = new AnalyticsSSEHub()
+    this.sseHub.startStatsBroadcast(() => this.toJSON())
+    this.timeseries = new TimeSeriesAggregator()
+    this.costTracker = new CostTracker(options.budgets, (rule, current) => {
+      if (this.alertEngine) {
+        console.warn(`[silgi:budget] "${rule.name}" exceeded: $${current.toFixed(2)} / $${rule.limit}`)
+      }
+    })
+
+    if (options.alerts && options.alerts.length > 0) {
+      this.alertEngine = new AlertEngine(options.alerts)
+    }
 
     this.#store = new AnalyticsStore(options.flushInterval ?? 5000, options.retentionDays ?? 30)
     this.#store.hydrate().then((c) => {
@@ -737,6 +768,8 @@ export class AnalyticsCollector {
     entry.count++
     entry.latencies.push(durationMs)
     this.#tick(false)
+    this.timeseries.record(durationMs, false)
+    this.alertEngine?.record(durationMs, false, path)
   }
 
   recordError(path: string, durationMs: number, errorMsg: string): void {
@@ -749,6 +782,8 @@ export class AnalyticsCollector {
     entry.lastError = errorMsg
     entry.lastErrorTime = Date.now()
     this.#tick(true)
+    this.timeseries.record(durationMs, true)
+    this.alertEngine?.record(durationMs, true, path)
   }
 
   recordDetailedError(entry: Omit<ErrorEntry, 'id'>): void {
@@ -758,6 +793,7 @@ export class AnalyticsCollector {
       this.#errors.shift()
     }
     this.#store.enqueueError(full)
+    this.sseHub.broadcast({ type: 'error', data: full })
   }
 
   recordDetailedRequest(entry: Omit<RequestEntry, 'id'>): void {
@@ -767,6 +803,7 @@ export class AnalyticsCollector {
       this.#requests.shift()
     }
     this.#store.enqueueRequest(full)
+    this.sseHub.broadcast({ type: 'request', data: full })
     this.#flushCountersIfNeeded()
   }
 
@@ -776,6 +813,7 @@ export class AnalyticsCollector {
     if (this.#taskExecutions.length > MEM_MAX_TASKS) {
       this.#taskExecutions.shift()
     }
+    this.sseHub.broadcast({ type: 'task', data: full })
 
     // Aggregate stats
     let stats = this.#taskStats.get(entry.taskName)
@@ -1332,17 +1370,6 @@ function jsonResponse(data: unknown, headers: HeadersInit): Response {
   return new Response(JSON.stringify(data), { headers })
 }
 
-function paginatedResponse(items: unknown[], params: URLSearchParams, headers: HeadersInit): Response {
-  const page = Math.max(1, Number(params.get('page')) || 1)
-  const rawLimit = Number(params.get('limit')) || 50
-  const limit = rawLimit <= 0 ? 50 : rawLimit
-  const total = items.length
-  const totalPages = Math.ceil(total / limit)
-  const start = (page - 1) * limit
-  const data = items.slice(start, start + limit)
-  return jsonResponse({ data, page, limit, total, totalPages }, headers)
-}
-
 /** Serve analytics dashboard and API routes. */
 export async function serveAnalyticsRoute(
   pathname: string,
@@ -1378,20 +1405,50 @@ export async function serveAnalyticsRoute(
     }
   }
   if (pathname === 'api/analytics/errors') {
-    const errors = (await collector.getErrors()).filter((e) => !collector.isHidden(e.procedure)).reverse()
-    return paginatedResponse(errors, url.searchParams, jsonCacheHeaders)
+    const errors = (await collector.getErrors()).filter((e) => !collector.isHidden(e.procedure))
+    const params = parseQueryParams(url.searchParams)
+    return jsonResponse(queryErrors(errors, params), jsonCacheHeaders)
   }
   if (pathname === 'api/analytics/requests') {
-    const requests = (await collector.getRequests()).filter((r) => !collector.isHidden(r.path)).reverse()
-    return paginatedResponse(requests, url.searchParams, jsonCacheHeaders)
+    const requests = (await collector.getRequests()).filter((r) => !collector.isHidden(r.path))
+    const params = parseQueryParams(url.searchParams)
+    return jsonResponse(queryRequests(requests, params), jsonCacheHeaders)
   }
   if (pathname === 'api/analytics/tasks') {
-    const tasks = (await collector.getTaskExecutions()).reverse()
-    return paginatedResponse(tasks, url.searchParams, jsonCacheHeaders)
+    const tasks = await collector.getTaskExecutions()
+    const params = parseQueryParams(url.searchParams)
+    return jsonResponse(queryTasks(tasks, params), jsonCacheHeaders)
   }
   if (pathname === 'api/analytics/scheduled') {
     const { getScheduledTasks } = await import('../core/task.ts')
     return jsonResponse(getScheduledTasks(), jsonCacheHeaders)
+  }
+  // SSE stream
+  if (pathname === 'api/analytics/stream') {
+    const stream = collector.sseHub.createStream()
+    return new Response(stream, {
+      headers: {
+        'content-type': 'text/event-stream',
+        'cache-control': 'no-cache',
+        'connection': 'keep-alive',
+      },
+    })
+  }
+  // Time-series
+  if (pathname === 'api/analytics/timeseries') {
+    const range = (url.searchParams.get('range') as '1h' | '6h' | '24h' | '7d' | '30d') || '1h'
+    return jsonResponse(collector.timeseries.query(range), jsonCacheHeaders)
+  }
+  // Alerts
+  if (pathname === 'api/analytics/alerts') {
+    return jsonResponse({
+      history: collector.alertEngine?.getHistory() ?? [],
+      states: collector.alertEngine?.getStates() ?? {},
+    }, jsonCacheHeaders)
+  }
+  // Cost
+  if (pathname === 'api/analytics/cost') {
+    return jsonResponse(collector.costTracker.getSummary(), jsonCacheHeaders)
   }
   if (pathname.startsWith('api/analytics/requests/') && pathname.endsWith('/md')) {
     const rawId = pathname.slice('api/analytics/requests/'.length, -'/md'.length)
