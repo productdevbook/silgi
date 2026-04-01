@@ -160,12 +160,6 @@ export interface AnalyticsOptions {
   bufferSize?: number
   /** Time-series history in seconds (default: 120) */
   historySeconds?: number
-  /** Max error entries to keep (default: 100) */
-  maxErrors?: number
-  /** Max recent request entries to keep (default: 200) */
-  maxRequests?: number
-  /** Max task execution entries to keep (default: 200) */
-  maxTasks?: number
   /**
    * Protect dashboard access.
    * - `string` — secret token checked against `Authorization: Bearer <token>` header or `?token=` query param
@@ -175,6 +169,10 @@ export interface AnalyticsOptions {
   auth?: string | ((req: Request) => boolean | Promise<boolean>)
   /** Interval in ms between storage flushes (default: 5000) */
   flushInterval?: number
+  /** Days to retain entries in storage (default: 30). Entries older than this are pruned on flush. */
+  retentionDays?: number
+  /** Path prefixes to exclude from tracking. Can also be managed at runtime via the dashboard or API. */
+  ignorePaths?: string[]
 }
 
 const REDACTED = '[REDACTED]'
@@ -555,15 +553,13 @@ class AnalyticsStore {
   #storage: ReturnType<typeof useStorage>
   #pendingRequests: RequestEntry[] = []
   #pendingErrors: ErrorEntry[] = []
-  #maxRequests: number
-  #maxErrors: number
+  #retentionMs: number
   #timer: ReturnType<typeof setInterval> | null = null
   #flushing = false
 
-  constructor(maxRequests: number, maxErrors: number, flushInterval: number) {
+  constructor(flushInterval: number, retentionDays: number) {
     this.#storage = useStorage('data')
-    this.#maxRequests = maxRequests
-    this.#maxErrors = maxErrors
+    this.#retentionMs = retentionDays * 86_400_000
     this.#timer = setInterval(() => this.flush(), flushInterval)
     if (typeof this.#timer === 'object' && 'unref' in this.#timer) this.#timer.unref()
   }
@@ -584,16 +580,17 @@ class AnalyticsStore {
 
     this.#flushing = true
     try {
+      const cutoff = Date.now() - this.#retentionMs
       if (requests.length > 0) {
         const existing = normalizeRequestEntries(await this.#storage.getItem('analytics:requests'))
           .filter((entry) => isTrackedRequestPath(entry.path))
-        const merged = [...existing, ...requests].slice(-this.#maxRequests)
+        const merged = [...existing, ...requests].filter((e) => e.timestamp >= cutoff)
         await this.#storage.setItem('analytics:requests', merged)
       }
       if (errors.length > 0) {
         const existing = normalizeErrorEntries(await this.#storage.getItem('analytics:errors'))
           .filter((entry) => isTrackedRequestPath(entry.procedure))
-        const merged = [...existing, ...errors].slice(-this.#maxErrors)
+        const merged = [...existing, ...errors].filter((e) => e.timestamp >= cutoff)
         await this.#storage.setItem('analytics:errors', merged)
       }
     } catch {
@@ -606,19 +603,21 @@ class AnalyticsStore {
   }
 
   async getRequests(): Promise<RequestEntry[]> {
+    const cutoff = Date.now() - this.#retentionMs
     const stored = normalizeRequestEntries(await this.#storage.getItem('analytics:requests'))
-      .filter((entry) => isTrackedRequestPath(entry.path))
-    const pending = this.#pendingRequests.filter((entry) => isTrackedRequestPath(entry.path))
+      .filter((entry) => isTrackedRequestPath(entry.path) && entry.timestamp >= cutoff)
+    const pending = this.#pendingRequests.filter((entry) => isTrackedRequestPath(entry.path) && entry.timestamp >= cutoff)
     if (pending.length === 0) return stored
-    return [...stored, ...pending].slice(-this.#maxRequests)
+    return [...stored, ...pending]
   }
 
   async getErrors(): Promise<ErrorEntry[]> {
+    const cutoff = Date.now() - this.#retentionMs
     const stored = normalizeErrorEntries(await this.#storage.getItem('analytics:errors'))
-      .filter((entry) => isTrackedRequestPath(entry.procedure))
-    const pending = this.#pendingErrors.filter((entry) => isTrackedRequestPath(entry.procedure))
+      .filter((entry) => isTrackedRequestPath(entry.procedure) && entry.timestamp >= cutoff)
+    const pending = this.#pendingErrors.filter((entry) => isTrackedRequestPath(entry.procedure) && entry.timestamp >= cutoff)
     if (pending.length === 0) return stored
-    return [...stored, ...pending].slice(-this.#maxErrors)
+    return [...stored, ...pending]
   }
 
   async hydrate(): Promise<{ totalRequests: number; totalErrors: number }> {
@@ -638,6 +637,19 @@ class AnalyticsStore {
     }
   }
 
+  async loadHiddenPaths(): Promise<string[]> {
+    try {
+      const paths = await this.#storage.getItem<string[]>('analytics:hiddenPaths')
+      return Array.isArray(paths) ? paths : []
+    } catch {
+      return []
+    }
+  }
+
+  saveHiddenPaths(paths: string[]): void {
+    this.#storage.setItem('analytics:hiddenPaths', paths).catch(() => {})
+  }
+
   async dispose(): Promise<void> {
     if (this.#timer) clearInterval(this.#timer)
     this.#timer = null
@@ -647,6 +659,11 @@ class AnalyticsStore {
 
 // ── Collector ───────────────────────────────────────
 
+/** Internal in-memory buffer caps — not user-configurable */
+const MEM_MAX_REQUESTS = 10_000
+const MEM_MAX_ERRORS = 10_000
+const MEM_MAX_TASKS = 10_000
+
 export class AnalyticsCollector {
   #procedures = new Map<string, ProcedureEntry>()
   #startTime = Date.now()
@@ -654,9 +671,6 @@ export class AnalyticsCollector {
   #totalErrors = 0
   #bufferSize: number
   #historySeconds: number
-  #maxErrors: number
-  #maxRequests: number
-  #maxTasks: number
   #timeSeries: TimeWindow[] = []
   #currentWindow: TimeWindow
   #errors: ErrorEntry[] = []
@@ -668,20 +682,53 @@ export class AnalyticsCollector {
   #taskStats = new Map<string, { runs: number; errors: number; totalDuration: number; lastRun: number }>()
   #store: AnalyticsStore
   #counterFlushCounter = 0
+  /** Server-side ignore — from config, prevents recording entirely */
+  #ignorePaths: Set<string>
+  /** Client-side hide — from dashboard, filters display only */
+  #hiddenPaths: Set<string> = new Set()
 
   constructor(options: AnalyticsOptions = {}) {
     this.#bufferSize = options.bufferSize ?? 1024
     this.#historySeconds = options.historySeconds ?? 120
-    this.#maxErrors = options.maxErrors ?? 100
-    this.#maxRequests = options.maxRequests ?? 200
-    this.#maxTasks = options.maxTasks ?? 200
+    this.#ignorePaths = new Set((options.ignorePaths ?? []).map((p) => p.startsWith('/') ? p.slice(1) : p))
     this.#currentWindow = { time: Math.floor(Date.now() / 1000), count: 0, errors: 0 }
 
-    this.#store = new AnalyticsStore(this.#maxRequests, this.#maxErrors, options.flushInterval ?? 5000)
+    this.#store = new AnalyticsStore(options.flushInterval ?? 5000, options.retentionDays ?? 30)
     this.#store.hydrate().then((c) => {
       this.#totalRequests += c.totalRequests
       this.#totalErrors += c.totalErrors
     })
+    this.#store.loadHiddenPaths().then((paths) => {
+      for (const p of paths) this.#hiddenPaths.add(p)
+    })
+  }
+
+  /** Check if a path is server-side ignored (from config). */
+  isIgnored(pathname: string): boolean {
+    if (this.#ignorePaths.size === 0) return false
+    return matchesPathPrefix(pathname, this.#ignorePaths)
+  }
+
+  /** Check if a path is hidden in the dashboard (from runtime API). */
+  isHidden(pathname: string): boolean {
+    if (this.#hiddenPaths.size === 0) return false
+    return matchesPathPrefix(pathname, this.#hiddenPaths)
+  }
+
+  addHiddenPath(path: string): void {
+    const normalized = path.startsWith('/') ? path.slice(1) : path
+    this.#hiddenPaths.add(normalized)
+    this.#store.saveHiddenPaths([...this.#hiddenPaths])
+  }
+
+  removeHiddenPath(path: string): void {
+    const normalized = path.startsWith('/') ? path.slice(1) : path
+    this.#hiddenPaths.delete(normalized)
+    this.#store.saveHiddenPaths([...this.#hiddenPaths])
+  }
+
+  getHiddenPaths(): string[] {
+    return [...this.#hiddenPaths]
   }
 
   record(path: string, durationMs: number): void {
@@ -707,7 +754,7 @@ export class AnalyticsCollector {
   recordDetailedError(entry: Omit<ErrorEntry, 'id'>): void {
     const full = { ...entry, id: this.#nextErrorId++ }
     this.#errors.push(full)
-    if (this.#errors.length > this.#maxErrors) {
+    if (this.#errors.length > MEM_MAX_ERRORS) {
       this.#errors.shift()
     }
     this.#store.enqueueError(full)
@@ -716,7 +763,7 @@ export class AnalyticsCollector {
   recordDetailedRequest(entry: Omit<RequestEntry, 'id'>): void {
     const full = { ...entry, id: this.#nextRequestId++ }
     this.#requests.push(full)
-    if (this.#requests.length > this.#maxRequests) {
+    if (this.#requests.length > MEM_MAX_REQUESTS) {
       this.#requests.shift()
     }
     this.#store.enqueueRequest(full)
@@ -726,7 +773,7 @@ export class AnalyticsCollector {
   recordTask(entry: Omit<TaskExecution, 'id'>): void {
     const full = { ...entry, id: this.#nextTaskId++ }
     this.#taskExecutions.push(full)
-    if (this.#taskExecutions.length > this.#maxTasks) {
+    if (this.#taskExecutions.length > MEM_MAX_TASKS) {
       this.#taskExecutions.shift()
     }
 
@@ -1137,6 +1184,14 @@ function safeStringify(v: unknown): string {
   }
 }
 
+function matchesPathPrefix(pathname: string, prefixes: Set<string>): boolean {
+  const normalized = pathname.startsWith('/') ? pathname.slice(1) : pathname
+  for (const prefix of prefixes) {
+    if (normalized === prefix || normalized.startsWith(prefix + '/')) return true
+  }
+  return false
+}
+
 function isTrackedRequestPath(pathname: string): boolean {
   const normalized = pathname.startsWith('/') ? pathname.slice(1) : pathname
   return (
@@ -1277,14 +1332,26 @@ function jsonResponse(data: unknown, headers: HeadersInit): Response {
   return new Response(JSON.stringify(data), { headers })
 }
 
+function paginatedResponse(items: unknown[], params: URLSearchParams, headers: HeadersInit): Response {
+  const page = Math.max(1, Number(params.get('page')) || 1)
+  const limit = Math.min(200, Math.max(1, Number(params.get('limit')) || 50))
+  const total = items.length
+  const totalPages = Math.ceil(total / limit)
+  const start = (page - 1) * limit
+  const data = items.slice(start, start + limit)
+  return jsonResponse({ data, page, limit, total, totalPages }, headers)
+}
+
 /** Serve analytics dashboard and API routes. */
 export async function serveAnalyticsRoute(
   pathname: string,
+  request: Request,
   collector: AnalyticsCollector,
   dashboardHtml: string | undefined,
 ): Promise<Response> {
   const jsonCacheHeaders = { 'content-type': 'application/json', 'cache-control': 'no-cache' }
   const mdHeaders = { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-cache' }
+  const url = new URL(request.url)
 
   if (pathname === 'api/analytics' || pathname === 'api/analytics/') {
     return new Response(dashboardHtml, { headers: { 'content-type': 'text/html' } })
@@ -1292,17 +1359,34 @@ export async function serveAnalyticsRoute(
   if (pathname === 'api/analytics/stats') {
     return jsonResponse(collector.toJSON(), jsonCacheHeaders)
   }
+  if (pathname === 'api/analytics/hidden') {
+    if (request.method === 'GET') {
+      return jsonResponse(collector.getHiddenPaths(), jsonCacheHeaders)
+    }
+    if (request.method === 'POST') {
+      const body = await request.json() as { path?: string }
+      if (typeof body.path !== 'string') return new Response('{"error":"path required"}', { status: 400, headers: jsonCacheHeaders })
+      collector.addHiddenPath(body.path)
+      return jsonResponse(collector.getHiddenPaths(), jsonCacheHeaders)
+    }
+    if (request.method === 'DELETE') {
+      const body = await request.json() as { path?: string }
+      if (typeof body.path !== 'string') return new Response('{"error":"path required"}', { status: 400, headers: jsonCacheHeaders })
+      collector.removeHiddenPath(body.path)
+      return jsonResponse(collector.getHiddenPaths(), jsonCacheHeaders)
+    }
+  }
   if (pathname === 'api/analytics/errors') {
-    const errors = await collector.getErrors()
-    return jsonResponse(errors, jsonCacheHeaders)
+    const errors = (await collector.getErrors()).filter((e) => !collector.isHidden(e.procedure))
+    return paginatedResponse(errors, url.searchParams, jsonCacheHeaders)
   }
   if (pathname === 'api/analytics/requests') {
-    const requests = await collector.getRequests()
-    return jsonResponse(requests, jsonCacheHeaders)
+    const requests = (await collector.getRequests()).filter((r) => !collector.isHidden(r.path))
+    return paginatedResponse(requests, url.searchParams, jsonCacheHeaders)
   }
   if (pathname === 'api/analytics/tasks') {
     const tasks = await collector.getTaskExecutions()
-    return jsonResponse(tasks, jsonCacheHeaders)
+    return paginatedResponse(tasks, url.searchParams, jsonCacheHeaders)
   }
   if (pathname === 'api/analytics/scheduled') {
     const { getScheduledTasks } = await import('../core/task.ts')
@@ -1386,10 +1470,10 @@ export function wrapWithAnalytics(handler: FetchHandler, options: AnalyticsOptio
         const ok = authResult instanceof Promise ? await authResult : authResult
         if (!ok) return analyticsAuthResponse(pathname)
       }
-      return serveAnalyticsRoute(pathname, collector, dashboardHtml)
+      return serveAnalyticsRoute(pathname, request, collector, dashboardHtml)
     }
 
-    if (!isTrackedRequestPath(pathname)) {
+    if (!isTrackedRequestPath(pathname) || collector.isIgnored(pathname)) {
       return handler(request)
     }
 

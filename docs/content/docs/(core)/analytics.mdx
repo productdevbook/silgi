@@ -35,7 +35,7 @@ Open `http://localhost:3000/api/analytics` in your browser.
 | Session tracking             | Cookie-based (`_sid`)              | ~0             |
 | Response headers             | Captured after Response is built   | ~0             |
 
-All data lives in memory. No disk I/O, no network calls, no serialization until the dashboard is opened.
+By default, data lives in memory and is also flushed to [storage](/docs/plugins/storage) periodically. When you configure a `data` mount (Redis, filesystem, etc.), analytics entries survive restarts. Entries older than `retentionDays` are automatically pruned on each flush.
 
 ## Dashboard
 
@@ -262,9 +262,36 @@ The function receives the raw `Request` and returns `boolean` or `Promise<boolea
   and internal procedure names.
 </Callout>
 
+## Persistent storage
+
+Analytics automatically persists request and error entries to [storage](/docs/plugins/storage). By default, storage uses an in-memory driver — data is lost on restart. Mount a persistent driver on the `data` prefix to keep analytics across restarts:
+
+```ts twoslash
+// @noErrors
+import fsDriver from 'unstorage/drivers/fs'
+
+const s = silgi({
+  context: () => ({}),
+  storage: {
+    data: fsDriver({ base: '.data' }),
+  },
+})
+
+s.serve(appRouter, {
+  analytics: {
+    auth: process.env.ANALYTICS_TOKEN,
+    retentionDays: 90,
+  },
+})
+```
+
+Entries older than `retentionDays` (default: 30) are pruned on each flush. Aggregate counters (total requests, total errors) are also persisted and restored on startup.
+
+Any [unstorage driver](https://unstorage.unjs.io/drivers) works — Redis, S3, Cloudflare KV, etc. See the [Storage docs](/docs/plugins/storage) for the full driver list.
+
 ## Configuration
 
-Pass an options object instead of `true` to customize buffer sizes and history:
+Pass an options object instead of `true` to customize buffer sizes, history, and retention:
 
 ```ts twoslash
 // @noErrors
@@ -273,21 +300,22 @@ s.serve(appRouter, {
     auth: 'my-secret-token',
     bufferSize: 2048,
     historySeconds: 300,
-    maxErrors: 200,
-    maxRequests: 500,
+    retentionDays: 90,
+    ignorePaths: ['api/health', 'api/metrics'],
   },
 })
 ```
 
-| Option           | Type                                  | Default     | Description                                         |
-| ---------------- | ------------------------------------- | ----------- | --------------------------------------------------- |
-| `auth`           | `string \| (req: Request) => boolean` | `undefined` | Token string or custom auth function                |
-| `bufferSize`     | `number`                              | `1024`      | Latency samples to keep per procedure (ring buffer) |
-| `historySeconds` | `number`                              | `120`       | Time-series sparkline history in seconds            |
-| `maxErrors`      | `number`                              | `100`       | Maximum error log entries to keep                   |
-| `maxRequests`    | `number`                              | `200`       | Maximum recent request entries to keep              |
+| Option           | Type                                  | Default     | Description                                                       |
+| ---------------- | ------------------------------------- | ----------- | ----------------------------------------------------------------- |
+| `auth`           | `string \| (req: Request) => boolean` | `undefined` | Token string or custom auth function                              |
+| `bufferSize`     | `number`                              | `1024`      | Latency samples to keep per procedure (ring buffer)               |
+| `historySeconds` | `number`                              | `120`       | Time-series sparkline history in seconds                          |
+| `retentionDays`  | `number`                              | `30`        | Days to keep request and error entries in storage                 |
+| `flushInterval`  | `number`                              | `5000`      | Interval in milliseconds between storage flushes                  |
+| `ignorePaths`    | `string[]`                            | `[]`        | Path prefixes to exclude from tracking                            |
 
-All buffers are fixed-size ring buffers — memory usage stays constant regardless of traffic volume.
+Latency samples use fixed-size ring buffers — memory usage stays constant regardless of traffic volume. Request and error entries are retained for `retentionDays` and pruned automatically on each storage flush.
 
 ## With `handler()`
 
@@ -301,6 +329,45 @@ Bun.serve({ port: 3000, fetch: handle })
 // Dashboard at /api/analytics
 ```
 
+## Ignoring paths
+
+Noisy endpoints like health checks or metrics can be completely excluded from tracking via config:
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, {
+  analytics: {
+    ignorePaths: ['api/health', 'api/metrics'],
+  },
+})
+```
+
+Requests matching these prefixes are never recorded — zero overhead, no storage, no dashboard entries. This is server-side only and cannot be changed at runtime.
+
+## Hiding paths
+
+You can also hide paths from the dashboard without stopping server-side tracking. This is useful when you want to keep the data but reduce noise in the UI.
+
+Hidden paths are managed at runtime via the API and persisted to storage across restarts.
+
+| Method   | Endpoint                  | Body                    | Description          |
+| -------- | ------------------------- | ----------------------- | -------------------- |
+| `GET`    | `/api/analytics/hidden`   | —                       | List hidden paths    |
+| `POST`   | `/api/analytics/hidden`   | `{ "path": "api/..." }` | Hide a path          |
+| `DELETE` | `/api/analytics/hidden`   | `{ "path": "api/..." }` | Unhide a path        |
+
+```bash
+# Hide health checks from dashboard
+curl -X POST http://localhost:3000/api/analytics/hidden \
+  -H 'content-type: application/json' \
+  -d '{"path": "api/health"}'
+
+# List hidden paths
+curl http://localhost:3000/api/analytics/hidden
+```
+
+In the dashboard, right-click any request row and select **Hide path** to filter it from the view. The data is still recorded and accessible via the JSON API without the hidden filter.
+
 ## JSON API
 
 The dashboard reads from JSON endpoints. You can also query them directly for custom integrations, alerting, or external dashboards:
@@ -313,8 +380,35 @@ The dashboard reads from JSON endpoints. You can also query them directly for cu
 | `/api/analytics/requests`            | Recent requests with trace spans and session IDs       |
 | `/api/analytics/requests/:id`        | One request entry as JSON                              |
 | `/api/analytics/requests/:requestId` | One request entry by request ID as JSON                |
+| `/api/analytics/hidden`              | Manage hidden paths (GET/POST/DELETE)                  |
 
 All endpoints return JSON with `cache-control: no-cache`.
+
+### Pagination
+
+The `/api/analytics/requests`, `/api/analytics/errors`, and `/api/analytics/tasks` endpoints support pagination via query parameters:
+
+| Parameter | Default | Max | Description        |
+| --------- | ------- | --- | ------------------ |
+| `page`    | `1`     | —   | Page number        |
+| `limit`   | `50`    | 200 | Items per page     |
+
+Response shape:
+
+```json
+{
+  "data": [...],
+  "page": 1,
+  "limit": 50,
+  "total": 342,
+  "totalPages": 7
+}
+```
+
+```bash
+# Get page 2 with 20 items
+curl 'http://localhost:3000/api/analytics/requests?page=2&limit=20'
+```
 
 ## Markdown export endpoints
 
@@ -447,9 +541,8 @@ Analytics keeps development debugging convenient while still protecting producti
 If you expose analytics outside local development, always enable dashboard auth and assume analytics data may contain request payloads and internal headers.
 
 <Callout type='info'>
-  For production monitoring with alerting, long-term storage, and multi-service correlation, use
-  [OpenTelemetry](/docs/plugins/otel) with your preferred backend. Built-in analytics is designed for development and
-  single-service visibility.
+  Built-in analytics supports [persistent storage](#persistent-storage) for single-service use. For multi-service
+  correlation and alerting, use [OpenTelemetry](/docs/plugins/otel) with your preferred backend.
 </Callout>
 
 ## What's next?

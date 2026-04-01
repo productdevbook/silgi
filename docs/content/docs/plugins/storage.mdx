@@ -82,6 +82,28 @@ const listUsers = s.$use(cacheQuery({ maxAge: 60 })).$resolve(({ ctx }) => ctx.d
 
 Without a `cache` mount, `cacheQuery()` falls back to in-memory (default).
 
+## Analytics integration
+
+When you configure a `data` mount, [analytics](/docs/analytics) automatically persists request and error entries to it. Data survives restarts and is pruned by `retentionDays`:
+
+```ts twoslash
+// @noErrors
+import fsDriver from 'unstorage/drivers/fs'
+
+const s = silgi({
+  context: () => ({}),
+  storage: {
+    data: fsDriver({ base: '.data' }),
+  },
+})
+
+s.serve(appRouter, {
+  analytics: { retentionDays: 90 },
+})
+```
+
+Without a `data` mount, analytics falls back to in-memory (default).
+
 ## Available drivers
 
 All [unstorage drivers](https://unstorage.unjs.io/drivers) work. Import from `unstorage/drivers/*`:

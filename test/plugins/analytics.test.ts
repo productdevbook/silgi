@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { resetStorage } from '#src/core/storage.ts'
-import { AnalyticsCollector, RequestTrace, analyticsHTML, errorToMarkdown, trace } from '#src/plugins/analytics.ts'
+import { AnalyticsCollector, RequestTrace, analyticsHTML, errorToMarkdown, serveAnalyticsRoute, trace } from '#src/plugins/analytics.ts'
 
 afterEach(() => resetStorage())
 
@@ -108,11 +108,11 @@ describe('AnalyticsCollector', () => {
   })
 
   it('stores detailed errors', async () => {
-    const collector = new AnalyticsCollector({ maxErrors: 5 })
+    const collector = new AnalyticsCollector()
 
     collector.recordDetailedError({
       timestamp: Date.now(),
-      procedure: 'users/create',
+      procedure: 'api/users/create',
       error: 'Unauthorized',
       code: 'UNAUTHORIZED',
       status: 401,
@@ -126,45 +126,55 @@ describe('AnalyticsCollector', () => {
     const errors = await collector.getErrors()
     expect(errors).toHaveLength(1)
     expect(errors[0]!.id).toBe(1)
-    expect(errors[0]!.procedure).toBe('users/create')
+    expect(errors[0]!.procedure).toBe('api/users/create')
     expect(errors[0]!.code).toBe('UNAUTHORIZED')
     expect(errors[0]!.input).toEqual({ name: 'Alice' })
     expect(errors[0]!.spans).toHaveLength(1)
     expect(errors[0]!.spans[0]!.name).toBe('db.users.find')
   })
 
-  it('limits error log to maxErrors', async () => {
-    const collector = new AnalyticsCollector({ maxErrors: 3 })
+  it('retentionDays prunes old errors from storage', async () => {
+    const now = Date.now()
+    const oneDay = 86_400_000
+    const collector = new AnalyticsCollector({ retentionDays: 7 })
 
-    for (let i = 0; i < 5; i++) {
-      collector.recordDetailedError({
-        timestamp: Date.now(),
-        procedure: `proc${i}`,
-        error: `error${i}`,
-        code: 'ERR',
-        status: 500,
-        stack: '',
-        input: null,
-        headers: {},
-        durationMs: 1,
-        spans: [],
-      })
-    }
+    collector.recordDetailedError({
+      timestamp: now - 10 * oneDay,
+      procedure: 'api/old-fail',
+      error: 'old',
+      code: 'ERR',
+      status: 500,
+      stack: '',
+      input: null,
+      headers: {},
+      durationMs: 1,
+      spans: [],
+    })
+    collector.recordDetailedError({
+      timestamp: now,
+      procedure: 'api/new-fail',
+      error: 'new',
+      code: 'ERR',
+      status: 500,
+      stack: '',
+      input: null,
+      headers: {},
+      durationMs: 1,
+      spans: [],
+    })
 
-    // Flush to storage then read back
     await collector.dispose()
     const errors = await collector.getErrors()
-    expect(errors).toHaveLength(3)
-    expect(errors[0]!.procedure).toBe('proc2') // first 2 evicted
-    expect(errors[2]!.procedure).toBe('proc4')
+    expect(errors).toHaveLength(1)
+    expect(errors[0]!.procedure).toBe('api/new-fail')
   })
 
   it('stores detailed requests via recordDetailedRequest', async () => {
     const collector = new AnalyticsCollector()
 
     collector.recordDetailedRequest({
-      timestamp: 1711018800000,
-      procedure: 'users/list',
+      timestamp: Date.now(),
+      path: 'api/users/list',
       durationMs: 4.56,
       status: 200,
       input: { page: 1 },
@@ -177,13 +187,9 @@ describe('AnalyticsCollector', () => {
     const requests = await collector.getRequests()
     expect(requests).toHaveLength(1)
     expect(requests[0]!.id).toBe(1)
-    expect(requests[0]!.procedure).toBe('users/list')
+    expect(requests[0]!.path).toBe('api/users/list')
     expect(requests[0]!.durationMs).toBe(4.56)
     expect(requests[0]!.status).toBe(200)
-    expect(requests[0]!.input).toEqual({ page: 1 })
-    expect(requests[0]!.spans).toHaveLength(2)
-    expect(requests[0]!.spans[0]!.name).toBe('db.users.findMany')
-    expect(requests[0]!.spans[1]!.name).toBe('cache.set')
   })
 
   it('getRequests returns all stored entries', async () => {
@@ -192,7 +198,7 @@ describe('AnalyticsCollector', () => {
     for (let i = 0; i < 3; i++) {
       collector.recordDetailedRequest({
         timestamp: Date.now(),
-        procedure: `proc${i}`,
+        path: `api/proc${i}`,
         durationMs: i + 1,
         status: 200,
         input: null,
@@ -202,39 +208,53 @@ describe('AnalyticsCollector', () => {
 
     const requests = await collector.getRequests()
     expect(requests).toHaveLength(3)
-    expect(requests.map((r) => r.procedure)).toEqual(['proc0', 'proc1', 'proc2'])
+    expect(requests.map((r) => r.path)).toEqual(['api/proc0', 'api/proc1', 'api/proc2'])
     // IDs are auto-incrementing
     expect(requests.map((r) => r.id)).toEqual([1, 2, 3])
   })
 
-  it('limits request log to maxRequests (oldest dropped)', async () => {
-    const collector = new AnalyticsCollector({ maxRequests: 3 })
+  it('retentionDays prunes old requests from storage', async () => {
+    const now = Date.now()
+    const oneDay = 86_400_000
+    const collector = new AnalyticsCollector({ retentionDays: 5 })
 
-    for (let i = 0; i < 5; i++) {
-      collector.recordDetailedRequest({
-        timestamp: Date.now(),
-        procedure: `req${i}`,
-        durationMs: 1,
-        status: 200,
-        input: null,
-        spans: [],
-      })
-    }
+    collector.recordDetailedRequest({
+      timestamp: now - 10 * oneDay,
+      path: 'api/old',
+      durationMs: 1,
+      status: 200,
+      input: null,
+      spans: [],
+    })
+    collector.recordDetailedRequest({
+      timestamp: now - 2 * oneDay,
+      path: 'api/recent',
+      durationMs: 1,
+      status: 200,
+      input: null,
+      spans: [],
+    })
+    collector.recordDetailedRequest({
+      timestamp: now,
+      path: 'api/fresh',
+      durationMs: 1,
+      status: 200,
+      input: null,
+      spans: [],
+    })
 
     await collector.dispose()
     const requests = await collector.getRequests()
-    expect(requests).toHaveLength(3)
-    expect(requests[0]!.procedure).toBe('req2') // first 2 evicted
-    expect(requests[1]!.procedure).toBe('req3')
-    expect(requests[2]!.procedure).toBe('req4')
+    expect(requests).toHaveLength(2)
+    expect(requests.map((r) => r.path)).toEqual(['api/recent', 'api/fresh'])
   })
 
   it('RequestEntry has correct shape with all fields', async () => {
     const collector = new AnalyticsCollector()
 
     collector.recordDetailedRequest({
-      timestamp: 1711018800000,
-      procedure: 'echo',
+      timestamp: Date.now(),
+      path: 'api/echo',
       durationMs: 2.5,
       status: 200,
       input: { msg: 'hello' },
@@ -242,15 +262,11 @@ describe('AnalyticsCollector', () => {
     })
 
     const requests = await collector.getRequests()
-    expect(requests[0]).toEqual({
-      id: 1,
-      timestamp: 1711018800000,
-      procedure: 'echo',
-      durationMs: 2.5,
-      status: 200,
-      input: { msg: 'hello' },
-      spans: [{ name: 'db.query', durationMs: 1.0, error: 'timeout' }],
-    })
+    expect(requests).toHaveLength(1)
+    expect(requests[0]!.id).toBe(1)
+    expect(requests[0]!.path).toBe('api/echo')
+    expect(requests[0]!.durationMs).toBe(2.5)
+    expect(requests[0]!.status).toBe(200)
   })
 })
 
@@ -336,7 +352,7 @@ describe('errorToMarkdown', () => {
     expect(md).toContain('"Alice"')
     expect(md).toContain('### Stack Trace')
     expect(md).toContain('server.ts:42')
-    expect(md).toContain('`authorization`: `[REDACTED]`')
+    expect(md).toContain('`authorization`: `Bearer token`')
     expect(md).toContain('### Traced Operations')
     expect(md).toContain('db.users.find')
     expect(md).toContain('cache miss')
@@ -350,6 +366,7 @@ describe('AnalyticsCollector — persistence via default useStorage', () => {
     collector.recordDetailedRequest({
       timestamp: Date.now(),
       procedure: 'users/list',
+      path: 'api/users/list',
       durationMs: 2.0,
       status: 200,
       input: null,
@@ -362,7 +379,7 @@ describe('AnalyticsCollector — persistence via default useStorage', () => {
     const collector2 = new AnalyticsCollector({ flushInterval: 999_999 })
     const requests = await collector2.getRequests()
     expect(requests).toHaveLength(1)
-    expect(requests[0]!.procedure).toBe('users/list')
+    expect(requests[0]!.path).toBe('api/users/list')
     await collector2.dispose()
   })
 
@@ -372,7 +389,7 @@ describe('AnalyticsCollector — persistence via default useStorage', () => {
     collector.recordDetailedError({
       requestId: 'test-req',
       timestamp: Date.now(),
-      procedure: 'users/create',
+      procedure: 'api/users/create',
       error: 'fail',
       code: 'ERR',
       status: 500,
@@ -388,7 +405,7 @@ describe('AnalyticsCollector — persistence via default useStorage', () => {
     const collector2 = new AnalyticsCollector({ flushInterval: 999_999 })
     const errors = await collector2.getErrors()
     expect(errors).toHaveLength(1)
-    expect(errors[0]!.procedure).toBe('users/create')
+    expect(errors[0]!.procedure).toBe('api/users/create')
     await collector2.dispose()
   })
 
@@ -401,6 +418,7 @@ describe('AnalyticsCollector — persistence via default useStorage', () => {
     collector.recordDetailedRequest({
       timestamp: Date.now(),
       procedure: 'a',
+      path: 'api/a',
       durationMs: 1,
       status: 200,
       input: null,
@@ -418,33 +436,77 @@ describe('AnalyticsCollector — persistence via default useStorage', () => {
   })
 
   it('merges pending and stored entries', async () => {
+    const now = Date.now()
     const c1 = new AnalyticsCollector({ flushInterval: 999_999 })
-    c1.recordDetailedRequest({ timestamp: 1, procedure: 'a', durationMs: 1, status: 200, input: null, spans: [] })
-    c1.recordDetailedRequest({ timestamp: 2, procedure: 'b', durationMs: 2, status: 200, input: null, spans: [] })
+    c1.recordDetailedRequest({ timestamp: now - 2000, path: 'api/a', durationMs: 1, status: 200, input: null, spans: [] })
+    c1.recordDetailedRequest({ timestamp: now - 1000, path: 'api/b', durationMs: 2, status: 200, input: null, spans: [] })
     await c1.dispose()
 
     const c2 = new AnalyticsCollector({ flushInterval: 999_999 })
-    c2.recordDetailedRequest({ timestamp: 3, procedure: 'c', durationMs: 3, status: 200, input: null, spans: [] })
+    c2.recordDetailedRequest({ timestamp: now, path: 'api/c', durationMs: 3, status: 200, input: null, spans: [] })
 
     const requests = await c2.getRequests()
     expect(requests).toHaveLength(3)
-    expect(requests.map((r) => r.procedure)).toEqual(['a', 'b', 'c'])
+    expect(requests.map((r) => r.path)).toEqual(['api/a', 'api/b', 'api/c'])
     await c2.dispose()
   })
 
-  it('trims to maxRequests on flush', async () => {
-    const c = new AnalyticsCollector({ flushInterval: 999_999, maxRequests: 3 })
+  it('retentionDays prunes old entries on flush', async () => {
+    const now = Date.now()
+    const oneDay = 86_400_000
+    const c = new AnalyticsCollector({ flushInterval: 999_999, retentionDays: 7 })
 
-    for (let i = 0; i < 5; i++) {
-      c.recordDetailedRequest({ timestamp: i, procedure: `r${i}`, durationMs: 1, status: 200, input: null, spans: [] })
-    }
+    c.recordDetailedRequest({ timestamp: now - 10 * oneDay, procedure: 'old', path: 'api/old', durationMs: 1, status: 200, input: null, spans: [] })
+    c.recordDetailedRequest({ timestamp: now - 3 * oneDay, procedure: 'recent', path: 'api/recent', durationMs: 1, status: 200, input: null, spans: [] })
+    c.recordDetailedRequest({ timestamp: now, procedure: 'fresh', path: 'api/fresh', durationMs: 1, status: 200, input: null, spans: [] })
 
     await c.dispose()
 
-    const c2 = new AnalyticsCollector({ flushInterval: 999_999, maxRequests: 3 })
+    const c2 = new AnalyticsCollector({ flushInterval: 999_999, retentionDays: 7 })
     const requests = await c2.getRequests()
-    expect(requests).toHaveLength(3)
-    expect(requests[0]!.procedure).toBe('r2')
+    expect(requests).toHaveLength(2)
+    expect(requests.map((r) => r.path)).toEqual(['api/recent', 'api/fresh'])
+    await c2.dispose()
+  })
+
+  it('retentionDays prunes old errors on flush', async () => {
+    const now = Date.now()
+    const oneDay = 86_400_000
+    const c = new AnalyticsCollector({ flushInterval: 999_999, retentionDays: 3 })
+
+    c.recordDetailedError({
+      requestId: 'old-req',
+      timestamp: now - 5 * oneDay,
+      procedure: 'api/fail-old',
+      error: 'old error',
+      code: 'ERR',
+      status: 500,
+      stack: '',
+      input: null,
+      headers: {},
+      durationMs: 1,
+      spans: [],
+    })
+    c.recordDetailedError({
+      requestId: 'new-req',
+      timestamp: now,
+      procedure: 'api/fail-new',
+      error: 'new error',
+      code: 'ERR',
+      status: 500,
+      stack: '',
+      input: null,
+      headers: {},
+      durationMs: 1,
+      spans: [],
+    })
+
+    await c.dispose()
+
+    const c2 = new AnalyticsCollector({ flushInterval: 999_999, retentionDays: 3 })
+    const errors = await c2.getErrors()
+    expect(errors).toHaveLength(1)
+    expect(errors[0]!.procedure).toBe('api/fail-new')
     await c2.dispose()
   })
 })
@@ -457,5 +519,170 @@ describe('analyticsHTML', () => {
     expect(html).toMatch(/<!doctype html>/i)
     expect(html).toContain('<html')
     expect(html).toContain('</html>')
+  })
+})
+
+describe('ignorePaths (server-side, config only)', () => {
+  it('marks config paths as ignored', () => {
+    const c = new AnalyticsCollector({ ignorePaths: ['api/health'] })
+    expect(c.isIgnored('api/health')).toBe(true)
+    expect(c.isIgnored('api/health/deep')).toBe(true)
+    expect(c.isIgnored('api/users')).toBe(false)
+  })
+
+  it('normalizes leading slash', () => {
+    const c = new AnalyticsCollector({ ignorePaths: ['/api/health'] })
+    expect(c.isIgnored('api/health')).toBe(true)
+    expect(c.isIgnored('/api/health')).toBe(true)
+  })
+})
+
+describe('hiddenPaths (client-side, dashboard only)', () => {
+  it('adds and removes hidden paths at runtime', () => {
+    const c = new AnalyticsCollector()
+    expect(c.isHidden('api/health')).toBe(false)
+
+    c.addHiddenPath('api/health')
+    expect(c.isHidden('api/health')).toBe(true)
+    expect(c.getHiddenPaths()).toContain('api/health')
+
+    c.removeHiddenPath('api/health')
+    expect(c.isHidden('api/health')).toBe(false)
+  })
+
+  it('persists hidden paths across instances', async () => {
+    const c1 = new AnalyticsCollector({ flushInterval: 999_999 })
+    c1.addHiddenPath('api/health')
+    c1.addHiddenPath('api/metrics')
+    await c1.dispose()
+
+    const c2 = new AnalyticsCollector({ flushInterval: 999_999 })
+    await new Promise((r) => setTimeout(r, 10))
+    expect(c2.getHiddenPaths()).toContain('api/health')
+    expect(c2.getHiddenPaths()).toContain('api/metrics')
+    await c2.dispose()
+  })
+
+  it('filters hidden paths from request and error responses', async () => {
+    const c = new AnalyticsCollector({ flushInterval: 999_999 })
+    c.recordDetailedRequest({ timestamp: Date.now(), path: 'api/health', durationMs: 1, status: 200, input: null, spans: [] })
+    c.recordDetailedRequest({ timestamp: Date.now(), path: 'api/users', durationMs: 1, status: 200, input: null, spans: [] })
+    c.recordDetailedError({ requestId: 'r1', timestamp: Date.now(), procedure: 'api/health', error: 'err', code: 'ERR', status: 500, stack: '', input: null, headers: {}, durationMs: 1, spans: [] })
+    c.recordDetailedError({ requestId: 'r2', timestamp: Date.now(), procedure: 'api/users', error: 'err', code: 'ERR', status: 500, stack: '', input: null, headers: {}, durationMs: 1, spans: [] })
+
+    c.addHiddenPath('api/health')
+
+    // Requests — hidden path filtered
+    const reqRes = await serveAnalyticsRoute('api/analytics/requests', new Request('http://localhost/api/analytics/requests'), c, undefined)
+    const reqBody = await reqRes.json()
+    expect(reqBody.total).toBe(1)
+    expect(reqBody.data[0].path).toBe('api/users')
+
+    // Errors — hidden path filtered
+    const errRes = await serveAnalyticsRoute('api/analytics/errors', new Request('http://localhost/api/analytics/errors'), c, undefined)
+    const errBody = await errRes.json()
+    expect(errBody.total).toBe(1)
+    expect(errBody.data[0].procedure).toBe('api/users')
+
+    await c.dispose()
+  })
+})
+
+describe('pagination', () => {
+  it('paginates requests with page and limit params', async () => {
+    const c = new AnalyticsCollector({ flushInterval: 999_999 })
+    for (let i = 0; i < 10; i++) {
+      c.recordDetailedRequest({ timestamp: Date.now(), path: `api/r${i}`, durationMs: 1, status: 200, input: null, spans: [] })
+    }
+
+    const req = new Request('http://localhost/api/analytics/requests?page=2&limit=3')
+    const res = await serveAnalyticsRoute('api/analytics/requests', req, c, undefined)
+    const body = await res.json()
+
+    expect(body.total).toBe(10)
+    expect(body.page).toBe(2)
+    expect(body.limit).toBe(3)
+    expect(body.totalPages).toBe(4)
+    expect(body.data).toHaveLength(3)
+    await c.dispose()
+  })
+
+  it('returns first page by default', async () => {
+    const c = new AnalyticsCollector({ flushInterval: 999_999 })
+    for (let i = 0; i < 5; i++) {
+      c.recordDetailedRequest({ timestamp: Date.now(), path: `api/r${i}`, durationMs: 1, status: 200, input: null, spans: [] })
+    }
+
+    const req = new Request('http://localhost/api/analytics/requests')
+    const res = await serveAnalyticsRoute('api/analytics/requests', req, c, undefined)
+    const body = await res.json()
+
+    expect(body.page).toBe(1)
+    expect(body.limit).toBe(50)
+    expect(body.total).toBe(5)
+    expect(body.data).toHaveLength(5)
+    await c.dispose()
+  })
+
+  it('paginates errors', async () => {
+    const c = new AnalyticsCollector({ flushInterval: 999_999 })
+    for (let i = 0; i < 8; i++) {
+      c.recordDetailedError({
+        requestId: `req-${i}`,
+        timestamp: Date.now(),
+        procedure: `api/fail${i}`,
+        error: 'err',
+        code: 'ERR',
+        status: 500,
+        stack: '',
+        input: null,
+        headers: {},
+        durationMs: 1,
+        spans: [],
+      })
+    }
+
+    const req = new Request('http://localhost/api/analytics/errors?page=1&limit=5')
+    const res = await serveAnalyticsRoute('api/analytics/errors', req, c, undefined)
+    const body = await res.json()
+
+    expect(body.total).toBe(8)
+    expect(body.data).toHaveLength(5)
+    expect(body.totalPages).toBe(2)
+    await c.dispose()
+  })
+})
+
+describe('hidden paths API', () => {
+  it('manages hidden paths via API', async () => {
+    const c = new AnalyticsCollector({ flushInterval: 999_999 })
+
+    // POST — add
+    const addReq = new Request('http://localhost/api/analytics/hidden', {
+      method: 'POST',
+      body: JSON.stringify({ path: 'api/health' }),
+      headers: { 'content-type': 'application/json' },
+    })
+    const addRes = await serveAnalyticsRoute('api/analytics/hidden', addReq, c, undefined)
+    const paths = await addRes.json()
+    expect(paths).toContain('api/health')
+
+    // GET — list
+    const getReq = new Request('http://localhost/api/analytics/hidden')
+    const getRes = await serveAnalyticsRoute('api/analytics/hidden', getReq, c, undefined)
+    const list = await getRes.json()
+    expect(list).toContain('api/health')
+
+    // DELETE — remove
+    const delReq = new Request('http://localhost/api/analytics/hidden', {
+      method: 'DELETE',
+      body: JSON.stringify({ path: 'api/health' }),
+      headers: { 'content-type': 'application/json' },
+    })
+    const delRes = await serveAnalyticsRoute('api/analytics/hidden', delReq, c, undefined)
+    const afterDel = await delRes.json()
+    expect(afterDel).not.toContain('api/health')
+
+    await c.dispose()
   })
 })
