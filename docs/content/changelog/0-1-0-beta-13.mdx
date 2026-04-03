@@ -109,14 +109,14 @@ const client = createClient<AppRouter>(link)
 
 All built-in routes now live under the `/api/` prefix to avoid collisions with application routes:
 
-| Before | After |
-| --- | --- |
-| `/analytics` | `/api/analytics` |
-| `/analytics/_api/stats` | `/api/analytics/stats` |
-| `/analytics/_api/errors` | `/api/analytics/errors` |
+| Before                     | After                     |
+| -------------------------- | ------------------------- |
+| `/analytics`               | `/api/analytics`          |
+| `/analytics/_api/stats`    | `/api/analytics/stats`    |
+| `/analytics/_api/errors`   | `/api/analytics/errors`   |
 | `/analytics/_api/requests` | `/api/analytics/requests` |
-| `/reference` | `/api/reference` |
-| `/openapi.json` | `/api/openapi.json` |
+| `/reference`               | `/api/reference`          |
+| `/openapi.json`            | `/api/openapi.json`       |
 
 The `_api` infix in analytics sub-routes was removed — it's redundant now that everything is under `/api/`.
 

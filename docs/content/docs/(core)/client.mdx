@@ -122,14 +122,14 @@ type Client = InferClient<typeof appRouter>
 
 The `createLink` function accepts these options:
 
-| Option       | Type                                   | Default     | Description                                                                        |
-| ------------ | -------------------------------------- | ----------- | ---------------------------------------------------------------------------------- |
-| `url`        | `string`                               | (required)  | Server base URL (e.g. `"http://localhost:3000"`)                                   |
-| `headers`    | `Record<string, string>` or function   | `undefined` | Static headers or a function that returns headers per request                      |
-| `retry`      | `number \| false`                      | `0`         | Number of retries on failure                                                       |
-| `retryDelay` | `number \| (ctx) => number`            | `0`         | Delay between retries in milliseconds                                              |
-| `timeout`    | `number`                               | `30000`     | Request timeout in milliseconds                                                    |
-| `protocol`   | `'json' \| 'messagepack' \| 'devalue'` | `'json'`    | Wire protocol for encoding                                                         |
+| Option       | Type                                   | Default     | Description                                                   |
+| ------------ | -------------------------------------- | ----------- | ------------------------------------------------------------- |
+| `url`        | `string`                               | (required)  | Server base URL (e.g. `"http://localhost:3000"`)              |
+| `headers`    | `Record<string, string>` or function   | `undefined` | Static headers or a function that returns headers per request |
+| `retry`      | `number \| false`                      | `0`         | Number of retries on failure                                  |
+| `retryDelay` | `number \| (ctx) => number`            | `0`         | Delay between retries in milliseconds                         |
+| `timeout`    | `number`                               | `30000`     | Request timeout in milliseconds                               |
+| `protocol`   | `'json' \| 'messagepack' \| 'devalue'` | `'json'`    | Wire protocol for encoding                                    |
 
 The client always uses POST and resolves procedure paths from the router tree structure (e.g. `client.users.list()` sends `POST /users/list`). No route metadata is needed.
 

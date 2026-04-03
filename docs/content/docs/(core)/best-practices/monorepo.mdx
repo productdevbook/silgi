@@ -29,10 +29,10 @@ Silgi works like tRPC — the client uses the router's tree structure to call pr
 
 Two packages. The server defines procedures and exports the router type. The frontend imports only the type.
 
-| Package      | Responsibility          | Dependencies          |
-| ------------ | ----------------------- | --------------------- |
-| `api-server` | Procedures and router   | `silgi`, `zod`        |
-| `frontend`   | Consumes the API        | `silgi` (client only) |
+| Package      | Responsibility        | Dependencies          |
+| ------------ | --------------------- | --------------------- |
+| `api-server` | Procedures and router | `silgi`, `zod`        |
+| `frontend`   | Consumes the API      | `silgi` (client only) |
 
 ## 1. Define the server
 
@@ -102,7 +102,8 @@ const users = await client.users.list({ limit: 10 })
 ```
 
 <Callout type='info'>
-Use `import type` for the router. This ensures the import is erased at build time — no server code is bundled into the frontend.
+  Use `import type` for the router. This ensures the import is erased at build time — no server code is bundled into the
+  frontend.
 </Callout>
 
 ## Workspace configuration

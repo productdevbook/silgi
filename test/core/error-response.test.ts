@@ -93,9 +93,7 @@ describe('HTTP error responses', () => {
   it('returns JSON 400 for input validation errors', async () => {
     const router = k.router({
       users: {
-        create: k
-          .$input(z.object({ email: z.string().email() }))
-          .$resolve(({ input }) => input),
+        create: k.$input(z.object({ email: z.string().email() })).$resolve(({ input }) => input),
       },
     })
 

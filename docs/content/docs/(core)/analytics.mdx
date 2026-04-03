@@ -306,14 +306,14 @@ s.serve(appRouter, {
 })
 ```
 
-| Option           | Type                                  | Default     | Description                                                       |
-| ---------------- | ------------------------------------- | ----------- | ----------------------------------------------------------------- |
-| `auth`           | `string \| (req: Request) => boolean` | `undefined` | Token string or custom auth function                              |
-| `bufferSize`     | `number`                              | `1024`      | Latency samples to keep per procedure (ring buffer)               |
-| `historySeconds` | `number`                              | `120`       | Time-series sparkline history in seconds                          |
-| `retentionDays`  | `number`                              | `30`        | Days to keep request and error entries in storage                 |
-| `flushInterval`  | `number`                              | `5000`      | Interval in milliseconds between storage flushes                  |
-| `ignorePaths`    | `string[]`                            | `[]`        | Path prefixes to exclude from tracking                            |
+| Option           | Type                                  | Default     | Description                                         |
+| ---------------- | ------------------------------------- | ----------- | --------------------------------------------------- |
+| `auth`           | `string \| (req: Request) => boolean` | `undefined` | Token string or custom auth function                |
+| `bufferSize`     | `number`                              | `1024`      | Latency samples to keep per procedure (ring buffer) |
+| `historySeconds` | `number`                              | `120`       | Time-series sparkline history in seconds            |
+| `retentionDays`  | `number`                              | `30`        | Days to keep request and error entries in storage   |
+| `flushInterval`  | `number`                              | `5000`      | Interval in milliseconds between storage flushes    |
+| `ignorePaths`    | `string[]`                            | `[]`        | Path prefixes to exclude from tracking              |
 
 Latency samples use fixed-size ring buffers — memory usage stays constant regardless of traffic volume. Request and error entries are retained for `retentionDays` and pruned automatically on each storage flush.
 
@@ -350,11 +350,11 @@ You can also hide paths from the dashboard without stopping server-side tracking
 
 Hidden paths are managed at runtime via the API and persisted to storage across restarts.
 
-| Method   | Endpoint                  | Body                    | Description          |
-| -------- | ------------------------- | ----------------------- | -------------------- |
-| `GET`    | `/api/analytics/hidden`   | —                       | List hidden paths    |
-| `POST`   | `/api/analytics/hidden`   | `{ "path": "api/..." }` | Hide a path          |
-| `DELETE` | `/api/analytics/hidden`   | `{ "path": "api/..." }` | Unhide a path        |
+| Method   | Endpoint                | Body                    | Description       |
+| -------- | ----------------------- | ----------------------- | ----------------- |
+| `GET`    | `/api/analytics/hidden` | —                       | List hidden paths |
+| `POST`   | `/api/analytics/hidden` | `{ "path": "api/..." }` | Hide a path       |
+| `DELETE` | `/api/analytics/hidden` | `{ "path": "api/..." }` | Unhide a path     |
 
 ```bash
 # Hide health checks from dashboard
@@ -388,10 +388,10 @@ All endpoints return JSON with `cache-control: no-cache`.
 
 The `/api/analytics/requests`, `/api/analytics/errors`, and `/api/analytics/tasks` endpoints support pagination via query parameters:
 
-| Parameter | Default | Max | Description        |
-| --------- | ------- | --- | ------------------ |
-| `page`    | `1`     | —   | Page number        |
-| `limit`   | `50`    | 200 | Items per page     |
+| Parameter | Default | Max | Description    |
+| --------- | ------- | --- | -------------- |
+| `page`    | `1`     | —   | Page number    |
+| `limit`   | `50`    | 200 | Items per page |
 
 Response shape:
 
@@ -414,12 +414,12 @@ curl 'http://localhost:3000/api/analytics/requests?page=2&limit=20'
 
 Server-generated markdown is available over HTTP, so bots, LLM tools, Slack jobs, and shell scripts can fetch the same export shown in the dashboard:
 
-| Endpoint                               | Description                        |
-| -------------------------------------- | ---------------------------------- |
-| `/api/analytics/errors/md`             | Entire error log as markdown       |
-| `/api/analytics/errors/:id/md`         | One error as markdown              |
-| `/api/analytics/requests/:id/md`       | One request as markdown            |
-| `/api/analytics/requests/:requestId/md`| One request by request ID          |
+| Endpoint                                | Description                  |
+| --------------------------------------- | ---------------------------- |
+| `/api/analytics/errors/md`              | Entire error log as markdown |
+| `/api/analytics/errors/:id/md`          | One error as markdown        |
+| `/api/analytics/requests/:id/md`        | One request as markdown      |
+| `/api/analytics/requests/:requestId/md` | One request by request ID    |
 
 These endpoints return `Content-Type: text/markdown; charset=utf-8`.
 

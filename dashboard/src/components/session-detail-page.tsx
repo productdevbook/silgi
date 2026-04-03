@@ -69,7 +69,12 @@ export function SessionDetailPage({ requests, sessionId, navigate }: SessionDeta
   const maxDuration = Math.max(...sessionRequests.map((r) => r.durationMs), 0.1)
   const exportOptions = [
     { id: `md-${sessionId}`, label: 'Markdown', text: sessionToMarkdown(sessionRequests, sessionId), hint: 'summary' },
-    { id: `json-${sessionId}`, label: 'JSON', text: sessionToRedactedJson(sessionRequests, sessionId), hint: 'redacted' },
+    {
+      id: `json-${sessionId}`,
+      label: 'JSON',
+      text: sessionToRedactedJson(sessionRequests, sessionId),
+      hint: 'redacted',
+    },
   ]
 
   const byKind = new Map<string, number>()

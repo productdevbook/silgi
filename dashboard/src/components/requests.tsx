@@ -1,9 +1,9 @@
 import { SearchField } from '@/components/dashboard-shell'
 import { SpanWaterfall } from '@/components/span-waterfall'
 import { Badge } from '@/components/ui/badge'
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { Button } from '@/components/ui/button'
 import { ChartContainer, ChartTooltip } from '@/components/ui/chart'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
 import {
   Select,
   SelectContent,
@@ -283,91 +283,91 @@ export function Requests({ requests, navigate, initialProcedure }: RequestsProps
               const durationPct = (entry.durationMs / maxDuration) * 100
               return (
                 <ContextMenu key={entry.id}>
-                <ContextMenuTrigger asChild>
-                <div
-                  className={cn(
-                    'flex cursor-pointer items-center gap-2 border-b border-dashed px-5 py-2 hover:bg-muted/20',
-                    selectedIdx === idx && 'bg-primary/5',
-                  )}
-                  onClick={() => setSelectedIdx(selectedIdx === idx ? null : idx)}
-                  onDoubleClick={() => navigate('requests', String(entry.id))}
-                >
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className='w-14 shrink-0 text-[11px] tabular-nums text-muted-foreground'>
-                        {fmtRelativeTime(entry.timestamp)}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side='right' className='text-xs'>
-                      {fmtTime(entry.timestamp)}
-                    </TooltipContent>
-                  </Tooltip>
-                  <span
-                    className={cn('size-1.5 shrink-0 rounded-full', isError ? 'bg-destructive' : 'bg-emerald-500')}
-                  />
-                  <span className='w-8 shrink-0 font-mono text-[10px] text-muted-foreground'>{entry.method}</span>
-                  <span className='min-w-0 flex-1 truncate font-mono text-[11px] font-semibold'>
-                    {entry.procedures.map((p) => p.procedure).join(', ')}
-                    {entry.isBatch && (
-                      <Badge variant='outline' className='ml-1.5 text-[9px]'>
-                        batch
-                      </Badge>
-                    )}
-                  </span>
-                  <Badge variant={isError ? 'destructive' : 'secondary'} className='w-12 justify-center text-[9px]'>
-                    {entry.status}
-                  </Badge>
-                  <div className='hidden w-28 lg:block'>
-                    <div className='h-1.5 w-full rounded-full bg-muted'>
-                      <div
-                        className={cn('h-full rounded-full', isError ? 'bg-destructive/50' : 'bg-primary/40')}
-                        style={{ width: `${Math.max(durationPct, 2)}%` }}
+                  <ContextMenuTrigger asChild>
+                    <div
+                      className={cn(
+                        'flex cursor-pointer items-center gap-2 border-b border-dashed px-5 py-2 hover:bg-muted/20',
+                        selectedIdx === idx && 'bg-primary/5',
+                      )}
+                      onClick={() => setSelectedIdx(selectedIdx === idx ? null : idx)}
+                      onDoubleClick={() => navigate('requests', String(entry.id))}
+                    >
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className='w-14 shrink-0 text-[11px] tabular-nums text-muted-foreground'>
+                            {fmtRelativeTime(entry.timestamp)}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side='right' className='text-xs'>
+                          {fmtTime(entry.timestamp)}
+                        </TooltipContent>
+                      </Tooltip>
+                      <span
+                        className={cn('size-1.5 shrink-0 rounded-full', isError ? 'bg-destructive' : 'bg-emerald-500')}
                       />
+                      <span className='w-8 shrink-0 font-mono text-[10px] text-muted-foreground'>{entry.method}</span>
+                      <span className='min-w-0 flex-1 truncate font-mono text-[11px] font-semibold'>
+                        {entry.procedures.map((p) => p.procedure).join(', ')}
+                        {entry.isBatch && (
+                          <Badge variant='outline' className='ml-1.5 text-[9px]'>
+                            batch
+                          </Badge>
+                        )}
+                      </span>
+                      <Badge variant={isError ? 'destructive' : 'secondary'} className='w-12 justify-center text-[9px]'>
+                        {entry.status}
+                      </Badge>
+                      <div className='hidden w-28 lg:block'>
+                        <div className='h-1.5 w-full rounded-full bg-muted'>
+                          <div
+                            className={cn('h-full rounded-full', isError ? 'bg-destructive/50' : 'bg-primary/40')}
+                            style={{ width: `${Math.max(durationPct, 2)}%` }}
+                          />
+                        </div>
+                      </div>
+                      <span className='w-14 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground'>
+                        {fmtMs(entry.durationMs)}
+                      </span>
+                      <span className='w-8 shrink-0 text-right font-mono text-[9px] text-muted-foreground/50'>
+                        {spanCount || ''}
+                      </span>
+                      <Badge
+                        variant='outline'
+                        className='w-16 cursor-pointer justify-center font-mono text-[9px] hover:bg-muted'
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigate('sessions', entry.sessionId)
+                        }}
+                      >
+                        {entry.sessionId?.slice(0, 8) ?? '-'}
+                      </Badge>
                     </div>
-                  </div>
-                  <span className='w-14 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground'>
-                    {fmtMs(entry.durationMs)}
-                  </span>
-                  <span className='w-8 shrink-0 text-right font-mono text-[9px] text-muted-foreground/50'>
-                    {spanCount || ''}
-                  </span>
-                  <Badge
-                    variant='outline'
-                    className='w-16 cursor-pointer justify-center font-mono text-[9px] hover:bg-muted'
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      navigate('sessions', entry.sessionId)
-                    }}
-                  >
-                    {entry.sessionId?.slice(0, 8) ?? '-'}
-                  </Badge>
-                </div>
-                </ContextMenuTrigger>
-                <ContextMenuContent>
-                  <ContextMenuItem onClick={() => navigate('requests', String(entry.id))}>
-                    View details
-                  </ContextMenuItem>
-                  <ContextMenuItem onClick={() => navigate('sessions', entry.sessionId)}>
-                    View session
-                  </ContextMenuItem>
-                  <ContextMenuItem
-                    onClick={() => {
-                      fetch('/api/analytics/hidden', {
-                        method: 'POST',
-                        headers: { 'content-type': 'application/json' },
-                        body: JSON.stringify({ path: entry.path }),
-                      })
-                    }}
-                    className='text-destructive'
-                  >
-                    Hide path
-                  </ContextMenuItem>
-                  {entry.traceId && (
-                    <ContextMenuItem onClick={() => navigate('requests', `trace:${entry.traceId}`)}>
-                      View trace
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    <ContextMenuItem onClick={() => navigate('requests', String(entry.id))}>
+                      View details
                     </ContextMenuItem>
-                  )}
-                </ContextMenuContent>
+                    <ContextMenuItem onClick={() => navigate('sessions', entry.sessionId)}>
+                      View session
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      onClick={() => {
+                        fetch('/api/analytics/hidden', {
+                          method: 'POST',
+                          headers: { 'content-type': 'application/json' },
+                          body: JSON.stringify({ path: entry.path }),
+                        })
+                      }}
+                      className='text-destructive'
+                    >
+                      Hide path
+                    </ContextMenuItem>
+                    {entry.traceId && (
+                      <ContextMenuItem onClick={() => navigate('requests', `trace:${entry.traceId}`)}>
+                        View trace
+                      </ContextMenuItem>
+                    )}
+                  </ContextMenuContent>
                 </ContextMenu>
               )
             })}
@@ -467,11 +467,11 @@ function RequestDetailPanel({
           <PanelKV label='time' value={fmtTime(req.timestamp)} />
           <PanelKV label='ip' value={req.ip || '-'} />
         </PanelSection>
-      <div className='px-4 py-3'>
-        <Button variant='outline' size='xs' className='w-full' onClick={() => navigate('requests', String(req.id))}>
-          Open full detail
-        </Button>
-      </div>
+        <div className='px-4 py-3'>
+          <Button variant='outline' size='xs' className='w-full' onClick={() => navigate('requests', String(req.id))}>
+            Open full detail
+          </Button>
+        </div>
       </div>
     </>
   )

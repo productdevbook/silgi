@@ -1,8 +1,8 @@
 import { SearchField } from '@/components/dashboard-shell'
 import { SpanWaterfall } from '@/components/span-waterfall'
 import { Badge } from '@/components/ui/badge'
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { Button } from '@/components/ui/button'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu'
 import {
   Select,
   SelectContent,
@@ -229,65 +229,63 @@ export function Errors({ errors, navigate, initialProcedure }: ErrorsProps) {
           <div className={cn('flex-1 overflow-y-auto', selectedErr && 'hidden xl:block')}>
             {filtered.map((entry, idx) => (
               <ContextMenu key={entry.id}>
-              <ContextMenuTrigger asChild>
-              <div
-                className={cn(
-                  'flex cursor-pointer items-start gap-3 border-b border-dashed px-5 py-2.5 hover:bg-muted/20',
-                  selectedIdx === idx && 'bg-destructive/5',
-                )}
-                onClick={() => setSelectedIdx(selectedIdx === idx ? null : idx)}
-                onDoubleClick={() => navigate('errors', String(entry.id))}
-              >
-                {/* Left: status indicator */}
-                <span className='mt-1 size-1.5 shrink-0 rounded-full bg-destructive' />
+                <ContextMenuTrigger asChild>
+                  <div
+                    className={cn(
+                      'flex cursor-pointer items-start gap-3 border-b border-dashed px-5 py-2.5 hover:bg-muted/20',
+                      selectedIdx === idx && 'bg-destructive/5',
+                    )}
+                    onClick={() => setSelectedIdx(selectedIdx === idx ? null : idx)}
+                    onDoubleClick={() => navigate('errors', String(entry.id))}
+                  >
+                    {/* Left: status indicator */}
+                    <span className='mt-1 size-1.5 shrink-0 rounded-full bg-destructive' />
 
-                {/* Center: main content */}
-                <div className='min-w-0 flex-1'>
-                  <div className='flex items-center gap-2'>
-                    <span className='truncate font-mono text-[11px] font-semibold'>{entry.procedure}</span>
-                    <Badge variant='destructive' className='text-[9px]'>
-                      {entry.code}
-                    </Badge>
-                    <span className='text-[10px] tabular-nums text-muted-foreground'>{entry.status}</span>
-                  </div>
-                  <p className='mt-0.5 truncate text-[11px] text-muted-foreground'>{entry.error}</p>
-                </div>
+                    {/* Center: main content */}
+                    <div className='min-w-0 flex-1'>
+                      <div className='flex items-center gap-2'>
+                        <span className='truncate font-mono text-[11px] font-semibold'>{entry.procedure}</span>
+                        <Badge variant='destructive' className='text-[9px]'>
+                          {entry.code}
+                        </Badge>
+                        <span className='text-[10px] tabular-nums text-muted-foreground'>{entry.status}</span>
+                      </div>
+                      <p className='mt-0.5 truncate text-[11px] text-muted-foreground'>{entry.error}</p>
+                    </div>
 
-                {/* Right: time + duration */}
-                <div className='shrink-0 text-right'>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className='text-[11px] tabular-nums text-muted-foreground'>
-                        {fmtRelativeTime(entry.timestamp)}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side='left' className='text-xs'>
-                      {fmtTime(entry.timestamp)}
-                    </TooltipContent>
-                  </Tooltip>
-                  <div className='font-mono text-[10px] tabular-nums text-muted-foreground/60'>
-                    {fmtMs(entry.durationMs)}
+                    {/* Right: time + duration */}
+                    <div className='shrink-0 text-right'>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className='text-[11px] tabular-nums text-muted-foreground'>
+                            {fmtRelativeTime(entry.timestamp)}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side='left' className='text-xs'>
+                          {fmtTime(entry.timestamp)}
+                        </TooltipContent>
+                      </Tooltip>
+                      <div className='font-mono text-[10px] tabular-nums text-muted-foreground/60'>
+                        {fmtMs(entry.durationMs)}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-              </ContextMenuTrigger>
-              <ContextMenuContent>
-                <ContextMenuItem onClick={() => navigate('errors', String(entry.id))}>
-                  View details
-                </ContextMenuItem>
-                <ContextMenuItem
-                  onClick={() => {
-                    fetch('/api/analytics/hidden', {
-                      method: 'POST',
-                      headers: { 'content-type': 'application/json' },
-                      body: JSON.stringify({ path: entry.procedure }),
-                    })
-                  }}
-                  className='text-destructive'
-                >
-                  Hide path
-                </ContextMenuItem>
-              </ContextMenuContent>
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  <ContextMenuItem onClick={() => navigate('errors', String(entry.id))}>View details</ContextMenuItem>
+                  <ContextMenuItem
+                    onClick={() => {
+                      fetch('/api/analytics/hidden', {
+                        method: 'POST',
+                        headers: { 'content-type': 'application/json' },
+                        body: JSON.stringify({ path: entry.procedure }),
+                      })
+                    }}
+                    className='text-destructive'
+                  >
+                    Hide path
+                  </ContextMenuItem>
+                </ContextMenuContent>
               </ContextMenu>
             ))}
           </div>

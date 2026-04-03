@@ -60,7 +60,11 @@ export default function App() {
                 data-icon='inline-start'
                 className={cn(
                   'size-1.5 rounded-full',
-                  analytics.connected ? 'bg-emerald-500 animate-pulse' : analytics.autoRefresh ? 'bg-amber-500' : 'bg-muted-foreground/40',
+                  analytics.connected
+                    ? 'bg-emerald-500 animate-pulse'
+                    : analytics.autoRefresh
+                      ? 'bg-amber-500'
+                      : 'bg-muted-foreground/40',
                 )}
               />
               {analytics.connected ? 'Live' : analytics.autoRefresh ? 'Connecting...' : 'Paused'}
@@ -81,11 +85,14 @@ export default function App() {
               {analytics.error}
             </div>
           )}
-          {analytics.isLoading && !analytics.data && analytics.requests.length === 0 && analytics.errors.length === 0 && (
-            <div className='flex min-h-40 items-center justify-center text-sm text-muted-foreground'>
-              Analytics yukleniyor...
-            </div>
-          )}
+          {analytics.isLoading &&
+            !analytics.data &&
+            analytics.requests.length === 0 &&
+            analytics.errors.length === 0 && (
+              <div className='flex min-h-40 items-center justify-center text-sm text-muted-foreground'>
+                Analytics yukleniyor...
+              </div>
+            )}
           {route.page === 'overview' && <Overview data={analytics.data} navigate={navigate} />}
           {route.page === 'errors' && !route.id && (
             <Errors errors={analytics.errors} navigate={navigate} initialProcedure={route.params.procedure} />

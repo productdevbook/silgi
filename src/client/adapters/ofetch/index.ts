@@ -86,7 +86,7 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
 
   return {
     async call(path, input, callOptions) {
-      const url = `${baseUrl}/${ path.map(encodeURIComponent).join('/')}`
+      const url = `${baseUrl}/${path.map(encodeURIComponent).join('/')}`
 
       // Resolve headers
       const headers: Record<string, string> = {

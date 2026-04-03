@@ -45,16 +45,16 @@ const getUser = s
   .$resolve(...)
 ```
 
-| Option               | Type       | Default                 | Description                                                |
-| -------------------- | ---------- | ----------------------- | ---------------------------------------------------------- |
-| `summary`            | `string`   | —                       | Short summary shown in API docs                            |
-| `description`        | `string`   | —                       | Detailed description (supports markdown)                   |
-| `tags`               | `string[]` | auto from router        | Tags for grouping operations                               |
-| `operationId`        | `string`   | auto from router        | Custom operation ID for SDK generation                     |
-| `deprecated`         | `boolean`  | —                       | Mark as deprecated                                         |
-| `successStatus`      | `number`   | `200`                   | HTTP status code for success response                      |
-| `successDescription` | `string`   | `'Successful response'` | Description for success response                           |
-| `method`             | `string`   | `'POST'`                | HTTP method — used for special cases like auth passthrough  |
+| Option               | Type       | Default                 | Description                                                    |
+| -------------------- | ---------- | ----------------------- | -------------------------------------------------------------- |
+| `summary`            | `string`   | —                       | Short summary shown in API docs                                |
+| `description`        | `string`   | —                       | Detailed description (supports markdown)                       |
+| `tags`               | `string[]` | auto from router        | Tags for grouping operations                                   |
+| `operationId`        | `string`   | auto from router        | Custom operation ID for SDK generation                         |
+| `deprecated`         | `boolean`  | —                       | Mark as deprecated                                             |
+| `successStatus`      | `number`   | `200`                   | HTTP status code for success response                          |
+| `successDescription` | `string`   | `'Successful response'` | Description for success response                               |
+| `method`             | `string`   | `'POST'`                | HTTP method — used for special cases like auth passthrough     |
 | `path`               | `string`   | auto from router        | Custom URL path — used for special cases like auth passthrough |
 
 <Callout type='info'>
@@ -69,12 +69,12 @@ OpenAPI paths are generated automatically from the router tree structure. Each p
 // @noErrors
 const appRouter = s.router({
   users: {
-    list: listUsers,     // → POST /users/list
-    create: createUser,  // → POST /users/create
-    get: getUser,        // → POST /users/get
+    list: listUsers, // → POST /users/list
+    create: createUser, // → POST /users/create
+    get: getUser, // → POST /users/get
   },
   orders: {
-    list: listOrders,    // → POST /orders/list
+    list: listOrders, // → POST /orders/list
   },
 })
 ```
