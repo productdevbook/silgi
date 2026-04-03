@@ -10,6 +10,7 @@
  * via withEventMeta() using a WeakMap side-channel.
  */
 
+import { SilgiError } from './error.ts'
 import { AsyncIteratorClass } from './iterator.ts'
 
 // === Event Metadata ===
@@ -226,9 +227,9 @@ export function iteratorToEventStream(
 
         // Send error event — sanitize message to prevent leaking internal details
         let errorData: string
-        if (error instanceof Error && 'code' in error && typeof (error as any).defined === 'boolean') {
+        if (error instanceof SilgiError && error.defined) {
           // SilgiError with defined=true — safe to expose
-          errorData = JSON.stringify({ message: error.message, code: (error as any).code })
+          errorData = JSON.stringify({ message: error.message, code: error.code })
         } else {
           // Internal error — generic message only
           errorData = JSON.stringify({ message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' })

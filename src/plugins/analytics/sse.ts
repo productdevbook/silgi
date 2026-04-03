@@ -2,9 +2,9 @@
  * Analytics SSE — real-time event streaming for the analytics dashboard.
  */
 
-import { encodeEventMessage } from '../core/sse.ts'
+import { encodeEventMessage } from '../../core/sse.ts'
 
-import type { ErrorEntry, RequestEntry, TaskExecution } from './analytics.ts'
+import type { ErrorEntry, RequestEntry, TaskExecution } from './types.ts'
 
 // ── Event Types ──
 

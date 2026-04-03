@@ -23,7 +23,7 @@
  */
 
 import { compileRouter } from '../compile.ts'
-import { buildContext, serializeError, parseQueryData } from '../core/dispatch.ts'
+import { buildContext, isMethodAllowed, serializeError, parseQueryData } from '../core/dispatch.ts'
 
 import type { RouterDef } from '../types.ts'
 
@@ -55,6 +55,19 @@ export function createHandler<TCtx extends Record<string, unknown>>(
       return
     }
     const route = match.data
+
+    // HTTP method enforcement
+    if (!isMethodAllowed(req.method, route.method)) {
+      res
+        .status(405)
+        .set?.('allow', route.method)
+        .json({
+          code: 'METHOD_NOT_ALLOWED',
+          status: 405,
+          message: `Method ${req.method} not allowed`,
+        })
+      return
+    }
 
     try {
       const baseCtx = options.context ? await options.context(req) : undefined

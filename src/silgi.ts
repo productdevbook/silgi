@@ -300,9 +300,7 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
     subscription: ((...args: unknown[]) => createProcedure('subscription', ...args)) as SubscriptionFactory<TBaseCtx>,
 
     $task: ((config: any) => {
-      return createTaskFromProcedure(config, config.resolve, null, null, () =>
-        contextFactory(new Request('http://localhost')),
-      )
+      return createTaskFromProcedure(config, config.resolve, null, null, ctxFactory)
     }) as any,
 
     router: (def) => {

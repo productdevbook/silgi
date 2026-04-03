@@ -15,7 +15,7 @@
  */
 
 import { compileRouter } from '../compile.ts'
-import { buildContext, isMethodAllowed, serializeError } from '../core/dispatch.ts'
+import { buildContext, isMethodAllowed, parseQueryData, serializeError } from '../core/dispatch.ts'
 import { iteratorToEventStream } from '../core/sse.ts'
 
 import type { RouterDef } from '../types.ts'
@@ -71,16 +71,7 @@ export function createHandler<TCtx extends Record<string, unknown>>(
         if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
           input = req.body
         } else if (req.query?.data) {
-          if (typeof req.query.data === 'string') {
-            try {
-              input = JSON.parse(req.query.data)
-            } catch {
-              res.status(400).json({ code: 'BAD_REQUEST', status: 400, message: 'Invalid JSON in data parameter' })
-              return
-            }
-          } else {
-            input = req.query.data
-          }
+          input = typeof req.query.data === 'string' ? parseQueryData(req.query.data) : req.query.data
         }
 
         const ac = new AbortController()

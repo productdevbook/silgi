@@ -10,7 +10,6 @@
 
 import { createContext, releaseContext } from '../compile.ts'
 import { compileRouter } from '../compile.ts'
-import { analyticsTraceMap } from '../plugins/analytics.ts'
 
 import { detectResponseFormat, encodeResponse, makeErrorResponse } from './codec.ts'
 import { runWithCtx } from './context-bridge.ts'
@@ -18,6 +17,8 @@ import { applyContext } from './dispatch.ts'
 import { parseInput } from './input.ts'
 import { routerCache } from './router-utils.ts'
 import { iteratorToEventStream } from './sse.ts'
+import { analyticsTraceMap } from './trace-map.ts'
+import { parseUrlPath } from './url.ts'
 
 import type { CompiledRoute, CompiledRouterFn } from '../compile.ts'
 import type { SilgiHooks } from '../silgi.ts'
@@ -132,10 +133,9 @@ export function createFetchHandler(
 
   return async function handleRequest(request: Request): Promise<Response> {
     const url = request.url
-    const pathStart = url.indexOf('/', url.indexOf('//') + 2)
-    const qMark = url.indexOf('?', pathStart)
-    const fullPath = qMark === -1 ? url.slice(pathStart) : url.slice(pathStart, qMark)
+    const fullPath = parseUrlPath(url)
     const pathname = fullPath.length > 1 ? fullPath.slice(1) : ''
+    const qMark = url.indexOf('?', url.indexOf('/', url.indexOf('//') + 2))
 
     // Route lookup
     const match = compiledRouter!(request.method, fullPath)
@@ -172,9 +172,7 @@ export function createFetchHandler(
       // Input — parse body/query, then merge URL path params
       if (!route.passthrough) rawInput = await parseInput(request, url, qMark)
       if (match.params && Object.keys(match.params).length > 0) {
-        rawInput = rawInput != null && typeof rawInput === 'object'
-          ? { ...match.params, ...rawInput }
-          : match.params
+        rawInput = rawInput != null && typeof rawInput === 'object' ? { ...match.params, ...rawInput } : match.params
       }
 
       callHook('request', { path: pathname, input: rawInput })

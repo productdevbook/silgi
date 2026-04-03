@@ -195,7 +195,9 @@ export class AlertEngine {
           break
       }
     } catch (err) {
-      console.error(`[silgi:alert] Failed to execute ${action.type} action: ${err instanceof Error ? err.message : err}`)
+      console.error(
+        `[silgi:alert] Failed to execute ${action.type} action: ${err instanceof Error ? err.message : err}`,
+      )
     }
   }
 

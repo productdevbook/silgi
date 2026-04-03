@@ -58,10 +58,7 @@ export class CostTracker {
   #budgetRules: BudgetRule[]
   #onBudgetExceeded?: (rule: BudgetRule, current: number) => void
 
-  constructor(
-    budgetRules: BudgetRule[] = [],
-    onBudgetExceeded?: (rule: BudgetRule, current: number) => void,
-  ) {
+  constructor(budgetRules: BudgetRule[] = [], onBudgetExceeded?: (rule: BudgetRule, current: number) => void) {
     this.#budgetRules = budgetRules
     this.#onBudgetExceeded = onBudgetExceeded
   }
@@ -140,9 +137,15 @@ export class CostTracker {
 
       let cutoff: number
       switch (rule.period) {
-        case 'daily': cutoff = now - DAY_MS; break
-        case 'weekly': cutoff = now - 7 * DAY_MS; break
-        case 'monthly': cutoff = now - 30 * DAY_MS; break
+        case 'daily':
+          cutoff = now - DAY_MS
+          break
+        case 'weekly':
+          cutoff = now - 7 * DAY_MS
+          break
+        case 'monthly':
+          cutoff = now - 30 * DAY_MS
+          break
       }
 
       for (const bucket of buckets) {

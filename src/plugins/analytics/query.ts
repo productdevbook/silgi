@@ -2,7 +2,7 @@
  * Analytics Query Engine — server-side filtering, sorting, and cursor-based pagination.
  */
 
-import type { ErrorEntry, RequestEntry, TaskExecution } from './analytics.ts'
+import type { ErrorEntry, RequestEntry, TaskExecution } from './types.ts'
 
 // ── Query Types ──
 
@@ -84,10 +84,14 @@ function matchesStatus(entryStatus: number, filter: string): boolean {
     const [, op, val] = rangeMatch
     const n = Number(val)
     switch (op) {
-      case '>': return entryStatus > n
-      case '>=': return entryStatus >= n
-      case '<': return entryStatus < n
-      case '<=': return entryStatus <= n
+      case '>':
+        return entryStatus > n
+      case '>=':
+        return entryStatus >= n
+      case '<':
+        return entryStatus < n
+      case '<=':
+        return entryStatus <= n
     }
   }
 
