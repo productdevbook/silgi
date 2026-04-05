@@ -253,9 +253,7 @@
     "fix": "oxlint --fix . && oxfmt --ignore-path .oxfmtignore .",
     "test": "vitest run",
     "typecheck": "tsgo --noEmit",
-    "release:beta": "pnpm build && npm publish --tag beta --access public",
-    "release": "pnpm build && npm publish --access public",
-    "prepublishOnly": "pnpm build"
+    "release": "bumpp"
   },
   "dependencies": {
     "@standard-schema/spec": "^1.1.0",
@@ -289,6 +287,7 @@
     "@types/ws": "^8.18.1",
     "@typescript/native-preview": "7.0.0-dev.20260316.1",
     "ai": "^6.0.141",
+    "bumpp": "^11.0.1",
     "elysia": "^1.4.28",
     "express": "^5.2.1",
     "fastify": "^5.8.4",
