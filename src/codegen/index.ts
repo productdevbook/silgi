@@ -23,7 +23,8 @@ import { join, resolve, extname } from 'node:path'
 
 import type { OpenAPISpec } from './parse.ts'
 import { parseOpenAPI } from './parse.ts'
-import { type GenerateOptions, generateCode } from './generate.ts'
+import type { GenerateOptions } from './generate.ts'
+import { generateCode } from './generate.ts'
 
 // ── Public API ─────────────────────────────────────────
 
@@ -172,31 +173,4 @@ async function fileExists(path: string): Promise<boolean> {
   } catch {
     return false
   }
-}
-
-/**
- * Merge new handler stubs into an existing route file.
- * Only adds functions that don't already exist.
- */
-async function mergeRouteModule(existingPath: string, newCode: string): Promise<string> {
-  const existing = await readFile(existingPath, 'utf-8')
-
-  const existingFns = new Set<string>()
-  const fnRegex = /(?:export\s+)?(?:async\s+)?function\s+(\w+)/g
-  let match
-  while ((match = fnRegex.exec(existing)) !== null) {
-    existingFns.add(match[1]!)
-  }
-
-  const newFns: string[] = []
-  const newFnRegex = /(?:\/\*\*[^]*?\*\/\n)?(?:async\s+)?function\s+(\w+)[^]*?^\}/gm
-  while ((match = newFnRegex.exec(newCode)) !== null) {
-    if (!existingFns.has(match[1]!)) {
-      newFns.push(match[0]!)
-    }
-  }
-
-  if (newFns.length === 0) return existing
-
-  return existing.trimEnd() + '\n\n' + newFns.join('\n\n') + '\n'
 }

@@ -15,7 +15,8 @@
 import type { SchemaTarget } from './emitters.ts'
 import { getEmitter } from './emitters.ts'
 import type { ParsedOperation } from './parse.ts'
-import { type SchemaContext, createSchemaContext, emitComponentSchemas, jsonSchemaToCode } from './schema-to-code.ts'
+import type { SchemaContext } from './schema-to-code.ts'
+import { createSchemaContext, emitComponentSchemas, jsonSchemaToCode } from './schema-to-code.ts'
 
 // ── Types ──────────────────────────────────────────────
 
@@ -206,7 +207,7 @@ function generateOperationFile(
   routeParts.push(`    operationId: ${JSON.stringify(op.operationId)},`)
   if (op.successStatus !== 200) routeParts.push(`    successStatus: ${op.successStatus},`)
   if (op.security === false) routeParts.push('    security: false,')
-  else if (op.security) routeParts.push(`    security: [${op.security.map((s) => JSON.stringify(s)).join(', ')}],`)
+  else if (op.security) routeParts.push(`    security: [${op.security.map((v) => JSON.stringify(v)).join(', ')}],`)
 
   lines.push(`  .$route({`)
   lines.push(routeParts.join('\n'))
@@ -311,7 +312,7 @@ function groupOperations(
         key = op.tags[0] ?? 'default'
         break
       case 'path':
-        key = op.path.split('/').filter(Boolean)[0] ?? 'default'
+        key = op.path.split('/').find(Boolean) ?? 'default'
         break
       case 'flat':
         key = 'default'

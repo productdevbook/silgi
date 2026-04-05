@@ -201,7 +201,7 @@ export const arktypeEmitter: SchemaEmitter = {
   literal: (value) => `type(${JSON.stringify(JSON.stringify(value))})`,
   enum: (values) => {
     const members = values.map((v) => JSON.stringify(JSON.stringify(v)))
-    return `type(${members.join(' + ' + "' | ' + ")})`
+    return `type(${members.join(" + ' | ' + ")})`
   },
   array: (items) => `${items}.array()`,
   object: (entries) => {
