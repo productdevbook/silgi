@@ -66,11 +66,11 @@ export const listPets = s
 
 The generator supports all Standard Schema compatible libraries. The `schema` option controls which library's syntax is emitted:
 
-| Target | Import | Example |
-| --- | --- | --- |
-| `zod` (default) | `import { z } from 'zod'` | `z.string().email()` |
-| `valibot` | `import * as v from 'valibot'` | `v.pipe(v.string(), v.email())` |
-| `arktype` | `import { type } from 'arktype'` | `type('string.email')` |
+| Target          | Import                           | Example                         |
+| --------------- | -------------------------------- | ------------------------------- |
+| `zod` (default) | `import { z } from 'zod'`        | `z.string().email()`            |
+| `valibot`       | `import * as v from 'valibot'`   | `v.pipe(v.string(), v.email())` |
+| `arktype`       | `import { type } from 'arktype'` | `type('string.email')`          |
 
 Handler type inference also adapts: `z.infer<>`, `v.InferOutput<>`, or `typeof X.infer`.
 
@@ -91,11 +91,11 @@ The default `smart` strategy uses [oxc-parser](https://oxc.rs) to parse existing
 
 Three strategies available:
 
-| Strategy | Behavior |
-| --- | --- |
+| Strategy          | Behavior                                 |
+| ----------------- | ---------------------------------------- |
 | `smart` (default) | Preserve `$resolve`, regenerate metadata |
-| `skip` | Never touch existing route files |
-| `overwrite` | Regenerate everything |
+| `skip`            | Never touch existing route files         |
+| `overwrite`       | Regenerate everything                    |
 
 See [Code Generation docs](/docs/codegen) for the full guide.
 

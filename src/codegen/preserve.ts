@@ -71,10 +71,7 @@ export function spliceResolveBody(generatedSource: string, preservedBody: string
 function findResolveCall(node: any): any {
   if (!node) return null
   if (node.type === 'CallExpression') {
-    if (
-      node.callee?.type === 'MemberExpression' &&
-      node.callee.property?.name === '$resolve'
-    ) {
+    if (node.callee?.type === 'MemberExpression' && node.callee.property?.name === '$resolve') {
       return node
     }
     return findResolveCall(node.callee?.object)

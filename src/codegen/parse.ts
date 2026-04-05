@@ -208,9 +208,7 @@ function generateOperationId(method: string, path: string): string {
     .replace(/\{([^}]+)\}/g, '$1')
     .split('/')
     .filter(Boolean)
-  const camel = segments
-    .map((s, i) => (i === 0 ? s : s[0]!.toUpperCase() + s.slice(1)))
-    .join('')
+  const camel = segments.map((s, i) => (i === 0 ? s : s[0]!.toUpperCase() + s.slice(1))).join('')
   return method + camel[0]!.toUpperCase() + camel.slice(1)
 }
 

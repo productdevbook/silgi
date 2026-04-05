@@ -12,11 +12,12 @@
  *       getInventory.ts
  */
 
-import type { SchemaTarget } from './emitters.ts'
 import { getEmitter } from './emitters.ts'
+import { createSchemaContext, emitComponentSchemas, jsonSchemaToCode } from './schema-to-code.ts'
+
+import type { SchemaTarget } from './emitters.ts'
 import type { ParsedOperation } from './parse.ts'
 import type { SchemaContext } from './schema-to-code.ts'
-import { createSchemaContext, emitComponentSchemas, jsonSchemaToCode } from './schema-to-code.ts'
 
 // ── Types ──────────────────────────────────────────────
 
@@ -252,11 +253,7 @@ function generateRootRouter(
   opts: { header: string; instanceName: string },
 ): string {
   const s = opts.instanceName
-  const lines: string[] = [
-    opts.header,
-    "import { silgi } from 'silgi'",
-    '',
-  ]
+  const lines: string[] = [opts.header, "import { silgi } from 'silgi'", '']
 
   // Import each operation
   for (const [groupName, ops] of groups) {

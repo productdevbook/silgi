@@ -1,6 +1,7 @@
-import { generate } from '../../src/codegen/index.ts'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+
+import { generate } from '../../src/codegen/index.ts'
 
 const petstoreSpec = {
   openapi: '3.1.0',
@@ -18,7 +19,12 @@ const petstoreSpec = {
         parameters: [
           { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 100 } },
           { name: 'cursor', in: 'query', required: false, schema: { type: 'string' } },
-          { name: 'status', in: 'query', required: false, schema: { type: 'string', enum: ['available', 'pending', 'sold'] } },
+          {
+            name: 'status',
+            in: 'query',
+            required: false,
+            schema: { type: 'string', enum: ['available', 'pending', 'sold'] },
+          },
         ],
         responses: {
           '200': {

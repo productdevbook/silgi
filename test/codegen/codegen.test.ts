@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { createSchemaContext, generate, jsonSchemaToCode, parseOpenAPI } from '#src/codegen/index.ts'
+
 import type { OpenAPISpec } from '#src/codegen/parse.ts'
 import type { SchemaContext } from '#src/codegen/schema-to-code.ts'
 
@@ -257,10 +258,7 @@ describe('jsonSchemaToCode (zod)', () => {
   })
 
   it('converts record (additionalProperties)', () => {
-    const result = jsonSchemaToCode(
-      { type: 'object', additionalProperties: { type: 'integer' } },
-      ctx(),
-    )
+    const result = jsonSchemaToCode({ type: 'object', additionalProperties: { type: 'integer' } }, ctx())
     expect(result).toBe('z.record(z.string(), z.int())')
   })
 
@@ -275,10 +273,7 @@ describe('jsonSchemaToCode (zod)', () => {
   })
 
   it('converts oneOf as union', () => {
-    const result = jsonSchemaToCode(
-      { oneOf: [{ type: 'string' }, { type: 'integer' }] },
-      ctx(),
-    )
+    const result = jsonSchemaToCode({ oneOf: [{ type: 'string' }, { type: 'integer' }] }, ctx())
     expect(result).toBe('z.union([z.string(), z.int()])')
   })
 
@@ -371,10 +366,7 @@ describe('jsonSchemaToCode (valibot)', () => {
   })
 
   it('converts union', () => {
-    const result = jsonSchemaToCode(
-      { oneOf: [{ type: 'string' }, { type: 'integer' }] },
-      ctx(),
-    )
+    const result = jsonSchemaToCode({ oneOf: [{ type: 'string' }, { type: 'integer' }] }, ctx())
     expect(result).toBe('v.union([v.string(), v.pipe(v.number(), v.integer())])')
   })
 
@@ -392,10 +384,7 @@ describe('jsonSchemaToCode (valibot)', () => {
   })
 
   it('converts record', () => {
-    const result = jsonSchemaToCode(
-      { type: 'object', additionalProperties: { type: 'integer' } },
-      ctx(),
-    )
+    const result = jsonSchemaToCode({ type: 'object', additionalProperties: { type: 'integer' } }, ctx())
     expect(result).toBe('v.record(v.string(), v.pipe(v.number(), v.integer()))')
   })
 
@@ -462,10 +451,7 @@ describe('jsonSchemaToCode (arktype)', () => {
   })
 
   it('converts union with .or()', () => {
-    const result = jsonSchemaToCode(
-      { oneOf: [{ type: 'string' }, { type: 'integer' }] },
-      ctx(),
-    )
+    const result = jsonSchemaToCode({ oneOf: [{ type: 'string' }, { type: 'integer' }] }, ctx())
     expect(result).toContain('.or(')
   })
 })
@@ -580,7 +566,7 @@ describe('generate', () => {
     const result = generate(petstoreSpec)
     expect(result.schemas).toContain('PetSchema')
     expect(result.schemas).toContain('z.object({')
-    expect(result.schemas).toContain("status: z.enum([\"available\", \"pending\", \"sold\"])")
+    expect(result.schemas).toContain('status: z.enum(["available", "pending", "sold"])')
   })
 
   it('generates success status for non-200', () => {

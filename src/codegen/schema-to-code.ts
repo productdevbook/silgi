@@ -5,8 +5,9 @@
  * Supports Zod, Valibot, and ArkType via the emitter pattern.
  */
 
-import type { SchemaEmitter, SchemaTarget } from './emitters.ts'
 import { getEmitter } from './emitters.ts'
+
+import type { SchemaEmitter, SchemaTarget } from './emitters.ts'
 
 interface JsonSchema {
   type?: string | string[]
@@ -54,10 +55,7 @@ export interface SchemaContext {
   emitter: SchemaEmitter
 }
 
-export function createSchemaContext(
-  target: SchemaTarget,
-  components: Record<string, JsonSchema> = {},
-): SchemaContext {
+export function createSchemaContext(target: SchemaTarget, components: Record<string, JsonSchema> = {}): SchemaContext {
   return {
     refs: new Set(),
     components,
@@ -202,9 +200,7 @@ function buildObject(schema: JsonSchema, ctx: SchemaContext): string {
 
   if (!schema.properties && schema.additionalProperties) {
     const valueSchema =
-      typeof schema.additionalProperties === 'object'
-        ? jsonSchemaToCode(schema.additionalProperties, ctx)
-        : e.unknown()
+      typeof schema.additionalProperties === 'object' ? jsonSchemaToCode(schema.additionalProperties, ctx) : e.unknown()
     return e.record(e.string(), valueSchema)
   }
 

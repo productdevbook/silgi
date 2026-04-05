@@ -1,9 +1,11 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises'
-import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 
 import { generateFromSpec } from '#src/codegen/index.ts'
+
 import type { OpenAPISpec } from '#src/codegen/parse.ts'
 
 // ── Spec v1: initial API ───────────────────────────────
@@ -17,9 +19,7 @@ const specV1: OpenAPISpec = {
         operationId: 'listUsers',
         summary: 'List users',
         tags: ['users'],
-        parameters: [
-          { name: 'limit', in: 'query', schema: { type: 'integer' } },
-        ],
+        parameters: [{ name: 'limit', in: 'query', schema: { type: 'integer' } }],
         responses: {
           '200': {
             description: 'User list',
@@ -130,9 +130,7 @@ const specV2: OpenAPISpec = {
         operationId: 'getUser',
         summary: 'Get user by ID',
         tags: ['users'],
-        parameters: [
-          { name: 'userId', in: 'path', required: true, schema: { type: 'integer' } },
-        ],
+        parameters: [{ name: 'userId', in: 'path', required: true, schema: { type: 'integer' } }],
         responses: {
           '200': {
             description: 'A user',

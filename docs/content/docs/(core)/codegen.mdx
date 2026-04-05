@@ -30,6 +30,7 @@ Run it:
 ```bash
 npx tsx generate.ts
 ```
+
 </Step>
 <Step>
 ### Implement your resolvers
@@ -53,6 +54,7 @@ export const listUsers = s
     })
   })
 ```
+
 </Step>
 <Step>
 ### Use the router
@@ -67,34 +69,35 @@ const s = silgi({
 
 s.serve(router, { port: 3000, scalar: true })
 ```
+
 </Step>
 </Steps>
 
 ## Output structure
 
 <Files>
-  <Folder name="src/api" defaultOpen>
-    <File name="schemas.gen.ts" />
-    <File name="router.gen.ts" />
-    <Folder name="routes" defaultOpen>
-      <Folder name="users" defaultOpen>
-        <File name="listUsers.ts" />
-        <File name="createUser.ts" />
-        <File name="getUser.ts" />
+  <Folder name='src/api' defaultOpen>
+    <File name='schemas.gen.ts' />
+    <File name='router.gen.ts' />
+    <Folder name='routes' defaultOpen>
+      <Folder name='users' defaultOpen>
+        <File name='listUsers.ts' />
+        <File name='createUser.ts' />
+        <File name='getUser.ts' />
       </Folder>
-      <Folder name="store" defaultOpen>
-        <File name="getInventory.ts" />
-        <File name="placeOrder.ts" />
+      <Folder name='store' defaultOpen>
+        <File name='getInventory.ts' />
+        <File name='placeOrder.ts' />
       </Folder>
     </Folder>
   </Folder>
 </Files>
 
-| File | Regenerated? | Description |
-| --- | --- | --- |
-| `schemas.gen.ts` | Always | Component + operation schemas (Zod/Valibot/ArkType) |
-| `router.gen.ts` | Always | Root router — imports and combines all operations |
-| `routes/<group>/<op>.ts` | Smart | One file per operation with inline `$resolve` |
+| File                     | Regenerated? | Description                                         |
+| ------------------------ | ------------ | --------------------------------------------------- |
+| `schemas.gen.ts`         | Always       | Component + operation schemas (Zod/Valibot/ArkType) |
+| `router.gen.ts`          | Always       | Root router — imports and combines all operations   |
+| `routes/<group>/<op>.ts` | Smart        | One file per operation with inline `$resolve`       |
 
 ## Schema targets
 
@@ -119,6 +122,7 @@ export const UserSchema = z.object({
   email: z.string().email().optional(),
 })
 ```
+
 </Tab>
 <Tab value='Valibot'>
 ```ts
@@ -138,6 +142,7 @@ export const UserSchema = v.object({
   email: v.optional(v.pipe(v.string(), v.email())),
 })
 ```
+
 </Tab>
 <Tab value='ArkType'>
 ```ts
@@ -152,11 +157,12 @@ await generateFromSpec({
 import { type } from 'arktype'
 
 export const UserSchema = type({
-  ["id"]: type('string.uuid'),
-  ["name"]: type('string').atLeast(1).atMost(100),
-  ["email?"]: type('string.email'),
+  ['id']: type('string.uuid'),
+  ['name']: type('string').atLeast(1).atMost(100),
+  ['email?']: type('string.email'),
 })
 ```
+
 </Tab>
 </Tabs>
 
@@ -176,17 +182,18 @@ The default `smart` strategy uses [oxc-parser](https://oxc.rs) to parse existing
    ✅ New operations              (generated as stubs)
 ```
 
-<Callout type="info">
-  If a `$resolve` body still contains `Not implemented`, it's treated as a stub and overwritten with a fresh stub. Only real implementations are preserved.
+<Callout type='info'>
+  If a `$resolve` body still contains `Not implemented`, it's treated as a stub and overwritten with a fresh stub. Only
+  real implementations are preserved.
 </Callout>
 
 ### Route strategies
 
-| Strategy | Behavior |
-| --- | --- |
-| `smart` (default) | Preserve `$resolve` body, regenerate metadata |
-| `skip` | Never touch existing route files |
-| `overwrite` | Regenerate everything, discard implementations |
+| Strategy          | Behavior                                       |
+| ----------------- | ---------------------------------------------- |
+| `smart` (default) | Preserve `$resolve` body, regenerate metadata  |
+| `skip`            | Never touch existing route files               |
+| `overwrite`       | Regenerate everything, discard implementations |
 
 ```ts
 await generateFromSpec({
@@ -201,32 +208,32 @@ await generateFromSpec({
 ```ts
 await generateFromSpec({
   // Required
-  spec: './openapi.json',        // path or parsed object
+  spec: './openapi.json', // path or parsed object
 
   // Output
-  outDir: './src/api',           // default: './generated'
-  schema: 'zod',                 // 'zod' | 'valibot' | 'arktype'
+  outDir: './src/api', // default: './generated'
+  schema: 'zod', // 'zod' | 'valibot' | 'arktype'
 
   // Grouping
-  groupBy: 'tag',                // 'tag' | 'path' | 'flat'
+  groupBy: 'tag', // 'tag' | 'path' | 'flat'
 
   // Regeneration
-  routeStrategy: 'smart',       // 'smart' | 'skip' | 'overwrite'
+  routeStrategy: 'smart', // 'smart' | 'skip' | 'overwrite'
 
   // Customization
-  instanceName: 's',             // Silgi instance variable name
-  header: '// Auto-generated',   // Comment at top of each file
+  instanceName: 's', // Silgi instance variable name
+  header: '// Auto-generated', // Comment at top of each file
 })
 ```
 
-| Option | Default | Description |
-| --- | --- | --- |
-| `spec` | — | Path to OpenAPI JSON/YAML file, or a parsed spec object |
-| `outDir` | `./generated` | Output directory |
-| `schema` | `zod` | Target validation library |
-| `groupBy` | `tag` | How to organize route folders: by OpenAPI tag, first URL segment, or flat |
-| `routeStrategy` | `smart` | How to handle existing route files on re-generation |
-| `instanceName` | `s` | Variable name for the `silgi()` instance in generated code |
+| Option          | Default       | Description                                                               |
+| --------------- | ------------- | ------------------------------------------------------------------------- |
+| `spec`          | —             | Path to OpenAPI JSON/YAML file, or a parsed spec object                   |
+| `outDir`        | `./generated` | Output directory                                                          |
+| `schema`        | `zod`         | Target validation library                                                 |
+| `groupBy`       | `tag`         | How to organize route folders: by OpenAPI tag, first URL segment, or flat |
+| `routeStrategy` | `smart`       | How to handle existing route files on re-generation                       |
+| `instanceName`  | `s`           | Variable name for the `silgi()` instance in generated code                |
 
 ## Programmatic API
 
@@ -252,21 +259,9 @@ const { schemas, router, routes, operations } = generate(spec, {
 YAML specs are supported if the `yaml` package is installed:
 
 <Tabs items={['pnpm', 'npm', 'bun']}>
-<Tab value='pnpm'>
-```bash
-pnpm add -D yaml
-```
-</Tab>
-<Tab value='npm'>
-```bash
-npm install -D yaml
-```
-</Tab>
-<Tab value='bun'>
-```bash
-bun add -D yaml
-```
-</Tab>
+  <Tab value='pnpm'>```bash pnpm add -D yaml ```</Tab>
+  <Tab value='npm'>```bash npm install -D yaml ```</Tab>
+  <Tab value='bun'>```bash bun add -D yaml ```</Tab>
 </Tabs>
 
 Then pass a `.yaml` or `.yml` path:
@@ -280,6 +275,6 @@ await generateFromSpec({
 
 ## What's next?
 
-- [OpenAPI](/docs/openapi) — generate an OpenAPI spec *from* your router (the reverse direction)
+- [OpenAPI](/docs/openapi) — generate an OpenAPI spec _from_ your router (the reverse direction)
 - [Procedures](/docs/procedures) — `$input()`, `$output()`, `$errors()`, `$route()` API
 - [Server](/docs/server) — serve your router with Scalar UI

@@ -21,10 +21,11 @@
 import { readFile, mkdir, writeFile } from 'node:fs/promises'
 import { join, resolve, extname } from 'node:path'
 
-import type { OpenAPISpec } from './parse.ts'
-import { parseOpenAPI } from './parse.ts'
-import type { GenerateOptions } from './generate.ts'
 import { generateCode } from './generate.ts'
+import { parseOpenAPI } from './parse.ts'
+
+import type { GenerateOptions } from './generate.ts'
+import type { OpenAPISpec } from './parse.ts'
 
 // ── Public API ─────────────────────────────────────────
 
@@ -156,9 +157,7 @@ async function loadSpec(path: string): Promise<OpenAPISpec> {
       const { parse } = await import('yaml')
       return parse(content) as OpenAPISpec
     } catch {
-      throw new Error(
-        'YAML spec detected but "yaml" package is not installed. Install it with: pnpm add -D yaml',
-      )
+      throw new Error('YAML spec detected but "yaml" package is not installed. Install it with: pnpm add -D yaml')
     }
   }
 
