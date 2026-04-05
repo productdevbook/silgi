@@ -106,7 +106,7 @@ When analytics is enabled, every request context gets a `trace()` method. Use it
 
 ```ts twoslash
 // @noErrors
-const listUsers = s.query().$resolve(async ({ ctx }) => {
+const listUsers = s.$resolve(async ({ ctx }) => {
   const users = await ctx.trace('db.users.findMany', () => db.users.findMany())
   const count = await ctx.trace('db.users.count', () => db.users.count())
   return { users, count }
@@ -188,7 +188,7 @@ If you prefer an explicit import over the context method, use the standalone `tr
 // @noErrors
 import { trace } from 'silgi/analytics'
 
-const listUsers = s.query().$resolve(async ({ ctx }) => {
+const listUsers = s.$resolve(async ({ ctx }) => {
   const users = await trace(ctx, 'db.users.findMany', () => db.users.findMany())
   const weather = await trace(ctx, 'api.weather', () => fetch(weatherUrl))
   return { users, weather }

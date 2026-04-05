@@ -46,6 +46,7 @@ export default defineConfig({
     'src/broker/index.ts',
     'src/broker/nats.ts',
     'src/broker/redis.ts',
+    'src/codegen/index.ts',
   ],
   format: 'esm',
   outDir: 'dist',

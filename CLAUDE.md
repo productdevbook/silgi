@@ -33,7 +33,7 @@ pnpm bench:memory   # Memory profiling (--expose-gc)
 
 ### Key Modules (src/)
 
-- **silgi.ts** — Factory function. Creates typed instance with `query()`, `mutation()`, `guard()`, `wrap()`, `router()`, `handler()`, `serve()`
+- **silgi.ts** — Factory function. Creates typed instance with `$resolve()`, `$input()`, `$use()`, `$output()`, `$errors()`, `$route()`, `guard()`, `wrap()`, `router()`, `handler()`, `serve()`
 - **compile.ts** — Pipeline compiler. Unrolls 0-4 guards into specialized code paths (no loop), uses ContextPool for zero per-request allocation, compiles router via rou3 (unjs radix tree)
 - **types.ts** — `ProcedureDef` (fixed 8-property shape for V8 hidden class alignment), `RouterDef`, type inference helpers (`InferContextFromUse`, `InferSchemaInput`, `InferSchemaOutput`, `InferClient`)
 - **core/error.ts** — `SilgiError` with cross-realm instanceof via global WeakSet registry. Error codes are UPPER_SNAKE_CASE

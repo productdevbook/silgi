@@ -215,6 +215,10 @@
       "import": "./dist/broker/redis.mjs",
       "types": "./dist/broker/redis.d.mts"
     },
+    "./codegen": {
+      "import": "./dist/codegen/index.mjs",
+      "types": "./dist/codegen/index.d.mts"
+    },
     "./unstorage": {
       "import": "./lib/unstorage.mjs",
       "types": "./lib/unstorage.d.mts"

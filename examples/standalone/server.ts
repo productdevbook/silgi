@@ -16,29 +16,26 @@ const s = silgi({
   }),
 })
 
-const { query, mutation, guard, router } = s
-
-const auth = guard((ctx) => {
+const auth = s.guard((ctx) => {
   const token = ctx.headers.authorization?.replace('Bearer ', '')
   if (token !== 'secret') throw new SilgiError('UNAUTHORIZED')
   return { userId: 1 }
 })
 
-const appRouter = router({
-  health: query(() => ({ status: 'ok' })),
+const appRouter = s.router({
+  health: s.$resolve(() => ({ status: 'ok' })),
   users: {
-    list: query(z.object({ limit: z.number().optional() }), ({ input, ctx }) =>
-      ctx.db.users.slice(0, input.limit ?? 10),
-    ),
-    create: mutation({
-      use: [auth],
-      input: z.object({ name: z.string(), email: z.string().email() }),
-      resolve: ({ input, ctx }) => {
+    list: s
+      .$input(z.object({ limit: z.number().optional() }))
+      .$resolve(({ input, ctx }) => ctx.db.users.slice(0, input.limit ?? 10)),
+    create: s
+      .$use(auth)
+      .$input(z.object({ name: z.string(), email: z.string().email() }))
+      .$resolve(({ input, ctx }) => {
         const user = { id: ctx.db.nextId++, ...input }
         ctx.db.users.push(user)
         return user
-      },
-    }),
+      }),
   },
 })
 

@@ -7,7 +7,7 @@
  *
  * Usage:
  *   const k = silgi({ context: (req) => ({ db, headers }) })
- *   export const { query, mutation, guard, wrap, router, handler } = k
+ *   // k.$input(), k.$resolve(), k.$use(), k.guard(), k.router(), k.handler()
  */
 
 import { createHooks } from 'hookable'
@@ -239,7 +239,7 @@ function createProcedure(type: ProcedureType, ...args: unknown[]): ProcedureDef 
  *     request: ({ path }) => console.log(`-> ${path}`),
  *   },
  * })
- * const { query, mutation, guard, wrap, router, serve } = k
+ * // k.$input(), k.$resolve(), k.guard(), k.router(), k.serve()
  * ```
  */
 export function silgi<TBaseCtx extends Record<string, unknown>>(

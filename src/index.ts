@@ -9,20 +9,18 @@
  * import { z } from "zod"
  *
  * const k = silgi({ context: (req) => ({ db: getDB() }) })
- * const { query, mutation, guard, router, handler } = k
  *
- * const auth = guard(async (ctx) => {
+ * const auth = k.guard(async (ctx) => {
  *   const user = await verify(ctx.headers.authorization)
  *   if (!user) throw new SilgiError("UNAUTHORIZED")
  *   return { user }
  * })
  *
- * const listUsers = query(
- *   z.object({ limit: z.number().optional() }),
- *   async ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }),
- * )
+ * const listUsers = k
+ *   .$input(z.object({ limit: z.number().optional() }))
+ *   .$resolve(async ({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))
  *
- * const createUser = mutation()
+ * const createUser = k
  *   .$use(auth)
  *   .$input(z.object({ name: z.string() }))
  *   .$errors({ CONFLICT: 409 })
@@ -31,7 +29,7 @@
  *     return ctx.db.users.create(input)
  *   })
  *
- * export default handler(router({ users: { list: listUsers, create: createUser } }))
+ * export default k.handler(k.router({ users: { list: listUsers, create: createUser } }))
  * ```
  */
 
