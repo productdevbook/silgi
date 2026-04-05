@@ -38,11 +38,10 @@ export function createServerClient<TRouter extends RouterDef, TCtx extends Recor
   options: ServerClientOptions<TCtx>,
 ): InferClient<TRouter> {
   const flatRouter = compileRouter(router)
-  return createServerProxy(router, flatRouter, options.context, []) as InferClient<TRouter>
+  return createServerProxy(flatRouter, options.context, []) as InferClient<TRouter>
 }
 
 function createServerProxy(
-  router: unknown,
   flatRouter: CompiledRouterFn,
   contextFactory: () => Record<string, unknown> | Promise<Record<string, unknown>>,
   path: string[],
@@ -67,7 +66,7 @@ function createServerProxy(
       if (typeof prop !== 'string') return undefined
       let cached = cache.get(prop)
       if (!cached) {
-        cached = createServerProxy(router, flatRouter, contextFactory, [...path, prop])
+        cached = createServerProxy(flatRouter, contextFactory, [...path, prop])
         cache.set(prop, cached)
       }
       return cached

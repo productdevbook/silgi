@@ -10,7 +10,7 @@ function safeJson(value: unknown): string {
 }
 
 function toCurlValue(value: string): string {
-  return `'${value.replaceAll("'", `'\"'\"'`)}'`
+  return `'${value.replaceAll("'", `'"'"'`)}'`
 }
 
 function getAnalyticsOrigin(): string {
