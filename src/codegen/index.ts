@@ -154,6 +154,7 @@ async function loadSpec(path: string): Promise<OpenAPISpec> {
 
   if (ext === '.yaml' || ext === '.yml') {
     try {
+      // @ts-ignore -- yaml is an optional dependency
       const { parse } = await import('yaml')
       return parse(content) as OpenAPISpec
     } catch {

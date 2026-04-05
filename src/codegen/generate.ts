@@ -170,7 +170,7 @@ function buildInputSchema(op: ParsedOperation, ctx: SchemaContext): string | nul
   return e.object(parts)
 }
 
-function hasOverlap(parts: { key: string }[], properties: Record<string, unknown>): boolean {
+function hasOverlap(parts: { key: string }[], properties: object): boolean {
   const existing = new Set(parts.map((p) => p.key))
   return Object.keys(properties).some((k) => existing.has(k))
 }
