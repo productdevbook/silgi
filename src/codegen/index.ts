@@ -34,11 +34,11 @@ export interface GenerateFromSpecOptions extends GenerateOptions {
   outDir?: string
   /**
    * What to do when route files already exist:
-   * - "skip" (default) — don't overwrite existing route files
-   * - "overwrite" — regenerate route files
-   * - "merge" — only add missing handler functions
+   * - "smart" (default) — regenerate $route/$input/$output/$errors, preserve $resolve body
+   * - "skip" — don't touch existing route files at all
+   * - "overwrite" — regenerate everything including $resolve
    */
-  routeStrategy?: 'skip' | 'overwrite' | 'merge'
+  routeStrategy?: 'smart' | 'skip' | 'overwrite'
 }
 
 export interface GenerateResult {
@@ -54,7 +54,7 @@ export interface GenerateResult {
  * Generate Silgi code from an OpenAPI spec file or object.
  */
 export async function generateFromSpec(options: GenerateFromSpecOptions): Promise<GenerateResult> {
-  const { outDir = './generated', routeStrategy = 'skip', ...genOpts } = options
+  const { outDir = './generated', routeStrategy = 'smart', ...genOpts } = options
 
   const spec = typeof options.spec === 'string' ? await loadSpec(options.spec) : options.spec
   const { operations, components, tags: _tags } = parseOpenAPI(spec)
@@ -77,14 +77,29 @@ export async function generateFromSpec(options: GenerateFromSpecOptions): Promis
 
   // routes/<group>/<operationId>.ts
   if (routes.size > 0) {
+    const { extractResolveBody, spliceResolveBody } = await import('./preserve.ts')
+
     for (const [filePath, code] of routes) {
-      // filePath is "group/operationId"
       const fullPath = join(outputDir, 'routes', `${filePath}.ts`)
       const dir = join(fullPath, '..')
       await mkdir(dir, { recursive: true })
 
       if (routeStrategy === 'skip') {
         if (await fileExists(fullPath)) continue
+      }
+
+      if (routeStrategy === 'smart' && (await fileExists(fullPath))) {
+        // Preserve developer's $resolve body, regenerate everything else
+        const existing = await readFile(fullPath, 'utf-8')
+        const preserved = extractResolveBody(existing)
+        if (preserved) {
+          await writeFile(fullPath, spliceResolveBody(code, preserved), 'utf-8')
+        } else {
+          // Stub or unparseable — overwrite with fresh generated code
+          await writeFile(fullPath, code, 'utf-8')
+        }
+        files.push(fullPath)
+        continue
       }
 
       await writeFile(fullPath, code, 'utf-8')
@@ -126,6 +141,7 @@ export { createSchemaContext } from './schema-to-code.ts'
 export type { SchemaContext } from './schema-to-code.ts'
 export { getEmitter } from './emitters.ts'
 export type { SchemaTarget, SchemaEmitter } from './emitters.ts'
+export { extractResolveBody, spliceResolveBody } from './preserve.ts'
 
 // ── Internal Helpers ───────────────────────────────────
 
