@@ -77,7 +77,7 @@ export interface TraceSpan {
   /** Structured key-value attributes (db.name, auth.operation, user.id, etc.) */
   attributes?: Record<string, string | number | boolean>
   /** Cost metadata for this span (tokens, price, provider). */
-  cost?: import('./analytics-cost.ts').SpanCost
+  cost?: import('./cost.ts').SpanCost
 }
 
 export interface ErrorEntry {
@@ -165,9 +165,9 @@ export interface AnalyticsOptions {
   /** Path prefixes to exclude from tracking. Can also be managed at runtime via the dashboard or API. */
   ignorePaths?: string[]
   /** Alert rules — fire actions when conditions are met within a sliding window. */
-  alerts?: import('./analytics-alerts.ts').AlertRule[]
+  alerts?: import('./alerts.ts').AlertRule[]
   /** Budget rules for cost tracking. */
-  budgets?: import('./analytics-cost.ts').BudgetRule[]
+  budgets?: import('./cost.ts').BudgetRule[]
 }
 
 export interface ProcedureSnapshot {
