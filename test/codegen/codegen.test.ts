@@ -473,7 +473,7 @@ describe('jsonSchemaToCode (arktype)', () => {
 // ── Generate — multi-target ────────────────────────────
 
 describe('generate', () => {
-  it('generates schemas, router, and handlers (zod default)', () => {
+  it('generates schemas, router, and route modules (zod default)', () => {
     const result = generate(petstoreSpec)
     expect(result.schemas).toContain("import { z } from 'zod'")
     expect(result.schemas).toContain('PetSchema')
@@ -500,90 +500,80 @@ describe('generate', () => {
     expect(result.schemas).toContain('type({')
   })
 
-  it('handler stubs use correct infer type for valibot', () => {
-    const result = generate(petstoreSpec, { schema: 'valibot' })
-    const petsHandler = result.handlers.get('pets')!
-    expect(petsHandler).toContain('v.InferOutput<typeof schemas.')
+  it('one file per operation with inline resolve', () => {
+    const result = generate(petstoreSpec)
+    const listPets = result.routes.get('pets/listPets')!
+    expect(listPets).toContain('export const listPets = s')
+    expect(listPets).toContain('.$resolve(({ input, ctx, fail }) => {')
+    expect(listPets).toContain('// TODO: implement listPets')
+    expect(listPets).toContain("import { silgi, SilgiError } from 'silgi'")
   })
 
-  it('handler stubs use correct infer type for arktype', () => {
-    const result = generate(petstoreSpec, { schema: 'arktype' })
-    const petsHandler = result.handlers.get('pets')!
-    expect(petsHandler).toContain('typeof schemas.')
-    expect(petsHandler).toContain('.infer')
-  })
-
-  it('handler stubs use correct infer type for zod', () => {
-    const result = generate(petstoreSpec, { schema: 'zod' })
-    const petsHandler = result.handlers.get('pets')!
-    expect(petsHandler).toContain('z.infer<typeof schemas.')
-  })
-
-  it('groups by tag', () => {
+  it('groups operations into folders by tag', () => {
     const result = generate(petstoreSpec, { groupBy: 'tag' })
-    expect(result.router).toContain('pets:')
-    expect(result.router).toContain('store:')
-    expect(result.handlers.has('pets')).toBe(true)
-    expect(result.handlers.has('store')).toBe(true)
+    expect(result.routes.has('pets/listPets')).toBe(true)
+    expect(result.routes.has('pets/createPet')).toBe(true)
+    expect(result.routes.has('pets/getPet')).toBe(true)
+    expect(result.routes.has('store/getInventory')).toBe(true)
   })
 
   it('groups flat', () => {
     const result = generate(petstoreSpec, { groupBy: 'flat' })
-    expect(result.handlers.has('default')).toBe(true)
-    expect(result.handlers.size).toBe(1)
+    expect(result.routes.has('default/listPets')).toBe(true)
+    expect(result.routes.has('default/getInventory')).toBe(true)
   })
 
-  it('generates handler stubs with SilgiError', () => {
+  it('operation files contain $route with correct metadata', () => {
     const result = generate(petstoreSpec)
-    const petsHandler = result.handlers.get('pets')!
-    expect(petsHandler).toContain("import { SilgiError } from 'silgi'")
-    expect(petsHandler).toContain('export function listPets')
-    expect(petsHandler).toContain('export function createPet')
-    expect(petsHandler).toContain('export function getPet')
-    expect(petsHandler).toContain('Not implemented')
+    const getPet = result.routes.get('pets/getPet')!
+    expect(getPet).toContain("path: '/pets/:petId'")
+    expect(getPet).toContain("method: 'GET'")
+    expect(getPet).toContain('operationId: "getPet"')
   })
 
-  it('generates $route with correct metadata', () => {
+  it('operation files contain $errors', () => {
     const result = generate(petstoreSpec)
-    expect(result.router).toContain("path: '/pets'")
-    expect(result.router).toContain("method: 'GET'")
-    expect(result.router).toContain("path: '/pets/:petId'")
-    expect(result.router).toContain('operationId: "getPet"')
+    const getPet = result.routes.get('pets/getPet')!
+    expect(getPet).toContain('NOT_FOUND: 404')
+    const createPet = result.routes.get('pets/createPet')!
+    expect(createPet).toContain('CONFLICT: 409')
   })
 
-  it('generates $errors for error responses', () => {
+  it('operation files contain $input and $output', () => {
     const result = generate(petstoreSpec)
-    expect(result.router).toContain('NOT_FOUND: 404')
-    expect(result.router).toContain('CONFLICT: 409')
+    const listPets = result.routes.get('pets/listPets')!
+    expect(listPets).toContain('.$input(schemas.listPetsInputSchema)')
+    expect(listPets).toContain('.$output(schemas.listPetsOutputSchema)')
   })
 
-  it('generates $input and $output references', () => {
+  it('root router imports each operation and builds grouped tree', () => {
     const result = generate(petstoreSpec)
-    expect(result.router).toContain('.$input(schemas.listPetsInputSchema)')
-    expect(result.router).toContain('.$output(schemas.listPetsOutputSchema)')
-  })
-
-  it('chains directly from instance without .query()/.mutation()', () => {
-    const result = generate(petstoreSpec)
-    expect(result.router).not.toContain('.query()')
-    expect(result.router).not.toContain('.mutation()')
-    expect(result.router).toContain('s\n')
+    expect(result.router).toContain("import { listPets } from './routes/pets/listPets.ts'")
+    expect(result.router).toContain("import { getInventory } from './routes/store/getInventory.ts'")
+    expect(result.router).toContain('pets: {')
+    expect(result.router).toContain('    listPets,')
+    expect(result.router).toContain('store: {')
+    expect(result.router).toContain('    getInventory,')
   })
 
   it('respects custom instance name', () => {
     const result = generate(petstoreSpec, { instanceName: 'k' })
     expect(result.router).toContain('const k = silgi()')
     expect(result.router).toContain('k.router(')
+    const listPets = result.routes.get('pets/listPets')!
+    expect(listPets).toContain('const k = silgi()')
   })
 
   it('generates deprecated procedures', () => {
     const result = generate(petstoreSpec)
-    expect(result.router).toContain('deprecated: true')
+    const deletePet = result.routes.get('pets/deletePet')!
+    expect(deletePet).toContain('deprecated: true')
   })
 
   it('generates security metadata', () => {
     const result = generate(petstoreSpec)
-    expect(result.router).toContain('security: ["apiKey"]')
+    const getInventory = result.routes.get('store/getInventory')!
+    expect(getInventory).toContain('security: ["apiKey"]')
   })
 
   it('generates component schemas from refs', () => {
@@ -595,7 +585,8 @@ describe('generate', () => {
 
   it('generates success status for non-200', () => {
     const result = generate(petstoreSpec)
-    expect(result.router).toContain('successStatus: 201')
+    const createPet = result.routes.get('pets/createPet')!
+    expect(createPet).toContain('successStatus: 201')
   })
 })
 
@@ -603,7 +594,7 @@ describe('edge cases', () => {
   it('handles empty spec', () => {
     const result = generate({ openapi: '3.1.0', info: { title: 'Empty', version: '1.0.0' } })
     expect(result.operations).toHaveLength(0)
-    expect(result.handlers.size).toBe(0)
+    expect(result.routes.size).toBe(0)
   })
 
   it('generates fallback operationId', () => {

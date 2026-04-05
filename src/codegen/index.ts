@@ -3,8 +3,8 @@
  *
  * Takes an OpenAPI 3.x spec and generates:
  * - Validation schemas (Zod, Valibot, or ArkType) for all components and operation I/O
- * - Silgi router with typed procedures
- * - Handler stubs ready to implement
+ * - Co-located route modules (handlers + procedures in the same file, per domain)
+ * - Root router that combines all route modules
  *
  * @example
  * ```ts
@@ -33,12 +33,12 @@ export interface GenerateFromSpecOptions extends GenerateOptions {
   /** Output directory for generated files (default: "./generated") */
   outDir?: string
   /**
-   * What to do when handler files already exist:
-   * - "skip" (default) — don't overwrite existing handlers
-   * - "overwrite" — regenerate handler stubs
+   * What to do when route files already exist:
+   * - "skip" (default) — don't overwrite existing route files
+   * - "overwrite" — regenerate route files
    * - "merge" — only add missing handler functions
    */
-  handlerStrategy?: 'skip' | 'overwrite' | 'merge'
+  routeStrategy?: 'skip' | 'overwrite' | 'merge'
 }
 
 export interface GenerateResult {
@@ -54,18 +54,12 @@ export interface GenerateResult {
  * Generate Silgi code from an OpenAPI spec file or object.
  */
 export async function generateFromSpec(options: GenerateFromSpecOptions): Promise<GenerateResult> {
-  const { outDir = './generated', handlerStrategy = 'skip', ...genOpts } = options
+  const { outDir = './generated', routeStrategy = 'skip', ...genOpts } = options
 
-  // Load spec
   const spec = typeof options.spec === 'string' ? await loadSpec(options.spec) : options.spec
-
-  // Parse
   const { operations, components, tags: _tags } = parseOpenAPI(spec)
+  const { schemas, router, routes } = generateCode(operations, components, genOpts)
 
-  // Generate code
-  const { schemas, router, handlers } = generateCode(operations, components, genOpts)
-
-  // Write files
   const outputDir = resolve(outDir)
   await mkdir(outputDir, { recursive: true })
 
@@ -81,33 +75,23 @@ export async function generateFromSpec(options: GenerateFromSpecOptions): Promis
   await writeFile(routerPath, router, 'utf-8')
   files.push(routerPath)
 
-  // handlers/
-  if (handlers.size > 0) {
-    const handlersDir = join(outputDir, 'handlers')
-    await mkdir(handlersDir, { recursive: true })
+  // routes/<group>/<operationId>.ts
+  if (routes.size > 0) {
+    for (const [filePath, code] of routes) {
+      // filePath is "group/operationId"
+      const fullPath = join(outputDir, 'routes', `${filePath}.ts`)
+      const dir = join(fullPath, '..')
+      await mkdir(dir, { recursive: true })
 
-    for (const [name, code] of handlers) {
-      const handlerPath = join(handlersDir, `${name}.ts`)
-
-      if (handlerStrategy === 'skip') {
-        const exists = await fileExists(handlerPath)
-        if (exists) continue
-      } else if (handlerStrategy === 'merge') {
-        const exists = await fileExists(handlerPath)
-        if (exists) {
-          const merged = await mergeHandlerStub(handlerPath, code)
-          await writeFile(handlerPath, merged, 'utf-8')
-          files.push(handlerPath)
-          continue
-        }
+      if (routeStrategy === 'skip') {
+        if (await fileExists(fullPath)) continue
       }
 
-      await writeFile(handlerPath, code, 'utf-8')
-      files.push(handlerPath)
+      await writeFile(fullPath, code, 'utf-8')
+      files.push(fullPath)
     }
   }
 
-  // Count schemas from generated code
   const schemaCount = (schemas.match(/^export const \w+Schema/gm) ?? []).length
 
   return { files, operationCount: operations.length, schemaCount }
@@ -123,7 +107,7 @@ export function generate(
 ): {
   schemas: string
   router: string
-  handlers: Map<string, string>
+  routes: Map<string, string>
   operations: ReturnType<typeof parseOpenAPI>['operations']
 } {
   const { operations, components } = parseOpenAPI(spec)
@@ -151,8 +135,6 @@ async function loadSpec(path: string): Promise<OpenAPISpec> {
   const ext = extname(resolved).toLowerCase()
 
   if (ext === '.yaml' || ext === '.yml') {
-    // Simple YAML parsing for common OpenAPI patterns
-    // For complex YAML, users should pre-parse and pass the object
     try {
       const { parse } = await import('yaml')
       return parse(content) as OpenAPISpec
@@ -177,23 +159,21 @@ async function fileExists(path: string): Promise<boolean> {
 }
 
 /**
- * Merge new handler stubs into an existing handler file.
+ * Merge new handler stubs into an existing route file.
  * Only adds functions that don't already exist.
  */
-async function mergeHandlerStub(existingPath: string, newCode: string): Promise<string> {
+async function mergeRouteModule(existingPath: string, newCode: string): Promise<string> {
   const existing = await readFile(existingPath, 'utf-8')
 
-  // Extract function names from existing file
   const existingFns = new Set<string>()
-  const fnRegex = /export\s+(?:async\s+)?function\s+(\w+)/g
+  const fnRegex = /(?:export\s+)?(?:async\s+)?function\s+(\w+)/g
   let match
   while ((match = fnRegex.exec(existing)) !== null) {
     existingFns.add(match[1]!)
   }
 
-  // Extract new functions that don't exist yet
   const newFns: string[] = []
-  const newFnRegex = /(?:\/\*\*[^]*?\*\/\n)?export\s+(?:async\s+)?function\s+(\w+)[^]*?^\}/gm
+  const newFnRegex = /(?:\/\*\*[^]*?\*\/\n)?(?:async\s+)?function\s+(\w+)[^]*?^\}/gm
   while ((match = newFnRegex.exec(newCode)) !== null) {
     if (!existingFns.has(match[1]!)) {
       newFns.push(match[0]!)

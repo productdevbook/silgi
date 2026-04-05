@@ -203,11 +203,13 @@ const outBase = '/Users/code/Work/pb/katman/test/codegen/output'
 for (const target of ['zod', 'valibot', 'arktype'] as const) {
   const result = generate(petstoreSpec as any, { schema: target, groupBy: 'tag' })
   const dir = join(outBase, target)
-  await mkdir(join(dir, 'handlers'), { recursive: true })
+  await mkdir(dir, { recursive: true })
   await writeFile(join(dir, 'schemas.gen.ts'), result.schemas)
   await writeFile(join(dir, 'router.gen.ts'), result.router)
-  for (const [name, code] of result.handlers) {
-    await writeFile(join(dir, 'handlers', `${name}.ts`), code)
+  for (const [filePath, code] of result.routes) {
+    const fullPath = join(dir, 'routes', `${filePath}.ts`)
+    await mkdir(join(fullPath, '..'), { recursive: true })
+    await writeFile(fullPath, code)
   }
-  console.log(`✓ ${target}: ${result.operations.length} operations`)
+  console.log(`✓ ${target}: ${result.operations.length} operations, ${result.routes.size} files`)
 }
