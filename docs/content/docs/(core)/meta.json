@@ -17,6 +17,7 @@
     "---",
     "server",
     "openapi",
+    "codegen",
     "client",
     "client-plugins",
     "testing",
