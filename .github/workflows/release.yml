@@ -40,13 +40,37 @@ jobs:
       - name: 🚀 Build
         run: pnpm build
 
+      - name: 🏷️ Determine npm tag
+        id: npm-tag
+        run: |
+          VERSION="${{ github.ref_name }}"
+          if [[ "$VERSION" == *"-beta"* ]] || [[ "$VERSION" == *"-alpha"* ]] || [[ "$VERSION" == *"-rc"* ]]; then
+            echo "tag=beta" >> $GITHUB_OUTPUT
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
+          echo "NPM tag: $(grep tag= $GITHUB_OUTPUT | cut -d= -f2)"
+
       - name: 📦 Publish to npm
-        run: pnpm publish --provenance --access public --no-git-checks
+        run: pnpm publish --provenance --access public --tag ${{ steps.npm-tag.outputs.tag }} --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: 📝 Get previous tag
+        id: prev-tag
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          echo "tag=$PREV_TAG" >> $GITHUB_OUTPUT
+
       - name: 📝 Generate changelog
-        run: pnpm dlx changelogithub
+        run: |
+          if [ -n "${{ steps.prev-tag.outputs.tag }}" ]; then
+            pnpm dlx changelogithub --from ${{ steps.prev-tag.outputs.tag }}
+          else
+            pnpm dlx changelogithub
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -55,3 +79,5 @@ jobs:
           echo "## Release Complete 🚀" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**NPM Tag:** ${{ steps.npm-tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Prerelease:** ${{ steps.npm-tag.outputs.prerelease }}" >> $GITHUB_STEP_SUMMARY
