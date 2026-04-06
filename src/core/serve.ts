@@ -1,6 +1,6 @@
 import { serve } from 'srvx'
 
-import { createFetchHandler } from './handler.ts'
+import { createFetchHandler, wrapHandler } from './handler.ts'
 
 import type { AnalyticsOptions } from '../plugins/analytics.ts'
 import type { ScalarOptions } from '../scalar.ts'
@@ -73,19 +73,7 @@ export async function createServeHandler(
   const hostname = options?.hostname ?? '127.0.0.1'
 
   // Build handler pipeline: base → scalar → analytics
-  let handler: FetchHandler = createFetchHandler(routerDef, contextFactory, hooks)
-
-  if (options?.scalar) {
-    const { wrapWithScalar } = await import('../scalar.ts')
-    const scalarOpts = typeof options.scalar === 'object' ? options.scalar : {}
-    handler = wrapWithScalar(handler, routerDef, scalarOpts)
-  }
-
-  if (options?.analytics) {
-    const { wrapWithAnalytics } = await import('../plugins/analytics.ts')
-    const analyticsOpts = typeof options.analytics === 'object' ? options.analytics : {}
-    handler = wrapWithAnalytics(handler, analyticsOpts)
-  }
+  const handler: FetchHandler = wrapHandler(createFetchHandler(routerDef, contextFactory, hooks), routerDef, options)
 
   // Resolve graceful shutdown config
   const shutdownOpt = options?.gracefulShutdown ?? true

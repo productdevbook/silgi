@@ -15,7 +15,7 @@ import { createHooks } from 'hookable'
 import { createProcedureBuilder } from './builder.ts'
 import { createCaller } from './caller.ts'
 import { compileRouter } from './compile.ts'
-import { createFetchHandler } from './core/handler.ts'
+import { createFetchHandler, wrapHandler } from './core/handler.ts'
 import { assignPaths, routerCache } from './core/router-utils.ts'
 import { createTaskFromProcedure } from './core/task.ts'
 
@@ -317,33 +317,7 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
     },
 
     handler: (routerDef, options) => {
-      let fetchHandler: FetchHandler | undefined
-      let initPromise: Promise<void> | undefined
-
-      async function init(): Promise<void> {
-        let h: FetchHandler = createFetchHandler(routerDef, contextFactory, hooks)
-        if (options?.scalar) {
-          const { wrapWithScalar } = await import('./scalar.ts')
-          const scalarOpts = typeof options.scalar === 'object' ? options.scalar : {}
-          h = wrapWithScalar(h, routerDef, scalarOpts)
-        }
-        if (options?.analytics) {
-          const { wrapWithAnalytics } = await import('./plugins/analytics.ts')
-          const analyticsOpts = typeof options.analytics === 'object' ? options.analytics : {}
-          h = wrapWithAnalytics(h, analyticsOpts)
-        }
-        fetchHandler = h
-      }
-
-      return (request: Request): Response | Promise<Response> => {
-        if (fetchHandler) return fetchHandler(request)
-        if (!options?.scalar && !options?.analytics) {
-          fetchHandler = createFetchHandler(routerDef, contextFactory, hooks)
-          return fetchHandler(request)
-        }
-        initPromise ??= init()
-        return initPromise.then(() => fetchHandler!(request))
-      }
+      return wrapHandler(createFetchHandler(routerDef, contextFactory, hooks), routerDef, options)
     },
 
     serve: async (routerDef, options) => {

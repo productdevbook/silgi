@@ -105,6 +105,48 @@ function makeResponse(
 
 export type FetchHandler = (request: Request) => Response | Promise<Response>
 
+export interface WrapHandlerOptions {
+  analytics?: boolean | import('../plugins/analytics/types.ts').AnalyticsOptions
+  scalar?: boolean | import('../scalar.ts').ScalarOptions
+}
+
+/**
+ * Lazily wrap a FetchHandler with analytics and/or scalar.
+ * Returns a new handler that applies wrappers on first request (async import).
+ * If no wrappers are needed, returns the original handler as-is.
+ */
+export function wrapHandler(
+  handler: FetchHandler,
+  router: import('../types.ts').RouterDef,
+  options?: WrapHandlerOptions,
+): FetchHandler {
+  if (!options?.scalar && !options?.analytics) return handler
+
+  let wrapped: FetchHandler | undefined
+  let initPromise: Promise<void> | undefined
+
+  async function init(): Promise<void> {
+    let h = handler
+    if (options!.scalar) {
+      const { wrapWithScalar } = await import('../scalar.ts')
+      const scalarOpts = typeof options!.scalar === 'object' ? options!.scalar : {}
+      h = wrapWithScalar(h, router, scalarOpts)
+    }
+    if (options!.analytics) {
+      const { wrapWithAnalytics } = await import('../plugins/analytics.ts')
+      const analyticsOpts = typeof options!.analytics === 'object' ? options!.analytics : {}
+      h = wrapWithAnalytics(h, analyticsOpts)
+    }
+    wrapped = h
+  }
+
+  return (request: Request): Response | Promise<Response> => {
+    if (wrapped) return wrapped(request)
+    initPromise ??= init()
+    return initPromise.then(() => wrapped!(request))
+  }
+}
+
 export function createFetchHandler(
   routerDef: import('../types.ts').RouterDef,
   contextFactory: (req: Request) => Record<string, unknown> | Promise<Record<string, unknown>>,
