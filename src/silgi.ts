@@ -317,7 +317,44 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
     },
 
     handler: (routerDef, options) => {
-      return wrapHandler(createFetchHandler(routerDef, contextFactory, hooks), routerDef, options)
+      const fetchHandler = wrapHandler(createFetchHandler(routerDef, contextFactory, hooks), routerDef, options)
+
+      // Check if router has ws-enabled procedures → auto-attach crossws hooks for Nitro/srvx
+      const hasWsProcedures = (function checkWs(def: any): boolean {
+        if (!def || typeof def !== 'object') return false
+        if (def.route?.ws) return true
+        for (const v of Object.values(def)) {
+          if (checkWs(v)) return true
+        }
+        return false
+      })(routerDef)
+
+      if (!hasWsProcedures) return fetchHandler
+
+      // Lazy-load WS hooks
+      let wsHooks: Record<string, Function> | undefined
+      let wsInitPromise: Promise<void> | undefined
+
+      async function initWsHooks(): Promise<void> {
+        const { createWSHooks } = await import('./ws.ts')
+        wsHooks = createWSHooks(routerDef) as Record<string, Function>
+      }
+
+      return async (request: Request): Promise<Response> => {
+        // Intercept /_ws path — return empty response with .crossws hooks for Nitro/h3
+        const url = new URL(request.url)
+        if (url.pathname === '/_ws') {
+          if (!wsHooks) {
+            wsInitPromise ??= initWsHooks()
+            await wsInitPromise
+          }
+          const response = new Response(null, { status: 200 })
+          ;(response as any).crossws = wsHooks
+          return response
+        }
+
+        return fetchHandler(request)
+      }
     },
 
     serve: async (routerDef, options) => {
