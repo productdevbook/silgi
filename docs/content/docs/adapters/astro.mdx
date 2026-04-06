@@ -47,7 +47,23 @@ export default defineConfig({
 })
 ```
 
+## Analytics and Scalar
+
+Enable the built-in [analytics dashboard](/docs/analytics) or [Scalar API reference](/docs/scalar) directly in the adapter:
+
+```ts twoslash
+// @noErrors
+const handler = createHandler(appRouter, {
+  context: (ctx) => ({ headers: Object.fromEntries(ctx.request.headers) }),
+  analytics: {
+    auth: process.env.ANALYTICS_TOKEN,
+  },
+  scalar: true,
+})
+```
+
 ## What's next?
 
+- [Analytics](/docs/analytics) — built-in monitoring dashboard
 - [Server](/docs/server) — standalone `serve()` as an alternative
 - [Integrations](/docs/integrations) — other available integrations

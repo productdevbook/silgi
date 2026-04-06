@@ -63,8 +63,24 @@ export const runtime = 'edge'
   cost is paid only once per cold start.
 </Callout>
 
+## Analytics and Scalar
+
+Enable the built-in [analytics dashboard](/docs/analytics) or [Scalar API reference](/docs/scalar) directly in the adapter:
+
+```ts twoslash
+// @noErrors
+const handler = createHandler(appRouter, {
+  context: (req) => ({ headers: Object.fromEntries(req.headers) }),
+  analytics: {
+    auth: process.env.ANALYTICS_TOKEN,
+  },
+  scalar: true,
+})
+```
+
 ## What's next?
 
+- [Analytics](/docs/analytics) — built-in monitoring dashboard
 - [React Server Actions](/docs/integrations/react) — `[error, data]` tuple pattern
 - [TanStack Query](/docs/integrations/tanstack-query) — React Query integration
 - [Integrations](/docs/integrations) — other available integrations

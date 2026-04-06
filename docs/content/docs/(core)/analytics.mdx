@@ -329,6 +329,41 @@ Bun.serve({ port: 3000, fetch: handle })
 // Dashboard at /api/analytics
 ```
 
+## With framework adapters
+
+All fetch-based adapters (SvelteKit, Next.js, Astro, Remix, SolidStart) support `analytics` and `scalar` options:
+
+```ts twoslash
+// @noErrors
+// SvelteKit — src/routes/api/rpc/[...path]/+server.ts
+import { createHandler } from 'silgi/sveltekit'
+
+const handler = createHandler(appRouter, {
+  context: (event) => ({ user: event.locals.user }),
+  analytics: {
+    auth: process.env.ANALYTICS_TOKEN,
+  },
+})
+
+export const GET = handler
+export const POST = handler
+```
+
+```ts twoslash
+// @noErrors
+// Next.js — app/api/rpc/[...path]/route.ts
+import { createHandler } from 'silgi/nextjs'
+
+const handler = createHandler(appRouter, {
+  context: (req) => ({ headers: Object.fromEntries(req.headers) }),
+  analytics: true,
+})
+
+export { handler as GET, handler as POST }
+```
+
+The dashboard is available at `/api/analytics` regardless of which adapter you use.
+
 ## Ignoring paths
 
 Noisy endpoints like health checks or metrics can be completely excluded from tracking via config:

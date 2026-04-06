@@ -48,7 +48,25 @@ const handler = createHandler(appRouter, {
 })
 ```
 
+## Analytics and Scalar
+
+Enable the built-in [analytics dashboard](/docs/analytics) or [Scalar API reference](/docs/scalar) directly in the adapter:
+
+```ts twoslash
+// @noErrors
+const handler = createHandler(appRouter, {
+  context: (event) => ({ user: event.locals.user }),
+  analytics: {
+    auth: process.env.ANALYTICS_TOKEN,
+  },
+  scalar: true,
+})
+```
+
+The analytics dashboard is available at `/api/analytics` and Scalar at `/api/reference`.
+
 ## What's next?
 
+- [Analytics](/docs/analytics) — built-in monitoring dashboard
 - [Server](/docs/server) — standalone `serve()` as an alternative
 - [Integrations](/docs/integrations) — other available integrations
