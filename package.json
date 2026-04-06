@@ -1,6 +1,6 @@
 {
   "name": "silgi",
-  "version": "0.50.0",
+  "version": "0.50.1",
   "private": false,
   "description": "The fastest end-to-end type-safe RPC framework for TypeScript — compiled pipelines, single package, every runtime",
   "keywords": [
@@ -268,7 +268,6 @@
     "ocache": "^0.1.4",
     "ofetch": "2.0.0-alpha.3",
     "ohash": "^2.0.11",
-    "silgi": "link:",
     "srvx": "^0.11.13",
     "unstorage": "^2.0.0-alpha.7"
   },
