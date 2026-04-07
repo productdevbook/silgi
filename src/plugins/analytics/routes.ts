@@ -95,7 +95,7 @@ document.getElementById('f').onsubmit=function(e){
 e.preventDefault();
 var t=document.getElementById('t').value.trim();
 if(!t)return;
-var base=location.pathname.replace(/\/$/,'');
+var base=location.pathname;if(base.slice(-1)==='/')base=base.slice(0,-1);
 document.cookie='silgi-auth='+encodeURIComponent(t)+';path='+base+';samesite=strict';
 fetch(base+'/stats',{headers:{'cookie':'silgi-auth='+encodeURIComponent(t)}}).then(function(){
 location.reload();

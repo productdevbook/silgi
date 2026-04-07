@@ -145,7 +145,7 @@ export class AlertEngine {
       case 'latency_avg':
         return samples.reduce((sum, s) => sum + s.durationMs, 0) / samples.length
       case 'latency_p95': {
-        const sorted = samples.map((s) => s.durationMs).sort((a, b) => a - b)
+        const sorted = samples.map((s) => s.durationMs).toSorted((a, b) => a - b)
         const idx = Math.ceil(sorted.length * 0.95) - 1
         return sorted[Math.max(0, idx)]!
       }

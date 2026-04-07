@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-
 import { getAnalyticsBase } from '@/lib/api-base'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { AnalyticsData, ErrorEntry, RequestEntry, ScheduledTaskInfo, TaskExecution } from '@/lib/types'
 
