@@ -21,7 +21,7 @@ For most APIs, HTTP is the right choice. WebSocket adds value when you need pers
 
 ## Enabling WebSocket on procedures
 
-Mark individual procedures with `$route({ ws: true })` to make them accessible over WebSocket. Procedures without this flag are HTTP-only.
+Every procedure is reachable over WebSocket automatically — no flag required. Queries, mutations, and subscriptions all work through `WSLink` or `attachWebSocket`.
 
 ```ts twoslash
 // @noErrors
@@ -29,33 +29,48 @@ import { silgi } from 'silgi'
 
 const s = silgi({ context: () => ({}) })
 
-// HTTP-only — not accessible over WebSocket
+// Query — reachable via both HTTP and WebSocket
 const listUsers = s.$resolve(({ ctx }) => ctx.db.users.findMany())
 
-// WebSocket-enabled — accessible over both HTTP and WebSocket
-const clock = s
-  .subscription()
-  .$route({ ws: true })
-  .$resolve(async function* () {
-    for (let i = 5; i > 0; i--) {
-      yield { count: i }
-      await new Promise((r) => setTimeout(r, 1000))
-    }
-  })
-
-// Any procedure type can be WebSocket-enabled
-const echo = s
-  .$route({ ws: true })
-  .$input(z.object({ msg: z.string() }))
-  .$resolve(({ input }) => ({ echo: input.msg }))
+// Subscription — streams to the client as an async iterator over WebSocket
+const clock = s.subscription().$resolve(async function* () {
+  for (let i = 5; i > 0; i--) {
+    yield { count: i }
+    await new Promise((r) => setTimeout(r, 1000))
+  }
+})
 ```
 
 <Callout type='info'>
-  WebSocket-enabled procedures also work over HTTP. The `ws: true` flag adds WebSocket access, it doesn't remove HTTP
-  access.
+  `$route({ ws: true })` is still accepted and is used as a hint by adapters (such as Nitro) that need an explicit
+  marker to auto-attach WebSocket hooks. Subscriptions are always detected automatically and do not need the flag.
 </Callout>
 
 ## Server setup
+
+### With handler() — Nitro, Nuxt, Bun, Deno (zero config)
+
+When you use `s.handler(appRouter)` as your entry point, WebSocket support is automatic. Any router containing a subscription (or a procedure with `$route({ ws: true })`) causes `handler()` to expose a `/_ws` endpoint that srvx/Nitro picks up natively — **no extra route file needed**.
+
+```ts title="server.ts" twoslash
+// @noErrors
+import { s } from './rpc/instance'
+import { appRouter } from './rpc/router'
+
+export default {
+  fetch: s.handler(appRouter),
+}
+```
+
+For Nuxt, enable the Nitro WebSocket feature in `nuxt.config.ts`:
+
+```ts
+export default defineNuxtConfig({
+  nitro: { features: { websocket: true } },
+})
+```
+
+That's it — subscriptions in your router are reachable over `ws://host/_ws` out of the box.
 
 ### With serve()
 
@@ -90,7 +105,7 @@ await attachWebSocket(server, appRouter)
 server.listen(3000)
 ```
 
-Both `attachWebSocket` and `createWSHooks` accept a context factory via the `context` option. The factory receives the `Peer` object:
+`attachWebSocket` accepts a context factory via the `context` option. The factory receives the `Peer` object:
 
 ```ts twoslash
 // @noErrors
@@ -104,56 +119,6 @@ await attachWebSocket(server, appRouter, {
 ```
 
 When a client disconnects, all in-flight requests for that peer are automatically aborted.
-
-### With createWSHooks (Nitro, Nuxt, Deno, Bun)
-
-For frameworks that use crossws natively, use `createWSHooks` to get crossws-compatible hooks:
-
-```ts twoslash
-// @noErrors
-import { createWSHooks } from 'silgi/ws'
-
-// Returns crossws hooks — works with any crossws integration
-const hooks = createWSHooks(appRouter)
-```
-
-<Tabs items={['Nuxt / Nitro', 'Deno', 'Bun']}>
-  <Tab value='Nuxt / Nitro'>
-  ```ts title="server/routes/_ws.ts"
-  import { createWSHooks } from 'silgi/ws'
-  import { appRouter } from '../rpc/router'
-
-// @ts-expect-error — Nitro auto-import
-export default defineWebSocketHandler(createWSHooks(appRouter))
-
-````
-
-Enable in `nuxt.config.ts`:
-
-```ts
-export default defineNuxtConfig({
-  nitro: { features: { websocket: true } },
-})
-````
-
-  </Tab>
-  <Tab value='Deno'>
-  ```ts
-  import { createWSHooks } from 'silgi/ws'
-
-Deno.serve({ handler: fetchHandler, websocket: createWSHooks(appRouter) })
-
-````
-</Tab>
-<Tab value='Bun'>
-```ts
-import { createWSHooks } from 'silgi/ws'
-
-Bun.serve({ fetch: fetchHandler, websocket: createWSHooks(appRouter) })
-````
-
-  </Tab>
-</Tabs>
 
 ## Message protocol
 
@@ -175,7 +140,7 @@ The server responds with the result:
 
 ### Errors
 
-If the procedure fails or is not WebSocket-enabled, the server sends an error:
+If the procedure fails or the path does not exist, the server sends an error:
 
 ```json
 { "id": "2", "error": { "code": "NOT_FOUND", "status": 404, "message": "Procedure not found" } }
@@ -217,7 +182,15 @@ const users = await client.users.list({ limit: 10 })
 link.dispose()
 ```
 
-`WSLink` handles connection lifecycle automatically — it connects on the first call, reconnects if the connection drops, and multiplexes concurrent calls over a single WebSocket.
+`WSLink` handles connection lifecycle automatically — it connects on the first call, multiplexes concurrent calls over a single WebSocket, and transparently returns an `AsyncIterableIterator` for subscription procedures:
+
+```ts twoslash
+// @noErrors
+const iter = await client.clock()
+for await (const tick of iter) {
+  console.log(tick.count)
+}
+```
 
 | Option      | Type                      | Default                | Description                  |
 | ----------- | ------------------------- | ---------------------- | ---------------------------- |

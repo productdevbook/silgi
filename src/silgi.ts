@@ -319,9 +319,10 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
     handler: (routerDef, options) => {
       const fetchHandler = wrapHandler(createFetchHandler(routerDef, contextFactory, hooks), routerDef, options)
 
-      // Check if router has ws-enabled procedures → auto-attach crossws hooks for Nitro/srvx
+      // Check if router has any WS-relevant procedures (subscriptions or ws-flagged) → auto-attach crossws hooks for Nitro/srvx
       const hasWsProcedures = (function checkWs(def: any): boolean {
         if (!def || typeof def !== 'object') return false
+        if (def.type === 'subscription') return true
         if (def.route?.ws) return true
         for (const v of Object.values(def)) {
           if (checkWs(v)) return true
@@ -336,8 +337,8 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
       let wsInitPromise: Promise<void> | undefined
 
       async function initWsHooks(): Promise<void> {
-        const { createWSHooks } = await import('./ws.ts')
-        wsHooks = createWSHooks(routerDef) as Record<string, Function>
+        const { _createWSHooks } = await import('./ws.ts')
+        wsHooks = _createWSHooks(routerDef) as Record<string, Function>
       }
 
       return async (request: Request): Promise<Response> => {

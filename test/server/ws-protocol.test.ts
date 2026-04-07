@@ -103,10 +103,9 @@ describe('WebSocket RPC (crossws)', () => {
     })
   })
 
-  it('rejects procedures without ws: true', async () => {
-    await expect(rpc('httpOnly')).rejects.toMatchObject({
-      code: 'NOT_FOUND',
-    })
+  it('allows procedures without ws: true flag (flag is now optional)', async () => {
+    const result = await rpc('httpOnly')
+    expect(result.secret).toBe(true)
   })
 
   it('returns error for invalid input', async () => {

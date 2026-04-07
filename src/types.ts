@@ -48,7 +48,19 @@ export interface Route {
    * - Only applies to query procedures (mutations and subscriptions are never cached)
    */
   cache?: number | string
-  /** Enable WebSocket RPC for this procedure */
+  /**
+   * Hint: mark this procedure as WebSocket-preferred.
+   *
+   * As of v0.51, ALL procedures are automatically callable over WebSocket when
+   * using `WSLink` or when `handler()` auto-attaches crossws hooks. This flag is
+   * no longer required for WS access.
+   *
+   * Setting `ws: true` still triggers auto-WS attachment in adapters that need
+   * an explicit signal (e.g. Nitro `/_ws` route injection), and is useful as
+   * documentation for procedures intended to be consumed over WS.
+   *
+   * Subscriptions are always auto-routed to WS.
+   */
   ws?: boolean
 }
 

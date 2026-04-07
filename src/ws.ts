@@ -85,23 +85,13 @@ const peerAbortControllers = new WeakMap<Peer, Set<AbortController>>()
 const peerKeepaliveTimers = new WeakMap<Peer, ReturnType<typeof setInterval>>()
 
 /**
- * Create crossws-compatible hooks for Silgi RPC over WebSocket.
+ * Internal — build crossws-compatible hooks for Silgi RPC over WebSocket.
  *
- * Works with any crossws integration — Nitro, Deno, Bun, Cloudflare, etc.
- *
- * @example
- * ```ts
- * // Nitro / Nuxt
- * import { createWSHooks } from "silgi/ws";
- * export default defineWebSocketHandler(createWSHooks(appRouter));
- *
- * // With context
- * export default defineWebSocketHandler(createWSHooks(appRouter, {
- *   context: (peer) => ({ userId: peer.request?.headers.get('x-user-id') }),
- * }));
- * ```
+ * Used by `attachWebSocket()`, `serve({ ws: true })`, and `handler()` auto-WS.
+ * Not part of the public API; callers should use one of those higher-level entry points.
  */
-export function createWSHooks<TCtx extends Record<string, unknown>>(
+/** @internal — exported only for use by silgi.ts handler() and attachWebSocket(). Not part of the public API. */
+export function _createWSHooks<TCtx extends Record<string, unknown>>(
   routerDef: RouterDef,
   options: WSAdapterOptions<TCtx> = {},
 ): Partial<WSHooks> {
@@ -164,9 +154,9 @@ export function createWSHooks<TCtx extends Record<string, unknown>>(
 
       const { id, path, input } = req
 
-      // Route lookup — only procedures with ws: true are accessible
+      // Route lookup — all procedures are accessible via WS, no flag required
       const route = flat('POST', '/' + path)?.data
-      if (!route || !route.ws) {
+      if (!route) {
         send(peer, { id, error: { code: 'NOT_FOUND', status: 404, message: `Procedure "${path}" not found` } })
         return
       }
@@ -284,7 +274,7 @@ export async function attachWebSocket<TCtx extends Record<string, unknown>>(
   }
 
   const ws = nodeAdapter({
-    hooks: createWSHooks(routerDef, options),
+    hooks: _createWSHooks(routerDef, options),
     ...(Object.keys(serverOptions).length > 0 && { serverOptions }),
   })
 
