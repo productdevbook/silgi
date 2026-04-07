@@ -55,7 +55,8 @@ s.serve(appRouter, {
   port: 3000, // auto-finds next available if busy
   hostname: '0.0.0.0', // bind to all interfaces
   scalar: true, // API docs at /api/reference
-  ws: true, // WebSocket RPC on the same port
+  // ws is auto-enabled when the router contains a subscription.
+  // Pass ws: false to disable, or ws: { compress, keepalive, ... } to configure crossws.
   http2: {
     // HTTP/2 with TLS
     cert: './certs/cert.pem',
@@ -288,24 +289,21 @@ HTTP/2 requires TLS. Older clients that don't support HTTP/2 automatically fall 
 
 ## WebSocket support
 
-Enable bidirectional RPC alongside the HTTP server:
+WebSocket RPC is auto-enabled whenever your router contains a subscription. The same code works on Node, Bun, and Deno — silgi detects the runtime and wires crossws accordingly.
 
 ```ts twoslash
 // @noErrors
-s.serve(appRouter, {
-  port: 3000,
-  ws: true,
-})
+s.serve(appRouter, { port: 3000 })
 ```
 
 ```
 Silgi server running at http://127.0.0.1:3000
-  WebSocket RPC at ws://127.0.0.1:3000
+  WebSocket RPC at ws://127.0.0.1:3000/_ws (node)
 ```
 
-HTTP and WebSocket share the same port. Only procedures marked with `$route({ ws: true })` are accessible over WebSocket — other procedures remain HTTP-only.
+HTTP and WebSocket share the same port. Every procedure — queries, mutations, subscriptions — is reachable over both transports. Pass `ws: false` if you want to disable WebSocket even when subscriptions exist.
 
-See the [WebSocket protocol](/docs/protocols/websocket) page for per-procedure setup, framework integration, and the message format.
+See the [WebSocket protocol](/docs/protocols/websocket) page for the message format and client usage.
 
 ### WebSocket options
 

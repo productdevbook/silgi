@@ -103,20 +103,9 @@ const countdown = s.subscription(async function* () {
     await new Promise((r) => setTimeout(r, 1000))
   }
 })
-
-// SSE + WebSocket — add $route({ ws: true }) to also stream over WebSocket
-const liveFeed = s
-  .subscription()
-  .$route({ ws: true })
-  .$resolve(async function* () {
-    for (let i = 5; i > 0; i--) {
-      yield { count: i }
-      await new Promise((r) => setTimeout(r, 1000))
-    }
-  })
 ```
 
-The client receives a stream of `{ count: 5 }`, `{ count: 4 }`, ... `{ count: 1 }`.
+Subscriptions stream via SSE over HTTP and are automatically exposed over WebSocket — no flag required. The client receives `{ count: 5 }`, `{ count: 4 }`, ... `{ count: 1 }`.
 
 ### IDE autocomplete with `$output`
 

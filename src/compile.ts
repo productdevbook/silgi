@@ -422,8 +422,6 @@ export interface CompiledRoute {
   handler: CompiledHandler
   /** Pre-computed Cache-Control header value, or undefined if no caching */
   cacheControl?: string
-  /** Procedure is accessible over WebSocket */
-  ws?: boolean
   /** Skip body parsing — procedure receives raw request (e.g. catch-all proxy) */
   passthrough?: boolean
   /** HTTP method this route is registered for (uppercase) */
@@ -466,7 +464,6 @@ export function compileRouter(def: Record<string, unknown>): CompiledRouterFn {
       const compiled: CompiledRoute = {
         handler: compileProcedure(proc),
         cacheControl,
-        ws: route?.ws ?? undefined,
         passthrough: routePath.includes('**') || undefined,
         method,
       }

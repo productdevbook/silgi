@@ -8,15 +8,12 @@ export const appRouter = s.router({
     toggle: todos.toggle,
     remove: todos.remove,
   },
-  clock: s
-    .subscription()
-    .$route({ ws: true })
-    .$resolve(async function* () {
-      for (let i = 0; i < 5; i++) {
-        yield { tick: i + 1, time: new Date().toISOString() }
-        await new Promise((r) => setTimeout(r, 1000))
-      }
-    }),
+  clock: s.subscription().$resolve(async function* () {
+    for (let i = 0; i < 5; i++) {
+      yield { tick: i + 1, time: new Date().toISOString() }
+      await new Promise((r) => setTimeout(r, 1000))
+    }
+  }),
 })
 
 export type AppRouter = typeof appRouter

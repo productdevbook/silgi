@@ -122,11 +122,11 @@ export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}):
       }
     }
 
-    // Description (append WebSocket note if applicable)
+    // Description (append WebSocket note for subscriptions)
     let description = route?.description
-    if (route?.ws) {
+    if (proc.type === 'subscription') {
       const wsNote =
-        'Also available over WebSocket (`ws://`). Send `{ id, path: "' + path.join('/') + '", input }` as JSON.'
+        'Streams over WebSocket (`ws://…/_ws`). Send `{ id, path: "' + path.join('/') + '", input }` as JSON.'
       description = description ? `${description}\n\n${wsNote}` : wsNote
     }
 

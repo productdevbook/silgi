@@ -22,11 +22,8 @@ import type { Server } from 'node:http'
 const k = silgi({ context: () => ({}) })
 
 const appRouter = k.router({
-  health: k.$route({ ws: true }).$resolve(() => ({ status: 'ok' })),
-  echo: k
-    .$route({ ws: true })
-    .$input(z.object({ msg: z.string() }))
-    .$resolve(({ input }) => ({ echo: input.msg })),
+  health: k.$resolve(() => ({ status: 'ok' })),
+  echo: k.$input(z.object({ msg: z.string() })).$resolve(({ input }) => ({ echo: input.msg })),
 })
 
 const handle = k.handler(appRouter)

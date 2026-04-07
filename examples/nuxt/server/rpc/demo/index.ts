@@ -13,13 +13,10 @@ const timingWrap = s.wrap(async (_ctx, next) => {
   return result
 })
 
-export const slow = s
-  .$route({ ws: true })
-  .$use(timingWrap)
-  .$resolve(async () => {
-    await new Promise((r) => setTimeout(r, 100))
-    return { message: 'Done after 100ms', timestamp: Date.now() }
-  })
+export const slow = s.$use(timingWrap).$resolve(async () => {
+  await new Promise((r) => setTimeout(r, 100))
+  return { message: 'Done after 100ms', timestamp: Date.now() }
+})
 
 // ── HTTP Cache (Cache-Control header) ──────────────
 
@@ -53,20 +50,16 @@ export const invalidateCache = s.$resolve(async () => {
 
 // ── Subscription / SSE ─────────────────────────────
 
-export const clock = s
-  .subscription()
-  .$route({ ws: true })
-  .$resolve(async function* () {
-    for (let i = 0; i < 10; i++) {
-      yield { tick: i + 1, time: new Date().toISOString() }
-      await new Promise((r) => setTimeout(r, 1000))
-    }
-  })
+export const clock = s.subscription().$resolve(async function* () {
+  for (let i = 0; i < 10; i++) {
+    yield { tick: i + 1, time: new Date().toISOString() }
+    await new Promise((r) => setTimeout(r, 1000))
+  }
+})
 
 // ── Input validation demo ──────────────────────────
 
 export const compute = s
-  .$route({ ws: true })
   .$input(
     z.object({
       a: z.number(),

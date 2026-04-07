@@ -319,11 +319,10 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
     handler: (routerDef, options) => {
       const fetchHandler = wrapHandler(createFetchHandler(routerDef, contextFactory, hooks), routerDef, options)
 
-      // Check if router has any WS-relevant procedures (subscriptions or ws-flagged) → auto-attach crossws hooks for Nitro/srvx
+      // Check if router has any subscriptions → auto-attach crossws hooks for Nitro/srvx
       const hasWsProcedures = (function checkWs(def: any): boolean {
         if (!def || typeof def !== 'object') return false
         if (def.type === 'subscription') return true
-        if (def.route?.ws) return true
         for (const v of Object.values(def)) {
           if (checkWs(v)) return true
         }

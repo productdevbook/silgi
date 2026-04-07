@@ -21,7 +21,7 @@ For most APIs, HTTP is the right choice. WebSocket adds value when you need pers
 
 ## Enabling WebSocket on procedures
 
-Every procedure is reachable over WebSocket automatically — no flag required. Queries, mutations, and subscriptions all work through `WSLink` or `attachWebSocket`.
+Every procedure is reachable over WebSocket automatically — no flag or configuration required. Queries, mutations, and subscriptions all work over the same connection.
 
 ```ts twoslash
 // @noErrors
@@ -41,16 +41,24 @@ const clock = s.subscription().$resolve(async function* () {
 })
 ```
 
-<Callout type='info'>
-  `$route({ ws: true })` is still accepted and is used as a hint by adapters (such as Nitro) that need an explicit
-  marker to auto-attach WebSocket hooks. Subscriptions are always detected automatically and do not need the flag.
-</Callout>
-
 ## Server setup
 
-### With handler() — Nitro, Nuxt, Bun, Deno (zero config)
+### With serve() — Node, Bun, Deno (recommended)
 
-When you use `s.handler(appRouter)` as your entry point, WebSocket support is automatic. Any router containing a subscription (or a procedure with `$route({ ws: true })`) causes `handler()` to expose a `/_ws` endpoint that srvx/Nitro picks up natively — **no extra route file needed**.
+`s.serve()` is the universal entry point. WebSocket support is enabled automatically whenever the router contains at least one subscription procedure. The same code works on Node, Bun, and Deno — silgi detects the runtime and wires the right crossws adapter under the hood.
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, { port: 3000 })
+// HTTP on http://127.0.0.1:3000
+// WebSocket on ws://127.0.0.1:3000/_ws (if router has subscriptions)
+```
+
+Pass `ws: false` to disable auto-WS, or `ws: { compress, keepalive, maxPayload }` to tune crossws options.
+
+### With handler() — Nitro, Nuxt (zero config)
+
+When you use `s.handler(appRouter)` as your entry point, WebSocket support is automatic through srvx's `/_ws` convention. **No extra route file needed.**
 
 ```ts title="server.ts" twoslash
 // @noErrors
@@ -70,25 +78,11 @@ export default defineNuxtConfig({
 })
 ```
 
-That's it — subscriptions in your router are reachable over `ws://host/_ws` out of the box.
+Subscriptions in your router are reachable over `ws://host/_ws` out of the box.
 
-### With serve()
+### With attachWebSocket — Express, raw Node HTTP (escape hatch)
 
-If you're using `serve()`, add `ws: true`:
-
-```ts twoslash
-// @noErrors
-s.serve(appRouter, {
-  port: 3000,
-  ws: true,
-})
-```
-
-HTTP and WebSocket share the same port. Powered by [crossws](https://github.com/unjs/crossws).
-
-### With attachWebSocket (Express, Node HTTP)
-
-If you have your own HTTP server, attach WebSocket separately:
+Only needed when you already manage your own Node `http.Server` (Express, Fastify `.server`, raw Node HTTP). Prefer `s.serve()` when you can.
 
 ```ts twoslash
 // @noErrors
