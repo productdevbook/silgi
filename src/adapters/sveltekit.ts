@@ -3,12 +3,13 @@
  *
  * @example
  * ```ts
- * // src/routes/api/rpc/[...path]/+server.ts
+ * // src/routes/api/[...path]/+server.ts
  * import { createHandler } from "silgi/sveltekit"
  * import { appRouter } from "$lib/server/rpc"
  *
  * const handler = createHandler(appRouter, {
  *   context: (event) => ({ db: getDB(), user: event.locals.user }),
+ *   analytics: true,
  * })
  *
  * export const GET = handler
@@ -35,5 +36,5 @@ export function createHandler<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: SvelteKitAdapterOptions<TCtx> = {},
 ): (event: any) => Response | Promise<Response> {
-  return createEventFetchAdapter(router, options, '/api/rpc', (event) => event.request)
+  return createEventFetchAdapter(router, options, '/api', (event) => event.request)
 }

@@ -22,7 +22,7 @@ import { AnalyticsCollector } from './analytics/collector.ts'
 import { generateRequestId } from './analytics/request-id.ts'
 import { analyticsAuthResponse, analyticsHTML, checkAnalyticsAuth, serveAnalyticsRoute } from './analytics/routes.ts'
 import { RequestTrace } from './analytics/trace.ts'
-import { isAnalyticsPath, isTrackedRequestPath, round, sanitizeHeaders } from './analytics/utils.ts'
+import { isTrackedRequestPath, normalizeAnalyticsPath, round, sanitizeHeaders } from './analytics/utils.ts'
 
 import type { FetchHandler } from '../core/handler.ts'
 import type { AnalyticsOptions, TraceSpan } from './analytics/types.ts'
@@ -125,14 +125,18 @@ export function wrapWithAnalytics(handler: FetchHandler, options: AnalyticsOptio
   return async (request: Request): Promise<Response> => {
     const pathname = parseUrlPathname(request.url)
 
-    // Analytics dashboard routes
-    if (isAnalyticsPath(pathname)) {
+    // Analytics dashboard routes — accept either `api/analytics*` or bare
+    // `analytics*` (depending on adapter prefix). Normalize to the canonical
+    // `api/analytics[/sub]` shape so serveAnalyticsRoute's matching is stable.
+    const analyticsSub = normalizeAnalyticsPath(pathname)
+    if (analyticsSub !== null) {
+      const canonical = analyticsSub === '' ? 'api/analytics' : `api/analytics/${analyticsSub}`
       if (auth) {
         const authResult = checkAnalyticsAuth(request, auth)
         const ok = authResult instanceof Promise ? await authResult : authResult
-        if (!ok) return analyticsAuthResponse(pathname)
+        if (!ok) return analyticsAuthResponse(canonical)
       }
-      return serveAnalyticsRoute(pathname, request, collector, dashboardHtml)
+      return serveAnalyticsRoute(canonical, request, collector, dashboardHtml)
     }
 
     if (!isTrackedRequestPath(pathname) || collector.isIgnored(pathname)) {

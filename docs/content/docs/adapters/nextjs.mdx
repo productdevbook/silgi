@@ -13,12 +13,11 @@ Create a catch-all API route:
 
 ```ts twoslash
 // @noErrors
-// app/api/rpc/[...path]/route.ts
+// app/api/[...path]/route.ts
 import { createHandler } from 'silgi/nextjs'
 import { appRouter } from '~/server/rpc'
 
 const handler = createHandler(appRouter, {
-  prefix: '/api/rpc',
   context: (req) => ({
     db: getDB(),
     headers: Object.fromEntries(req.headers),
@@ -31,9 +30,9 @@ export { handler as GET, handler as POST }
 Procedures are accessible at:
 
 ```
-POST /api/rpc/users/list
-POST /api/rpc/users/create
-GET  /api/rpc/health
+POST /api/users/list
+POST /api/users/create
+GET  /api/health
 ```
 
 ## Server Actions

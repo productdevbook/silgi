@@ -60,8 +60,28 @@ export function isTrackedRequestPath(pathname: string): boolean {
   )
 }
 
+/**
+ * Normalize an incoming path to its analytics sub-path.
+ *
+ * Returns the sub-path after `analytics/` (e.g. `'stats'`, `'requests/5'`),
+ * an empty string for the dashboard root, or `null` if this isn't an
+ * analytics path at all.
+ *
+ * Accepts both `api/analytics*` (mounted under an `/api` RPC prefix) and
+ * bare `analytics*` (mounted at a prefix that already ends with `/api`),
+ * so the dashboard works regardless of adapter prefix configuration.
+ */
+export function normalizeAnalyticsPath(pathname: string): string | null {
+  const p = pathname.endsWith('/') ? pathname.slice(0, -1) : pathname
+  if (p === 'api/analytics') return ''
+  if (p.startsWith('api/analytics/')) return p.slice('api/analytics/'.length)
+  if (p === 'analytics') return ''
+  if (p.startsWith('analytics/')) return p.slice('analytics/'.length)
+  return null
+}
+
 export function isAnalyticsPath(pathname: string): boolean {
-  return pathname === 'api/analytics' || pathname.startsWith('api/analytics/')
+  return normalizeAnalyticsPath(pathname) !== null
 }
 
 /** Helper to safely cast unknown to Record. */

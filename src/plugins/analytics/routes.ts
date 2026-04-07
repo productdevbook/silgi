@@ -95,8 +95,9 @@ document.getElementById('f').onsubmit=function(e){
 e.preventDefault();
 var t=document.getElementById('t').value.trim();
 if(!t)return;
-document.cookie='silgi-auth='+encodeURIComponent(t)+';path=/api/analytics;samesite=strict';
-fetch('/api/analytics/stats',{headers:{'cookie':'silgi-auth='+encodeURIComponent(t)}}).then(function(){
+var base=location.pathname.replace(/\/$/,'');
+document.cookie='silgi-auth='+encodeURIComponent(t)+';path='+base+';samesite=strict';
+fetch(base+'/stats',{headers:{'cookie':'silgi-auth='+encodeURIComponent(t)}}).then(function(){
 location.reload();
 }).catch(function(){location.reload()});
 };

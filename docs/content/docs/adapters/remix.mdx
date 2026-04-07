@@ -11,12 +11,11 @@ Create a catch-all route:
 
 ```ts twoslash
 // @noErrors
-// app/routes/rpc.$.tsx
+// app/routes/api.$.tsx
 import { createHandler } from 'silgi/remix'
 import { appRouter } from '~/server/rpc'
 
 const handler = createHandler(appRouter, {
-  prefix: '/rpc',
   context: (args) => ({
     db: getDB(),
     headers: Object.fromEntries(args.request.headers),
@@ -30,9 +29,9 @@ export const loader = handler
 Procedures are accessible at:
 
 ```
-POST /rpc/users/list
-POST /rpc/users/create
-GET  /rpc/health
+POST /api/users/list
+POST /api/users/create
+GET  /api/health
 ```
 
 ## Context from Remix loaders
@@ -56,7 +55,6 @@ Enable the built-in [analytics dashboard](/docs/analytics) or [Scalar API refere
 ```ts twoslash
 // @noErrors
 const handler = createHandler(appRouter, {
-  prefix: '/rpc',
   context: (args) => ({ headers: Object.fromEntries(args.request.headers) }),
   analytics: {
     auth: process.env.ANALYTICS_TOKEN,

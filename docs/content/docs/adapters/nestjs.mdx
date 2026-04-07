@@ -20,7 +20,7 @@ const rpcHandler = createHandler(appRouter, {
   context: (req) => ({ db: getDB(), user: req.user }),
 })
 
-@Controller('rpc')
+@Controller('api')
 export class RpcController {
   @All('*')
   async handle(@Req() req: Request, @Res() res: Response) {
@@ -32,8 +32,8 @@ export class RpcController {
 Procedures are accessible at:
 
 ```
-POST /rpc/users/list
-POST /rpc/users/create
+POST /api/users/list
+POST /api/users/create
 ```
 
 ## Context from NestJS

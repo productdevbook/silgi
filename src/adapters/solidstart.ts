@@ -3,13 +3,13 @@
  *
  * @example
  * ```ts
- * // src/routes/api/rpc/[...path].ts
+ * // src/routes/api/[...path].ts
  * import { createHandler } from "silgi/solidstart"
  * import { appRouter } from "~/server/rpc"
  *
  * const handler = createHandler(appRouter, {
- *   prefix: "/api/rpc",
  *   context: (event) => ({ db: getDB() }),
+ *   analytics: true,
  * })
  *
  * export const GET = handler
@@ -34,5 +34,5 @@ export function createHandler<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: SolidStartAdapterOptions<TCtx> = {},
 ): (event: any) => Response | Promise<Response> {
-  return createEventFetchAdapter(router, options, '/api/rpc', (event) => event.request ?? event)
+  return createEventFetchAdapter(router, options, '/api', (event) => event.request ?? event)
 }

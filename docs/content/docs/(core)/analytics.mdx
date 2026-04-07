@@ -335,7 +335,7 @@ All fetch-based adapters (SvelteKit, Next.js, Astro, Remix, SolidStart) support 
 
 ```ts twoslash
 // @noErrors
-// SvelteKit — src/routes/api/rpc/[...path]/+server.ts
+// SvelteKit — src/routes/api/[...path]/+server.ts
 import { createHandler } from 'silgi/sveltekit'
 
 const handler = createHandler(appRouter, {
@@ -351,7 +351,7 @@ export const POST = handler
 
 ```ts twoslash
 // @noErrors
-// Next.js — app/api/rpc/[...path]/route.ts
+// Next.js — app/api/[...path]/route.ts
 import { createHandler } from 'silgi/nextjs'
 
 const handler = createHandler(appRouter, {

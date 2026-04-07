@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { getAnalyticsBase } from '@/lib/api-base'
+
 import type { AnalyticsData, ErrorEntry, RequestEntry, ScheduledTaskInfo, TaskExecution } from '@/lib/types'
 
+const BASE = getAnalyticsBase()
 const ENDPOINTS = {
-  stats: '/api/analytics/stats',
-  errors: '/api/analytics/errors?limit=500&sort=timestamp&order=desc',
-  requests: '/api/analytics/requests?limit=500&sort=timestamp&order=desc',
-  tasks: '/api/analytics/tasks?limit=500&sort=timestamp&order=desc',
-  scheduled: '/api/analytics/scheduled',
-  stream: '/api/analytics/stream',
+  stats: `${BASE}/stats`,
+  errors: `${BASE}/errors?limit=500&sort=timestamp&order=desc`,
+  requests: `${BASE}/requests?limit=500&sort=timestamp&order=desc`,
+  tasks: `${BASE}/tasks?limit=500&sort=timestamp&order=desc`,
+  scheduled: `${BASE}/scheduled`,
+  stream: `${BASE}/stream`,
 } as const
 
 const MAX_BUFFER = 2000

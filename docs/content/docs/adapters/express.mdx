@@ -18,11 +18,11 @@ const app = express()
 app.use(express.json()) // Required for POST body parsing
 
 // Existing routes
-app.get('/api/health', (req, res) => res.json({ status: 'ok' }))
+app.get('/health', (req, res) => res.json({ status: 'ok' }))
 
-// Silgi RPC under /rpc
+// Silgi RPC under /api
 app.use(
-  '/rpc',
+  '/api',
   createHandler(appRouter, {
     context: (req) => ({
       db: getDB(),
@@ -53,8 +53,8 @@ createHandler(appRouter, {
 ## Route behavior
 
 - Procedures are matched by the path after the mount prefix
-- `POST /rpc/users/list` → calls `users.list` with the JSON body as input
-- `GET /rpc/users/list?data={"limit":10}` → calls `users.list` with parsed query data
+- `POST /api/users/list` → calls `users.list` with the JSON body as input
+- `GET /api/users/list?data={"limit":10}` → calls `users.list` with parsed query data
 - Unmatched paths pass through to the next Express middleware (`next()`)
 
 <Callout type='info'>

@@ -3,13 +3,13 @@
  *
  * @example
  * ```ts
- * // src/pages/api/rpc/[...path].ts
+ * // src/pages/api/[...path].ts
  * import { createHandler } from "silgi/astro"
  * import { appRouter } from "~/server/rpc"
  *
  * const handler = createHandler(appRouter, {
- *   prefix: "/api/rpc",
  *   context: (req) => ({ db: getDB() }),
+ *   analytics: true,
  * })
  *
  * export const GET = handler
@@ -33,6 +33,6 @@ export function createHandler<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: AstroAdapterOptions<TCtx> = {},
 ): (ctx: { request: Request; params: Record<string, string> }) => Response | Promise<Response> {
-  const handler = createFetchAdapter(router, options, '/api/rpc')
+  const handler = createFetchAdapter(router, options, '/api')
   return ({ request }) => handler(request)
 }

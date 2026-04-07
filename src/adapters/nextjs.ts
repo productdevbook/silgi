@@ -3,12 +3,13 @@
  *
  * @example
  * ```ts
- * // app/api/rpc/[...path]/route.ts
+ * // app/api/[...path]/route.ts
  * import { createHandler } from "silgi/nextjs"
  * import { appRouter } from "~/server/rpc"
  *
  * const handler = createHandler(appRouter, {
  *   context: (req) => ({ db: getDB() }),
+ *   analytics: true,
  * })
  *
  * export { handler as GET, handler as POST }
@@ -32,5 +33,5 @@ export function createHandler<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: NextjsAdapterOptions<TCtx> = {},
 ): (req: Request) => Response | Promise<Response> {
-  return createFetchAdapter(router, options, '/api/rpc')
+  return createFetchAdapter(router, options, '/api')
 }

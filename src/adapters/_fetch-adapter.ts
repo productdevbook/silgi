@@ -14,7 +14,7 @@ import type { FetchHandler, WrapHandlerOptions } from '../core/handler.ts'
 import type { RouterDef } from '../types.ts'
 
 export interface FetchAdapterConfig<TCtx extends Record<string, unknown>> extends WrapHandlerOptions {
-  /** Route prefix to strip. Default: "/api/rpc" */
+  /** Route prefix to strip. Default: "/api" */
   prefix?: string
   /** Context factory — receives the Request (or framework event via eventMap). */
   context?: (req: Request) => TCtx | Promise<TCtx>
@@ -28,6 +28,7 @@ export interface FetchAdapterConfigWithEvent<
   TCtx extends Record<string, unknown>,
   TEvent = any,
 > extends WrapHandlerOptions {
+  /** Route prefix to strip. Default: "/api" */
   prefix?: string
   /** Context factory — receives the framework event, not raw Request. */
   context?: (event: TEvent) => TCtx | Promise<TCtx>

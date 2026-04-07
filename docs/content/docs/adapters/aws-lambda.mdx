@@ -28,7 +28,7 @@ export const handler = createHandler(appRouter, {
 Map a catch-all route to your Lambda:
 
 ```
-ANY /rpc/{proxy+}  →  your-lambda-function
+ANY /api/{proxy+}  →  your-lambda-function
 ```
 
 Then set the prefix in the adapter:
@@ -36,7 +36,7 @@ Then set the prefix in the adapter:
 ```ts twoslash
 // @noErrors
 export const handler = createHandler(appRouter, {
-  prefix: '/rpc',
+  prefix: '/api',
   context: (event) => ({ db: getDB() }),
 })
 ```

@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { getAnalyticsBase } from '@/lib/api-base'
 import { fmtMs, fmtRelativeTime, fmtTime } from '@/lib/format'
 import { filterErrors, getProcedureOptions } from '@/lib/list-filters'
 import { isSensitiveHeader, shouldRedactSensitiveData } from '@/lib/privacy'
@@ -275,7 +276,7 @@ export function Errors({ errors, navigate, initialProcedure }: ErrorsProps) {
                   <ContextMenuItem onClick={() => navigate('errors', String(entry.id))}>View details</ContextMenuItem>
                   <ContextMenuItem
                     onClick={() => {
-                      fetch('/api/analytics/hidden', {
+                      fetch(`${getAnalyticsBase()}/hidden`, {
                         method: 'POST',
                         headers: { 'content-type': 'application/json' },
                         body: JSON.stringify({ path: entry.procedure }),

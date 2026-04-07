@@ -14,7 +14,8 @@ function toCurlValue(value: string): string {
 }
 
 function getAnalyticsOrigin(): string {
-  return typeof window === 'undefined' ? '' : window.location.origin
+  if (typeof window === 'undefined') return ''
+  return window.location.origin + window.location.pathname.replace(/\/$/, '')
 }
 
 function analyticsMarkdownCurl(url: string): string {
@@ -209,7 +210,7 @@ export function requestTimingMarkdown(entry: RequestEntry): string {
 
 export function requestMarkdownUrl(entry: RequestEntry): string {
   const id = encodeURIComponent(entry.requestId || String(entry.id))
-  return `${getAnalyticsOrigin()}/api/analytics/requests/${id}/md`
+  return `${getAnalyticsOrigin()}/requests/${id}/md`
 }
 
 export function requestMarkdownCurl(entry: RequestEntry): string {
@@ -217,7 +218,7 @@ export function requestMarkdownCurl(entry: RequestEntry): string {
 }
 
 export function errorMarkdownUrl(entry: ErrorEntry): string {
-  return `${getAnalyticsOrigin()}/api/analytics/errors/${encodeURIComponent(String(entry.id))}/md`
+  return `${getAnalyticsOrigin()}/errors/${encodeURIComponent(String(entry.id))}/md`
 }
 
 export function errorMarkdownCurl(entry: ErrorEntry): string {

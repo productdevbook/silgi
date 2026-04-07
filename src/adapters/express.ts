@@ -7,7 +7,7 @@
  * import { createHandler } from "silgi/express"
  *
  * const app = express()
- * app.use("/rpc", createHandler(appRouter, {
+ * app.use("/api", createHandler(appRouter, {
  *   context: (req) => ({ db: getDB(), user: req.user }),
  * }))
  * app.listen(3000)

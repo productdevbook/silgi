@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { getAnalyticsBase } from '@/lib/api-base'
 import { fmtMs, fmtRelativeTime, fmtTime } from '@/lib/format'
 import { filterRequests, getProcedureOptions } from '@/lib/list-filters'
 import { cn } from '@/lib/utils'
@@ -352,7 +353,7 @@ export function Requests({ requests, navigate, initialProcedure }: RequestsProps
                     </ContextMenuItem>
                     <ContextMenuItem
                       onClick={() => {
-                        fetch('/api/analytics/hidden', {
+                        fetch(`${getAnalyticsBase()}/hidden`, {
                           method: 'POST',
                           headers: { 'content-type': 'application/json' },
                           body: JSON.stringify({ path: entry.path }),

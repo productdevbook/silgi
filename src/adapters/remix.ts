@@ -3,13 +3,13 @@
  *
  * @example
  * ```ts
- * // app/routes/rpc.$.tsx
+ * // app/routes/api.$.tsx
  * import { createHandler } from "silgi/remix"
  * import { appRouter } from "~/server/rpc"
  *
  * const handler = createHandler(appRouter, {
- *   prefix: "/rpc",
  *   context: (req) => ({ db: getDB() }),
+ *   analytics: true,
  * })
  *
  * export const action = handler
@@ -32,6 +32,6 @@ export function createHandler<TCtx extends Record<string, unknown>>(
   router: RouterDef,
   options: RemixAdapterOptions<TCtx> = {},
 ): (args: { request: Request; params: Record<string, string> }) => Response | Promise<Response> {
-  const handler = createFetchAdapter(router, options, '/rpc')
+  const handler = createFetchAdapter(router, options, '/api')
   return ({ request }) => handler(request)
 }
