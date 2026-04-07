@@ -1,0 +1,62 @@
+---
+title: 0.51.0
+description: Analytics dashboard now works in every fetch-based adapter, default adapter prefix switched from /api/rpc to /api.
+version: 0.51.0
+date: 2026-04-07
+---
+
+## Analytics dashboard in framework adapters
+
+The built-in [analytics dashboard](/docs/analytics) now works in every fetch-based adapter — SvelteKit, Next.js, Astro, Remix, SolidStart. Previously the `analytics` option was wired into `serve()` / `handler()` only; in adapters it was accepted but the dashboard path didn't match after prefix stripping, so hitting `/api/analytics` returned `Procedure not found`.
+
+```ts
+// src/routes/api/[...path]/+server.ts
+import { createHandler } from 'silgi/sveltekit'
+import { appRouter } from '$lib/server/rpc'
+
+const handler = createHandler(appRouter, {
+  context: (event) => ({ user: event.locals.user }),
+  analytics: true,
+})
+
+export const GET = handler
+export const POST = handler
+```
+
+Dashboard available at `http://localhost:5173/api/analytics` regardless of which framework you use.
+
+### What changed under the hood
+
+- `normalizeAnalyticsPath` helper accepts both `api/analytics*` and bare `analytics*` post-strip paths, so the dashboard is reachable no matter what `prefix` the adapter strips.
+- The dashboard bundle no longer hardcodes absolute `/api/analytics/*` URLs. All fetches are derived from `window.location.pathname`, making the bundle mount-path agnostic.
+- Login HTML derives cookie path and fetch base from `location.pathname`.
+
+## Breaking: default adapter prefix is now `/api`
+
+The default `prefix` in fetch-based adapters was previously `/api/rpc` (SvelteKit, Next.js, Astro, SolidStart) or `/rpc` (Remix). It is now **`/api`** across all of them.
+
+If you relied on the old default, set `prefix` explicitly:
+
+```ts
+const handler = createHandler(appRouter, {
+  prefix: '/api/rpc', // pre-0.51.0 default
+  context: (event) => ({ user: event.locals.user }),
+})
+```
+
+Recommended new convention:
+
+| Framework   | Route file                              | URL                      |
+| ----------- | --------------------------------------- | ------------------------ |
+| SvelteKit   | `src/routes/api/[...path]/+server.ts`   | `POST /api/users/list`   |
+| Next.js     | `app/api/[...path]/route.ts`            | `POST /api/users/list`   |
+| Astro       | `src/pages/api/[...path].ts`            | `POST /api/users/list`   |
+| SolidStart  | `src/routes/api/[...path].ts`           | `POST /api/users/list`   |
+| Remix       | `app/routes/api.$.tsx`                  | `POST /api/users/list`   |
+
+## Smaller changes
+
+- All adapter JSDoc examples now show `analytics: true` and the `/api/[...path]` route pattern.
+- Docs pages for every adapter ([SvelteKit](/docs/adapters/sveltekit), [Next.js](/docs/adapters/nextjs), [Astro](/docs/adapters/astro), [SolidStart](/docs/adapters/solidstart), [Remix](/docs/adapters/remix), [Express](/docs/adapters/express), [AWS Lambda](/docs/adapters/aws-lambda), [NestJS](/docs/adapters/nestjs)) updated to the new `/api` convention.
+- `FetchAdapterConfigWithEvent` now documents the `prefix` option.
+- Lint pass: `Array#toSorted()` in `alerts.ts`, oxfmt import order fixes.
