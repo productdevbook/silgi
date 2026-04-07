@@ -1,11 +1,70 @@
 ---
 title: 0.51.0
-description: Analytics dashboard now works in every fetch-based adapter, default adapter prefix switched from /api/rpc to /api.
+description: Zero-config WebSocket across Node/Bun/Deno/Nitro, universal procedure access over WS, analytics dashboard in every fetch adapter, and /api as the new default prefix.
 version: 0.51.0
 date: 2026-04-07
 ---
 
-## Analytics dashboard in framework adapters
+This release makes WebSocket support effectively invisible — add a subscription, run `serve()`, and you're done. It also fixes the built-in analytics dashboard so it works in every framework adapter, and switches the default URL prefix from `/api/rpc` to `/api`.
+
+## Zero-config WebSocket in `serve()`
+
+`serve()` now detects the runtime (Node / Bun / Deno) and wires the matching [crossws](https://github.com/h3js/crossws) adapter automatically. WebSocket is auto-enabled whenever the router contains a subscription — no flags, no manual `attachWebSocket`, no runtime-specific setup.
+
+```ts
+import { s } from './rpc/instance'
+import { appRouter } from './rpc/router'
+
+s.serve(appRouter, { port: 3000 })
+// Same code runs on Node, Bun, and Deno.
+// WebSocket upgrades on /_ws are handled automatically if a subscription exists.
+```
+
+Opt out or tune via options:
+
+```ts
+s.serve(appRouter, {
+  port: 3000,
+  ws: false, // disable entirely
+  // or: ws: { compress: true, keepalive: 30 }
+})
+```
+
+See [serve() docs](/docs/server) and [WebSocket docs](/docs/protocols/websocket).
+
+## Every procedure reachable over WebSocket
+
+The `$route({ ws: true })` flag is **gone**. Previously queries and mutations were HTTP-only unless explicitly opted into WS — that restriction is removed. Every procedure in the router is now reachable over WebSocket. Subscriptions are the sole signal that WS should be attached.
+
+`WSLink` on the client side now:
+
+- Honors `protocol: 'messagepack'` for binary-encoded frames
+- Returns an `AsyncIterableIterator` for subscriptions so you can `for await` over streamed values
+
+```ts
+import { createClient, wsLink } from 'silgi/client'
+import type { AppRouter } from './server/router'
+
+const client = createClient<AppRouter>({
+  link: wsLink({ url: 'ws://localhost:3000/_ws', protocol: 'messagepack' }),
+})
+
+// Queries and mutations flow over the same socket
+const user = await client.users.byId.query({ id: 1 })
+
+// Subscriptions stream naturally
+for await (const event of client.events.stream.subscribe({ topic: 'orders' })) {
+  console.log(event)
+}
+```
+
+## Auto WebSocket for Nitro / h3
+
+When `s.handler()` detects subscriptions in the router, it now automatically intercepts the `/_ws` path and attaches crossws hooks. Nitro (and therefore Nuxt) picks this up without requiring a manual `server/routes/_ws.ts` file — zero config.
+
+The obsolete `examples/nuxt/server/routes/_ws.ts` is removed.
+
+## Analytics dashboard in every fetch adapter
 
 The built-in [analytics dashboard](/docs/analytics) now works in every fetch-based adapter — SvelteKit, Next.js, Astro, Remix, SolidStart. Previously the `analytics` option was wired into `serve()` / `handler()` only; in adapters it was accepted but the dashboard path didn't match after prefix stripping, so hitting `/api/analytics` returned `Procedure not found`.
 
@@ -23,12 +82,12 @@ export const GET = handler
 export const POST = handler
 ```
 
-Dashboard available at `http://localhost:5173/api/analytics` regardless of which framework you use.
+Dashboard at `http://localhost:5173/api/analytics`, regardless of framework.
 
 ### What changed under the hood
 
-- `normalizeAnalyticsPath` helper accepts both `api/analytics*` and bare `analytics*` post-strip paths, so the dashboard is reachable no matter what `prefix` the adapter strips.
-- The dashboard bundle no longer hardcodes absolute `/api/analytics/*` URLs. All fetches are derived from `window.location.pathname`, making the bundle mount-path agnostic.
+- New `normalizeAnalyticsPath` helper accepts both `api/analytics*` and bare `analytics*` post-strip paths, so the dashboard is reachable no matter what `prefix` the adapter strips.
+- The dashboard bundle no longer hardcodes absolute `/api/analytics/*` URLs. All fetches derive from `window.location.pathname`, making the bundle mount-path agnostic.
 - Login HTML derives cookie path and fetch base from `location.pathname`.
 
 ## Breaking: default adapter prefix is now `/api`
@@ -54,9 +113,35 @@ Recommended new convention:
 | SolidStart  | `src/routes/api/[...path].ts`           | `POST /api/users/list`   |
 | Remix       | `app/routes/api.$.tsx`                  | `POST /api/users/list`   |
 
+## Breaking: `$route({ ws: true })` flag removed
+
+The `ws` property on `$route()` was used to mark individual procedures as WebSocket-enabled. That flag is gone — all procedures are reachable over WS when the transport is attached, and subscriptions alone decide whether WS is attached.
+
+If you had procedures marked with `$route({ ws: true })`, just drop the flag:
+
+```ts
+// Before
+const createOrder = s
+  .$route({ method: 'POST', ws: true })
+  .$input(schema)
+  .$resolve(({ input }) => createOrderImpl(input))
+
+// After
+const createOrder = s
+  .$route({ method: 'POST' })
+  .$input(schema)
+  .$resolve(({ input }) => createOrderImpl(input))
+```
+
+## Internal refactor: `wrapHandler()`
+
+Analytics and Scalar wrapping logic was duplicated across `silgi.ts`, `serve.ts`, and `_fetch-adapter.ts`. Consolidated into a single `wrapHandler()` in `core/handler.ts` — adding new wrappers now requires a single change.
+
 ## Smaller changes
 
-- All adapter JSDoc examples now show `analytics: true` and the `/api/[...path]` route pattern.
+- `createWSHooks` is now internal (`_createWSHooks`); `attachWebSocket`, `serve`, and `handler` are the only public WS entry points.
+- All adapter JSDoc examples show `analytics: true` and the `/api/[...path]` route pattern.
 - Docs pages for every adapter ([SvelteKit](/docs/adapters/sveltekit), [Next.js](/docs/adapters/nextjs), [Astro](/docs/adapters/astro), [SolidStart](/docs/adapters/solidstart), [Remix](/docs/adapters/remix), [Express](/docs/adapters/express), [AWS Lambda](/docs/adapters/aws-lambda), [NestJS](/docs/adapters/nestjs)) updated to the new `/api` convention.
 - `FetchAdapterConfigWithEvent` now documents the `prefix` option.
-- Lint pass: `Array#toSorted()` in `alerts.ts`, oxfmt import order fixes.
+- New test coverage: `test/client/ws-link.test.ts` (flag-less query + subscription iterator).
+- Lint pass: `Array#toSorted()` in `alerts.ts`.
