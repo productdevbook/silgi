@@ -56,15 +56,18 @@ export function createFetchAdapter<TCtx extends Record<string, unknown>>(
 ): FetchHandler {
   const prefix = options.prefix ?? defaultPrefix
   const contextFactory = options.context ?? (() => ({}) as TCtx)
+  const inner = createFetchHandler(router, contextFactory as (req: Request) => Record<string, unknown>)
+  // Wrap analytics/scalar around the OUTER handler so they see the original
+  // (non-rewritten) request URL — otherwise the `/api` prefix has already been
+  // stripped and analytics' `isTrackedRequestPath` filter rejects every call.
   const handler = wrapHandler(
-    createFetchHandler(router, contextFactory as (req: Request) => Record<string, unknown>),
+    (request: Request): Response | Promise<Response> => inner(rewriteRequest(request, prefix)),
     router,
     options,
+    prefix,
   )
 
-  return (request: Request): Response | Promise<Response> => {
-    return handler(rewriteRequest(request, prefix))
-  }
+  return handler
 }
 
 /**
@@ -81,21 +84,29 @@ export function createEventFetchAdapter<TCtx extends Record<string, unknown>, TE
   const prefix = options.prefix ?? defaultPrefix
   const requestEventMap = new WeakMap<Request, TEvent>()
 
+  const inner = createFetchHandler(router, (_req: Request) => {
+    const eventRef = requestEventMap.get(_req)
+    if (options.context && eventRef)
+      return options.context(eventRef) as Record<string, unknown> | Promise<Record<string, unknown>>
+    return {} as Record<string, unknown>
+  })
+  // Wrap analytics/scalar around the OUTER handler so they see the original
+  // (non-rewritten) request URL — see note in createFetchAdapter above.
   const handler = wrapHandler(
-    createFetchHandler(router, (_req: Request) => {
-      const eventRef = requestEventMap.get(_req)
-      if (options.context && eventRef)
-        return options.context(eventRef) as Record<string, unknown> | Promise<Record<string, unknown>>
-      return {} as Record<string, unknown>
-    }),
+    (request: Request): Response | Promise<Response> => {
+      const rewritten = rewriteRequest(request, prefix)
+      const eventRef = requestEventMap.get(request)
+      if (eventRef) requestEventMap.set(rewritten, eventRef)
+      return inner(rewritten)
+    },
     router,
     options,
+    prefix,
   )
 
   return (event: TEvent): Response | Promise<Response> => {
     const request = extractRequest(event)
-    const rewritten = rewriteRequest(request, prefix)
-    requestEventMap.set(rewritten, event)
-    return handler(rewritten)
+    requestEventMap.set(request, event)
+    return handler(request)
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "silgi",
-  "version": "0.51.0",
+  "version": "0.51.1",
   "private": false,
   "description": "The fastest end-to-end type-safe RPC framework for TypeScript — compiled pipelines, single package, every runtime",
   "keywords": [
@@ -268,6 +268,7 @@
     "ocache": "^0.1.4",
     "ofetch": "2.0.0-alpha.3",
     "ohash": "^2.0.11",
+    "rou3": "^0.8.1",
     "srvx": "^0.11.13",
     "unstorage": "^2.0.0-alpha.7"
   },
@@ -313,6 +314,8 @@
   "peerDependencies": {
     "@pinia/colada": ">=0.16.0",
     "@scalar/api-reference": ">=1.0.0",
+    "ai": ">=5.0.0",
+    "oxc-parser": ">=0.50.0",
     "vue": ">=3.3.0"
   },
   "peerDependenciesMeta": {
@@ -320,6 +323,12 @@
       "optional": true
     },
     "@pinia/colada": {
+      "optional": true
+    },
+    "ai": {
+      "optional": true
+    },
+    "oxc-parser": {
       "optional": true
     },
     "vue": {

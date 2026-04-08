@@ -99,14 +99,19 @@ function toOpenAPIPath(raw: string): { httpPath: string; pathParams: string[] } 
   return { httpPath, pathParams }
 }
 
-export function generateOpenAPI(router: RouterDef, options: ScalarOptions = {}): Record<string, unknown> {
+export function generateOpenAPI(
+  router: RouterDef,
+  options: ScalarOptions = {},
+  basePath: string = '',
+): Record<string, unknown> {
   const paths: Record<string, Record<string, unknown>> = {}
   const tags = new Map<string, { description?: string }>()
 
   collectProcedures(router, [], (path, proc) => {
     const route = proc.route as Route | null
     const rawPath = route?.path ?? '/' + path.join('/')
-    const { httpPath, pathParams } = toOpenAPIPath(rawPath)
+    const { httpPath: routePath, pathParams } = toOpenAPIPath(rawPath)
+    const httpPath = basePath ? basePath.replace(/\/$/, '') + routePath : routePath
     const rawMethod = route?.method?.toLowerCase() ?? 'post'
     const validMethods = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace']
     const methods = rawMethod === '*' ? validMethods : [rawMethod]
@@ -448,9 +453,20 @@ import type { FetchHandler } from './core/handler.ts'
  * Wrap a fetch handler to serve Scalar API Reference at /api/reference and /api/openapi.json.
  * Scalar routes are intercepted before the handler — zero overhead for normal requests.
  */
-export function wrapWithScalar(handler: FetchHandler, routerDef: RouterDef, options: ScalarOptions = {}): FetchHandler {
-  const specJson = JSON.stringify(generateOpenAPI(routerDef, options))
-  const specHtml = scalarHTML('/api/openapi.json', options)
+export function wrapWithScalar(
+  handler: FetchHandler,
+  routerDef: RouterDef,
+  options: ScalarOptions = {},
+  prefix: string = '/api',
+): FetchHandler {
+  // Normalize prefix: ensure leading slash, strip trailing
+  const normPrefix = (prefix.startsWith('/') ? prefix : '/' + prefix).replace(/\/+$/, '')
+  const specJson = JSON.stringify(generateOpenAPI(routerDef, options, normPrefix))
+  const specUrl = `${normPrefix}/openapi.json`
+  const specHtml = scalarHTML(specUrl, options)
+  // Interception paths are relative (no leading slash) to match pathname form.
+  const openapiMatch = `${normPrefix.slice(1)}/openapi.json`
+  const referenceMatch = `${normPrefix.slice(1)}/reference`
 
   return (request: Request): Response | Promise<Response> => {
     const url = request.url
@@ -459,10 +475,10 @@ export function wrapWithScalar(handler: FetchHandler, routerDef: RouterDef, opti
     const fullPath = qMark === -1 ? url.slice(pathStart) : url.slice(pathStart, qMark)
     const pathname = fullPath.length > 1 ? fullPath.slice(1) : ''
 
-    if (pathname === 'api/openapi.json') {
+    if (pathname === openapiMatch) {
       return new Response(specJson, { headers: { 'content-type': 'application/json' } })
     }
-    if (pathname === 'api/reference') {
+    if (pathname === referenceMatch) {
       return new Response(specHtml, { headers: { 'content-type': 'text/html' } })
     }
 

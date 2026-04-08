@@ -119,6 +119,7 @@ export function wrapHandler(
   handler: FetchHandler,
   router: import('../types.ts').RouterDef,
   options?: WrapHandlerOptions,
+  prefix?: string,
 ): FetchHandler {
   if (!options?.scalar && !options?.analytics) return handler
 
@@ -130,7 +131,7 @@ export function wrapHandler(
     if (options!.scalar) {
       const { wrapWithScalar } = await import('../scalar.ts')
       const scalarOpts = typeof options!.scalar === 'object' ? options!.scalar : {}
-      h = wrapWithScalar(h, router, scalarOpts)
+      h = wrapWithScalar(h, router, scalarOpts, prefix)
     }
     if (options!.analytics) {
       const { wrapWithAnalytics } = await import('../plugins/analytics.ts')
