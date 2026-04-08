@@ -9,6 +9,7 @@
  */
 
 import { createFetchHandler, wrapHandler } from '../core/handler.ts'
+import { analyticsTraceMap } from '../core/trace-map.ts'
 
 import type { FetchHandler, WrapHandlerOptions } from '../core/handler.ts'
 import type { RouterDef } from '../types.ts'
@@ -61,7 +62,15 @@ export function createFetchAdapter<TCtx extends Record<string, unknown>>(
   // (non-rewritten) request URL — otherwise the `/api` prefix has already been
   // stripped and analytics' `isTrackedRequestPath` filter rejects every call.
   const handler = wrapHandler(
-    (request: Request): Response | Promise<Response> => inner(rewriteRequest(request, prefix)),
+    (request: Request): Response | Promise<Response> => {
+      const rewritten = rewriteRequest(request, prefix)
+      // Analytics wraps the outer handler and stores the per-request trace
+      // keyed by the ORIGINAL request. The inner fetch handler looks it up
+      // using the REWRITTEN request, so we must carry the entry across.
+      const trace = analyticsTraceMap.get(request)
+      if (trace) analyticsTraceMap.set(rewritten, trace)
+      return inner(rewritten)
+    },
     router,
     options,
     prefix,
@@ -97,6 +106,9 @@ export function createEventFetchAdapter<TCtx extends Record<string, unknown>, TE
       const rewritten = rewriteRequest(request, prefix)
       const eventRef = requestEventMap.get(request)
       if (eventRef) requestEventMap.set(rewritten, eventRef)
+      // Carry the analytics trace across the request rewrite (see note above).
+      const trace = analyticsTraceMap.get(request)
+      if (trace) analyticsTraceMap.set(rewritten, trace)
       return inner(rewritten)
     },
     router,
