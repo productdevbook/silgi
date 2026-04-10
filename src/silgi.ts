@@ -18,6 +18,7 @@ import { compileRouter } from './compile.ts'
 import { createFetchHandler, wrapHandler } from './core/handler.ts'
 import { assignPaths, routerCache } from './core/router-utils.ts'
 import { createTaskFromProcedure } from './core/task.ts'
+import { normalizePrefix } from './core/url.ts'
 
 import type { ProcedureBuilder } from './builder.ts'
 import type { FetchHandler } from './core/handler.ts'
@@ -132,6 +133,8 @@ export interface SilgiInstance<TBaseCtx extends Record<string, unknown>> {
   handler: (
     router: RouterDef,
     options?: {
+      /** URL path prefix (e.g. "/api"). Only requests matching this prefix are handled; others return 404. */
+      basePath?: string
       /** Enable Scalar API Reference UI at /api/reference and /api/openapi.json */
       scalar?: boolean | ScalarOptions
       /** Enable analytics dashboard at /api/analytics */
@@ -317,7 +320,13 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
     },
 
     handler: (routerDef, options) => {
-      const fetchHandler = wrapHandler(createFetchHandler(routerDef, contextFactory, hooks), routerDef, options)
+      const prefix = options?.basePath ? normalizePrefix(options.basePath) : undefined
+      const fetchHandler = wrapHandler(
+        createFetchHandler(routerDef, contextFactory, hooks, prefix),
+        routerDef,
+        options,
+        prefix,
+      )
 
       // Check if router has any subscriptions → auto-attach crossws hooks for Nitro/srvx
       const hasWsProcedures = (function checkWs(def: any): boolean {
@@ -340,10 +349,12 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
         wsHooks = _createWSHooks(routerDef) as Record<string, Function>
       }
 
+      const wsPath = prefix ? `${prefix}/_ws` : '/_ws'
+
       return async (request: Request): Promise<Response> => {
         // Intercept /_ws path — return empty response with .crossws hooks for Nitro/h3
         const url = new URL(request.url)
-        if (url.pathname === '/_ws') {
+        if (url.pathname === wsPath) {
           if (!wsHooks) {
             wsInitPromise ??= initWsHooks()
             await wsInitPromise

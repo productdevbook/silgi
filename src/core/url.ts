@@ -25,3 +25,10 @@ export function parseUrlPathname(url: string): string {
   const fullPath = parseUrlPath(url)
   return fullPath.length > 1 ? fullPath.slice(1) : ''
 }
+
+/** Normalize a basePath: ensure leading slash, strip trailing slash. */
+export function normalizePrefix(basePath: string): string {
+  let p = basePath.startsWith('/') ? basePath : '/' + basePath
+  if (p.endsWith('/')) p = p.slice(0, -1)
+  return p
+}

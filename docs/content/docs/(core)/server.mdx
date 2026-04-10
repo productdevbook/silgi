@@ -54,6 +54,7 @@ await server.close()
 s.serve(appRouter, {
   port: 3000, // auto-finds next available if busy
   hostname: '0.0.0.0', // bind to all interfaces
+  basePath: '/api', // mount under /api prefix
   scalar: true, // API docs at /api/reference
   // ws is auto-enabled when the router contains a subscription.
   // Pass ws: false to disable, or ws: { compress, keepalive, ... } to configure crossws.
@@ -66,14 +67,15 @@ s.serve(appRouter, {
 })
 ```
 
-| Option             | Type                                     | Default       | Description                                                                                  |
-| ------------------ | ---------------------------------------- | ------------- | -------------------------------------------------------------------------------------------- |
-| `port`             | `number`                                 | `3000`        | Port to listen on. If it's taken, Silgi automatically picks the next free port in 3000-3100. |
-| `hostname`         | `string`                                 | `"127.0.0.1"` | Network interface. Use `"0.0.0.0"` to accept connections from other machines.                |
-| `scalar`           | `boolean \| ScalarOptions`               | `false`       | Enable auto-generated API docs at `/api/reference`.                                          |
-| `ws`               | `boolean \| WSAdapterOptions`            | `false`       | Enable WebSocket RPC on the same port. Pass an object for [WS options](#websocket-options).  |
-| `http2`            | `{ cert, key }`                          | `undefined`   | Enable HTTP/2 with TLS certificates. Falls back to HTTP/1.1 for older clients.               |
-| `gracefulShutdown` | `boolean \| { timeout?, forceTimeout? }` | `true`        | Handle SIGINT/SIGTERM for clean shutdown. See [graceful shutdown](#graceful-shutdown).       |
+| Option             | Type                                     | Default       | Description                                                                                    |
+| ------------------ | ---------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------- |
+| `port`             | `number`                                 | `3000`        | Port to listen on. If it's taken, Silgi automatically picks the next free port in 3000-3100.   |
+| `hostname`         | `string`                                 | `"127.0.0.1"` | Network interface. Use `"0.0.0.0"` to accept connections from other machines.                  |
+| `basePath`         | `string`                                 | `undefined`   | URL prefix (e.g. `"/api"`). Only requests matching this prefix are handled; others return 404. |
+| `scalar`           | `boolean \| ScalarOptions`               | `false`       | Enable auto-generated API docs at `/api/reference`.                                            |
+| `ws`               | `boolean \| WSAdapterOptions`            | `false`       | Enable WebSocket RPC on the same port. Pass an object for [WS options](#websocket-options).    |
+| `http2`            | `{ cert, key }`                          | `undefined`   | Enable HTTP/2 with TLS certificates. Falls back to HTTP/1.1 for older clients.                 |
+| `gracefulShutdown` | `boolean \| { timeout?, forceTimeout? }` | `true`        | Handle SIGINT/SIGTERM for clean shutdown. See [graceful shutdown](#graceful-shutdown).         |
 
 ### Runtime support
 
@@ -106,18 +108,20 @@ export default {
 
 ### handler() options
 
-You can pass options to enable API docs:
+You can pass options to mount under a prefix and enable API docs:
 
 ```ts twoslash
 // @noErrors
 const handle = s.handler(appRouter, {
+  basePath: '/api', // only handle /api/* requests, strip prefix before routing
   scalar: true, // serves /api/openapi.json and /api/reference
 })
 ```
 
-| Option   | Type                       | Default | Description                                                        |
-| -------- | -------------------------- | ------- | ------------------------------------------------------------------ |
-| `scalar` | `boolean \| ScalarOptions` | `false` | Enable Scalar API docs at `/api/reference` and `/api/openapi.json` |
+| Option     | Type                       | Default     | Description                                                                    |
+| ---------- | -------------------------- | ----------- | ------------------------------------------------------------------------------ |
+| `basePath` | `string`                   | `undefined` | URL prefix (e.g. `"/api"`). Requests not matching this prefix return 404.      |
+| `scalar`   | `boolean \| ScalarOptions` | `false`     | Enable Scalar API docs at `{basePath}/reference` and `{basePath}/openapi.json` |
 
 <Callout type='info'>
   Both `serve()` and `handler()` support content negotiation automatically. If the client sends an `Accept:

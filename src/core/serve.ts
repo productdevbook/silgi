@@ -3,6 +3,7 @@ import { serve } from 'srvx'
 import { _createWSHooks } from '../ws.ts'
 
 import { createFetchHandler, wrapHandler } from './handler.ts'
+import { normalizePrefix } from './url.ts'
 
 import type { AnalyticsOptions } from '../plugins/analytics.ts'
 import type { ScalarOptions } from '../scalar.ts'
@@ -34,6 +35,8 @@ export interface SilgiServer {
 // ── Serve Options ───────────────────────────────────
 
 export interface ServeOptions {
+  /** URL path prefix (e.g. "/api"). Only requests matching this prefix are handled; others return 404. */
+  basePath?: string
   port?: number
   hostname?: string
   /** Enable Scalar API Reference UI at /api/reference and /api/openapi.json */
@@ -97,12 +100,14 @@ export async function createServeHandler(
 ): Promise<SilgiServer> {
   const port = options?.port ?? 3000
   const hostname = options?.hostname ?? '127.0.0.1'
+  const prefix = options?.basePath ? normalizePrefix(options.basePath) : undefined
 
   // Build handler pipeline: base → scalar → analytics
   const httpHandler: FetchHandler = wrapHandler(
-    createFetchHandler(routerDef, contextFactory, hooks),
+    createFetchHandler(routerDef, contextFactory, hooks, prefix),
     routerDef,
     options,
+    prefix,
   )
 
   // Resolve graceful shutdown config

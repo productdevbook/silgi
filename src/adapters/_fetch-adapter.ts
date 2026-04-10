@@ -9,7 +9,6 @@
  */
 
 import { createFetchHandler, wrapHandler } from '../core/handler.ts'
-import { analyticsTraceMap } from '../core/trace-map.ts'
 
 import type { FetchHandler, WrapHandlerOptions } from '../core/handler.ts'
 import type { RouterDef } from '../types.ts'
@@ -35,17 +34,6 @@ export interface FetchAdapterConfigWithEvent<
   context?: (event: TEvent) => TCtx | Promise<TCtx>
 }
 
-/** Strip prefix from request URL and create a rewritten Request. */
-function rewriteRequest(request: Request, prefix: string): Request {
-  const url = new URL(request.url)
-  let pathname = url.pathname
-  if (pathname.startsWith(prefix)) {
-    pathname = pathname.slice(prefix.length)
-    if (!pathname.startsWith('/')) pathname = '/' + pathname
-  }
-  return new Request(new URL(pathname + url.search, url.origin), request)
-}
-
 /**
  * Create a fetch-passthrough adapter that strips a prefix and delegates to handler.
  * Used by adapters that receive a standard Request (Next.js, Astro, Remix).
@@ -57,26 +45,12 @@ export function createFetchAdapter<TCtx extends Record<string, unknown>>(
 ): FetchHandler {
   const prefix = options.prefix ?? defaultPrefix
   const contextFactory = options.context ?? (() => ({}) as TCtx)
-  const inner = createFetchHandler(router, contextFactory as (req: Request) => Record<string, unknown>)
-  // Wrap analytics/scalar around the OUTER handler so they see the original
-  // (non-rewritten) request URL — otherwise the `/api` prefix has already been
-  // stripped and analytics' `isTrackedRequestPath` filter rejects every call.
-  const handler = wrapHandler(
-    (request: Request): Response | Promise<Response> => {
-      const rewritten = rewriteRequest(request, prefix)
-      // Analytics wraps the outer handler and stores the per-request trace
-      // keyed by the ORIGINAL request. The inner fetch handler looks it up
-      // using the REWRITTEN request, so we must carry the entry across.
-      const trace = analyticsTraceMap.get(request)
-      if (trace) analyticsTraceMap.set(rewritten, trace)
-      return inner(rewritten)
-    },
+  return wrapHandler(
+    createFetchHandler(router, contextFactory as (req: Request) => Record<string, unknown>, undefined, prefix),
     router,
     options,
     prefix,
   )
-
-  return handler
 }
 
 /**
@@ -93,24 +67,18 @@ export function createEventFetchAdapter<TCtx extends Record<string, unknown>, TE
   const prefix = options.prefix ?? defaultPrefix
   const requestEventMap = new WeakMap<Request, TEvent>()
 
-  const inner = createFetchHandler(router, (_req: Request) => {
-    const eventRef = requestEventMap.get(_req)
-    if (options.context && eventRef)
-      return options.context(eventRef) as Record<string, unknown> | Promise<Record<string, unknown>>
-    return {} as Record<string, unknown>
-  })
-  // Wrap analytics/scalar around the OUTER handler so they see the original
-  // (non-rewritten) request URL — see note in createFetchAdapter above.
   const handler = wrapHandler(
-    (request: Request): Response | Promise<Response> => {
-      const rewritten = rewriteRequest(request, prefix)
-      const eventRef = requestEventMap.get(request)
-      if (eventRef) requestEventMap.set(rewritten, eventRef)
-      // Carry the analytics trace across the request rewrite (see note above).
-      const trace = analyticsTraceMap.get(request)
-      if (trace) analyticsTraceMap.set(rewritten, trace)
-      return inner(rewritten)
-    },
+    createFetchHandler(
+      router,
+      (_req: Request) => {
+        const eventRef = requestEventMap.get(_req)
+        if (options.context && eventRef)
+          return options.context(eventRef) as Record<string, unknown> | Promise<Record<string, unknown>>
+        return {} as Record<string, unknown>
+      },
+      undefined,
+      prefix,
+    ),
     router,
     options,
     prefix,

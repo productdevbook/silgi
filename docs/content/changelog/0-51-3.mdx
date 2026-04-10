@@ -1,0 +1,53 @@
+---
+title: 0.51.3
+description: handler() and serve() now support basePath for URL prefix mounting, plus zero-allocation prefix stripping across all adapters.
+version: 0.51.3
+date: 2026-04-10
+---
+
+This release adds `basePath` support to `handler()` and `serve()`, so you can mount your API under a URL prefix without manual request rewriting. It also eliminates per-request object allocation from prefix stripping in all framework adapters.
+
+## `basePath` option for `handler()` and `serve()`
+
+Both `handler()` and `serve()` now accept a `basePath` option. Requests matching the prefix are routed normally; everything else returns 404.
+
+```ts
+const handle = s.handler(appRouter, {
+  basePath: '/api',
+  scalar: true,
+})
+
+export default { fetch: handle }
+// GET /api/health       → routes to "health" procedure
+// GET /api/users/list   → routes to "users.list" procedure
+// GET /other            → 404
+```
+
+Scalar docs and WebSocket endpoints automatically respect the prefix — API reference is served at `/api/reference`, WebSocket upgrades at `/api/_ws`.
+
+Previously, users had to manually strip the prefix:
+
+```ts
+// Before — manual prefix stripping
+const url = new URL(request.url)
+if (!url.pathname.startsWith('/api')) return
+const strippedPath = url.pathname.slice(4) || '/'
+const strippedUrl = new URL(strippedPath + url.search, url.origin)
+const proxiedRequest = new Request(strippedUrl, request)
+const response = await silgiHandler(proxiedRequest)
+```
+
+```ts
+// After — one option
+const handle = s.handler(appRouter, { basePath: '/api' })
+```
+
+See the [Server docs](/docs/server) for the full options table.
+
+## Zero-allocation prefix stripping
+
+Prefix stripping now happens inside the compiled request handler via `string.startsWith()` + `string.slice()` on the already-parsed path — no `new URL()`, no `new Request()`, no `WeakMap` transfers. This applies to all framework adapters (Next.js, Astro, SvelteKit, Remix, SolidStart) as well as `handler()` and `serve()`.
+
+**Before:** each request with a prefix allocated 2 objects (`URL` + `Request`) and performed a `WeakMap` transfer for analytics tracing.
+
+**After:** pure string comparison, zero allocation per request.

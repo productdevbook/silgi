@@ -105,13 +105,13 @@ const handler = createHandler(appRouter, {
 
 Recommended new convention:
 
-| Framework   | Route file                              | URL                      |
-| ----------- | --------------------------------------- | ------------------------ |
-| SvelteKit   | `src/routes/api/[...path]/+server.ts`   | `POST /api/users/list`   |
-| Next.js     | `app/api/[...path]/route.ts`            | `POST /api/users/list`   |
-| Astro       | `src/pages/api/[...path].ts`            | `POST /api/users/list`   |
-| SolidStart  | `src/routes/api/[...path].ts`           | `POST /api/users/list`   |
-| Remix       | `app/routes/api.$.tsx`                  | `POST /api/users/list`   |
+| Framework  | Route file                            | URL                    |
+| ---------- | ------------------------------------- | ---------------------- |
+| SvelteKit  | `src/routes/api/[...path]/+server.ts` | `POST /api/users/list` |
+| Next.js    | `app/api/[...path]/route.ts`          | `POST /api/users/list` |
+| Astro      | `src/pages/api/[...path].ts`          | `POST /api/users/list` |
+| SolidStart | `src/routes/api/[...path].ts`         | `POST /api/users/list` |
+| Remix      | `app/routes/api.$.tsx`                | `POST /api/users/list` |
 
 ## Breaking: `$route({ ws: true })` flag removed
 

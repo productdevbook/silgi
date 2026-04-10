@@ -93,3 +93,41 @@ describe('handler() — empty body with content-type headers', () => {
     expect(res.headers.get('content-type')).toBe('application/x-devalue+json')
   })
 })
+
+describe('handler() — basePath option', () => {
+  const handle = k.handler(testRouter, { basePath: '/api' })
+
+  it('routes requests matching the basePath prefix', async () => {
+    const res = await handle(new Request('http://localhost/api/health', { method: 'POST' }))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ status: 'ok' })
+  })
+
+  it('strips prefix and routes with input', async () => {
+    const res = await handle(
+      new Request('http://localhost/api/echo', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ msg: 'prefixed' }),
+      }),
+    )
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ echo: 'prefixed' })
+  })
+
+  it('returns 404 for paths not matching the prefix', async () => {
+    const res = await handle(new Request('http://localhost/other/health', { method: 'POST' }))
+    expect(res.status).toBe(404)
+  })
+
+  it('returns 404 for root path without prefix', async () => {
+    const res = await handle(new Request('http://localhost/health', { method: 'POST' }))
+    expect(res.status).toBe(404)
+  })
+
+  it('preserves query string through prefix stripping', async () => {
+    const res = await handle(new Request('http://localhost/api/health?foo=bar', { method: 'POST' }))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ status: 'ok' })
+  })
+})

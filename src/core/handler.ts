@@ -108,6 +108,8 @@ export type FetchHandler = (request: Request) => Response | Promise<Response>
 export interface WrapHandlerOptions {
   analytics?: boolean | import('../plugins/analytics/types.ts').AnalyticsOptions
   scalar?: boolean | import('../scalar.ts').ScalarOptions
+  /** URL path prefix for the handler (e.g. "/api"). Requests not matching this prefix return 404. */
+  basePath?: string
 }
 
 /**
@@ -152,6 +154,7 @@ export function createFetchHandler(
   routerDef: import('../types.ts').RouterDef,
   contextFactory: (req: Request) => Record<string, unknown> | Promise<Record<string, unknown>>,
   hooks?: Hookable<SilgiHooks>,
+  prefix?: string,
 ): FetchHandler {
   // Compile router
   let compiledRouter = routerCache.get(routerDef) as CompiledRouterFn | undefined
@@ -160,6 +163,7 @@ export function createFetchHandler(
     routerCache.set(routerDef, compiledRouter)
   }
 
+  const prefixLen = prefix ? prefix.length : 0
   const jsonHeaders = { 'content-type': 'application/json' }
   const notFoundBody = JSON.stringify({ code: 'NOT_FOUND', status: 404, message: 'Procedure not found' })
 
@@ -176,7 +180,14 @@ export function createFetchHandler(
 
   return async function handleRequest(request: Request): Promise<Response> {
     const url = request.url
-    const fullPath = parseUrlPath(url)
+    let fullPath = parseUrlPath(url)
+
+    // Strip basePath prefix — zero allocation, pure string slice
+    if (prefix) {
+      if (!fullPath.startsWith(prefix)) return new Response(notFoundBody, { status: 404, headers: jsonHeaders })
+      fullPath = fullPath.slice(prefixLen) || '/'
+    }
+
     const pathname = fullPath.length > 1 ? fullPath.slice(1) : ''
     const qMark = url.indexOf('?', url.indexOf('/', url.indexOf('//') + 2))
 
