@@ -33,14 +33,12 @@ For the API reference to show a response schema, you must declare `$output()` on
 const listUsers = s.$resolve(({ ctx }) => ctx.db.users.findMany())
 
 // With $output — Scalar renders the full response type
-const listUsers = s
-  .$output(z.array(UserSchema))
-  .$resolve(({ ctx }) => ctx.db.users.findMany())
+const listUsers = s.$output(z.array(UserSchema)).$resolve(({ ctx }) => ctx.db.users.findMany())
 ```
 
 <Callout type='info'>
-  `$output()` serves two purposes: it validates the return value at runtime, and it populates the response schema in
-  the OpenAPI spec. Both benefits apply whenever you declare it.
+  `$output()` serves two purposes: it validates the return value at runtime, and it populates the response schema in the
+  OpenAPI spec. Both benefits apply whenever you declare it.
 </Callout>
 
 ## Procedure metadata

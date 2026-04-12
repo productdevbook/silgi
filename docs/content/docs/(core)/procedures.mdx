@@ -48,15 +48,15 @@ const createUser = s
 
 ### Available builder methods
 
-| Method             | Required | Description                                                                                   |
-| ------------------ | -------- | --------------------------------------------------------------------------------------------- |
-| `.$resolve(fn)`    | Yes      | The function that does the work. Receives `{ input, ctx, fail, signal }`.                     |
-| `.$input(schema)`  | No       | A schema that validates the incoming data.                                                    |
+| Method             | Required | Description                                                                                                                                    |
+| ------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.$resolve(fn)`    | Yes      | The function that does the work. Receives `{ input, ctx, fail, signal }`.                                                                      |
+| `.$input(schema)`  | No       | A schema that validates the incoming data.                                                                                                     |
 | `.$output(schema)` | No       | Validates the return value and populates the response type in the API reference (Scalar/OpenAPI). Without it, no response schema is generated. |
-| `.$use(...mw)`     | No       | Add guards and wraps to run before the procedure.                                             |
-| `.$errors({...})`  | No       | A map of error codes to HTTP status codes. Enables the typed `fail()` function.               |
-| `.$route({...})`   | No       | OpenAPI metadata (tags, summary, description). Also used for special-case passthrough routes. |
-| `.$meta({...})`    | No       | Set custom metadata.                                                                          |
+| `.$use(...mw)`     | No       | Add guards and wraps to run before the procedure.                                                                                              |
+| `.$errors({...})`  | No       | A map of error codes to HTTP status codes. Enables the typed `fail()` function.                                                                |
+| `.$route({...})`   | No       | OpenAPI metadata (tags, summary, description). Also used for special-case passthrough routes.                                                  |
+| `.$meta({...})`    | No       | Set custom metadata.                                                                                                                           |
 
 <Callout type='info'>
   `.$resolve()` must be called last — it finalizes the builder and returns a `ProcedureDef`.
