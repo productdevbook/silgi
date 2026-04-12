@@ -2,6 +2,7 @@ name: Release
 
 permissions:
   contents: write
+  id-token: write
 
 on:
   push:
@@ -16,28 +17,35 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 🏷️ Determine release type
-        id: meta
-        run: |
-          VERSION="${{ github.ref_name }}"
-          if [[ "$VERSION" == *"-beta"* ]] || [[ "$VERSION" == *"-alpha"* ]] || [[ "$VERSION" == *"-rc"* ]]; then
-            echo "prerelease=true" >> $GITHUB_OUTPUT
-          else
-            echo "prerelease=false" >> $GITHUB_OUTPUT
-          fi
+      - run: corepack enable
 
-      - name: 📝 Get previous tag
-        id: prev-tag
-        run: |
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-          echo "tag=$PREV_TAG" >> $GITHUB_OUTPUT
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+          cache: pnpm
 
-      - name: 📝 Generate changelog & GitHub Release
-        run: |
-          if [ -n "${{ steps.prev-tag.outputs.tag }}" ]; then
-            npx changelogithub --from ${{ steps.prev-tag.outputs.tag }}
-          else
-            npx changelogithub
-          fi
+      - name: 📦 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 👀 Lint
+        run: pnpm lint
+
+      - name: 🔍 Typecheck
+        run: pnpm typecheck
+
+      - name: 🧪 Test
+        run: pnpm test
+
+      - name: 🚀 Build
+        run: pnpm build
+
+      - name: 📦 Publish to npm
+        run: pnpm publish --provenance --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: 📝 Generate changelog
+        run: pnpm dlx changelogithub
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
