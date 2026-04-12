@@ -138,7 +138,7 @@ export function wrapHandler(
     if (options!.analytics) {
       const { wrapWithAnalytics } = await import('../plugins/analytics.ts')
       const analyticsOpts = typeof options!.analytics === 'object' ? options!.analytics : {}
-      h = wrapWithAnalytics(h, analyticsOpts)
+      h = wrapWithAnalytics(h, router, analyticsOpts)
     }
     wrapped = h
   }

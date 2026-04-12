@@ -16,6 +16,7 @@ import { SilgiError, toSilgiError } from '../core/error.ts'
 import { ValidationError } from '../core/schema.ts'
 import { analyticsTraceMap } from '../core/trace-map.ts'
 import { parseUrlPathname } from '../core/url.ts'
+import { ZodSchemaConverter } from '../integrations/zod/converter.ts'
 
 import { RequestAccumulator } from './analytics/accumulator.ts'
 import { AnalyticsCollector } from './analytics/collector.ts'
@@ -25,6 +26,7 @@ import { RequestTrace } from './analytics/trace.ts'
 import { isTrackedRequestPath, normalizeAnalyticsPath, round, sanitizeHeaders } from './analytics/utils.ts'
 
 import type { FetchHandler } from '../core/handler.ts'
+import type { ProcedureDef, RouterDef } from '../types.ts'
 import type { AnalyticsOptions, TraceSpan } from './analytics/types.ts'
 
 // ── Re-exports ─────────────────────────────────────
@@ -106,14 +108,82 @@ function extractResponseError(output: unknown, status: number, fallback?: string
   return { code: `HTTP_${status}`, message: `Request failed with status ${status}` }
 }
 
+// ── Schema Extraction ──────────────────────────────
+
+export interface ProcedureSchemaInfo {
+  input?: Record<string, unknown>
+  output?: Record<string, unknown>
+}
+
+function isProcedureDef(value: unknown): value is ProcedureDef {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'type' in value &&
+    'resolve' in value &&
+    typeof (value as ProcedureDef).resolve === 'function'
+  )
+}
+
+const _zodConverter = new ZodSchemaConverter()
+
+function schemaToJson(schema: unknown, strategy: 'input' | 'output'): Record<string, unknown> | undefined {
+  if (!schema) return undefined
+  const std = (schema as any)['~standard']
+  if (std?.jsonSchema?.input) {
+    try {
+      const result = std.jsonSchema.input({ target: 'draft-2020-12' })
+      if (result && typeof result === 'object') {
+        const { $schema: _, ...rest } = result as Record<string, unknown>
+        return rest
+      }
+    } catch {}
+  }
+  if (_zodConverter.condition(schema as any)) {
+    try {
+      const [, json] = _zodConverter.convert(schema as any, { strategy })
+      return json as Record<string, unknown>
+    } catch {}
+  }
+  return undefined
+}
+
+function extractProcedureSchemas(router: RouterDef): Map<string, ProcedureSchemaInfo> {
+  const schemas = new Map<string, ProcedureSchemaInfo>()
+
+  function walk(node: unknown, path: string[]): void {
+    if (isProcedureDef(node)) {
+      const info: ProcedureSchemaInfo = {}
+      if (node.input) info.input = schemaToJson(node.input, 'input')
+      if (node.output) info.output = schemaToJson(node.output, 'output')
+      if (info.input || info.output) schemas.set(path.join('/'), info)
+      return
+    }
+    if (typeof node === 'object' && node !== null) {
+      for (const [key, child] of Object.entries(node as Record<string, unknown>)) {
+        walk(child, [...path, key])
+      }
+    }
+  }
+
+  walk(router, [])
+  return schemas
+}
+
 // ── Handler Wrapper ─────────────────────────────────
 
 /**
  * Wrap a fetch handler with analytics collection.
  * Intercepts analytics dashboard routes and instruments every request.
  */
-export function wrapWithAnalytics(handler: FetchHandler, options: AnalyticsOptions = {}): FetchHandler {
+export function wrapWithAnalytics(
+  handler: FetchHandler,
+  router: RouterDef | undefined,
+  options: AnalyticsOptions = {},
+): FetchHandler {
   const collector = new AnalyticsCollector(options)
+  const procedureSchemas = router ? extractProcedureSchemas(router) : undefined
+  if (procedureSchemas) collector.setProcedureSchemas(procedureSchemas)
   const dashboardHtml = analyticsHTML()
   const auth = options.auth
 

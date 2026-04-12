@@ -177,6 +177,8 @@ export interface ProcedureSnapshot {
   latency: { avg: number; p50: number; p95: number; p99: number }
   lastError: string | null
   lastErrorTime: number | null
+  inputSchema?: Record<string, unknown>
+  outputSchema?: Record<string, unknown>
 }
 
 export interface TaskSnapshot {

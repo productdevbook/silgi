@@ -54,6 +54,8 @@ export class AnalyticsCollector {
   #ignorePaths: Set<string>
   /** Client-side hide — from dashboard, filters display only */
   #hiddenPaths: Set<string> = new Set()
+  /** Procedure input/output JSON schemas (set once from router) */
+  #procedureSchemas: Map<string, { input?: Record<string, unknown>; output?: Record<string, unknown> }> | null = null
   /** SSE hub for real-time streaming */
   sseHub: AnalyticsSSEHub
   /** Multi-tier time-series aggregation */
@@ -90,6 +92,13 @@ export class AnalyticsCollector {
     this.#store.loadHiddenPaths().then((paths) => {
       for (const p of paths) this.#hiddenPaths.add(p)
     })
+  }
+
+  /** Set procedure schemas extracted from router definition. */
+  setProcedureSchemas(
+    schemas: Map<string, { input?: Record<string, unknown>; output?: Record<string, unknown> }>,
+  ): void {
+    this.#procedureSchemas = schemas
   }
 
   /** Check if a path is server-side ignored (from config). */
@@ -247,7 +256,7 @@ export class AnalyticsCollector {
 
     for (const [path, entry] of this.#procedures) {
       const avg = entry.latencies.avg()
-      procedures[path] = {
+      const snapshot: ProcedureSnapshot = {
         count: entry.count,
         errors: entry.errors,
         errorRate: entry.count > 0 ? round((entry.errors / entry.count) * 100) : 0,
@@ -260,6 +269,10 @@ export class AnalyticsCollector {
         lastError: entry.lastError,
         lastErrorTime: entry.lastErrorTime || null,
       }
+      const schemaInfo = this.#procedureSchemas?.get(path)
+      if (schemaInfo?.input) snapshot.inputSchema = schemaInfo.input
+      if (schemaInfo?.output) snapshot.outputSchema = schemaInfo.output
+      procedures[path] = snapshot
       totalLatencySum += avg * entry.latencies.count
       totalLatencyCount += entry.latencies.count
     }

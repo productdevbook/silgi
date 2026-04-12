@@ -5,7 +5,10 @@
  * Scalar UI at /api/reference + spec at /api/openapi.json.
  */
 
+import { ZodSchemaConverter } from './integrations/zod/converter.ts'
+
 import type { AnySchema } from './core/schema.ts'
+import type { ConvertOptions } from './integrations/zod/converter.ts'
 import type { ProcedureDef, RouterDef, Route } from './types.ts'
 
 // ── OpenAPI Spec Generation ─────────────────────────
@@ -160,7 +163,7 @@ export function generateOpenAPI(
     }
 
     // Input schema
-    const inputSchema = proc.input ? schemaToJsonSchema(proc.input) : null
+    const inputSchema = proc.input ? schemaToJsonSchema(proc.input, 'input') : null
 
     // Output
     const successStatus = route?.successStatus ?? 200
@@ -207,7 +210,7 @@ export function generateOpenAPI(
 
       // Success response
       if (proc.type === 'subscription') {
-        const outputSchema = proc.output ? schemaToJsonSchema(proc.output) : { type: 'string' }
+        const outputSchema = proc.output ? schemaToJsonSchema(proc.output, 'output') : { type: 'string' }
         op.responses[String(successStatus)] = {
           description: 'SSE event stream',
           content: {
@@ -219,7 +222,7 @@ export function generateOpenAPI(
       } else if (proc.output) {
         op.responses[String(successStatus)] = {
           description: successDesc,
-          content: { 'application/json': { schema: schemaToJsonSchema(proc.output) } },
+          content: { 'application/json': { schema: schemaToJsonSchema(proc.output, 'output') } },
         }
       } else {
         op.responses[String(successStatus)] = { description: successDesc }
@@ -416,20 +419,35 @@ function collectProcedures(node: unknown, path: string[], cb: (path: string[], p
 }
 
 /**
- * Convert a Standard Schema to JSON Schema via `~standard.jsonSchema.input()`.
+ * Convert a Standard Schema to JSON Schema.
  *
- * Works with Zod v4, Valibot, ArkType — any validator implementing Standard Schema v1.
+ * Fast path: `~standard.jsonSchema.input()` (StandardJSONSchemaV1 implementors).
+ * Fallback: vendor-specific converters (Zod v4 via ZodSchemaConverter).
  */
-function schemaToJsonSchema(schema: AnySchema): JSONSchema {
+const _zodConverter = new ZodSchemaConverter()
+
+function schemaToJsonSchema(schema: AnySchema, strategy: ConvertOptions['strategy'] = 'input'): JSONSchema {
   const std = (schema as any)['~standard']
-  if (!std?.jsonSchema?.input) return {}
-  try {
-    const result = std.jsonSchema.input({ target: 'draft-2020-12' })
-    if (result && typeof result === 'object') {
-      const { $schema: _, ...rest } = result as Record<string, unknown>
-      return rest as JSONSchema
-    }
-  } catch {}
+
+  // Fast path: StandardJSONSchemaV1
+  if (std?.jsonSchema?.input) {
+    try {
+      const result = std.jsonSchema.input({ target: 'draft-2020-12' })
+      if (result && typeof result === 'object') {
+        const { $schema: _, ...rest } = result as Record<string, unknown>
+        return rest as JSONSchema
+      }
+    } catch {}
+  }
+
+  // Fallback: Zod v4 schemas
+  if (_zodConverter.condition(schema)) {
+    try {
+      const [, jsonSchema] = _zodConverter.convert(schema, { strategy })
+      return jsonSchema as JSONSchema
+    } catch {}
+  }
+
   return {}
 }
 

@@ -350,4 +350,89 @@ describe('generateOpenAPI', () => {
       expect(validMethods).toContain(m)
     }
   })
+
+  // ── $output schema rendering ──
+
+  it('$output with Zod schema produces correct response schema', () => {
+    const router = k.router({
+      user: k.$output(z.object({ id: z.number(), name: z.string() })).$resolve(() => ({ id: 1, name: 'Alice' })),
+    })
+    const spec = generateOpenAPI(router)
+    const op = (spec.paths as any)['/user']?.post
+    const response = op.responses['200']
+    expect(response.content).toBeDefined()
+    const schema = response.content['application/json'].schema
+    expect(schema.type).toBe('object')
+    expect(schema.properties.id.type).toMatch(/number|integer/)
+    expect(schema.properties.name.type).toBe('string')
+  })
+
+  it('$input with Zod schema produces correct request body schema', () => {
+    const router = k.router({
+      create: k.$input(z.object({ name: z.string(), age: z.number() })).$resolve(({ input }) => input),
+    })
+    const spec = generateOpenAPI(router)
+    const op = (spec.paths as any)['/create']?.post
+    const bodySchema = op.requestBody.content['application/json'].schema
+    expect(bodySchema.type).toBe('object')
+    expect(bodySchema.properties.name.type).toBe('string')
+    expect(bodySchema.properties.age.type).toMatch(/number|integer/)
+  })
+
+  it('procedure with both $input and $output renders both schemas', () => {
+    const router = k.router({
+      users: {
+        create: k
+          .$input(z.object({ name: z.string() }))
+          .$output(z.object({ id: z.number(), name: z.string() }))
+          .$resolve(({ input }) => ({ id: 1, name: input.name })),
+      },
+    })
+    const spec = generateOpenAPI(router)
+    const op = (spec.paths as any)['/users/create']?.post
+    // Input
+    const inputSchema = op.requestBody.content['application/json'].schema
+    expect(inputSchema.type).toBe('object')
+    expect(inputSchema.properties.name).toBeDefined()
+    // Output
+    const outputSchema = op.responses['200'].content['application/json'].schema
+    expect(outputSchema.type).toBe('object')
+    expect(outputSchema.properties.id).toBeDefined()
+    expect(outputSchema.properties.name).toBeDefined()
+  })
+
+  it('no $output produces response without content', () => {
+    const router = k.router({
+      health: k.$resolve(() => ({ ok: true })),
+    })
+    const spec = generateOpenAPI(router)
+    const op = (spec.paths as any)['/health']?.post
+    expect(op.responses['200'].description).toBe('Successful response')
+    expect(op.responses['200'].content).toBeUndefined()
+  })
+
+  it('$output with nested Zod schema renders correctly', () => {
+    const router = k.router({
+      jobs: k
+        .$output(
+          z.object({
+            jobs: z.array(
+              z.object({
+                id: z.number(),
+                title: z.string(),
+                tags: z.array(z.string()),
+              }),
+            ),
+          }),
+        )
+        .$resolve(() => ({ jobs: [] })),
+    })
+    const spec = generateOpenAPI(router)
+    const schema = (spec.paths as any)['/jobs']?.post.responses['200'].content['application/json'].schema
+    expect(schema.type).toBe('object')
+    expect(schema.properties.jobs.type).toBe('array')
+    expect(schema.properties.jobs.items.type).toBe('object')
+    expect(schema.properties.jobs.items.properties.tags.type).toBe('array')
+    expect(schema.properties.jobs.items.properties.tags.items.type).toBe('string')
+  })
 })

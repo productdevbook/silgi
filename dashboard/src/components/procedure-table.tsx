@@ -22,6 +22,7 @@ interface ProcedureTableProps {
 export function ProcedureTable({ procedures, navigate, filter }: ProcedureTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('count')
   const [sortAsc, setSortAsc] = useState(false)
+  const [expandedSchema, setExpandedSchema] = useState<string | null>(null)
 
   const handleSort = useCallback((key: SortKey) => {
     setSortKey((prev) => {
@@ -112,68 +113,112 @@ export function ProcedureTable({ procedures, navigate, filter }: ProcedureTableP
       {entries.map(([path, proc]) => {
         const countPct = (proc.count / maxCount) * 100
         const hasErrors = proc.errors > 0
+        const hasSchema = !!(proc.inputSchema || proc.outputSchema)
+        const isExpanded = expandedSchema === path
 
         return (
-          <div
-            key={path}
-            className={cn(
-              'flex items-center gap-2 border-b border-dashed px-5 py-2 hover:bg-muted/20',
-              navigate && 'cursor-pointer',
-            )}
-            onClick={() => navigate?.('requests', undefined, { procedure: path })}
-          >
-            {/* Procedure name */}
-            <span className='min-w-0 flex-1 truncate font-mono text-[11px] font-semibold'>{path}</span>
-
-            {/* Count */}
-            <span className='w-20 shrink-0 text-right font-mono text-[11px] tabular-nums'>{fmt(proc.count)}</span>
-
-            {/* Count bar */}
-            <div className='hidden w-20 lg:block'>
-              <div className='h-1.5 w-full rounded-full bg-muted'>
-                <div className='h-full rounded-full bg-primary/30' style={{ width: `${countPct}%` }} />
-              </div>
-            </div>
-
-            {/* Errors */}
-            <div className='w-14 shrink-0 text-right'>
-              {hasErrors ? (
-                <Badge
-                  variant='destructive'
-                  className='text-[9px]'
-                  onClick={(e) => {
-                    if (navigate) {
-                      e.stopPropagation()
-                      navigate('errors', undefined, { procedure: path })
-                    }
-                  }}
-                >
-                  {proc.errors}
-                </Badge>
-              ) : (
-                <span className='text-[11px] text-muted-foreground/40'>0</span>
-              )}
-            </div>
-
-            {/* Error rate */}
-            <span
+          <div key={path}>
+            <div
               className={cn(
-                'w-12 shrink-0 text-right text-[11px] tabular-nums',
-                hasErrors ? 'text-destructive' : 'text-muted-foreground/40',
+                'flex items-center gap-2 border-b border-dashed px-5 py-2 hover:bg-muted/20',
+                navigate && 'cursor-pointer',
               )}
+              onClick={() => navigate?.('requests', undefined, { procedure: path })}
             >
-              {proc.errorRate.toFixed(1)}%
-            </span>
+              {/* Procedure name */}
+              <span className='min-w-0 flex-1 truncate font-mono text-[11px] font-semibold'>
+                {path}
+                {hasSchema && (
+                  <button
+                    className='ml-2 rounded bg-muted px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setExpandedSchema(isExpanded ? null : path)
+                    }}
+                  >
+                    {isExpanded ? 'Hide schema' : 'Schema'}
+                  </button>
+                )}
+              </span>
 
-            {/* Avg */}
-            <span className='w-14 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground'>
-              {fmtMs(proc.latency.avg)}
-            </span>
+              {/* Count */}
+              <span className='w-20 shrink-0 text-right font-mono text-[11px] tabular-nums'>{fmt(proc.count)}</span>
 
-            {/* p95 */}
-            <span className='w-14 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground'>
-              {fmtMs(proc.latency.p95)}
-            </span>
+              {/* Count bar */}
+              <div className='hidden w-20 lg:block'>
+                <div className='h-1.5 w-full rounded-full bg-muted'>
+                  <div className='h-full rounded-full bg-primary/30' style={{ width: `${countPct}%` }} />
+                </div>
+              </div>
+
+              {/* Errors */}
+              <div className='w-14 shrink-0 text-right'>
+                {hasErrors ? (
+                  <Badge
+                    variant='destructive'
+                    className='text-[9px]'
+                    onClick={(e) => {
+                      if (navigate) {
+                        e.stopPropagation()
+                        navigate('errors', undefined, { procedure: path })
+                      }
+                    }}
+                  >
+                    {proc.errors}
+                  </Badge>
+                ) : (
+                  <span className='text-[11px] text-muted-foreground/40'>0</span>
+                )}
+              </div>
+
+              {/* Error rate */}
+              <span
+                className={cn(
+                  'w-12 shrink-0 text-right text-[11px] tabular-nums',
+                  hasErrors ? 'text-destructive' : 'text-muted-foreground/40',
+                )}
+              >
+                {proc.errorRate.toFixed(1)}%
+              </span>
+
+              {/* Avg */}
+              <span className='w-14 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground'>
+                {fmtMs(proc.latency.avg)}
+              </span>
+
+              {/* p95 */}
+              <span className='w-14 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground'>
+                {fmtMs(proc.latency.p95)}
+              </span>
+            </div>
+
+            {/* Schema detail */}
+            {isExpanded && hasSchema && (
+              <div className='border-b bg-muted/10 px-5 py-3'>
+                <div className='flex gap-6'>
+                  {proc.inputSchema && (
+                    <div className='flex-1'>
+                      <span className='mb-1 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground'>
+                        Input
+                      </span>
+                      <pre className='overflow-x-auto whitespace-pre-wrap rounded-md bg-muted/30 p-3 font-mono text-[11px] leading-relaxed'>
+                        {JSON.stringify(proc.inputSchema, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                  {proc.outputSchema && (
+                    <div className='flex-1'>
+                      <span className='mb-1 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground'>
+                        Output
+                      </span>
+                      <pre className='overflow-x-auto whitespace-pre-wrap rounded-md bg-muted/30 p-3 font-mono text-[11px] leading-relaxed'>
+                        {JSON.stringify(proc.outputSchema, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )
       })}

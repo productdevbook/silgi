@@ -331,6 +331,51 @@ describe('tracing() — hooks.after span recording', () => {
     })
     // No crash = pass
   })
+
+  it('falls back to AsyncLocalStorage context when __silgiCtx is missing', async () => {
+    const plugin = tracing()
+    const request = new Request('http://localhost/api/auth/get-session')
+    await plugin.onRequest(request, {})
+
+    const reqTrace = new RequestTrace()
+    // No __silgiCtx on request — use withCtx (ALS) instead
+    await withCtx({ __analyticsTrace: reqTrace }, async () => {
+      await plugin.hooks.after[0].handler({
+        request,
+        path: '/api/auth/get-session',
+        context: { returned: { user: { id: 'u1', email: 'als@test.com' }, session: { id: 's1' } } },
+        body: null,
+      })
+    })
+
+    expect(reqTrace.spans).toHaveLength(1)
+    expect(reqTrace.spans[0]!.name).toBe('auth.get_session')
+    expect(reqTrace.spans[0]!.attributes!['auth.operation']).toBe('get_session')
+    expect(reqTrace.spans[0]!.attributes!['user.id']).toBe('u1')
+  })
+
+  it('prefers __silgiCtx over ALS context when both are present', async () => {
+    const plugin = tracing()
+    const request = new Request('http://localhost/api/auth/sign-in/email')
+    await plugin.onRequest(request, {})
+
+    const silgiTrace = new RequestTrace()
+    const alsTrace = new RequestTrace()
+    ;(request as any).__silgiCtx = { __analyticsTrace: silgiTrace }
+
+    await withCtx({ __analyticsTrace: alsTrace }, async () => {
+      await plugin.hooks.after[0].handler({
+        request,
+        path: '/api/auth/sign-in/email',
+        context: { returned: { user: { id: 'u2' } } },
+        body: null,
+      })
+    })
+
+    // Should use __silgiCtx (silgiTrace), not ALS (alsTrace)
+    expect(silgiTrace.spans).toHaveLength(1)
+    expect(alsTrace.spans).toHaveLength(0)
+  })
 })
 
 // ── instrumentBetterAuth() ──────────────────────────

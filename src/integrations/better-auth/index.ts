@@ -201,7 +201,7 @@ export function tracing(config?: TracingConfig): any {
               const request = ctx.request as Request | undefined
               if (!request) return
 
-              const silgiCtx = (request as any).__silgiCtx as Record<string, unknown> | undefined
+              const silgiCtx = ((request as any).__silgiCtx ?? getCtx()) as Record<string, unknown> | undefined
               if (!silgiCtx) return
 
               const reqTrace = silgiCtx.__analyticsTrace as RequestTrace | undefined
