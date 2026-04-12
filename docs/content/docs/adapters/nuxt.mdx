@@ -1,0 +1,204 @@
+---
+title: Nuxt
+description: Use Silgi with Nuxt 4 — modular server routes, typed client composable, analytics, and WebSocket support.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs'
+import { Files, Folder, File } from 'fumadocs-ui/components/files'
+
+[Nuxt](https://nuxt.com) uses Nitro under the hood. Silgi integrates via the `serverEntry` config, giving you a modular RPC layer alongside Nuxt's file-system routing, auto-imports, and Vue pages.
+
+## Project structure
+
+<Files>
+  <File name='nuxt.config.ts' />
+  <File name='server.ts' />
+  <Folder name='server/rpc' defaultOpen>
+    <File name='instance.ts' />
+    <File name='router.ts' />
+    <File name='guards.ts' />
+    <Folder name='todos' defaultOpen>
+      <File name='schema.ts' />
+      <File name='index.ts' />
+    </Folder>
+    <Folder name='auth'>
+      <File name='schema.ts' />
+      <File name='index.ts' />
+    </Folder>
+  </Folder>
+  <Folder name='app'>
+    <Folder name='composables'>
+      <File name='useClient.ts' />
+    </Folder>
+    <Folder name='pages'>
+      <File name='index.vue' />
+      <File name='todos.vue' />
+    </Folder>
+  </Folder>
+</Files>
+
+## Setup
+
+### 1. Silgi instance
+
+```ts title="server/rpc/instance.ts"
+import { silgi } from 'silgi'
+import { todos } from './todos/schema'
+
+export const s = silgi({
+  context: () => ({ todos }),
+})
+```
+
+### 2. Procedures
+
+```ts title="server/rpc/todos/schema.ts"
+import { z } from 'zod'
+
+export const TodoSchema = z.object({
+  id: z.number(),
+  title: z.string(),
+  completed: z.boolean(),
+  createdAt: z.string(),
+})
+
+export const CreateTodoSchema = z.object({ title: z.string().min(1).max(200) })
+export const TodoIdSchema = z.object({ id: z.number() })
+
+export type Todo = z.infer<typeof TodoSchema>
+
+export const todos: Todo[] = [{ id: 1, title: 'Buy groceries', completed: false, createdAt: '2026-03-20T10:00:00Z' }]
+```
+
+```ts twoslash title="server/rpc/todos/index.ts"
+// @noErrors
+import { trace } from 'silgi/analytics'
+import { s } from '../instance'
+import { CreateTodoSchema, TodoIdSchema, TodoListSchema, TodoSchema } from './schema'
+
+export const list = s
+  .$route({ tags: ['Todos'], summary: 'List all todos' })
+  .$output(TodoListSchema)
+  .$resolve(async ({ ctx }) => {
+    return trace(ctx, 'db.todos.findMany', () => [...ctx.todos])
+  })
+
+export const create = s
+  .$input(CreateTodoSchema)
+  .$output(TodoSchema)
+  .$resolve(async ({ input, ctx }) => {
+    const todo = { id: Date.now(), title: input.title, completed: false, createdAt: new Date().toISOString() }
+    ctx.todos.push(todo)
+    return todo
+  })
+```
+
+### 3. Router
+
+```ts title="server/rpc/router.ts"
+import * as todos from './todos'
+import { s } from './instance'
+
+export const appRouter = s.router({
+  todos: {
+    list: todos.list,
+    create: todos.create,
+  },
+})
+
+export type AppRouter = typeof appRouter
+```
+
+### 4. Server entry
+
+```ts title="server.ts"
+import { s } from './server/rpc/instance'
+import { appRouter } from './server/rpc/router'
+
+export default {
+  fetch: s.handler(appRouter, {
+    analytics: { auth: process.env.ANALYTICS_TOKEN },
+  }),
+}
+```
+
+### 5. Nuxt config
+
+```ts title="nuxt.config.ts"
+export default defineNuxtConfig({
+  compatibilityDate: '2025-01-01',
+})
+```
+
+<Callout>No `serverEntry` config is needed — Nuxt automatically detects `server.ts` at the project root.</Callout>
+
+## Typed client composable
+
+Create a composable that gives Vue components a fully typed RPC client:
+
+```ts title="app/composables/useClient.ts"
+import { createClient } from 'silgi/client'
+import { createLink } from 'silgi/client/ofetch'
+import type { AppRouter } from '../../server/rpc/router'
+
+export function useClient() {
+  const link = createLink({ url: '' })
+  return createClient<AppRouter>(link)
+}
+```
+
+Use it in any page or component:
+
+```vue title="app/pages/todos.vue"
+<script setup lang="ts">
+const client = useClient()
+const { data: todos } = await useAsyncData(() => client.todos.list())
+</script>
+
+<template>
+  <ul>
+    <li v-for="todo in todos" :key="todo.id">{{ todo.title }}</li>
+  </ul>
+</template>
+```
+
+## Binary protocols
+
+Silgi supports MessagePack and Devalue codecs alongside JSON. Pass `binary` or `devalue` to the link:
+
+```ts
+export function useClient(options?: { binary?: boolean; devalue?: boolean }) {
+  const link = createLink({
+    url: '',
+    binary: options?.binary,
+    devalue: options?.devalue,
+  })
+  return createClient<AppRouter>(link)
+}
+```
+
+<Callout type='info'>MessagePack requires `msgpackr` in `vite.optimizeDeps.include` to work in dev mode.</Callout>
+
+## Coexisting with Nuxt routes
+
+When Silgi handles all requests, Nuxt's own server routes and pages won't work. To let unmatched routes fall through:
+
+```ts title="server.ts"
+const silgiHandler = s.handler(appRouter)
+
+export default {
+  fetch: async (request: Request) => {
+    const response = await silgiHandler(request)
+    if (response.status === 404) return
+    return response
+  },
+}
+```
+
+## What's next?
+
+- [Nitro](/docs/integrations/nitro) — standalone Nitro without Nuxt
+- [Analytics](/docs/analytics) — built-in monitoring dashboard
+- [Client](/docs/client) — typed RPC client setup
+- [TanStack Query](/docs/integrations/tanstack-query) — query/mutation options generation

@@ -1,0 +1,89 @@
+---
+title: Core Concepts
+description: The mental model behind Silgi — context, procedures, middleware, and type inference.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+
+Before diving into API details, it helps to understand how Silgi thinks about your code. There are four main ideas.
+
+## Context
+
+Every request starts by running your **context factory**. This is a function you provide when creating the Silgi instance. It receives the raw HTTP request and returns an object.
+
+```ts twoslash
+// @noErrors
+import { silgi } from 'silgi'
+
+const s = silgi({
+  context: (req) => ({
+    db: getDB(),
+    headers: Object.fromEntries(req.headers),
+  }),
+})
+```
+
+This object — called `ctx` — is available in every procedure and every guard. Think of it as the shared state for one request.
+
+Guards can add to the context. If a guard returns `{ user }`, then `ctx.user` becomes available in all procedures that use that guard.
+
+## Procedures
+
+A procedure is a single API function. It takes an input, does something, and returns an output. The client always calls procedures via POST using the router tree path. Use `subscription()` for streaming.
+
+| Type           | What it does                                                                |
+| -------------- | --------------------------------------------------------------------------- |
+| procedure      | Handles a request and returns a response. Called via POST on the tree path. |
+| `subscription` | Streams data over time. Uses Server-Sent Events.                            |
+
+See the [Procedures](/docs/procedures) page for how to write them.
+
+## Middleware
+
+Middleware runs before (and sometimes after) a procedure. Silgi has two kinds:
+
+**Guards** run before the procedure and can add to the context:
+
+```ts twoslash
+// @noErrors
+const auth = s.guard(async (ctx) => {
+  const user = await verifyToken(ctx.headers.authorization)
+  if (!user) throw new SilgiError('UNAUTHORIZED')
+  return { user } // added to ctx
+})
+```
+
+**Wraps** run before _and_ after, like an onion:
+
+```ts twoslash
+// @noErrors
+const timing = s.wrap(async (ctx, next) => {
+  const start = Date.now()
+  const result = await next()
+  console.log(`Took ${Date.now() - start}ms`)
+  return result
+})
+```
+
+See the [Middleware](/docs/middleware) page for details and execution order.
+
+## Type inference
+
+Silgi infers types from your code. You don't write them yourself and you don't run a code generator.
+
+When you define a procedure with a Zod schema, the client automatically knows the input type. When the procedure returns something, the client knows the return type. When a guard adds `{ user }` to the context, the procedure knows `ctx.user` exists.
+
+This works because of `InferClient`:
+
+```ts twoslash
+// @noErrors
+import type { InferClient } from 'silgi'
+
+type Client = InferClient<typeof appRouter>
+// Client.users.list: (input: { limit?: number }) => Promise<User[]>
+```
+
+<Callout>
+  Silgi uses the Standard Schema spec for validation. This means Zod, Valibot, and ArkType all work — you're not locked
+  into any one library.
+</Callout>

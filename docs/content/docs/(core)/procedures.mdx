@@ -1,0 +1,183 @@
+---
+title: Procedures
+description: Define API endpoints with the builder pattern — $resolve, $input, $use, and more.
+---
+
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
+import { Callout } from 'fumadocs-ui/components/callout'
+
+A procedure is a single endpoint in your API. You create them with the builder methods `$resolve()`, `$input()`, `$use()`, etc. Subscriptions use `subscription()`.
+
+## Simple form
+
+The simplest way. Just pass a resolve function:
+
+```ts twoslash
+// @noErrors
+import { z } from 'zod'
+
+// No input
+const health = s.$resolve(() => ({ status: 'ok' }))
+
+// With input validation
+const getUser = s.$input(z.object({ id: z.number() })).$resolve(({ input, ctx }) => ctx.db.users.findById(input.id))
+```
+
+When you use `$input()`, Silgi validates the input before your function runs. If validation fails, the client gets a 400 error automatically.
+
+## Builder
+
+When you need middleware, error definitions, or output validation, chain builder methods:
+
+```ts twoslash
+// @noErrors
+import { z } from 'zod'
+
+const createUser = s
+  .$use(auth) // middleware
+  .$input(z.object({ name: z.string() })) // input validation
+  .$output(z.object({ id: z.number() })) // output validation (optional)
+  .$errors({ CONFLICT: 409 }) // typed errors
+  .$resolve(({ input, ctx, fail }) => {
+    if (ctx.db.users.exists(input.name)) {
+      fail('CONFLICT') // typed — only codes from `errors`
+    }
+    return ctx.db.users.create(input)
+  })
+```
+
+### Available builder methods
+
+| Method             | Required | Description                                                                                                                                    |
+| ------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.$resolve(fn)`    | Yes      | The function that does the work. Receives `{ input, ctx, fail, signal }`.                                                                      |
+| `.$input(schema)`  | No       | A schema that validates the incoming data.                                                                                                     |
+| `.$output(schema)` | No       | Validates the return value and populates the response type in the API reference (Scalar/OpenAPI). Without it, no response schema is generated. |
+| `.$use(...mw)`     | No       | Add guards and wraps to run before the procedure.                                                                                              |
+| `.$errors({...})`  | No       | A map of error codes to HTTP status codes. Enables the typed `fail()` function.                                                                |
+| `.$route({...})`   | No       | OpenAPI metadata (tags, summary, description). Also used for special-case passthrough routes.                                                  |
+| `.$meta({...})`    | No       | Set custom metadata.                                                                                                                           |
+
+<Callout type='info'>
+  `.$resolve()` must be called last — it finalizes the builder and returns a `ProcedureDef`.
+</Callout>
+
+## The resolve function
+
+Every procedure has a `resolve` function. It receives one object with four properties:
+
+```ts twoslash
+// @noErrors
+const myProcedure = s.$resolve(({ input, ctx, fail, signal }) => {
+  // input  — the validated input (or undefined if no schema)
+  // ctx    — the context object (from context factory + guards)
+  // fail   — throws a typed error (only if `errors` is defined)
+  // signal — AbortSignal for cancellation
+})
+```
+
+## OpenAPI metadata
+
+Use `$route()` to enrich the generated OpenAPI spec with tags, summary, and description. This metadata is purely for documentation — the client always calls procedures via POST on the tree path.
+
+```ts twoslash
+// @noErrors
+const listUsers = s
+  .$route({ tags: ['Users'], summary: 'List users' })
+  .$input(z.object({ limit: z.number().optional() }))
+  .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))
+```
+
+See the [OpenAPI](/docs/openapi) page for all available metadata options.
+
+## Subscriptions
+
+A subscription is a procedure that returns an async generator. Over HTTP, the server sends each yielded value as a Server-Sent Event. Over [WebSocket](/docs/protocols/websocket), each value is a separate message.
+
+```ts twoslash
+// @noErrors
+// SSE only (HTTP)
+const countdown = s.subscription(async function* () {
+  for (let i = 5; i > 0; i--) {
+    yield { count: i }
+    await new Promise((r) => setTimeout(r, 1000))
+  }
+})
+```
+
+Subscriptions stream via SSE over HTTP and are automatically exposed over WebSocket — no flag required. The client receives `{ count: 5 }`, `{ count: 4 }`, ... `{ count: 1 }`.
+
+## Output schema
+
+`$output()` does two things: it validates the return value at runtime, and it generates the response schema in the [API reference](/docs/openapi). Without `$output`, Scalar and the raw OpenAPI spec will have no response type for that procedure.
+
+```ts twoslash
+// @noErrors
+import { z } from 'zod'
+
+const PostSchema = z.object({
+  id: z.number(),
+  title: z.string(),
+  body: z.string(),
+})
+
+const createPost = s
+  .$input(z.object({ title: z.string(), body: z.string() }))
+  .$output(PostSchema)
+  .$errors({ CONFLICT: 409 })
+  .$resolve(({ input }) => {
+    return { id: 1, title: input.title, body: input.body }
+    //     ^ IDE suggests id, title, body — output schema drives autocomplete
+  })
+```
+
+## Routers
+
+Procedures are grouped into routers. You can nest them:
+
+```ts twoslash
+// @noErrors
+const appRouter = s.router({
+  health: healthCheck,
+  users: {
+    list: listUsers,
+    create: createUser,
+    delete: deleteUser,
+  },
+  admin: {
+    stats: getStats,
+  },
+})
+```
+
+The nesting becomes the URL path:
+
+- `users.list` → `POST /users/list`
+- `admin.stats` → `POST /admin/stats`
+
+## Metadata
+
+Attach custom key-value metadata to any procedure using `.$meta()`:
+
+```ts twoslash
+// @noErrors
+const listUsers = s
+  .$input(z.object({ limit: z.number().optional() }))
+  .$meta({ cacheable: true, rateLimit: 100 })
+  .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))
+```
+
+Metadata is stored on the procedure definition and can be read by middleware:
+
+```ts twoslash
+// @noErrors
+const cacheWrap = s.wrap(async (ctx, next) => {
+  // Access meta from the procedure being executed
+  // Useful for conditional caching, logging, authorization policies
+  return next()
+})
+```
+
+Common use cases: cache policies, rate limit tiers, feature flags, authorization rules, and documentation hints.
+
+<Callout>Export the router type so the client can use it: `export type AppRouter = typeof appRouter`</Callout>

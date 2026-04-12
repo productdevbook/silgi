@@ -1,0 +1,175 @@
+---
+title: Getting Started
+description: Install Silgi and build your first type-safe API in 5 minutes.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
+import { File, Folder, Files } from 'fumadocs-ui/components/files'
+
+## Install
+
+<Tabs items={['npm', 'pnpm', 'bun']}>
+  <Tab value='npm'>```bash npm install silgi zod ```</Tab>
+  <Tab value='pnpm'>```bash pnpm add silgi zod ```</Tab>
+  <Tab value='bun'>```bash bun add silgi zod ```</Tab>
+</Tabs>
+
+You also need a validator. We use Zod here, but Valibot and ArkType also work.
+
+## What you will build
+
+A small API with two endpoints:
+
+- `users.list` — returns a list of users (anyone can call it)
+- `users.create` — creates a user (requires authentication)
+
+## Project structure
+
+<Files>
+  <Folder name='src' defaultOpen>
+    <File name='rpc.ts' />
+    <File name='server.ts' />
+  </Folder>
+  <File name='package.json' />
+</Files>
+
+Two files. That's all you need to get started.
+
+## Step by step
+
+<Steps>
+<Step>
+
+### Create the Silgi instance
+
+This is where you tell Silgi how to build the context for each request. The context is an object that every procedure can access — a good place to put things like a database connection.
+
+```ts twoslash title="src/rpc.ts"
+// @noErrors
+import { silgi } from 'silgi'
+
+const s = silgi({
+  context: (req) => ({
+    // This runs on every request.
+    // Whatever you return here is available as `ctx` in procedures.
+    db: getDB(),
+  }),
+})
+
+// Export the helpers you need
+export const { guard, wrap, router } = s
+export { s }
+```
+
+</Step>
+<Step>
+
+### Define your procedures
+
+A **procedure** is a single API endpoint. The client calls all procedures via POST using the router tree path.
+
+```ts twoslash title="src/server.ts"
+// @noErrors
+import { s, guard, router } from './rpc'
+import { SilgiError } from 'silgi'
+import { z } from 'zod'
+
+// A guard checks something before the procedure runs.
+// If it returns an object, that object is added to the context.
+const auth = guard((ctx) => {
+  const token = ctx.headers?.authorization
+  if (!token) throw new SilgiError('UNAUTHORIZED')
+  return { userId: 1 }
+})
+
+// A procedure with input validation
+const listUsers = s.$input(z.object({ limit: z.number().min(1).max(100).optional() })).$resolve(({ input, ctx }) => {
+  return ctx.db.users.findMany({ take: input.limit ?? 10 })
+})
+
+// A procedure that requires authentication
+const createUser = s
+  .$use(auth)
+  .$input(
+    z.object({
+      name: z.string().min(1),
+      email: z.string().email(),
+    }),
+  )
+  .$resolve(({ input, ctx }) => {
+    return ctx.db.users.create({ ...input, createdBy: ctx.userId })
+  })
+```
+
+</Step>
+<Step>
+
+### Create a router and start the server
+
+The router groups your procedures. The structure becomes the API path: `users.list` becomes `/users/list`.
+
+```ts twoslash title="src/server.ts"
+// @noErrors
+// ... continuing from above
+
+const appRouter = router({
+  users: {
+    list: listUsers,
+    create: createUser,
+  },
+})
+
+s.serve(appRouter, {
+  port: 3000,
+  scalar: true, // Serves API docs at /api/reference
+})
+```
+
+Run it:
+
+```bash
+npx tsx src/server.ts
+```
+
+You should see:
+
+```
+Silgi server running at http://127.0.0.1:3000
+Scalar API Reference at http://127.0.0.1:3000/api/reference
+```
+
+</Step>
+<Step>
+
+### Call it from the client
+
+```ts twoslash
+// @noErrors
+import { createClient } from 'silgi/client'
+import { createLink } from 'silgi/client/ofetch'
+
+// The link tells the client how to talk to the server
+const link = createLink({ url: 'http://localhost:3000' })
+
+// InferClient gives you the types from the router
+const client = createClient<any>(link)
+
+// Now you have full autocomplete
+const users = await client.users.list({ limit: 5 })
+const newUser = await client.users.create({ name: 'Alice', email: 'alice@example.com' })
+```
+
+In a real project, you would import the router type and use `InferClient<typeof appRouter>` instead of `any`. See the [Client](/docs/client) page for the full setup.
+
+</Step>
+</Steps>
+
+## What's next?
+
+Now that you have a working API, learn about the building blocks:
+
+- [Core Concepts](/docs/concepts) — how context, guards, and wraps work together
+- [Procedures](/docs/procedures) — the builder pattern for defining endpoints
+- [Server](/docs/server) — serve(), handler(), HTTP/2, Scalar
+- [Client](/docs/client) — ofetch link, binary mode, interceptors

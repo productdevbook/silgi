@@ -1,0 +1,26 @@
+{
+  "title": "Plugins",
+  "description": "Extend your API",
+  "icon": "Blocks",
+  "root": true,
+  "pages": [
+    "index",
+    "---",
+    "cache",
+    "cors",
+    "ratelimit",
+    "body-limit",
+    "strict-get",
+    "cookies",
+    "---",
+    "otel",
+    "pino",
+    "---",
+    "signing",
+    "coerce",
+    "batch-server",
+    "pubsub",
+    "file-upload",
+    "storage"
+  ]
+}

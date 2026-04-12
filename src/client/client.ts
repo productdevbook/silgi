@@ -1,18 +1,23 @@
 /**
- * Client factory — creates a type-safe client from a link.
+ * Client factory — creates a type-safe proxy client from a link.
  *
- * Key optimization over oRPC:
- * - Sub-proxies are cached in a Map (oRPC creates new Proxy per access)
- * - Path accumulation uses frozen arrays (V8 fast path)
- * - preventNativeAwait is built into the proxy handler
+ * Sub-proxies are cached in a Map for O(1) repeated access.
  */
 
-import type { ClientLink, ClientContext, ClientOptions, NestedClient } from "./types.ts";
+import type { InferClient } from '../types.ts'
+import type { ClientLink, ClientContext, ClientOptions } from './types.ts'
 
-export function createClient<T extends NestedClient<TClientContext>, TClientContext extends ClientContext = Record<never, never>>(
+/**
+ * Create a type-safe client from a link.
+ *
+ * ```ts
+ * const client = createClient<typeof appRouter>(link)
+ * ```
+ */
+export function createClient<T, TClientContext extends ClientContext = Record<never, never>>(
   link: ClientLink<TClientContext>,
-): T {
-  return createClientProxy<T, TClientContext>(link, []);
+): InferClient<T> {
+  return createClientProxy(link, []) as any
 }
 
 function createClientProxy<T, TClientContext extends ClientContext>(
@@ -20,49 +25,91 @@ function createClientProxy<T, TClientContext extends ClientContext>(
   path: readonly string[],
 ): T {
   // Cache child proxies for O(1) repeated access
-  const cache = new Map<string, unknown>();
+  const cache = new Map<string, unknown>()
 
   const procedureClient = (input: unknown, options?: ClientOptions<TClientContext>) =>
-    link.call(path, input, options ?? ({} as ClientOptions<TClientContext>));
+    link.call(path, input, options ?? ({} as ClientOptions<TClientContext>))
 
   return new Proxy(procedureClient, {
     get(_target, prop) {
       // Prevent native await
-      if (prop === "then") return undefined;
-      if (typeof prop !== "string") return undefined;
+      if (prop === 'then') return undefined
+      if (typeof prop !== 'string') return undefined
 
-      let cached = cache.get(prop);
+      let cached = cache.get(prop)
       if (!cached) {
-        // Freeze the child path for V8 optimization
-        const childPath = Object.freeze([...path, prop]);
-        cached = createClientProxy(link, childPath);
-        cache.set(prop, cached);
+        cached = createClientProxy(link, [...path, prop])
+        cache.set(prop, cached)
       }
-      return cached;
+      return cached
     },
     apply(_target, _thisArg, args) {
-      return procedureClient(args[0], args[1]);
+      return procedureClient(args[0], args[1])
     },
-  }) as T;
+  }) as T
 }
 
 /**
  * Safe client wrapper — returns [error, data] tuples instead of throwing.
  */
 export interface SafeResult<TOutput, TError> {
-  error: TError | null;
-  data: TOutput | undefined;
-  isError: boolean;
-  isSuccess: boolean;
+  error: TError | null
+  data: TOutput | undefined
+  isError: boolean
+  isSuccess: boolean
 }
 
-export async function safe<TOutput, TError = unknown>(
-  promise: Promise<TOutput>,
-): Promise<SafeResult<TOutput, TError>> {
+export async function safe<TOutput, TError = unknown>(promise: Promise<TOutput>): Promise<SafeResult<TOutput, TError>> {
   try {
-    const data = await promise;
-    return { error: null, data, isError: false, isSuccess: true };
+    const data = await promise
+    return { error: null, data, isError: false, isSuccess: true }
   } catch (error) {
-    return { error: error as TError, data: undefined, isError: true, isSuccess: false };
+    return { error: error as TError, data: undefined, isError: true, isSuccess: false }
   }
 }
+
+/**
+ * Create a safe client — every procedure call returns { error, data } instead of throwing.
+ *
+ * ```ts
+ * const safeClient = createSafeClient<typeof appRouter>(link)
+ * const { error, data } = await safeClient.users.list()
+ * if (error) console.error(error)
+ * ```
+ */
+export function createSafeClient<T, TClientContext extends ClientContext = Record<never, never>>(
+  link: ClientLink<TClientContext>,
+): InferSafeClient<T> {
+  return createSafeProxy(link, []) as any
+}
+
+function createSafeProxy<TClientContext extends ClientContext>(
+  link: ClientLink<TClientContext>,
+  path: readonly string[],
+): unknown {
+  const cache = new Map<string, unknown>()
+
+  const procedureClient = (input: unknown, options?: ClientOptions<TClientContext>) =>
+    safe(link.call(path, input, options ?? ({} as ClientOptions<TClientContext>)))
+
+  return new Proxy(procedureClient, {
+    get(_target, prop) {
+      if (prop === 'then') return undefined
+      if (typeof prop !== 'string') return undefined
+      let cached = cache.get(prop)
+      if (!cached) {
+        cached = createSafeProxy(link, [...path, prop])
+        cache.set(prop, cached)
+      }
+      return cached
+    },
+    apply(_target, _thisArg, args) {
+      return procedureClient(args[0], args[1])
+    },
+  })
+}
+
+/** Infer a safe client type where every procedure returns SafeResult */
+export type InferSafeClient<T> = T extends (...args: infer A) => Promise<infer R>
+  ? (...args: A) => Promise<SafeResult<R, import('../core/error.ts').SilgiError>>
+  : { [K in keyof T]: InferSafeClient<T[K]> }

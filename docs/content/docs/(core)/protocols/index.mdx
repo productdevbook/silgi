@@ -1,0 +1,78 @@
+---
+title: Protocols
+description: Silgi supports three wire formats — JSON, MessagePack, and devalue — plus WebSocket for persistent connections.
+---
+
+import { Cards, Card } from 'fumadocs-ui/components/card'
+import { Callout } from 'fumadocs-ui/components/callout'
+
+When a client sends a request, the server needs to agree on how to encode the data. Silgi handles this automatically through **content negotiation** — the client says what format it wants via the `Accept` header, and the server responds accordingly. No configuration needed.
+
+## The three formats
+
+| Format          | Payload size  | Rich types                                    | Binary | Best for                             |
+| --------------- | ------------- | --------------------------------------------- | ------ | ------------------------------------ |
+| **JSON**        | Baseline      | No                                            | No     | Default, universal compatibility     |
+| **MessagePack** | ~30% smaller  | Date, Set, Map                                | Yes    | Mobile apps, bandwidth-sensitive     |
+| **devalue**     | ~Same as JSON | Date, Map, Set, BigInt, RegExp, circular refs | No     | APIs returning rich JavaScript types |
+
+**JSON** is the default. Every client and every tool understands it. If you don't configure anything, this is what you get.
+
+**MessagePack** is a binary format. Same data, fewer bytes. If you're building a mobile app or sending large payloads, switching to MessagePack can noticeably reduce bandwidth and improve parse speed.
+
+**devalue** preserves JavaScript types that JSON loses. If your API returns `Date` objects, `Map`, `Set`, or `BigInt`, devalue keeps them intact instead of converting them to strings or empty objects.
+
+## How content negotiation works
+
+The client sends an `Accept` header, and the server picks the matching format:
+
+```
+Accept: application/json              --> JSON (default)
+Accept: application/x-msgpack         --> MessagePack
+Accept: application/x-devalue+json    --> devalue
+```
+
+For request bodies, the server checks `Content-Type` and decodes accordingly. This all happens inside Silgi — you don't need to configure anything on the server.
+
+On the client side, set `protocol` in `createLink` to choose the wire format:
+
+```ts twoslash
+// @noErrors
+import { createLink } from 'silgi/client/ofetch'
+
+const link = createLink({
+  url: 'http://localhost:3000',
+  protocol: 'messagepack', // or 'devalue', default is 'json'
+})
+```
+
+<Callout type='info'>
+  You can also use these formats over [WebSocket](/docs/protocols/websocket). Pass `protocol: 'messagepack'` to
+  `attachWebSocket` for MessagePack over WebSocket.
+</Callout>
+
+## Choose a format
+
+Most applications work great with plain JSON. Consider switching when:
+
+- You need **smaller payloads** (mobile, IoT, high-traffic) --> MessagePack
+- Your API returns **Date, Map, Set, or BigInt** --> devalue
+- You want the **lowest possible latency** for repeated calls --> WebSocket
+
+<Cards>
+  <Card
+    title='MessagePack'
+    description='Binary protocol for smaller payloads and native Date support.'
+    href='/docs/protocols/msgpack'
+  />
+  <Card
+    title='devalue'
+    description='Rich type serialization — Date, Map, Set, BigInt, RegExp, circular refs.'
+    href='/docs/protocols/devalue'
+  />
+  <Card
+    title='WebSocket'
+    description='Bidirectional RPC over a persistent connection. Ideal for real-time and subscriptions.'
+    href='/docs/protocols/websocket'
+  />
+</Cards>

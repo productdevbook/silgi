@@ -1,0 +1,92 @@
+---
+title: 0.1.0-beta.6
+description: Protocol enum replaces binary/devalue booleans, graceful shutdown, WebSocket compression/keepalive, compiled pipelines docs.
+version: 0.1.0-beta.6
+date: 2026-03-26
+---
+
+## `protocol` replaces `binary` / `devalue` booleans
+
+The client link and WebSocket adapter now use a single `protocol` field instead of two separate booleans. This is more extensible — adding a new wire format no longer means adding another boolean flag.
+
+```ts
+import { createLink } from 'silgi/client/ofetch'
+
+// Before (deprecated, still works)
+const link = createLink({ url: '...', binary: true })
+
+// After
+const link = createLink({
+  url: '...',
+  protocol: 'messagepack', // 'json' | 'messagepack' | 'devalue'
+})
+```
+
+Same for WebSocket:
+
+```ts
+import { attachWebSocket } from 'silgi/ws'
+
+// Before
+await attachWebSocket(server, appRouter, { binary: true })
+
+// After
+await attachWebSocket(server, appRouter, { protocol: 'messagepack' })
+```
+
+The old `binary` and `devalue` booleans are marked `@deprecated` — they still work, but `protocol` takes precedence when both are set.
+
+See [Protocols docs](/docs/protocols) and [Client docs](/docs/client).
+
+## Graceful shutdown
+
+`s.serve()` now returns a `SilgiServer` handle with `close()` for programmatic shutdown. SIGINT/SIGTERM handling is enabled by default via srvx:
+
+```ts
+const server = await s.serve(appRouter, { port: 3000 })
+
+// Later — gracefully wait for in-flight requests
+await server.close()
+
+// Or force-terminate immediately
+await server.close(true)
+```
+
+Configure shutdown behavior:
+
+```ts
+await s.serve(appRouter, {
+  gracefulShutdown: {
+    timeout: 10_000, // max ms to wait for in-flight requests
+    forceTimeout: 15_000, // max ms before process.exit
+  },
+})
+```
+
+A new `serve:stop` lifecycle hook fires when shutdown begins.
+
+See [Server docs](/docs/server).
+
+## WebSocket compression & keepalive
+
+The WebSocket adapter gains three new options:
+
+```ts
+await attachWebSocket(server, appRouter, {
+  compress: true, // per-message-deflate (or pass object for fine-tuning)
+  maxPayload: 1_048_576, // 1 MB connection-level limit
+  keepalive: 30_000, // ping/pong interval — dead peers are terminated
+})
+```
+
+- **compress** — reduces WebSocket frame sizes, especially for large JSON payloads
+- **maxPayload** — prevents oversized messages from consuming server memory
+- **keepalive** — detects and terminates dead connections automatically
+
+See [WebSocket docs](/docs/protocols/websocket).
+
+## Compiled pipelines docs
+
+New documentation page explaining how Silgi compiles your procedures at startup. Covers guard unrolling, context pooling, the three execution paths (sync fast path, semi-sync, wrap path), and router compilation — all with Mermaid diagrams.
+
+See [Compiled Pipelines](/docs/compiled-pipelines).

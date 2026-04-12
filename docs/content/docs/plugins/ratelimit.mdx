@@ -1,0 +1,212 @@
+---
+title: Rate Limiting
+description: Sliding window rate limiter — protect your API with in-memory or pluggable backends like Redis.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
+
+Rate limiting prevents clients from making too many requests in a short period. Silgi provides a guard middleware that uses a sliding window algorithm and works with an in-memory store or any custom backend.
+
+## Quick start
+
+```ts twoslash
+// @noErrors
+import { rateLimitGuard, MemoryRateLimiter } from 'silgi/ratelimit'
+
+const rateLimit = rateLimitGuard({
+  limiter: new MemoryRateLimiter({
+    limit: 100, // max 100 requests
+    windowMs: 60_000, // per 60 seconds
+  }),
+  keyFn: (ctx) => ctx.ip ?? 'anonymous',
+})
+```
+
+Then add it to any procedure:
+
+```ts twoslash
+// @noErrors
+const listUsers = s.$use(rateLimit).$resolve(({ ctx }) => ctx.db.users.findMany())
+```
+
+When a client exceeds the limit, the guard throws a `TOO_MANY_REQUESTS` error:
+
+```json
+{
+  "code": "TOO_MANY_REQUESTS",
+  "status": 429,
+  "message": "Rate limit exceeded",
+  "data": {
+    "limit": 100,
+    "remaining": 0,
+    "reset": 1710720000000,
+    "retryAfter": 42
+  }
+}
+```
+
+The `retryAfter` field tells the client how many seconds to wait before trying again.
+
+## How the key function works
+
+The `keyFn` determines _who_ is being rate-limited. Different keys mean different rate limit buckets:
+
+```ts twoslash
+// @noErrors
+// Rate limit by IP address
+keyFn: (ctx) => ctx.ip ?? 'anonymous'
+
+// Rate limit by authenticated user
+keyFn: (ctx) => ctx.user?.id ?? ctx.ip
+
+// Rate limit by API key
+keyFn: (ctx) => ctx.headers['x-api-key'] ?? 'no-key'
+```
+
+Each unique key gets its own counter. So if you key by user ID, one user hitting the limit doesn't affect other users.
+
+## Context enrichment
+
+When the guard passes (the client is within the limit), it adds rate limit info to the context:
+
+```ts twoslash
+// @noErrors
+const listUsers = s.$use(rateLimit).$resolve(({ ctx }) => {
+  // ctx.rateLimit is available after the guard runs
+  console.log(ctx.rateLimit.remaining) // 97
+  return ctx.db.users.findMany()
+})
+```
+
+The `ctx.rateLimit` object has:
+
+| Property    | Type      | Description                                 |
+| ----------- | --------- | ------------------------------------------- |
+| `success`   | `boolean` | Always `true` (the guard throws if `false`) |
+| `limit`     | `number`  | Maximum requests allowed                    |
+| `remaining` | `number`  | Requests remaining in the current window    |
+| `reset`     | `number`  | Unix timestamp (ms) when the window resets  |
+
+## MemoryRateLimiter
+
+The built-in limiter stores counters in memory using a sliding window algorithm:
+
+```ts twoslash
+// @noErrors
+import { MemoryRateLimiter } from 'silgi/ratelimit'
+
+const limiter = new MemoryRateLimiter({
+  limit: 100, // max requests per window
+  windowMs: 60_000, // window duration in milliseconds
+})
+```
+
+This works well for single-server deployments. Counters are lost when the server restarts, which is usually fine — rate limiting is about preventing abuse, not exact accounting.
+
+<Callout>
+  For multi-server deployments, use a shared backend like Redis. See below for how to plug in a custom rate limiter.
+</Callout>
+
+## Custom backend
+
+The rate limiter is an interface with a single method. Implement it for Redis, Upstash, DynamoDB, or any other backend:
+
+<Tabs items={['Interface', 'Redis example']}>
+  <Tab value="Interface">
+  ```ts twoslash
+// @noErrors
+import type { RateLimiter, RateLimitResult } from "silgi/ratelimit"
+
+interface RateLimiter {
+limit(key: string): Promise<RateLimitResult>
+}
+
+interface RateLimitResult {
+success: boolean
+limit: number
+remaining: number
+reset: number // Unix timestamp in ms
+}
+
+````
+</Tab>
+<Tab value="Redis example">
+```ts twoslash
+// @noErrors
+import type { RateLimiter, RateLimitResult } from "silgi/ratelimit"
+import Redis from "ioredis"
+
+class RedisRateLimiter implements RateLimiter {
+#redis = new Redis()
+#limit: number
+#windowMs: number
+
+constructor(limit: number, windowMs: number) {
+  this.#limit = limit
+  this.#windowMs = windowMs
+}
+
+async limit(key: string): Promise<RateLimitResult> {
+  const now = Date.now()
+  const windowKey = `rl:${key}:${Math.floor(now / this.#windowMs)}`
+
+  const count = await this.#redis.incr(windowKey)
+  if (count === 1) await this.#redis.pexpire(windowKey, this.#windowMs)
+
+  return {
+    success: count <= this.#limit,
+    limit: this.#limit,
+    remaining: Math.max(0, this.#limit - count),
+    reset: (Math.floor(now / this.#windowMs) + 1) * this.#windowMs,
+  }
+}
+}
+
+// Use it like the MemoryRateLimiter
+const rateLimit = rateLimitGuard({
+limiter: new RedisRateLimiter(100, 60_000),
+keyFn: (ctx) => ctx.ip,
+})
+````
+
+  </Tab>
+</Tabs>
+
+## Options
+
+| Option    | Type                                 | Required | Description                                             |
+| --------- | ------------------------------------ | -------- | ------------------------------------------------------- |
+| `limiter` | `RateLimiter`                        | Yes      | The rate limiter instance (in-memory, Redis, etc.)      |
+| `keyFn`   | `(ctx) => string \| Promise<string>` | Yes      | Extract the rate limit key from the context             |
+| `message` | `string`                             | No       | Custom error message (default: `"Rate limit exceeded"`) |
+
+## Different limits per endpoint
+
+Create separate rate limit guards for different limits:
+
+```ts twoslash
+// @noErrors
+const publicLimit = rateLimitGuard({
+  limiter: new MemoryRateLimiter({ limit: 100, windowMs: 60_000 }),
+  keyFn: (ctx) => ctx.ip,
+})
+
+const authLimit = rateLimitGuard({
+  limiter: new MemoryRateLimiter({ limit: 1000, windowMs: 60_000 }),
+  keyFn: (ctx) => ctx.user.id,
+})
+
+const listUsers = s
+  .$use(publicLimit)
+  .$resolve(...)
+const createUser = s
+  .$use(auth, authLimit)
+  .$resolve(...)
+```
+
+## What's next?
+
+- [Middleware](/docs/middleware) — understand guards, which power the rate limiter
+- [Typed Errors](/docs/errors) — how the `TOO_MANY_REQUESTS` error works on the client
+- [Plugins](/docs/plugins) — other available plugins

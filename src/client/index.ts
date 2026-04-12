@@ -1,11 +1,19 @@
-export { createClient, safe } from "./client.ts";
-export type { SafeResult } from "./client.ts";
+export { createClient, createSafeClient, safe } from './client.ts'
+export type { SafeResult, InferSafeClient } from './client.ts'
 export type {
-  ClientContext, ClientOptions, Client, ClientRest,
-  NestedClient, ClientLink, InferClientInputs, InferClientOutputs,
-} from "./types.ts";
-export { DynamicLink, type LinkResolver } from "./dynamic-link.ts";
+  ClientContext,
+  ClientOptions,
+  Client,
+  ClientRest,
+  NestedClient,
+  ClientLink,
+  InferClientInputs,
+  InferClientOutputs,
+} from './types.ts'
 
-// Re-exports from core
-export { KatmanError, isDefinedError } from "../core/error.ts";
-export type { KatmanErrorCode, KatmanErrorJSON } from "../core/error.ts";
+export { DynamicLink, type LinkSelector } from './dynamic-link.ts'
+
+export { withInterceptors, type ClientInterceptors } from './interceptor.ts'
+
+export { SilgiError, isDefinedError } from '../core/error.ts'
+export type { SilgiErrorCode, SilgiErrorJSON } from '../core/error.ts'

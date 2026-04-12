@@ -1,0 +1,269 @@
+---
+title: Middleware
+description: Guards and wraps — the two kinds of middleware in Silgi, when to use each, and how they execute.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
+
+Middleware lets you run code before (and sometimes after) a procedure. Silgi has two kinds: **guards** and **wraps**. They solve different problems, so understanding the difference is important.
+
+## Guards
+
+A guard is a function that receives the current context and either:
+
+1. **Returns an object** — its properties get merged into `ctx` for everything that runs after it.
+2. **Returns nothing** — it acts as a pure check (throw an error to reject the request).
+3. **Throws** — the request stops immediately and the client gets an error.
+
+```ts twoslash
+// @noErrors
+import { silgi, SilgiError } from 'silgi'
+
+const s = silgi({
+  context: (req) => ({
+    headers: Object.fromEntries(req.headers),
+  }),
+})
+const { guard } = s
+
+// This guard verifies a token and adds `user` to the context
+const auth = guard(async (ctx) => {
+  const token = ctx.headers.authorization?.replace('Bearer ', '')
+  if (!token) throw new SilgiError('UNAUTHORIZED')
+
+  const user = await verifyToken(token)
+  return { user } // now ctx.user is available downstream
+})
+```
+
+When a procedure uses this guard, TypeScript knows that `ctx.user` exists:
+
+```ts twoslash
+// @noErrors
+const me = s.$use(auth).$resolve(({ ctx }) => {
+  return ctx.user // typed as User — no cast needed
+})
+```
+
+### Validation-only guards
+
+If you don't need to add anything to the context, just don't return anything. The guard acts as a gatekeeper:
+
+```ts twoslash
+// @noErrors
+const adminOnly = guard((ctx) => {
+  if (ctx.user.role !== 'admin') {
+    throw new SilgiError('FORBIDDEN')
+  }
+  // no return — ctx is unchanged
+})
+```
+
+### Guards with typed errors
+
+Guards can declare their own error maps. These errors automatically merge into any procedure that uses the guard — in TypeScript, at runtime, and in the OpenAPI spec:
+
+```ts twoslash
+// @noErrors
+const auth = guard({
+  errors: { UNAUTHORIZED: 401 },
+  fn: async (ctx) => {
+    const token = ctx.headers.authorization?.replace('Bearer ', '')
+    if (!token) throw new SilgiError('UNAUTHORIZED')
+    return { user: await verifyToken(token) }
+  },
+})
+
+// In the procedure, fail() knows about 'UNAUTHORIZED' from the guard
+const createPost = s
+  .$use(auth)
+  .$errors({ CONFLICT: 409 })
+  .$resolve(({ fail }) => {
+    // TypeScript allows both 'UNAUTHORIZED' and 'CONFLICT'
+    fail('CONFLICT')
+  })
+```
+
+The simple `guard(fn)` form still works exactly as before. Use `guard({ errors, fn })` when you want the guard's errors to be part of the typed API contract. See [Typed Errors](/docs/errors#typed-guard-errors) for more details.
+
+<Callout type='info'>
+  Guards can be synchronous or asynchronous. When they're sync, Silgi skips the async overhead entirely — no Promises
+  are created.
+</Callout>
+
+## Wraps
+
+A wrap is an "onion-style" middleware. It receives the context and a `next()` function. You call `next()` to run the rest of the pipeline, and you can do things both before and after:
+
+```ts twoslash
+// @noErrors
+const timing = s.wrap(async (ctx, next) => {
+  const start = performance.now()
+  const result = await next()
+  console.log(`Procedure took ${performance.now() - start}ms`)
+  return result // you must return the result
+})
+```
+
+Wraps are useful for:
+
+- **Timing** — measure how long a procedure takes
+- **Error capture** — catch errors and report them (Sentry, Datadog, etc.)
+- **Retries** — call `next()` again if it fails
+- **Caching** — return a cached value instead of calling `next()`
+- **Transactions** — start a DB transaction before, commit or rollback after
+
+```ts twoslash
+// @noErrors
+const withSentry = s.wrap(async (ctx, next) => {
+  try {
+    return await next()
+  } catch (error) {
+    Sentry.captureException(error)
+    throw error // re-throw so the client still gets the error
+  }
+})
+```
+
+<Callout>
+  Wraps are always asynchronous because they need to `await next()`. If you only need to run code *before* a procedure
+  and don't need the result, use a guard instead — it's faster.
+</Callout>
+
+## When to use which
+
+| Need                                          | Use   |
+| --------------------------------------------- | ----- |
+| Check authentication                          | Guard |
+| Add data to context (user, session, tenant)   | Guard |
+| Validate a precondition (throw if invalid)    | Guard |
+| Measure timing                                | Wrap  |
+| Catch and report errors                       | Wrap  |
+| Transform the result after the procedure runs | Wrap  |
+| Run code both before and after                | Wrap  |
+
+The rule of thumb: if you need the _result_ of the procedure, use a wrap. Otherwise, use a guard.
+
+## Execution order
+
+When you stack middleware via `.$use()`, guards always run first (in order), then wraps form an onion around the resolver:
+
+```ts twoslash
+// @noErrors
+const proc = s
+  .$use(auth, rateLimit, adminOnly, timing, withSentry)
+  //   ────── guards ──────────   ────── wraps ──────
+  .$resolve(({ ctx, input }) => {
+    // your handler
+  })
+```
+
+Here's what happens when a request comes in:
+
+```
+Request arrives
+│
+├─ auth         (guard)   → ctx gets { user }
+├─ rateLimit    (guard)   → ctx gets { rateLimit }
+├─ adminOnly    (guard)   → throws if not admin
+│
+├─ timing       (wrap)    → starts timer
+│  ├─ withSentry (wrap)   → try {
+│  │  └─ resolve()        → your handler runs
+│  │  ← withSentry        → } catch → report to Sentry
+│  ← timing               → logs duration
+│
+Response sent
+```
+
+Guards run sequentially from left to right. Each guard can see the context additions from previous guards — so `rateLimit` can access `ctx.user` that `auth` added.
+
+Wraps nest from left to right. The leftmost wrap is the outermost layer. In this example, `timing` wraps around `withSentry`, which wraps around `resolve()`.
+
+## Reusing middleware across procedures
+
+Since guards and wraps are just values, you can share them across your entire codebase:
+
+```ts twoslash
+// @noErrors
+// src/middleware.ts
+export const auth = guard(async (ctx) => {
+  // ...
+  return { user }
+})
+
+export const adminOnly = guard((ctx) => {
+  if (ctx.user.role !== 'admin') throw new SilgiError('FORBIDDEN')
+})
+
+export const timing = wrap(async (ctx, next) => {
+  const start = performance.now()
+  const result = await next()
+  console.log(`${performance.now() - start}ms`)
+  return result
+})
+```
+
+Then use them wherever you need:
+
+```ts twoslash
+// @noErrors
+import { auth, adminOnly, timing } from './middleware'
+
+const listUsers = s.$use(auth, timing).$resolve(({ ctx }) => ctx.db.users.findMany())
+
+const deleteUser = s.$use(auth, adminOnly, timing).$resolve(({ ctx, input }) => ctx.db.users.delete(input.id))
+```
+
+## Lifecycle hooks
+
+Instead of writing try/catch/finally in every wrap, use `lifecycleWrap` for a declarative approach:
+
+```ts twoslash
+// @noErrors
+import { lifecycleWrap } from 'silgi'
+
+const logging = lifecycleWrap({
+  onStart: ({ ctx }) => console.log('started'),
+  onSuccess: ({ output, durationMs }) => console.log(`done in ${durationMs}ms`),
+  onError: ({ error }) => reportToSentry(error),
+  onFinish: ({ durationMs }) => metrics.record(durationMs),
+})
+
+const listUsers = s.$use(logging).$resolve(({ ctx }) => ctx.db.users.findMany())
+```
+
+All four hooks are optional. They're purely for side effects — the procedure result is never modified.
+
+| Hook        | When it fires                                                 |
+| ----------- | ------------------------------------------------------------- |
+| `onStart`   | Before the procedure runs                                     |
+| `onSuccess` | After a successful return                                     |
+| `onError`   | When the procedure throws (error is re-thrown after the hook) |
+| `onFinish`  | Always — success or failure (like `finally`)                  |
+
+This is different from the global [lifecycle hooks](/docs/server#lifecycle-hooks) on the silgi instance — `lifecycleWrap` applies per-procedure via `.$use()`.
+
+## Input mapping
+
+Transform the input shape before a procedure runs with `mapInput`:
+
+```ts twoslash
+// @noErrors
+import { mapInput } from 'silgi'
+
+const renameUserId = mapInput((input: { userId: string }) => ({
+  id: input.userId,
+}))
+
+const getUser = s.$use(renameUserId).$resolve(({ input }) => db.users.find(input.id))
+```
+
+Useful for adapting between client and server naming conventions, or pre-processing input in a reusable way.
+
+## What's next?
+
+- [Typed Errors](/docs/errors) — define error maps and use `fail()` for type-safe error handling
+- [Procedures](/docs/procedures) — learn about the short form and builder for defining endpoints
+- [Plugins](/docs/plugins) — pre-built guards and wraps for rate limiting, OpenTelemetry, and logging

@@ -1,0 +1,185 @@
+---
+title: Pinia Colada
+description: Generate type-safe queryOptions, mutationOptions, and cache keys for Vue with Pinia Colada.
+---
+
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs'
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Step, Steps } from 'fumadocs-ui/components/steps'
+
+[Pinia Colada](https://pinia-colada.esm.dev/) is a smart data-fetching layer for Vue built on top of Pinia. Silgi provides `createColadaUtils`, a utility that generates type-safe `queryOptions` and `mutationOptions` from your client — with full Vue reactivity support.
+
+## Prerequisites
+
+You need a Silgi [client](/docs/client) set up. The Pinia Colada integration wraps this client.
+
+<Tabs items={['pnpm', 'npm', 'bun']}>
+  <Tab value='pnpm'>```bash pnpm add @pinia/colada pinia vue ```</Tab>
+  <Tab value='npm'>```bash npm install @pinia/colada pinia vue ```</Tab>
+  <Tab value='bun'>```bash bun add @pinia/colada pinia vue ```</Tab>
+</Tabs>
+
+## Setup
+
+<Steps>
+<Step>
+
+### Create colada utils
+
+```ts twoslash
+// @noErrors
+import { createColadaUtils } from 'silgi/pinia-colada'
+import { client } from './client' // your Silgi client
+
+const utils = createColadaUtils(client)
+```
+
+The `utils` object mirrors your client's structure. If your client has `client.users.list`, then `utils.users.list` gives you query/mutation helpers for that procedure.
+
+</Step>
+<Step>
+
+### Use in components
+
+```vue
+<script setup lang="ts">
+import { useQuery } from '@pinia/colada'
+
+const { data, status } = useQuery(
+  utils.users.list.queryOptions({
+    input: { limit: 10 },
+  }),
+)
+</script>
+
+<template>
+  <p v-if="status === 'loading'">Loading...</p>
+  <ul v-else>
+    <li v-for="user in data" :key="user.id">{{ user.name }}</li>
+  </ul>
+</template>
+```
+
+</Step>
+</Steps>
+
+## Queries
+
+`queryOptions` returns everything `useQuery` needs — a reactive computed key and the fetch function:
+
+```ts twoslash
+// @noErrors
+const options = utils.users.list.queryOptions({
+  input: { limit: 10 },
+})
+
+// options contains:
+// - key: computed(() => [["users", "list"], { type: "query", input: { limit: 10 } }])
+// - query: ({ signal }) => client.users.list({ limit: 10 }, { signal })
+```
+
+### Reactive inputs
+
+Both `input` and `context` accept Vue reactive values — `ref`, `computed`, or getter functions:
+
+```ts twoslash
+// @noErrors
+import { ref, computed } from 'vue'
+
+const limit = ref(10)
+
+const options = utils.users.list.queryOptions({
+  input: computed(() => ({ limit: limit.value })),
+})
+```
+
+When the reactive value changes, the query key updates automatically, which triggers a refetch.
+
+## Mutations
+
+`mutationOptions` returns everything `useMutation` needs:
+
+```vue
+<script setup lang="ts">
+import { useMutation, useQueryCache } from '@pinia/colada'
+
+const queryCache = useQueryCache()
+
+const { mutate, isLoading } = useMutation({
+  ...utils.users.create.mutationOptions(),
+  onSuccess: () => {
+    queryCache.invalidateQueries({
+      key: utils.users.key(),
+    })
+  },
+})
+</script>
+
+<template>
+  <button @click="mutate({ name: 'Alice' })" :disabled="isLoading">
+    {{ isLoading ? 'Creating...' : 'Create User' }}
+  </button>
+</template>
+```
+
+## Cache invalidation
+
+Every level of the utils tree has a `key()` method for generating cache keys:
+
+```ts twoslash
+// @noErrors
+import { useQueryCache } from '@pinia/colada'
+
+const queryCache = useQueryCache()
+
+// Invalidate all queries under "users"
+queryCache.invalidateQueries({
+  key: utils.users.key(),
+})
+
+// Invalidate a specific query with specific input
+queryCache.invalidateQueries({
+  key: utils.users.list.key({ type: 'query', input: { limit: 10 } }),
+})
+
+// Invalidate everything
+queryCache.invalidateQueries({
+  key: utils.key(),
+})
+```
+
+## Direct calls
+
+Each procedure util has a `call` property that is the original client function:
+
+```ts twoslash
+// @noErrors
+const users = await utils.users.list.call({ limit: 10 })
+```
+
+## Available methods
+
+Each procedure-level util provides:
+
+| Method                   | Returns                            | Description                    |
+| ------------------------ | ---------------------------------- | ------------------------------ |
+| `queryOptions(opts?)`    | `{ key: ComputedRef, query, ... }` | Full options for `useQuery`    |
+| `mutationOptions(opts?)` | `{ key: fn, mutation, ... }`       | Full options for `useMutation` |
+| `call(input, opts?)`     | `Promise<TOutput>`                 | Direct procedure call          |
+
+Each router-level util provides:
+
+| Method       | Returns    | Description                      |
+| ------------ | ---------- | -------------------------------- |
+| `key(opts?)` | `EntryKey` | Key prefix for bulk invalidation |
+
+<Callout type='info'>
+  Input and context parameters accept `MaybeRefOrGetter` — meaning you can pass plain values, `ref()`, `computed()`, or
+  getter functions. The query key is a `computed` that updates reactively.
+</Callout>
+
+## What's next?
+
+- [Client](/docs/client) — set up the Silgi client that powers the colada utils
+- [TanStack Query](/docs/libraries/tanstack-query) — if you prefer TanStack Query over Pinia Colada
+- [Typed Errors](/docs/errors) — handle errors from your queries and mutations

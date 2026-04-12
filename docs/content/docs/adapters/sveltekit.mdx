@@ -1,0 +1,71 @@
+---
+title: SvelteKit
+description: Use Silgi with SvelteKit API routes — catch-all endpoint with full type safety.
+---
+
+[SvelteKit](https://kit.svelte.dev) uses file-based API routes. Silgi integrates via a catch-all `+server.ts`.
+
+## Setup
+
+```ts twoslash
+// @noErrors
+// src/routes/api/[...path]/+server.ts
+import { createHandler } from 'silgi/sveltekit'
+import { appRouter } from '$lib/server/rpc'
+
+const handler = createHandler(appRouter, {
+  context: (event) => ({
+    db: getDB(),
+    user: event.locals.user,
+  }),
+})
+
+export const GET = handler
+export const POST = handler
+```
+
+## Context from SvelteKit hooks
+
+Use SvelteKit's `handle` hook to set `event.locals`, then access in the context factory:
+
+```ts twoslash
+// @noErrors
+// src/hooks.server.ts
+export async function handle({ event, resolve }) {
+  event.locals.user = await getUser(event.cookies.get('session'))
+  return resolve(event)
+}
+```
+
+```ts twoslash
+// @noErrors
+// src/routes/api/[...path]/+server.ts
+const handler = createHandler(appRouter, {
+  context: (event) => ({
+    user: event.locals.user,
+  }),
+})
+```
+
+## Analytics and Scalar
+
+Enable the built-in [analytics dashboard](/docs/analytics) or [Scalar API reference](/docs/scalar) directly in the adapter:
+
+```ts twoslash
+// @noErrors
+const handler = createHandler(appRouter, {
+  context: (event) => ({ user: event.locals.user }),
+  analytics: {
+    auth: process.env.ANALYTICS_TOKEN,
+  },
+  scalar: true,
+})
+```
+
+The analytics dashboard is available at `/api/analytics` and Scalar at `/api/reference`.
+
+## What's next?
+
+- [Analytics](/docs/analytics) — built-in monitoring dashboard
+- [Server](/docs/server) — standalone `serve()` as an alternative
+- [Integrations](/docs/integrations) — other available integrations

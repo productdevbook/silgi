@@ -1,0 +1,42 @@
+---
+title: Introducing Silgi
+description: Why we built another RPC framework — and why this one compiles.
+author: productdevbook
+date: 2026-02-15
+---
+
+Silgi is an end-to-end type-safe RPC framework for TypeScript. It ships compiled pipelines, supports every major runtime, and is heavily optimized for V8 performance.
+
+## Why another RPC framework?
+
+The TypeScript RPC ecosystem has excellent options — tRPC pioneered the space, oRPC brought OpenAPI-first design. But we kept running into the same friction:
+
+- **Multiple packages** — server, client, adapters, each a separate install with version alignment headaches
+- **Runtime overhead** — middleware chains that loop through arrays on every request
+- **Missing observability** — no built-in way to see what your API is actually doing
+
+Silgi takes a different approach.
+
+## Compiled pipelines
+
+Instead of resolving middleware at request time, Silgi compiles your guard chain at startup. A procedure with 3 guards becomes a direct function chain — no loops, no arrays, no closures per request.
+
+This means the hot path is a straight-line function call, not a framework abstraction.
+
+## Single package
+
+Server, client, 13 adapters, 15+ plugins, 3 codecs — all from one `npm install silgi`. No monorepo of scoped packages, no version matrix.
+
+## Built-in analytics
+
+Every Silgi server can enable a live monitoring dashboard with one flag: `analytics: true`. Request tracing, error logs with full context, session tracking, span waterfall — no Prometheus, no Grafana, no external infrastructure.
+
+## What's next
+
+We're working toward a stable 1.0 release. The beta is production-ready for early adopters. Try it:
+
+```bash
+pnpm add silgi
+```
+
+Read the [documentation](/docs) to get started, or check the [changelog](/changelog) for the latest updates.

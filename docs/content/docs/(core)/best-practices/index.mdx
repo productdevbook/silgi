@@ -1,0 +1,26 @@
+---
+title: Best Practices
+description: Patterns and tips for building production Silgi APIs.
+---
+
+import { Cards, Card } from 'fumadocs-ui/components/card'
+
+Patterns that work well in real Silgi projects.
+
+<Cards>
+  <Card
+    title='Testing & Mocking'
+    description='Unit test procedures with callable(), integration test with createServerClient(), HTTP test with handler().'
+    href='/docs/best-practices/testing'
+  />
+  <Card
+    title='Monorepo Setup'
+    description='Share the router type between frontend and backend in a pure RPC monorepo.'
+    href='/docs/best-practices/monorepo'
+  />
+  <Card
+    title='SSR Optimization'
+    description='Prevent refetch waterfalls with server-side prefetching and hydration.'
+    href='/docs/best-practices/ssr'
+  />
+</Cards>

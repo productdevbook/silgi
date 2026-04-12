@@ -1,0 +1,117 @@
+---
+title: 0.50.0
+description: OpenAPI-to-Silgi code generator with multi-schema support, smart incremental regeneration via oxc-parser, and CI improvements.
+version: 0.50.0
+date: 2026-04-05
+---
+
+## `silgi/codegen` — OpenAPI to Silgi code generator
+
+New `silgi/codegen` module generates a fully typed Silgi server from any OpenAPI 3.x specification. Pass a spec, get route files with `$route`, `$input`, `$output`, `$errors`, and an inline `$resolve` stub — one file per operation, grouped by domain.
+
+```ts
+import { generateFromSpec } from 'silgi/codegen'
+
+await generateFromSpec({
+  spec: './openapi.json',
+  outDir: './src/api',
+  schema: 'zod', // or 'valibot' or 'arktype'
+})
+```
+
+### One file per operation
+
+Each OpenAPI operation becomes its own file under `routes/<group>/<operationId>.ts`. The root `router.gen.ts` imports and assembles the tree:
+
+```
+src/api/
+  schemas.gen.ts              ← Component + operation schemas
+  router.gen.ts               ← Root router (always regenerated)
+  routes/
+    pets/
+      listPets.ts             ← Single operation, inline $resolve
+      createPet.ts
+      getPet.ts
+    store/
+      getInventory.ts
+      placeOrder.ts
+```
+
+Each route file is self-contained:
+
+```ts
+export const listPets = s
+  .$route({
+    path: '/pets',
+    method: 'GET',
+    summary: 'List all pets',
+    tags: ['pets'],
+    operationId: 'listPets',
+  })
+  .$input(schemas.listPetsInputSchema)
+  .$output(schemas.listPetsOutputSchema)
+  .$errors({
+    UNAUTHORIZED: 401,
+  })
+  .$resolve(({ input, ctx, fail }) => {
+    // TODO: implement listPets
+    throw new SilgiError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Not implemented: listPets',
+    })
+  })
+```
+
+### Multi-schema support
+
+The generator supports all Standard Schema compatible libraries. The `schema` option controls which library's syntax is emitted:
+
+| Target          | Import                           | Example                         |
+| --------------- | -------------------------------- | ------------------------------- |
+| `zod` (default) | `import { z } from 'zod'`        | `z.string().email()`            |
+| `valibot`       | `import * as v from 'valibot'`   | `v.pipe(v.string(), v.email())` |
+| `arktype`       | `import { type } from 'arktype'` | `type('string.email')`          |
+
+Handler type inference also adapts: `z.infer<>`, `v.InferOutput<>`, or `typeof X.infer`.
+
+### Smart incremental regeneration
+
+The default `smart` strategy uses [oxc-parser](https://oxc.rs) to parse existing route files, extract the `$resolve()` body by AST span, and preserve it while regenerating everything else from the spec.
+
+```
+1. Generate from spec        → stub files with throw
+2. Implement $resolve bodies → your code
+3. Spec changes              → re-run codegen
+4. Result:
+   ✅ $route/$input/$output/$errors updated from spec
+   ✅ $resolve body preserved (your implementation kept)
+   ✅ New operations generated as stubs
+   ✅ Unimplemented stubs overwritten with fresh stubs
+```
+
+Three strategies available:
+
+| Strategy          | Behavior                                 |
+| ----------------- | ---------------------------------------- |
+| `smart` (default) | Preserve `$resolve`, regenerate metadata |
+| `skip`            | Never touch existing route files         |
+| `overwrite`       | Regenerate everything                    |
+
+See [Code Generation docs](/docs/codegen) for the full guide.
+
+---
+
+## CI: beta/stable release workflow
+
+The release workflow now automatically detects prerelease tags and publishes to the correct npm dist-tag:
+
+- `v0.50.0-beta.1` → `npm publish --tag beta`
+- `v0.50.0` → `npm publish --tag latest`
+- Also supports `-alpha` and `-rc` suffixes
+- Changelog generated from previous tag range
+
+## Fixes
+
+- **Removed stale `query()`/`mutation()` references** from JSDoc, examples, docs, and CLAUDE.md — Silgi uses `s.$input().$resolve()` chain style, not standalone factory functions
+- **Resolved all oxlint errors** across the codebase (inline type imports, unnecessary escapes, unused parameters)
+- **Fixed `createServerProxy`** — removed unused `router` parameter that was only passed through recursive calls

@@ -1,0 +1,13 @@
+{
+  "name": "silgi-playground",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --experimental-strip-types server.ts"
+  },
+  "dependencies": {
+    "silgi": "workspace:*",
+    "zod": "^4.3.6"
+  }
+}

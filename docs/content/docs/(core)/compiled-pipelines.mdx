@@ -1,0 +1,87 @@
+---
+title: Compiled Pipelines
+description: How Silgi compiles your procedures into optimized pipelines at startup for maximum runtime performance.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+
+When your server starts, Silgi doesn't just register your procedures — it **compiles** them. Each procedure is analyzed and transformed into the fastest possible handler function. This happens once at startup, so every request after that runs pre-optimized code.
+
+## Overview
+
+<Mermaid chart='graph TD\n  A[s.router] --> B[compileProcedure]\n  B --> C{Has wraps?}\n  C -->|No schemas| D[Sync fast path]\n  C -->|Has schemas| E[Semi-sync path]\n  C -->|Yes| F[Wrap path]\n  A --> G[compileRouter]\n  G --> H[rou3 radix tree]' />
+
+## What gets compiled?
+
+When you call `s.router()` or `s.serve()`, Silgi walks through every procedure and:
+
+1. **Separates guards from wraps** — guards and wraps have different execution models, so they're split into separate lists
+2. **Selects an unrolled guard runner** — based on how many guards a procedure has (0–4), a specialized function is chosen with no loop overhead
+3. **Pre-computes the fail function** — if the procedure defines typed errors, the error factory is created once and reused
+4. **Builds a direct function chain** — the final handler is a single function that calls guards → validates input → runs the resolver → validates output, with no per-request closures
+
+The result is a `CompiledHandler` — a single function that takes a context object, raw input, and abort signal, and returns the result.
+
+## Guard unrolling
+
+Most procedures have 0–4 guards. Instead of looping through them at runtime, Silgi generates **specialized code paths** for each count:
+
+<Mermaid chart='graph TD\n  S[selectGuardRunner] --> C{guard count}\n  C -->|0| R0[no-op]\n  C -->|1| R1[1 direct call]\n  C -->|2| R2[2 direct calls]\n  C -->|3| R3[3 direct calls]\n  C -->|4| R4[4 direct calls]\n  C -->|5+| RN[loop]' />
+
+This matters because V8's optimizing compiler (Maglev/TurboFan) can inline fixed call counts much better than dynamic loops. Each guard function becomes a direct reference — no property lookups at runtime.
+
+Guards also have a **sync fast path**: if a guard returns a plain object (not a Promise), the result is applied immediately without awaiting. Only async guards trigger the Promise path.
+
+<Mermaid chart='graph TD\n  G[guard.fn] --> R{Returns Promise?}\n  R -->|No| A[Apply result immediately]\n  R -->|Yes| W[await Promise]\n  W --> A\n  A --> N[Next guard or resolve]' />
+
+## Context pooling
+
+Every request needs a context object. Instead of allocating a new one each time, Silgi maintains a **pool of pre-allocated null-prototype objects**:
+
+<Mermaid chart='graph TD\n  REQ[Request] --> ACQ{Pool empty?}\n  ACQ -->|No| POP[Pop from pool]\n  ACQ -->|Yes| NEW[Object.create null]\n  POP --> USE[Use ctx]\n  NEW --> USE\n  USE --> WIPE[Wipe properties]\n  WIPE --> RET{Pool full?}\n  RET -->|Under 128| PUSH[Return to pool]\n  RET -->|Full| GC[GC collect]' />
+
+The pool holds up to 128 context objects. This eliminates per-request garbage collection pressure — no objects are created or destroyed during normal operation.
+
+<Callout type='info'>
+  Context objects use `Object.create(null)` — they have no prototype chain. This prevents prototype pollution attacks
+  and avoids accidental collisions with `Object.prototype` methods.
+</Callout>
+
+## Three execution paths
+
+Based on what a procedure uses, Silgi picks one of three paths at compile time:
+
+<Mermaid chart='graph TD\n  P[compileProcedure] --> W{Has wraps?}\n  W -->|Yes| WP[Wrap path — onion chain with next]\n  W -->|No| V{Has schemas?}\n  V -->|No| SF[Sync fast path — zero closures, zero awaits]\n  V -->|Yes| SS[Semi-sync — validates input/output]\n  SF --> H[CompiledHandler]\n  SS --> H\n  WP --> H' />
+
+| Path               | When                              | What it avoids                              |
+| ------------------ | --------------------------------- | ------------------------------------------- |
+| **Sync fast path** | No wraps, no input/output schemas | Zero closures, zero awaits, zero validation |
+| **Semi-sync**      | No wraps, has schemas             | Zero closures, validates input/output       |
+| **Wrap path**      | Has wraps                         | Builds onion chain for `next()` calls       |
+
+The sync fast path is the most common case — a procedure with a few guards and a resolver. It runs without creating a single closure or Promise (unless a guard is async).
+
+### Sync fast path in detail
+
+<Mermaid chart='graph TD\n  CTX[Acquire ctx] --> RG[Run guards]\n  RG --> RES[Call resolver]\n  RES --> OUT[Return result]\n  OUT --> REL[Release ctx]' />
+
+### Wrap path in detail
+
+<Mermaid chart='graph TD\n  CTX[Acquire ctx] --> RG[Run guards]\n  RG --> VAL[Validate input]\n  VAL --> W1[wrap 1]\n  W1 -->|next| W2[wrap 2]\n  W2 -->|next| RES[resolver]\n  RES --> W2R[wrap 2 after]\n  W2R --> W1R[wrap 1 after]\n  W1R --> VOUT[Validate output]\n  VOUT --> REL[Release ctx]' />
+
+## Router compilation
+
+The procedure tree (nested objects from `s.router()`) is compiled into a **radix tree** powered by [rou3](https://github.com/unjs/rou3) — the same router used by h3 and Nitro. The tree is built once at startup:
+
+<Mermaid chart='graph TD\n  R[s.router] --> W[Walk tree]\n  W --> U1[users.list]\n  W --> U2[users.get]\n  W --> U3[users.:id]\n  U1 --> RT[rou3 radix tree]\n  U2 --> RT\n  U3 --> RT\n  RT --> M[findRoute]' />
+
+Route matching is O(path length), not O(route count). Special-case routes defined with `.$route({ path, method })` (e.g. auth passthrough wildcards) are also compiled into the same tree.
+
+## What this means for you
+
+You don't need to think about any of this. Silgi handles compilation automatically. But it helps explain a few things:
+
+- **Cold start is fast** — compilation is cheap (just function composition, no code generation)
+- **Warm requests are faster** — no per-request setup, no dynamic dispatch, no middleware array iteration
+- **Guard count doesn't matter** (up to 4) — adding a second or third guard has near-zero overhead compared to one
+- **Wraps are slightly slower than guards** — they need the onion model (`next()` calls), so prefer guards when you only need to add context

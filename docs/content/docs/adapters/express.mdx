@@ -1,0 +1,68 @@
+---
+title: Express
+description: Mount Silgi as Express middleware — run RPC and REST routes on the same server.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+
+If you have an existing Express application, Silgi can be mounted as middleware alongside your REST routes.
+
+## Setup
+
+```ts twoslash
+// @noErrors
+import express from 'express'
+import { createHandler } from 'silgi/express'
+
+const app = express()
+app.use(express.json()) // Required for POST body parsing
+
+// Existing routes
+app.get('/health', (req, res) => res.json({ status: 'ok' }))
+
+// Silgi RPC under /api
+app.use(
+  '/api',
+  createHandler(appRouter, {
+    context: (req) => ({
+      db: getDB(),
+      user: req.user,
+      ip: req.ip,
+    }),
+  }),
+)
+
+app.listen(3000)
+```
+
+## Context from Express
+
+The `context` function receives the Express request object. Bridge your existing auth middleware, IP detection, and headers:
+
+```ts twoslash
+// @noErrors
+createHandler(appRouter, {
+  context: (req) => ({
+    user: req.user, // from passport or similar
+    ip: req.ip,
+    headers: req.headers,
+  }),
+})
+```
+
+## Route behavior
+
+- Procedures are matched by the path after the mount prefix
+- `POST /api/users/list` → calls `users.list` with the JSON body as input
+- `GET /api/users/list?data={"limit":10}` → calls `users.list` with parsed query data
+- Unmatched paths pass through to the next Express middleware (`next()`)
+
+<Callout type='info'>
+  Make sure `express.json()` middleware is registered before the Silgi middleware — otherwise POST bodies won't be
+  parsed.
+</Callout>
+
+## What's next?
+
+- [Server](/docs/server) — standalone `serve()` as an alternative
+- [Integrations](/docs/integrations) — other available integrations

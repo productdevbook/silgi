@@ -1,0 +1,587 @@
+---
+title: Analytics
+description: Built-in monitoring dashboard with session tracking, deep error tracing, AI-ready markdown export, and custom span tracking.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+
+Built-in analytics for Silgi. No Prometheus, no Grafana, no external infrastructure. One flag gives you a live dashboard, full error context, session tracking, and one-click markdown export for AI debugging.
+
+## Quick start
+
+Pass `analytics: true` to `serve()` or `handler()`:
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, {
+  port: 3000,
+  analytics: true,
+})
+```
+
+Open `http://localhost:3000/api/analytics` in your browser.
+
+## What it tracks
+
+| Metric                       | How                                | Overhead       |
+| ---------------------------- | ---------------------------------- | -------------- |
+| Request count per procedure  | Atomic counter                     | ~0             |
+| Error log with full context  | Input, headers, stack trace, spans | ~0             |
+| Latency (avg, p50, p95, p99) | Ring buffer + `performance.now()`  | ~2ns           |
+| Requests/sec                 | Count / elapsed time               | ~0             |
+| Time-series (sparkline)      | 1-second windows                   | ~0             |
+| Custom spans (DB, API calls) | `trace()` helper                   | ~0 when unused |
+| HTTP request grouping        | Request accumulator with IDs       | ~0             |
+| Session tracking             | Cookie-based (`_sid`)              | ~0             |
+| Response headers             | Captured after Response is built   | ~0             |
+
+By default, data lives in memory and is also flushed to [storage](/docs/plugins/storage) periodically. When you configure a `data` mount (Redis, filesystem, etc.), analytics entries survive restarts. Entries older than `retentionDays` are automatically pruned on each flush.
+
+## Dashboard
+
+The dashboard is a self-contained single-file app served at `/api/analytics`. It auto-refreshes every 2 seconds and groups the most important signals into overview, request, session, and error workflows.
+
+**Overview tab:**
+
+- Health summary banner with busiest, noisiest, and slowest procedure callouts
+- Total requests, req/s, error rate, and average latency stat cards
+- Traffic console with peak windows, focus-mode panels for traffic, latency, and failures, plus a sortable per-procedure breakdown
+
+**Requests tab:**
+
+- Recent traced requests with procedure, status, and latency filters plus sortable columns
+- Clickable session ID badges to navigate to the session detail
+- Per-request detail pages with span waterfall timing, captured input/output payloads, request and response headers, timing breakdown by category (db, cache, http, etc.), and session link
+- Export menu for **Markdown**, **Timing**, **Markdown URL**, **cURL**, and **JSON**
+- Double-click any request row to jump straight to the full detail page
+
+**Sessions tab:**
+
+- All active sessions with request count, error count, total/average latency, and procedures called
+- Search and sortable columns
+- Session detail page with:
+  - Stat strip (requests, errors, wall clock time, CPU time, avg latency, slowest/fastest request)
+  - Procedure journey — visual breadcrumb trail showing the sequence of procedures called across the session
+  - Session flow Gantt chart — timeline visualization of when each request happened relative to session start
+  - Clickable request timeline with inline span waterfall and input/output preview
+  - Per-request mini timing bars showing db/cache/http breakdown at a glance
+  - Method and status code breakdown
+  - Time by category chart with tooltips
+  - Per-procedure stats cards (call count, total/avg duration, spans, errors)
+  - **Copy for AI (Markdown)** and **Copy JSON** for the entire session
+
+**Errors tab:**
+
+- Filterable error log with procedure, severity, and trace-presence controls
+- Detail pages with full input, headers, stack trace, and traced spans for each error
+- Clickable request ID badge to navigate to the HTTP request that caused the error
+- Export menu for **Markdown**, **Markdown URL**, **cURL**, and **JSON**
+- Double-click any error row to jump straight to the full detail page
+
+Only API traffic is recorded. Analytics ignores dashboard assets and unrelated browser requests such as `favicon.ico`.
+
+## Request IDs
+
+Every response includes an `x-request-id` header with a unique Snowflake-style ID. The ID is a 13-character Base36 string that is lexicographically time-sorted and collision-resistant across processes.
+
+```
+x-request-id: 1a2b3c4d5e6f7
+```
+
+Request IDs link HTTP requests to errors in the dashboard — clicking an error's request badge navigates to the full request detail.
+
+## Session tracking
+
+Analytics automatically tracks user sessions via a `_sid` cookie. Sessions group multiple HTTP requests from the same browser or client, letting you see the full user journey.
+
+- **Cookie**: `_sid` — `HttpOnly`, `SameSite=Lax`, 1-year expiry
+- **ID format**: Same Snowflake format as request IDs — unique and time-sorted
+- **No server-side session state**: Session data is derived from request entries client-side
+
+Sessions appear in the dashboard's **Sessions tab** and as clickable badges in request detail pages.
+
+## Tracing DB queries and API calls
+
+When analytics is enabled, every request context gets a `trace()` method. Use it to measure any async operation inside your procedures:
+
+```ts twoslash
+// @noErrors
+const listUsers = s.$resolve(async ({ ctx }) => {
+  const users = await ctx.trace('db.users.findMany', () => db.users.findMany())
+  const count = await ctx.trace('db.users.count', () => db.users.count())
+  return { users, count }
+})
+```
+
+Each traced operation records its name, duration, start offset, and error status. Spans appear in the request detail page with a waterfall timeline, and in the error detail panel when a request fails.
+
+### Span options
+
+The `trace()` method accepts an options object as the third argument:
+
+```ts twoslash
+// @noErrors
+await ctx.trace('db.users.findMany', () => db.users.findMany(), {
+  kind: 'db',
+  detail: 'SELECT * FROM users WHERE active = true',
+  input: { filter: 'active' },
+  output: (result) => ({ count: result.length }),
+})
+```
+
+| Option      | Type                             | Description                                                       |
+| ----------- | -------------------------------- | ----------------------------------------------------------------- |
+| `kind`      | `SpanKind`                       | Category for color-coding in the dashboard (see below)            |
+| `detail`    | `string`                         | Extra info shown in the expanded span view (SQL query, URL, etc.) |
+| `input`     | `unknown`                        | Input data captured for this span (shown in expanded detail)      |
+| `output`    | `unknown \| (result) => unknown` | Output data — a value or a function that receives the result      |
+| `procedure` | `{ input?, output? }`            | Set procedure-level input/output (recorded on the HTTP request)   |
+
+The `output` option can be a function to derive the captured value from the trace result, avoiding capturing the full response:
+
+```ts twoslash
+// @noErrors
+// Capture just the count, not the full user array
+await ctx.trace('db.users.findMany', () => db.users.findMany(), {
+  input: { limit: 10 },
+  output: (users) => ({ count: users.length }),
+})
+```
+
+### Procedure-level capture
+
+Use `procedure` to record input/output at the HTTP request level (visible in the request detail page), not just on the individual span:
+
+```ts twoslash
+// @noErrors
+const getUser = s.$input(z.object({ id: z.number() })).$resolve(async ({ input, ctx }) => {
+  return ctx.trace('db.users.findById', () => db.users.findById(input.id), {
+    input: { id: input.id },
+    output: (user) => ({ name: user.name }),
+    procedure: {
+      input,
+      output: (user) => user,
+    },
+  })
+})
+```
+
+### Span kinds
+
+Spans are automatically categorized by their name prefix. You can override this with the `kind` option.
+
+| Kind     | Auto-detected when name contains                    | Dashboard color |
+| -------- | --------------------------------------------------- | --------------- |
+| `db`     | `db.`, `sql`, `prisma`, `drizzle`, `query`, `mongo` | Purple          |
+| `http`   | `http.`, `fetch`, `api.`                            | Blue            |
+| `cache`  | `cache.`, `redis`, `memcache`                       | Emerald         |
+| `queue`  | `queue`, `publish`, `nats`, `kafka`                 | Amber           |
+| `email`  | `email`, `smtp`, `ses`                              | Orange          |
+| `ai`     | `ai`, `llm`, `openai`, `gemini`                     | Cyan            |
+| `custom` | Anything else                                       | Gray            |
+
+### Standalone `trace()` helper
+
+If you prefer an explicit import over the context method, use the standalone `trace()` function. It works whether analytics is enabled or not — when disabled, it calls the function directly with zero overhead:
+
+```ts twoslash
+// @noErrors
+import { trace } from 'silgi/analytics'
+
+const listUsers = s.$resolve(async ({ ctx }) => {
+  const users = await trace(ctx, 'db.users.findMany', () => db.users.findMany())
+  const weather = await trace(ctx, 'api.weather', () => fetch(weatherUrl))
+  return { users, weather }
+})
+```
+
+This is useful when you want tracing code that compiles cleanly regardless of whether the handler has analytics turned on.
+
+## Copy for AI
+
+Both errors and requests support one-click copy for AI debugging:
+
+- **Errors**: Full context with procedure path, error code, input, headers, stack trace, traced spans, and total duration
+- **Requests**: HTTP metadata, all procedure calls with input/output, span waterfall with timing breakdown
+- **Timing**: Focused performance view with just the span timeline and timing categories
+- **Sessions**: Full session summary with all requests and their procedures
+
+The markdown format is optimized for pasting into Claude, ChatGPT, or any AI assistant. Each export ends with analysis prompts for performance optimization.
+
+The export menu also includes:
+
+- **Markdown URL** — a direct link to the server-generated markdown endpoint
+- **cURL** — a ready-to-run command that fetches the markdown with `Accept: text/markdown`
+
+For example:
+
+```bash
+curl -L 'http://localhost:3000/api/analytics/requests/<request-id>/md' \
+  -H 'accept: text/markdown'
+```
+
+## Protecting the dashboard
+
+By default, the analytics dashboard is open to anyone who can reach the URL. In production you should always set the `auth` option.
+
+### Token auth
+
+Pass a secret string. The dashboard will prompt for the token on first visit and store it in the browser's session storage.
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, {
+  analytics: {
+    auth: process.env.ANALYTICS_TOKEN,
+  },
+})
+```
+
+The token is checked against the `Authorization: Bearer <token>` header or the `silgi-auth` cookie (set automatically by the login page).
+
+### Custom auth
+
+Pass a function for full control — check cookies, IP allowlists, OAuth tokens, or anything else:
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, {
+  analytics: {
+    auth: (req) => {
+      const cookie = req.headers.get('cookie') ?? ''
+      return cookie.includes('admin_session=valid')
+    },
+  },
+})
+```
+
+The function receives the raw `Request` and returns `boolean` or `Promise<boolean>`. Return `true` to allow access, `false` to block with a 401.
+
+<Callout type='warn'>
+  Never deploy analytics without `auth` in production. The dashboard exposes request payloads, headers, error stacks,
+  and internal procedure names.
+</Callout>
+
+## Persistent storage
+
+Analytics automatically persists request and error entries to [storage](/docs/plugins/storage). By default, storage uses an in-memory driver — data is lost on restart. Mount a persistent driver on the `data` prefix to keep analytics across restarts:
+
+```ts twoslash
+// @noErrors
+import fsDriver from 'unstorage/drivers/fs'
+
+const s = silgi({
+  context: () => ({}),
+  storage: {
+    data: fsDriver({ base: '.data' }),
+  },
+})
+
+s.serve(appRouter, {
+  analytics: {
+    auth: process.env.ANALYTICS_TOKEN,
+    retentionDays: 90,
+  },
+})
+```
+
+Entries older than `retentionDays` (default: 30) are pruned on each flush. Aggregate counters (total requests, total errors) are also persisted and restored on startup.
+
+Any [unstorage driver](https://unstorage.unjs.io/drivers) works — Redis, S3, Cloudflare KV, etc. See the [Storage docs](/docs/plugins/storage) for the full driver list.
+
+## Configuration
+
+Pass an options object instead of `true` to customize buffer sizes, history, and retention:
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, {
+  analytics: {
+    auth: 'my-secret-token',
+    bufferSize: 2048,
+    historySeconds: 300,
+    retentionDays: 90,
+    ignorePaths: ['api/health', 'api/metrics'],
+  },
+})
+```
+
+| Option           | Type                                  | Default     | Description                                         |
+| ---------------- | ------------------------------------- | ----------- | --------------------------------------------------- |
+| `auth`           | `string \| (req: Request) => boolean` | `undefined` | Token string or custom auth function                |
+| `bufferSize`     | `number`                              | `1024`      | Latency samples to keep per procedure (ring buffer) |
+| `historySeconds` | `number`                              | `120`       | Time-series sparkline history in seconds            |
+| `retentionDays`  | `number`                              | `30`        | Days to keep request and error entries in storage   |
+| `flushInterval`  | `number`                              | `5000`      | Interval in milliseconds between storage flushes    |
+| `ignorePaths`    | `string[]`                            | `[]`        | Path prefixes to exclude from tracking              |
+
+Latency samples use fixed-size ring buffers — memory usage stays constant regardless of traffic volume. Request and error entries are retained for `retentionDays` and pruned automatically on each storage flush.
+
+## With `handler()`
+
+Works the same way when using `s.handler()` instead of `s.serve()`:
+
+```ts twoslash
+// @noErrors
+const handle = s.handler(appRouter, { analytics: true })
+
+Bun.serve({ port: 3000, fetch: handle })
+// Dashboard at /api/analytics
+```
+
+## With framework adapters
+
+All fetch-based adapters (SvelteKit, Next.js, Astro, Remix, SolidStart) support `analytics` and `scalar` options:
+
+```ts twoslash
+// @noErrors
+// SvelteKit — src/routes/api/[...path]/+server.ts
+import { createHandler } from 'silgi/sveltekit'
+
+const handler = createHandler(appRouter, {
+  context: (event) => ({ user: event.locals.user }),
+  analytics: {
+    auth: process.env.ANALYTICS_TOKEN,
+  },
+})
+
+export const GET = handler
+export const POST = handler
+```
+
+```ts twoslash
+// @noErrors
+// Next.js — app/api/[...path]/route.ts
+import { createHandler } from 'silgi/nextjs'
+
+const handler = createHandler(appRouter, {
+  context: (req) => ({ headers: Object.fromEntries(req.headers) }),
+  analytics: true,
+})
+
+export { handler as GET, handler as POST }
+```
+
+The dashboard is available at `/api/analytics` regardless of which adapter you use.
+
+## Ignoring paths
+
+Noisy endpoints like health checks or metrics can be completely excluded from tracking via config:
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, {
+  analytics: {
+    ignorePaths: ['api/health', 'api/metrics'],
+  },
+})
+```
+
+Requests matching these prefixes are never recorded — zero overhead, no storage, no dashboard entries. This is server-side only and cannot be changed at runtime.
+
+## Hiding paths
+
+You can also hide paths from the dashboard without stopping server-side tracking. This is useful when you want to keep the data but reduce noise in the UI.
+
+Hidden paths are managed at runtime via the API and persisted to storage across restarts.
+
+| Method   | Endpoint                | Body                    | Description       |
+| -------- | ----------------------- | ----------------------- | ----------------- |
+| `GET`    | `/api/analytics/hidden` | —                       | List hidden paths |
+| `POST`   | `/api/analytics/hidden` | `{ "path": "api/..." }` | Hide a path       |
+| `DELETE` | `/api/analytics/hidden` | `{ "path": "api/..." }` | Unhide a path     |
+
+```bash
+# Hide health checks from dashboard
+curl -X POST http://localhost:3000/api/analytics/hidden \
+  -H 'content-type: application/json' \
+  -d '{"path": "api/health"}'
+
+# List hidden paths
+curl http://localhost:3000/api/analytics/hidden
+```
+
+In the dashboard, right-click any request row and select **Hide path** to filter it from the view. The data is still recorded and accessible via the JSON API without the hidden filter.
+
+## JSON API
+
+The dashboard reads from JSON endpoints. You can also query them directly for custom integrations, alerting, or external dashboards:
+
+| Endpoint                             | Description                                            |
+| ------------------------------------ | ------------------------------------------------------ |
+| `/api/analytics/stats`               | Procedure metrics, latency percentiles, time-series    |
+| `/api/analytics/errors`              | Full error log with input, headers, stack trace, spans |
+| `/api/analytics/errors/:id`          | One error entry as JSON                                |
+| `/api/analytics/requests`            | Recent requests with trace spans and session IDs       |
+| `/api/analytics/requests/:id`        | One request entry as JSON                              |
+| `/api/analytics/requests/:requestId` | One request entry by request ID as JSON                |
+| `/api/analytics/hidden`              | Manage hidden paths (GET/POST/DELETE)                  |
+
+All endpoints return JSON with `cache-control: no-cache`.
+
+### Pagination
+
+The `/api/analytics/requests`, `/api/analytics/errors`, and `/api/analytics/tasks` endpoints support pagination via query parameters:
+
+| Parameter | Default | Max | Description    |
+| --------- | ------- | --- | -------------- |
+| `page`    | `1`     | —   | Page number    |
+| `limit`   | `50`    | 200 | Items per page |
+
+Response shape:
+
+```json
+{
+  "data": [...],
+  "page": 1,
+  "limit": 50,
+  "total": 342,
+  "totalPages": 7
+}
+```
+
+```bash
+# Get page 2 with 20 items
+curl 'http://localhost:3000/api/analytics/requests?page=2&limit=20'
+```
+
+## Markdown export endpoints
+
+Server-generated markdown is available over HTTP, so bots, LLM tools, Slack jobs, and shell scripts can fetch the same export shown in the dashboard:
+
+| Endpoint                                | Description                  |
+| --------------------------------------- | ---------------------------- |
+| `/api/analytics/errors/md`              | Entire error log as markdown |
+| `/api/analytics/errors/:id/md`          | One error as markdown        |
+| `/api/analytics/requests/:id/md`        | One request as markdown      |
+| `/api/analytics/requests/:requestId/md` | One request by request ID    |
+
+These endpoints return `Content-Type: text/markdown; charset=utf-8`.
+
+### Stats response shape
+
+```ts twoslash
+// @noErrors
+interface AnalyticsSnapshot {
+  uptime: number // seconds since start
+  totalRequests: number
+  totalErrors: number
+  errorRate: number // percentage (0-100)
+  requestsPerSecond: number
+  avgLatency: number // milliseconds
+  procedures: Record<
+    string,
+    {
+      count: number
+      errors: number
+      errorRate: number
+      latency: { avg: number; p50: number; p95: number; p99: number }
+      lastError: string | null
+      lastErrorTime: number | null
+    }
+  >
+  timeSeries: Array<{ time: number; count: number; errors: number }>
+}
+```
+
+### Error response shape
+
+```ts twoslash
+// @noErrors
+interface ErrorEntry {
+  id: number
+  requestId: string // links to the HTTP request that caused this error
+  timestamp: number
+  procedure: string
+  error: string
+  code: string // e.g. 'BAD_REQUEST', 'NOT_FOUND', 'INTERNAL_SERVER_ERROR'
+  status: number
+  stack: string
+  input: unknown
+  headers: Record<string, string>
+  durationMs: number
+  spans: TraceSpan[]
+}
+```
+
+### Request response shape
+
+```ts twoslash
+// @noErrors
+interface RequestEntry {
+  id: number
+  requestId: string // unique ID (also in x-request-id response header)
+  sessionId: string // persistent session ID (from cookie)
+  timestamp: number
+  durationMs: number
+  method: string
+  url: string
+  path: string
+  ip: string
+  headers: Record<string, string>
+  responseHeaders: Record<string, string>
+  userAgent: string
+  status: number
+  procedures: ProcedureCall[]
+  isBatch: boolean
+}
+
+interface ProcedureCall {
+  procedure: string
+  durationMs: number
+  status: number
+  input: unknown
+  output: unknown
+  spans: TraceSpan[]
+  error?: string
+}
+
+interface TraceSpan {
+  name: string
+  kind: 'db' | 'http' | 'cache' | 'queue' | 'email' | 'ai' | 'custom'
+  durationMs: number
+  startOffsetMs?: number
+  detail?: string
+  input?: unknown
+  output?: unknown
+  error?: string
+}
+```
+
+## Server-side markdown export
+
+You can also generate the markdown programmatically for Slack notifications, log files, or custom alerting:
+
+```ts twoslash
+// @noErrors
+import { errorToMarkdown, requestToMarkdown, sessionToMarkdown } from 'silgi/analytics'
+
+// Error context for AI debugging
+const md = errorToMarkdown(errorEntry)
+
+// Full request with all procedures and spans
+const reqMd = requestToMarkdown(requestEntry)
+
+// Entire session with all requests
+const sesMd = sessionToMarkdown(sessionRequests, sessionId)
+```
+
+## Privacy behavior
+
+Analytics keeps development debugging convenient while still protecting production by default:
+
+- On `localhost` in the dashboard, sensitive headers such as `cookie`, `authorization`, and `set-cookie` are shown as-is
+- In production builds (`NODE_ENV=production`), those headers are redacted in stored analytics entries, JSON exports, and markdown exports
+
+If you expose analytics outside local development, always enable dashboard auth and assume analytics data may contain request payloads and internal headers.
+
+<Callout type='info'>
+  Built-in analytics supports [persistent storage](#persistent-storage) for single-service use. For multi-service
+  correlation and alerting, use [OpenTelemetry](/docs/plugins/otel) with your preferred backend.
+</Callout>
+
+## What's next?
+
+- [OpenTelemetry](/docs/plugins/otel) — distributed tracing for production
+- [Pino Logging](/docs/plugins/pino) — structured request logging
+- [Plugins](/docs/plugins) — all available plugins

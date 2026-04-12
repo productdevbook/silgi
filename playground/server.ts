@@ -1,14 +1,52 @@
 /**
- * Katman Playground — Server
+ * Silgi Playground — Full Feature Showcase
  *
- * Run: node --experimental-strip-types playground/server.ts
+ * Run: pnpm play
+ *
+ * Demonstrates every Silgi feature:
+ *  1.  silgi() instance + context
+ *  2.  guard middleware (auth)
+ *  3.  wrap middleware (timing)
+ *  4.  lifecycleWrap (onStart/onSuccess/onError/onFinish)
+ *  5.  Short-form query / mutation
+ *  6.  Config-form with errors + fail()
+ *  7.  Subscription (SSE streaming)
+ *  8.  Lifecycle hooks (request/response/error)
+ *  9.  CORS plugin
+ *  10. Rate limiting plugin
+ *  11. PubSub plugin (subscription with pub/sub)
+ *  12. Cookies (parse/set)
+ *  13. Signing & encryption
+ *  14. Body limit guard
+ *  15. Coercion guard
+ *  16. Callable (direct invocation without HTTP)
+ *  18. Contract-first workflow
+ *  19. Scalar / OpenAPI
+ *  20. mapInput middleware
+ *  21. Background tasks (dispatch, cron, router mount)
+ *  22. Task analytics tracking
  */
 
-import { createServer } from "node:http";
-import { ks, KatmanError, type Context } from "../src/index.ts";
-import { RPCHandler } from "../src/server/adapters/node/index.ts";
-import { CORSPlugin } from "../src/server/plugins/cors.ts";
-import { z } from "zod";
+import { silgi, SilgiError, callable, lifecycleWrap, mapInput } from 'silgi'
+import { trace } from 'silgi/analytics'
+import { contract, implement } from 'silgi/contract'
+import {
+  cors,
+  rateLimitGuard,
+  MemoryRateLimiter,
+  bodyLimitGuard,
+  coerceGuard,
+  createPublisher,
+  MemoryPubSub,
+  getCookie,
+  setCookie,
+  sign,
+  unsign,
+  encrypt,
+  decrypt,
+  createBatchHandler,
+} from 'silgi/plugins'
+import { z } from 'zod'
 
 // ── Schemas ──────────────────────────────────────────
 
@@ -16,156 +54,572 @@ const UserSchema = z.object({
   id: z.number(),
   name: z.string(),
   email: z.string().email(),
-  createdAt: z.date(),
-});
+  role: z.enum(['user', 'admin']).default('user'),
+  createdAt: z.string(),
+})
 
-type User = z.infer<typeof UserSchema>;
+const PostSchema = z.object({
+  id: z.number(),
+  title: z.string(),
+  body: z.string(),
+  authorId: z.number(),
+  published: z.boolean(),
+})
 
 // ── In-memory DB ─────────────────────────────────────
 
-const db: User[] = [
-  { id: 1, name: "Alice", email: "alice@katman.dev", createdAt: new Date("2024-01-15") },
-  { id: 2, name: "Bob", email: "bob@katman.dev", createdAt: new Date("2024-03-22") },
-  { id: 3, name: "Charlie", email: "charlie@katman.dev", createdAt: new Date("2024-06-10") },
-];
+const db = {
+  users: [
+    { id: 1, name: 'Alice', email: 'alice@silgi.dev', role: 'admin' as const, createdAt: new Date().toISOString() },
+    { id: 2, name: 'Bob', email: 'bob@silgi.dev', role: 'user' as const, createdAt: new Date().toISOString() },
+    { id: 3, name: 'Charlie', email: 'charlie@silgi.dev', role: 'user' as const, createdAt: new Date().toISOString() },
+  ],
+  posts: [
+    { id: 1, title: 'Hello Silgi', body: 'First post about RPC', authorId: 1, published: true },
+    { id: 2, title: 'Type Safety', body: 'End-to-end types', authorId: 1, published: true },
+    { id: 3, title: 'Draft Post', body: 'Work in progress', authorId: 2, published: false },
+  ],
+  nextUserId: 4,
+  nextPostId: 4,
+}
 
-let nextId = 4;
+// ── PubSub ───────────────────────────────────────────
 
-// ── Auth Middleware ──────────────────────────────────
+const pubsub = createPublisher(new MemoryPubSub())
 
-const withAuth = ks
-  .$context<{ headers: Record<string, string | string[] | undefined> }>()
-  .use(async ({ context, next, errors }) => {
-    const auth = context.headers["authorization"];
-    const token = typeof auth === "string" ? auth.replace("Bearer ", "") : undefined;
+// ── Silgi Instance ──────────────────────────────────
 
-    if (!token || token !== "secret-token") {
-      throw new KatmanError("UNAUTHORIZED", { message: "Invalid or missing token" });
-    }
+const s = silgi({
+  context: (req: Request) => ({
+    headers: Object.fromEntries(req.headers) as Record<string, string>,
+    db,
+    pubsub,
+    requestId: crypto.randomUUID().slice(0, 8),
+  }),
+  hooks: {
+    request: ({ path, input }) => {
+      console.log(`  → ${path}`, input !== undefined ? JSON.stringify(input).slice(0, 60) : '')
+    },
+    response: ({ path, durationMs }) => {
+      console.log(`  ← ${path} (${durationMs.toFixed(1)}ms)`)
+    },
+    error: ({ path, error }) => {
+      const msg = error instanceof SilgiError ? `${error.code} (${error.status})` : String(error)
+      console.log(`  ✗ ${path} — ${msg}`)
+    },
+  },
+})
 
-    return next({ context: { userId: 1, role: "admin" as const } });
-  });
+// Methods used directly on `s`: s.$resolve, s.$input, s.$use, s.guard, s.wrap, s.router, s.subscription
 
-// ── Procedures ──────────────────────────────────────
+// ── CORS (hook-based) ────────────────────────────────
 
-const listUsers = ks
-  .input(z.object({
-    limit: z.number().min(1).max(100).optional(),
-    offset: z.number().min(0).optional(),
-  }))
-  .handler(async ({ input }) => {
-    const limit = input.limit ?? 10;
-    const offset = input.offset ?? 0;
-    return {
-      users: db.slice(offset, offset + limit),
-      total: db.length,
-    };
-  });
+const _corsHooks = cors({
+  origin: 'http://localhost:3456',
+  credentials: true,
+  methods: ['GET', 'POST', 'OPTIONS'],
+})
 
-const getUser = ks
-  .input(z.object({ id: z.number() }))
-  .output(UserSchema)
-  .handler(async ({ input }) => {
-    const user = db.find((u) => u.id === input.id);
-    if (!user) {
-      throw new KatmanError("NOT_FOUND", { message: `User #${input.id} not found` });
-    }
-    return user;
-  });
+// ── Guards ───────────────────────────────────────────
 
-const createUser = withAuth
-  .input(z.object({
-    name: z.string().min(1).max(100),
-    email: z.string().email(),
-  }))
-  .errors({
-    CONFLICT: { status: 409, message: "Email already taken" },
-  })
-  .handler(async ({ input, context, errors }) => {
-    if (db.some((u) => u.email === input.email)) {
-      throw errors.CONFLICT({ data: { email: input.email } });
-    }
-    const user: User = { id: nextId++, ...input, createdAt: new Date() };
-    db.push(user);
-    console.log(`  [db] Created user #${user.id} by userId=${context.userId}`);
-    return user;
-  });
-
-const deleteUser = withAuth
-  .input(z.object({ id: z.number() }))
-  .handler(async ({ input, context }) => {
-    const idx = db.findIndex((u) => u.id === input.id);
-    if (idx === -1) {
-      throw new KatmanError("NOT_FOUND", { message: `User #${input.id} not found` });
-    }
-    db.splice(idx, 1);
-    console.log(`  [db] Deleted user #${input.id} by userId=${context.userId}`);
-    return { deleted: true };
-  });
-
-// ── SSE Streaming ───────────────────────────────────
-
-const streamUpdates = ks.handler(async function* () {
-  for (let i = 0; i < 5; i++) {
-    await new Promise((r) => setTimeout(r, 500));
-    yield { tick: i + 1, timestamp: new Date().toISOString(), users: db.length };
+// 1. Auth guard
+const auth = s.guard(async (ctx) => {
+  const token = ctx.headers.authorization?.replace('Bearer ', '')
+  if (token !== 'secret-token') {
+    throw new SilgiError('UNAUTHORIZED', { status: 401, message: 'Invalid or missing token' })
   }
-});
+  return { userId: 1, role: 'admin' as const }
+})
 
-// ── Health ──────────────────────────────────────────
+// 2. Rate limiting guard
+const _rateLimit = rateLimitGuard({
+  limiter: new MemoryRateLimiter({ limit: 100, windowMs: 60_000 }),
+  keyFn: (ctx: any) => ctx.headers['x-forwarded-for'] ?? 'anonymous',
+})
 
-const health = ks
-  .route({ method: "GET", path: "/health" })
-  .handler(async () => ({
-    status: "ok",
-    uptime: process.uptime(),
-    timestamp: new Date(),
-  }));
+// 3. Body limit guard (1MB)
+const _bodyLimit = bodyLimitGuard({ maxBytes: 1_048_576 })
 
-// ── Router ──────────────────────────────────────────
+// ── Wraps ────────────────────────────────────────────
 
-const router = {
+// 1. Simple timing wrap
+const timing = s.wrap(async (ctx, next) => {
+  const t0 = performance.now()
+  const result = await next()
+  const ms = (performance.now() - t0).toFixed(1)
+  console.log(`    [timing] ${ms}ms`)
+  return result
+})
+
+// 2. Lifecycle wrap (structured hooks)
+const lifecycle = lifecycleWrap({
+  onStart: ({ ctx }) => {
+    console.log(`    [lifecycle] start reqId=${(ctx as any).requestId}`)
+  },
+  onSuccess: ({ durationMs }) => {
+    console.log(`    [lifecycle] success ${durationMs.toFixed(1)}ms`)
+  },
+  onError: ({ error }) => {
+    console.log(`    [lifecycle] error: ${error instanceof Error ? error.message : error}`)
+  },
+  onFinish: () => {
+    console.log(`    [lifecycle] finish`)
+  },
+})
+
+// ── Procedures ───────────────────────────────────────
+
+// --- Health (zero-config short form) ---
+const health = s.$resolve(async () => ({
+  status: 'ok' as const,
+  uptime: process.uptime(),
+  timestamp: new Date().toISOString(),
+  features: [
+    'guard',
+    'wrap',
+    'lifecycle',
+    'subscription',
+    'hooks',
+    'cors',
+    'ratelimit',
+    'pubsub',
+    'cookies',
+    'signing',
+    'body-limit',
+    'coerce',
+    'serializer',
+    'callable',
+    'contract',
+    'openapi',
+    'batch',
+    'mapInput',
+  ],
+}))
+
+// --- Users: List (short form with input) ---
+const listUsers = s
+  .$input(z.object({ limit: z.number().min(1).max(100).optional() }))
+  .$resolve(async ({ input, ctx }) => {
+    const limit = input.limit ?? 10
+    const users = await trace(
+      ctx,
+      'db.users.findMany',
+      () => {
+        return ctx.db.users.slice(0, limit)
+      },
+      { kind: 'db', detail: `SELECT * FROM users LIMIT ${limit}` },
+    )
+    const total = await trace(
+      ctx,
+      'db.users.count',
+      () => {
+        return ctx.db.users.length
+      },
+      { kind: 'db', detail: 'SELECT COUNT(*) FROM users' },
+    )
+    return { users, total }
+  })
+
+// --- Users: Get (with NOT_FOUND error) ---
+const getUser = s.$input(z.object({ id: z.number() })).$resolve(async ({ input, ctx }) => {
+  const user = ctx.db.users.find((u) => u.id === input.id)
+  if (!user) throw new SilgiError('NOT_FOUND', { status: 404, message: `User #${input.id} not found` })
+  return user
+})
+
+// --- Users: Create (builder: auth + timing + lifecycle + output + errors) ---
+const createUser = s
+  .$use(auth, timing, lifecycle)
+  .$input(
+    z.object({
+      name: z.string().min(1).max(100),
+      email: z.string().email(),
+      role: z.enum(['user', 'admin']).optional(),
+    }),
+  )
+  .$output(UserSchema)
+  .$errors({
+    CONFLICT: 409,
+    VALIDATION: { status: 422, message: 'Validation failed' },
+  })
+  .$resolve(async ({ input, ctx, fail }) => {
+    if (ctx.db.users.some((u) => u.email === input.email)) {
+      fail('CONFLICT')
+    }
+    const user = {
+      id: ctx.db.nextUserId++,
+      name: input.name,
+      email: input.email,
+      role: input.role ?? ('user' as const),
+      createdAt: new Date().toISOString(),
+    }
+    ctx.db.users.push(user)
+    await ctx.pubsub.publish('user:created', user)
+    return user
+  })
+
+// --- Users: Delete (builder: auth + typed error) ---
+const deleteUser = s
+  .$use(auth)
+  .$input(z.object({ id: z.number() }))
+  .$errors({ NOT_FOUND: 404 })
+  .$resolve(async ({ input, ctx, fail }) => {
+    const idx = ctx.db.users.findIndex((u) => u.id === input.id)
+    if (idx === -1) fail('NOT_FOUND')
+    const [deleted] = ctx.db.users.splice(idx, 1)
+    await ctx.pubsub.publish('user:deleted', deleted)
+    return { deleted: true, id: input.id }
+  })
+
+// --- Posts: List (builder: coercion guard) ---
+const listPosts = s
+  .$use(coerceGuard)
+  .$input(
+    z.object({
+      authorId: z.number().optional(),
+      published: z.boolean().optional(),
+    }),
+  )
+  .$resolve(async ({ input, ctx }) => {
+    let posts = ctx.db.posts
+    if (input.authorId) posts = posts.filter((p) => p.authorId === input.authorId)
+    if (input.published !== undefined) posts = posts.filter((p) => p.published === input.published)
+    return { posts, total: posts.length }
+  })
+
+// --- Posts: Create (builder: auth + lifecycle + output) ---
+const createPost = s
+  .$use(auth, lifecycle)
+  .$input(
+    z.object({
+      title: z.string().min(1).max(200),
+      body: z.string().min(1),
+      published: z.boolean().default(false),
+    }),
+  )
+  .$output(PostSchema)
+  .$resolve(async ({ input, ctx }) => {
+    const post = {
+      id: ctx.db.nextPostId++,
+      title: input.title,
+      body: input.body,
+      authorId: ctx.userId,
+      published: input.published,
+    }
+    ctx.db.posts.push(post)
+    if (post.published) await ctx.pubsub.publish('post:published', post)
+    return post
+  })
+
+// --- Cookies: Demo ---
+const cookieDemo = s.$resolve(async ({ ctx }) => {
+  const existing = getCookie(ctx.headers.cookie ?? '', 'session')
+  const newCookie = setCookie('session', 'silgi-session-123', {
+    httpOnly: true,
+    maxAge: 3600,
+    path: '/',
+    sameSite: 'strict',
+  })
+  return {
+    existingCookie: existing ?? null,
+    setCookieHeader: newCookie,
+  }
+})
+
+// --- Signing & Encryption: Demo ---
+const signingDemo = s.$resolve(async () => {
+  const secret = 'silgi-secret-key-2026'
+  const message = 'hello from silgi'
+
+  // Sign
+  const signed = await sign(message, secret)
+  const verified = await unsign(signed, secret)
+  const tampered = await unsign(signed + 'x', secret)
+
+  // Encrypt
+  const encrypted = await encrypt(message, secret)
+  const decrypted = await decrypt(encrypted, secret)
+
+  return {
+    original: message,
+    signed,
+    verified,
+    tamperedResult: tampered, // null
+    encrypted: encrypted.slice(0, 40) + '...',
+    decrypted,
+  }
+})
+
+// --- Subscription: Tick stream ---
+const tickStream = s.subscription(async function* () {
+  for (let i = 0; i < 5; i++) {
+    await new Promise((r) => setTimeout(r, 300))
+    yield {
+      tick: i + 1,
+      users: db.users.length,
+      posts: db.posts.length,
+      time: new Date().toISOString(),
+    }
+  }
+})
+
+// --- Subscription: PubSub-based user events ---
+const userEvents = s.subscription(async function* ({ ctx }) {
+  yield* ctx.pubsub.subscribe<{ id: number; name: string; email: string }>('user:created')
+})
+
+// --- mapInput demo ---
+const getUserBySlug = s
+  .$use(
+    mapInput((input: { slug: string }) => ({
+      name: input.slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+    })),
+  )
+  .$resolve(async ({ input, ctx }) => {
+    const name = (input as any).name ?? (input as any).slug
+    const user = ctx.db.users.find((u) => u.name.toLowerCase() === name?.toLowerCase())
+    if (!user) throw new SilgiError('NOT_FOUND', { status: 404, message: `User "${name}" not found` })
+    return user
+  })
+
+// ── Contract-first: Admin API ────────────────────────
+
+const adminContract = contract({
+  stats: {
+    type: 'query' as const,
+    output: z.object({
+      totalUsers: z.number(),
+      totalPosts: z.number(),
+      publishedPosts: z.number(),
+    }),
+  },
+  resetDb: {
+    type: 'mutation' as const,
+    input: z.object({ confirm: z.boolean() }),
+    errors: { FORBIDDEN: 403 },
+  },
+})
+
+const adminRouter = implement(adminContract, {
+  stats: async ({ ctx }) => ({
+    totalUsers: (ctx as any).db.users.length,
+    totalPosts: (ctx as any).db.posts.length,
+    publishedPosts: (ctx as any).db.posts.filter((p: any) => p.published).length,
+  }),
+  resetDb: async ({ input, fail }) => {
+    if (!input.confirm) (fail as any)('FORBIDDEN')
+    db.users.length = 3
+    db.posts.length = 3
+    db.nextUserId = 4
+    db.nextPostId = 4
+    return { reset: true }
+  },
+})
+
+// ── Tasks ───────────────────────────────────────────
+
+// 1. Task with guards + input + trace() spans
+const sendWelcomeEmail = s
+  .$use(auth)
+  .$input(z.object({ userId: z.number(), email: z.string().email() }))
+  .$task({
+    name: 'send-welcome-email',
+    description: 'Send welcome email to new user',
+    resolve: async ({ input, ctx }) => {
+      const user = await trace(
+        ctx,
+        'db.users.findById',
+        async () => {
+          await new Promise((r) => setTimeout(r, 10))
+          return ctx.db.users.find((u) => u.id === input.userId)
+        },
+        { kind: 'db', detail: `SELECT * FROM users WHERE id = ${input.userId}` },
+      )
+
+      await trace(
+        ctx,
+        'email.send',
+        async () => {
+          await new Promise((r) => setTimeout(r, 80))
+          console.log(`    [task] Sent welcome email to ${input.email} (user: ${user?.name ?? 'unknown'})`)
+        },
+        { kind: 'email', detail: `to: ${input.email}` },
+      )
+
+      return { sent: true, to: input.email }
+    },
+  })
+
+// 2. Task without input — cleanup old data
+const cleanupOldData = s.$task({
+  name: 'cleanup-old-data',
+  description: 'Clean up old drafts and expired sessions',
+  resolve: async ({ ctx }) => {
+    const before = ctx.db.posts.length
+    console.log(`    [task] Cleanup: ${before} posts checked`)
+    return { checked: before, deleted: 0 }
+  },
+})
+
+// 3. Cron task — stats snapshot every 30s
+const statsSnapshot = s.$task({
+  cron: '*/30 * * * * *',
+  name: 'stats-snapshot',
+  description: 'Snapshot statistics',
+  resolve: async ({ ctx }) => {
+    const stats = {
+      users: ctx.db.users.length,
+      posts: ctx.db.posts.length,
+      published: ctx.db.posts.filter((p) => p.published).length,
+      timestamp: new Date().toISOString(),
+    }
+    console.log(`    [task:cron] Stats snapshot: ${JSON.stringify(stats)}`)
+    return stats
+  },
+})
+
+// 4. Cron heartbeat — every 10s
+const heartbeat = s.$task({
+  cron: '*/10 * * * * *',
+  name: 'heartbeat',
+  description: 'Periodic health ping',
+  resolve: async () => ({ alive: true, time: Date.now() }),
+})
+
+// 5. Task dispatched from procedure — with trace() spans
+const createUserWithEmail = s
+  .$use(auth, timing)
+  .$input(z.object({ name: z.string(), email: z.string().email() }))
+  .$output(UserSchema)
+  .$resolve(async ({ input, ctx }) => {
+    const user = await trace(
+      ctx,
+      'db.users.create',
+      async () => {
+        const u = {
+          id: ctx.db.nextUserId++,
+          name: input.name,
+          email: input.email,
+          role: 'user' as const,
+          createdAt: new Date().toISOString(),
+        }
+        ctx.db.users.push(u)
+        return u
+      },
+      { kind: 'db', detail: `INSERT INTO users (name, email) VALUES ('${input.name}', '${input.email}')` },
+    )
+
+    // Pass ctx — automatically adds span to parent request trace
+    sendWelcomeEmail.dispatch({ userId: user.id, email: user.email }, ctx)
+
+    return user
+  })
+
+// ── Callable: Direct invocation (no HTTP) ────────────
+
+const directListUsers = callable(listUsers, {
+  context: () => ({ headers: {}, db, pubsub, requestId: 'direct' }),
+})
+
+// Test callable immediately at startup
+directListUsers({ limit: 2 }).then((result) => {
+  console.log(`\n[callable] Direct call result: ${JSON.stringify(result)}`)
+})
+
+// ── Router ───────────────────────────────────────────
+
+const appRouter = s.router({
   health,
   users: {
     list: listUsers,
     get: getUser,
     create: createUser,
+    createWithEmail: createUserWithEmail,
     delete: deleteUser,
+    bySlug: getUserBySlug,
+  },
+  posts: {
+    list: listPosts,
+    create: createPost,
+  },
+  demo: {
+    cookies: cookieDemo,
+    signing: signingDemo,
   },
   stream: {
-    updates: streamUpdates,
+    ticks: tickStream,
+    userEvents,
   },
-};
+  admin: adminRouter,
+  tasks: {
+    sendWelcomeEmail,
+    cleanupOldData,
+    statsSnapshot,
+    heartbeat,
+  },
+})
 
-export type AppRouter = typeof router;
+export type AppRouter = typeof appRouter
 
-// ── HTTP Server ─────────────────────────────────────
+// ── Batch Handler ────────────────────────────────────
 
-const handler = new RPCHandler(router, {
-  plugins: [new CORSPlugin()],
-});
+const _batchHandler = createBatchHandler(appRouter, {
+  context: (req: Request) => ({
+    headers: Object.fromEntries(req.headers) as Record<string, string>,
+    db,
+    pubsub,
+    requestId: crypto.randomUUID().slice(0, 8),
+  }),
+  maxBatchSize: 20,
+})
 
-const server = createServer(async (req, res) => {
-  const result = await handler.handle(req, res, {
-    context: { headers: req.headers },
-  });
+// ── Serve ────────────────────────────────────────────
 
-  if (!result.matched) {
-    res.statusCode = 404;
-    res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify({ error: "Not found" }));
-  }
-});
+s.serve(appRouter, {
+  port: Number(process.env.PORT) || 3456,
+  scalar: {
+    title: 'Silgi Playground',
+    version: '0.1.0',
+    description: 'Full feature showcase — every Silgi capability in one server',
+    security: { type: 'http', scheme: 'bearer', bearerFormat: 'Token' },
+  },
+  analytics: true,
+})
 
-const PORT = 3456;
-server.listen(PORT, "127.0.0.1", () => {
-  console.log(`\n🚀 Katman playground server running at http://127.0.0.1:${PORT}\n`);
-  console.log("Routes:");
-  console.log("  POST /health         — Health check");
-  console.log("  POST /users/list     — List users");
-  console.log("  POST /users/get      — Get user by id");
-  console.log("  POST /users/create   — Create user (requires auth)");
-  console.log("  POST /users/delete   — Delete user (requires auth)");
-  console.log("  POST /stream/updates — SSE stream (5 ticks)");
-  console.log("\nAuth token: Bearer secret-token\n");
-});
+console.log('\n╔══════════════════════════════════════════════╗')
+console.log('║        Silgi Playground — All Features      ║')
+console.log('╠══════════════════════════════════════════════╣')
+console.log('║                                              ║')
+console.log('║  QUERIES (GET)                               ║')
+console.log('║    /health              Health check          ║')
+console.log('║    /users/list          List users            ║')
+console.log('║    /users/get           Get user by id        ║')
+console.log('║    /users/bySlug        Get user by slug      ║')
+console.log('║    /posts/list          List posts            ║')
+console.log('║    /demo/cookies        Cookie demo           ║')
+console.log('║    /demo/signing        Sign/encrypt demo     ║')
+console.log('║    /admin/stats         Admin stats           ║')
+console.log('║                                              ║')
+console.log('║  MUTATIONS (POST, auth: Bearer secret-token) ║')
+console.log('║    /users/create           Create user        ║')
+console.log('║    /users/createWithEmail  Create + email     ║')
+console.log('║    /users/delete           Delete user        ║')
+console.log('║    /posts/create           Create post        ║')
+console.log('║    /admin/resetDb          Reset database     ║')
+console.log('║                                              ║')
+console.log('║  TASKS (POST, background work)               ║')
+console.log('║    /tasks/sendWelcomeEmail Send email         ║')
+console.log('║    /tasks/cleanupOldData   Cleanup task       ║')
+console.log('║    /tasks/statsSnapshot    Cron: every 30s    ║')
+console.log('║    /tasks/heartbeat        Cron: every 10s    ║')
+console.log('║                                              ║')
+console.log('║  SUBSCRIPTIONS (SSE)                         ║')
+console.log('║    /stream/ticks        5-tick stream         ║')
+console.log('║    /stream/userEvents   PubSub user events    ║')
+console.log('║                                              ║')
+console.log('║  SPECIAL                                     ║')
+console.log('║    /reference           Scalar API docs       ║')
+console.log('║    /openapi.json        OpenAPI 3.1 spec      ║')
+console.log('║                                              ║')
+console.log('║  Auth: Bearer secret-token                   ║')
+console.log('╚══════════════════════════════════════════════╝\n')

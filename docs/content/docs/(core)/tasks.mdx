@@ -1,0 +1,149 @@
+---
+title: Tasks
+description: Run background work with guards, type-safe input, and automatic scheduling.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+
+A task is a piece of work that runs in the background. Send an email, generate a report, clean up old data — anything you don't want blocking your API response.
+
+Tasks use the same builder chain as procedures — `$use`, `$input`, `$errors` all work. The only difference: `$task()` instead of `$resolve()`.
+
+<Callout>
+  Tasks handle define, dispatch, and schedule. For queues, retries, and orchestration, pair with
+  [Trigger.dev](https://trigger.dev/), [BullMQ](https://bullmq.io/), or [pg-boss](https://github.com/timgit/pg-boss).
+</Callout>
+
+## Defining a task
+
+Use the builder chain, ending with `$task()`:
+
+```ts title="server/tasks.ts"
+const sendEmail = s
+  .$use(auth)
+  .$input(z.object({ to: z.string().email(), subject: z.string() }))
+  .$task({
+    name: 'send-email',
+    resolve: async ({ input, ctx }) => {
+      await ctx.mailer.send(input.to, input.subject)
+      return { sent: true }
+    },
+  })
+```
+
+Everything before `$task()` works the same as procedures:
+
+- `$use(guard)` — adds guards, enriches `ctx`
+- `$input(schema)` — validates input
+- `$errors({ ... })` — typed error codes
+- `$route({ ... })` — OpenAPI metadata
+
+A task without input or guards:
+
+```ts
+const prune = s.$task({
+  name: 'prune-logs',
+  resolve: async ({ ctx }) => {
+    const count = await ctx.db.logs.deleteOlderThan('30d')
+    return { deleted: count }
+  },
+})
+```
+
+## Dispatching
+
+Call `.dispatch()` — input is validated, context is created:
+
+```ts
+await sendEmail.dispatch({ to: 'alice@example.com', subject: 'Welcome' })
+```
+
+### From a procedure — pass `{ ctx }` for tracing
+
+When you dispatch a task from inside a procedure, pass `ctx` as the second argument. This automatically adds a span to the parent request's trace timeline:
+
+```ts
+const createUser = s.$input(z.object({ name: z.string(), email: z.string() })).$resolve(async ({ input, ctx }) => {
+  const user = await ctx.db.users.create(input)
+
+  sendEmail.dispatch({ to: input.email, subject: 'Welcome' }, ctx)
+
+  return user
+})
+```
+
+The analytics dashboard shows the task as a `queue` span on the request detail:
+
+```
+users/create — 2 spans, 4.2ms total
+├─ db.users.create     (db)     1.1ms
+└─ task:send-email     (queue)  92.3ms
+```
+
+<Callout>
+  `ctx` is optional. Without it, the task still runs and tracks analytics, but no span appears on the parent request.
+</Callout>
+
+## Mounting on router
+
+Tasks mount directly — guards run when called via HTTP:
+
+```ts title="server/router.ts"
+const router = s.router({
+  users: { create: createUser },
+  tasks: {
+    sendEmail, // POST /tasks/sendEmail — auth guard runs
+    prune, // POST /tasks/prune — no guard
+  },
+})
+```
+
+## Cron scheduling
+
+Add `cron` to run a task on a schedule:
+
+```ts
+const dailyReport = s.$task({
+  name: 'daily-report',
+  cron: '0 9 * * *',
+  description: 'Generate daily sales report',
+  resolve: async ({ ctx }) => {
+    return await ctx.db.reports.generateDaily()
+  },
+})
+```
+
+Put it in the router and call `serve()` — cron starts automatically:
+
+```ts
+const router = s.router({ tasks: { dailyReport } })
+await s.serve(router)
+```
+
+<Callout type='warn'>Cron tasks run without input — don't use `$input()` with them.</Callout>
+
+| Pattern        | Meaning                  |
+| -------------- | ------------------------ |
+| `0 9 * * *`    | Every day at 9:00 AM     |
+| `0 */6 * * *`  | Every 6 hours            |
+| `*/10 * * * *` | Every 10 minutes         |
+| `0 0 * * 0`    | Every Sunday at midnight |
+
+## Analytics
+
+Every dispatch is tracked in the [analytics dashboard](/docs/analytics):
+
+- **Task list** — runs, errors, avg duration
+- **Scheduled tasks** — cron expression, next/last run
+- **Execution detail** — click for input, output, error, trace spans
+
+## Prevent duplicate runs
+
+`runTask()` ensures one instance at a time:
+
+```ts
+import { runTask } from 'silgi'
+
+const [a, b] = await Promise.all([runTask(prune), runTask(prune)])
+// Runs once — a === b
+```

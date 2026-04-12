@@ -1,0 +1,280 @@
+---
+title: Code Generation
+description: Generate Silgi routes, schemas, and a ready-to-implement server from any OpenAPI 3.x spec — with Zod, Valibot, or ArkType.
+---
+
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs'
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Files, Folder, File } from 'fumadocs-ui/components/files'
+import { Steps, Step } from 'fumadocs-ui/components/steps'
+
+Silgi can generate a fully typed server from an OpenAPI specification. Pass a spec, get route files with `$route`, `$input`, `$output`, `$errors`, and an inline `$resolve` stub — one file per operation, grouped by domain. Re-running the generator preserves your implementations while updating metadata from the spec.
+
+## Quick start
+
+<Steps>
+<Step>
+### Generate from spec
+
+```ts title="generate.ts"
+import { generateFromSpec } from 'silgi/codegen'
+
+await generateFromSpec({
+  spec: './openapi.json',
+  outDir: './src/api',
+})
+```
+
+Run it:
+
+```bash
+npx tsx generate.ts
+```
+
+</Step>
+<Step>
+### Implement your resolvers
+
+Open any route file and replace the `// TODO` stub:
+
+```ts title="src/api/routes/users/listUsers.ts"
+export const listUsers = s
+  .$route({
+    path: '/users',
+    method: 'GET',
+    summary: 'List all users',
+    tags: ['users'],
+    operationId: 'listUsers',
+  })
+  .$input(schemas.listUsersInputSchema)
+  .$output(schemas.listUsersOutputSchema)
+  .$resolve(async ({ input, ctx }) => {
+    return ctx.db.users.findMany({
+      take: input.limit ?? 20,
+    })
+  })
+```
+
+</Step>
+<Step>
+### Use the router
+
+```ts title="src/server.ts"
+import { router } from './api/router.gen.ts'
+import { silgi } from 'silgi'
+
+const s = silgi({
+  context: (req) => ({ db: getDB() }),
+})
+
+s.serve(router, { port: 3000, scalar: true })
+```
+
+</Step>
+</Steps>
+
+## Output structure
+
+<Files>
+  <Folder name='src/api' defaultOpen>
+    <File name='schemas.gen.ts' />
+    <File name='router.gen.ts' />
+    <Folder name='routes' defaultOpen>
+      <Folder name='users' defaultOpen>
+        <File name='listUsers.ts' />
+        <File name='createUser.ts' />
+        <File name='getUser.ts' />
+      </Folder>
+      <Folder name='store' defaultOpen>
+        <File name='getInventory.ts' />
+        <File name='placeOrder.ts' />
+      </Folder>
+    </Folder>
+  </Folder>
+</Files>
+
+| File                     | Regenerated? | Description                                         |
+| ------------------------ | ------------ | --------------------------------------------------- |
+| `schemas.gen.ts`         | Always       | Component + operation schemas (Zod/Valibot/ArkType) |
+| `router.gen.ts`          | Always       | Root router — imports and combines all operations   |
+| `routes/<group>/<op>.ts` | Smart        | One file per operation with inline `$resolve`       |
+
+## Schema targets
+
+The generator supports any Standard Schema compatible library:
+
+<Tabs items={['Zod', 'Valibot', 'ArkType']}>
+<Tab value='Zod'>
+```ts
+await generateFromSpec({
+  spec: './openapi.json',
+  outDir: './src/api',
+  schema: 'zod',
+})
+```
+
+```ts title="schemas.gen.ts"
+import { z } from 'zod'
+
+export const UserSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(100),
+  email: z.string().email().optional(),
+})
+```
+
+</Tab>
+<Tab value='Valibot'>
+```ts
+await generateFromSpec({
+  spec: './openapi.json',
+  outDir: './src/api',
+  schema: 'valibot',
+})
+```
+
+```ts title="schemas.gen.ts"
+import * as v from 'valibot'
+
+export const UserSchema = v.object({
+  id: v.pipe(v.string(), v.uuid()),
+  name: v.pipe(v.string(), v.minValue(1), v.maxValue(100)),
+  email: v.optional(v.pipe(v.string(), v.email())),
+})
+```
+
+</Tab>
+<Tab value='ArkType'>
+```ts
+await generateFromSpec({
+  spec: './openapi.json',
+  outDir: './src/api',
+  schema: 'arktype',
+})
+```
+
+```ts title="schemas.gen.ts"
+import { type } from 'arktype'
+
+export const UserSchema = type({
+  ['id']: type('string.uuid'),
+  ['name']: type('string').atLeast(1).atMost(100),
+  ['email?']: type('string.email'),
+})
+```
+
+</Tab>
+</Tabs>
+
+## Incremental generation
+
+The default `smart` strategy uses [oxc-parser](https://oxc.rs) to parse existing route files, extract your `$resolve` implementation by AST, and preserve it while regenerating everything else.
+
+```
+1. Generate from spec v1         → stub files
+2. Implement $resolve bodies     → your code
+3. Spec changes (v2)             → re-run codegen
+4. Result:
+   ✅ $route metadata updated    (path, method, summary, tags)
+   ✅ $input/$output updated     (new fields from spec)
+   ✅ $errors updated            (new error codes)
+   ✅ $resolve preserved         (your implementation kept)
+   ✅ New operations              (generated as stubs)
+```
+
+<Callout type='info'>
+  If a `$resolve` body still contains `Not implemented`, it's treated as a stub and overwritten with a fresh stub. Only
+  real implementations are preserved.
+</Callout>
+
+### Route strategies
+
+| Strategy          | Behavior                                       |
+| ----------------- | ---------------------------------------------- |
+| `smart` (default) | Preserve `$resolve` body, regenerate metadata  |
+| `skip`            | Never touch existing route files               |
+| `overwrite`       | Regenerate everything, discard implementations |
+
+```ts
+await generateFromSpec({
+  spec: './openapi.json',
+  outDir: './src/api',
+  routeStrategy: 'smart',
+})
+```
+
+## Options
+
+```ts
+await generateFromSpec({
+  // Required
+  spec: './openapi.json', // path or parsed object
+
+  // Output
+  outDir: './src/api', // default: './generated'
+  schema: 'zod', // 'zod' | 'valibot' | 'arktype'
+
+  // Grouping
+  groupBy: 'tag', // 'tag' | 'path' | 'flat'
+
+  // Regeneration
+  routeStrategy: 'smart', // 'smart' | 'skip' | 'overwrite'
+
+  // Customization
+  instanceName: 's', // Silgi instance variable name
+  header: '// Auto-generated', // Comment at top of each file
+})
+```
+
+| Option          | Default       | Description                                                               |
+| --------------- | ------------- | ------------------------------------------------------------------------- |
+| `spec`          | —             | Path to OpenAPI JSON/YAML file, or a parsed spec object                   |
+| `outDir`        | `./generated` | Output directory                                                          |
+| `schema`        | `zod`         | Target validation library                                                 |
+| `groupBy`       | `tag`         | How to organize route folders: by OpenAPI tag, first URL segment, or flat |
+| `routeStrategy` | `smart`       | How to handle existing route files on re-generation                       |
+| `instanceName`  | `s`           | Variable name for the `silgi()` instance in generated code                |
+
+## Programmatic API
+
+Use `generate()` for in-memory generation without writing files:
+
+```ts
+import { generate } from 'silgi/codegen'
+import spec from './openapi.json'
+
+const { schemas, router, routes, operations } = generate(spec, {
+  schema: 'valibot',
+  groupBy: 'tag',
+})
+
+// schemas: string   — schemas.gen.ts content
+// router: string    — router.gen.ts content
+// routes: Map<string, string>  — 'group/operationId' → file content
+// operations: ParsedOperation[]
+```
+
+## YAML support
+
+YAML specs are supported if the `yaml` package is installed:
+
+<Tabs items={['pnpm', 'npm', 'bun']}>
+  <Tab value='pnpm'>```bash pnpm add -D yaml ```</Tab>
+  <Tab value='npm'>```bash npm install -D yaml ```</Tab>
+  <Tab value='bun'>```bash bun add -D yaml ```</Tab>
+</Tabs>
+
+Then pass a `.yaml` or `.yml` path:
+
+```ts
+await generateFromSpec({
+  spec: './openapi.yaml',
+  outDir: './src/api',
+})
+```
+
+## What's next?
+
+- [OpenAPI](/docs/openapi) — generate an OpenAPI spec _from_ your router (the reverse direction)
+- [Procedures](/docs/procedures) — `$input()`, `$output()`, `$errors()`, `$route()` API
+- [Server](/docs/server) — serve your router with Scalar UI

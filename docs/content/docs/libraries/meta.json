@@ -1,0 +1,22 @@
+{
+  "title": "Libraries",
+  "description": "Database, auth & more",
+  "icon": "Library",
+  "root": true,
+  "pages": [
+    "index",
+    "---",
+    "drizzle",
+    "better-auth",
+    "---",
+    "ai-sdk",
+    "tanstack-query",
+    "pinia-colada",
+    "react",
+    "---",
+    "openapi-client",
+    "hey-api",
+    "broker",
+    "trpc"
+  ]
+}

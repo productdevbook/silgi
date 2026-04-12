@@ -1,0 +1,54 @@
+---
+title: tRPC Interop
+description: Convert tRPC routers to Silgi — incremental migration path.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+
+Migrate from tRPC to Silgi incrementally. Convert your existing tRPC router and serve it with Silgi's pipeline.
+
+## Usage
+
+```ts twoslash
+// @noErrors
+import { fromTRPC } from 'silgi/trpc'
+import { trpcRouter } from './trpc-router'
+
+const silgiRouter = fromTRPC(trpcRouter)
+
+// Now use with Silgi's serve(), handler(), etc.
+s.serve(silgiRouter, { port: 3000 })
+```
+
+## What gets converted
+
+| tRPC                     | Silgi                       |
+| ------------------------ | --------------------------- |
+| `query` procedure        | ProcedureDef (GET)          |
+| `mutation` procedure     | ProcedureDef (POST)         |
+| `subscription` procedure | `subscription` ProcedureDef |
+| Input schemas (Zod)      | Passed through as-is        |
+| Nested routers           | Nested RouterDef            |
+
+## What doesn't convert
+
+- **tRPC middleware** runs inside tRPC, not Silgi's guard/wrap pipeline
+- **tRPC context** — use Silgi's `context` factory instead
+- **tRPC links** — use Silgi's client links
+
+<Callout type='info'>
+  `fromTRPC` wraps each procedure's resolver. tRPC middleware still runs inside the tRPC procedure — it's not converted
+  to Silgi guards/wraps. For full Silgi features, rewrite procedures natively.
+</Callout>
+
+## Migration strategy
+
+1. Convert with `fromTRPC()` — everything works immediately
+2. Rewrite procedures one by one to native Silgi (add guards, wraps, typed errors)
+3. Remove tRPC dependency when done
+
+## What's next?
+
+- [Getting Started](/docs/getting-started) — Silgi from scratch
+- [Middleware](/docs/middleware) — guards and wraps (Silgi's equivalent of tRPC middleware)
+- [Integrations](/docs/integrations) — other available integrations

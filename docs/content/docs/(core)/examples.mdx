@@ -1,0 +1,75 @@
+---
+title: Examples
+description: Ready-to-use example apps — download with one command.
+---
+
+import { Cards, Card } from 'fumadocs-ui/components/card'
+
+Every example is a complete, runnable project. Download any of them with [giget](https://github.com/unjs/giget) and start exploring.
+
+## Standalone
+
+<Cards>
+  <Card
+    title='Standalone Server'
+    description='Minimal Silgi server with serve() — no framework, just TypeScript. The simplest starting point.'
+  >
+    ```bash npx giget gh:productdevbook/silgi/examples/standalone silgi-standalone ```
+  </Card>
+</Cards>
+
+## Framework adapters
+
+<Cards>
+  <Card title="Express" description="Mount Silgi as Express middleware alongside existing REST routes.">
+  ```bash
+  npx giget gh:productdevbook/silgi/examples/express silgi-express
+  ```
+  </Card>
+
+<Card title='Nitro' description='Silgi with Nitro v3 — file-system routing and auto-imports.'>
+  ```bash npx giget gh:productdevbook/silgi/examples/nitro silgi-nitro ```
+</Card>
+
+  <Card title="Nitro + H3" description="Silgi with Nitro v3 and H3 v2 event handler integration.">
+  ```bash
+  npx giget gh:productdevbook/silgi/examples/nitro-h3 silgi-nitro-h3
+  ```
+  </Card>
+</Cards>
+
+## Full-stack
+
+<Cards>
+  <Card title="Next.js" description="Full-stack Next.js App Router — server actions, TanStack Query, and SSR prefetching.">
+  ```bash
+  npx giget gh:productdevbook/silgi/examples/nextjs silgi-nextjs
+  ```
+  </Card>
+
+<Card title='Nuxt' description='Nuxt 4 with Nitro server routes and auto-imported Silgi procedures.'>
+  ```bash npx giget gh:productdevbook/silgi/examples/nuxt silgi-nuxt ```
+</Card>
+
+<Card title='SvelteKit' description='SvelteKit with server-side Silgi routes and typed client.'>
+  ```bash npx giget gh:productdevbook/silgi/examples/sveltekit silgi-sveltekit ```
+</Card>
+
+  <Card title="React Client" description="Vite + React frontend with TanStack Query — connects to any Silgi server.">
+  ```bash
+  npx giget gh:productdevbook/silgi/examples/client-react silgi-client-react
+  ```
+  </Card>
+</Cards>
+
+## Running an example
+
+After downloading, install dependencies and start the dev server:
+
+```bash
+cd silgi-standalone
+npm install
+npx tsx server.ts
+```
+
+Each example includes a README with specific instructions.

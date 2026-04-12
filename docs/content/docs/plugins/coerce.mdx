@@ -1,0 +1,65 @@
+---
+title: Smart Coercion
+description: Automatically convert string query parameters to numbers, booleans, and null.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+
+When procedures receive GET requests, all values arrive as strings from the query string. The coercion guard converts them to proper JavaScript types before validation runs.
+
+## Usage
+
+```ts twoslash
+// @noErrors
+import { coerceGuard } from 'silgi/plugins'
+
+const getUser = s
+  .$use(coerceGuard)
+  .$input(z.object({ id: z.number(), active: z.boolean().optional() }))
+  .$resolve(({ input }) => db.users.find(input.id))
+
+// GET /users/get?data={"id":"42","active":"true"}
+// Without coercion: validation fails (string "42" is not a number)
+// With coercion: input becomes { id: 42, active: true }
+```
+
+## Coercion rules
+
+| Input string               | Coerced value  |
+| -------------------------- | -------------- |
+| `"123"`, `"-42"`, `"3.14"` | number         |
+| `"true"`                   | `true`         |
+| `"false"`                  | `false`        |
+| `"null"`                   | `null`         |
+| `"undefined"`              | `undefined`    |
+| `""` (empty)               | `undefined`    |
+| anything else              | kept as string |
+
+Numbers are only coerced when the entire string is a valid number and `String(Number(s)) === s`. This prevents `"01"` or `"1e308"` from being coerced unexpectedly.
+
+## Standalone use
+
+The coercion functions are also exported for use outside of guards:
+
+```ts twoslash
+// @noErrors
+import { coerceValue, coerceObject } from 'silgi/plugins'
+
+coerceValue('42') // 42
+coerceValue('true') // true
+coerceValue('hello') // "hello"
+
+const obj = { id: '42', name: 'Alice', active: 'true' }
+coerceObject(obj)
+// { id: 42, name: "Alice", active: true }
+```
+
+<Callout type='info'>
+  Coercion processes top-level values, nested objects (one level deep), and array elements. It does not recurse into
+  deeply nested structures.
+</Callout>
+
+## What's next?
+
+- [Procedures](/docs/procedures) — input validation with Zod/Valibot/ArkType
+- [Plugins](/docs/plugins) — other available plugins

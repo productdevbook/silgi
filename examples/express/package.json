@@ -1,0 +1,17 @@
+{
+  "name": "silgi-example-express",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --experimental-strip-types server.ts"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "silgi": "latest",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6"
+  }
+}

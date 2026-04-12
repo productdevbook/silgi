@@ -1,0 +1,205 @@
+---
+title: React Server Actions
+description: Call Silgi procedures as React Server Actions — type-safe [error, data] tuples instead of try/catch.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+
+React Server Actions let you call server-side code directly from React components. Silgi wraps your procedures as actions that return `[error, data]` tuples instead of throwing, making error handling straightforward in your UI code.
+
+This works with **Next.js** (App Router) and **TanStack Start**.
+
+## Prerequisites
+
+You need a Silgi router defined on the server. If you haven't set one up yet, see the [Getting Started](/docs/getting-started) guide.
+
+## createAction
+
+Wraps a single procedure as a server action. Returns `[error, data]` instead of throwing.
+
+Define the action in a file with `"use server"`:
+
+```ts twoslash
+// @noErrors
+// app/actions.ts
+'use server'
+import { createAction } from 'silgi/react'
+import { appRouter } from '../router'
+
+export const listUsers = createAction(appRouter.users.list)
+export const createUser = createAction(appRouter.users.create)
+```
+
+Use it in a component:
+
+```tsx
+// app/page.tsx
+import { listUsers } from './actions'
+
+export default async function Page() {
+  const [error, users] = await listUsers({ limit: 10 })
+
+  if (error) {
+    return <p>Error: {error.message}</p>
+  }
+
+  return (
+    <ul>
+      {users.map((u) => (
+        <li key={u.id}>{u.name}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+### The return type
+
+Every action returns a tuple: `[error, data]`.
+
+- On success: `[null, data]` — `error` is `null`, `data` is the procedure's return value
+- On failure: `[error, undefined]` — `error` has `code`, `status`, `message`, and optionally `data`
+
+This pattern avoids try/catch in your components and makes error states explicit.
+
+## createActions
+
+Converts an entire router into actions at once. The result mirrors your router structure:
+
+```ts twoslash
+// @noErrors
+'use server'
+import { createActions } from 'silgi/react'
+import { appRouter } from '../router'
+
+export const actions = createActions(appRouter)
+```
+
+```ts twoslash
+// @noErrors
+// In a component or server function
+const [err, users] = await actions.users.list({ limit: 10 })
+const [err2, user] = await actions.users.create({ name: 'Alice' })
+```
+
+This is convenient when you have many procedures and don't want to export each one individually.
+
+## createFormAction
+
+For HTML `<form>` submissions, `createFormAction` accepts `FormData` and converts it into the input object your procedure expects:
+
+```ts twoslash
+// @noErrors
+// app/actions.ts
+'use server'
+import { createFormAction } from 'silgi/react'
+
+export const submitUser = createFormAction(appRouter.users.create)
+```
+
+```tsx
+<form action={submitUser}>
+  <input name='name' required />
+  <input name='email' type='email' required />
+  <button type='submit'>Create User</button>
+</form>
+```
+
+### Nested form data
+
+Bracket notation in field names is automatically parsed into nested objects:
+
+```html
+<input name="user[name]" value="Alice" /> <input name="user[email]" value="alice@example.com" />
+```
+
+Becomes:
+
+```json
+{ "user": { "name": "Alice", "email": "alice@example.com" } }
+```
+
+Array indices work too: `items[0]`, `items[1]`, etc.
+
+### Custom parsing
+
+If the default FormData parser doesn't match your needs, provide your own:
+
+```ts twoslash
+// @noErrors
+const submitUser = createFormAction(appRouter.users.create, {
+  parseFormData: (formData) => ({
+    name: formData.get('name'),
+    email: formData.get('email'),
+  }),
+})
+```
+
+## Framework errors
+
+Silgi automatically detects and rethrows framework-specific errors:
+
+- **Next.js** `redirect()` and `notFound()` (errors with `NEXT_` digest)
+- **TanStack Router** navigation errors (`isNotFound: true`)
+- **Response** objects (used for redirects)
+
+These errors pass through untouched — they won't be caught as `[error, data]` tuples.
+
+<Callout>
+  This means `redirect("/login")` inside a procedure works as expected in Next.js. The redirect happens, and the action
+  doesn't return an error tuple.
+</Callout>
+
+## useServerAction
+
+A React hook that wraps a server action with loading and error state:
+
+```tsx
+import { useServerAction } from 'silgi/react'
+
+function CreateUserButton() {
+  const { execute, data, error, isPending, reset } = useServerAction(createUser)
+
+  return (
+    <div>
+      <button onClick={() => execute({ name: 'Alice' })} disabled={isPending}>
+        {isPending ? 'Creating...' : 'Create User'}
+      </button>
+      {error && <p>Error: {error.message}</p>}
+      {data && <p>Created: {data.name}</p>}
+    </div>
+  )
+}
+```
+
+`execute()` returns the same `[error, data]` tuple as the action itself, so you can also handle results inline.
+
+## useOptimisticServerAction
+
+Like `useServerAction`, but applies an optimistic update immediately while the server call is in flight:
+
+```tsx
+import { useOptimisticServerAction } from 'silgi/react'
+
+function UserName({ user }) {
+  const { execute, displayData, isPending } = useOptimisticServerAction(updateUser, {
+    optimistic: (input) => ({ ...user, ...input }),
+  })
+
+  return (
+    <div>
+      <span>{displayData?.name ?? user.name}</span>
+      <button onClick={() => execute({ name: 'Bob' })}>Rename</button>
+    </div>
+  )
+}
+```
+
+- `displayData` shows the optimistic value while pending, then switches to the confirmed server response.
+- If the call fails, the optimistic value is rolled back automatically.
+
+## What's next?
+
+- [Getting Started](/docs/getting-started) — set up a Silgi router
+- [Typed Errors](/docs/errors) — how error maps and `fail()` work, and how they appear in the `error` tuple
+- [TanStack Query](/docs/integrations/tanstack-query) — client-side data fetching with caching, as an alternative

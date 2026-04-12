@@ -1,0 +1,255 @@
+---
+title: OpenAPI
+description: Auto-generated OpenAPI 3.1 spec from your router — per-procedure metadata, path parameters, security, and custom overrides.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+
+Silgi generates a full OpenAPI 3.1.0 specification from your router automatically. Every procedure becomes an operation — input schemas become request bodies or query parameters, output schemas become response bodies, and typed errors become error responses.
+
+## Enable
+
+Pass `scalar: true` to `serve()` or `handler()`:
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, {
+  scalar: true,
+})
+```
+
+This serves:
+
+- `/api/openapi.json` — the raw OpenAPI specification
+- `/api/reference` — interactive API docs powered by [Scalar](https://scalar.com)
+
+## Response types
+
+For the API reference to show a response schema, you must declare `$output()` on the procedure. Without it, the generated spec only includes a description — no schema is rendered in Scalar or the raw OpenAPI JSON.
+
+```ts twoslash
+// @noErrors
+// No $output — Scalar shows "Successful response" with no schema
+const listUsers = s.$resolve(({ ctx }) => ctx.db.users.findMany())
+
+// With $output — Scalar renders the full response type
+const listUsers = s.$output(z.array(UserSchema)).$resolve(({ ctx }) => ctx.db.users.findMany())
+```
+
+<Callout type='info'>
+  `$output()` serves two purposes: it validates the return value at runtime, and it populates the response schema in the
+  OpenAPI spec. Both benefits apply whenever you declare it.
+</Callout>
+
+## Procedure metadata
+
+Use `$route()` to enrich the generated OpenAPI spec with metadata. Paths are auto-generated from the router tree — you only need `$route()` for documentation metadata like tags, summary, and description:
+
+```ts twoslash
+// @noErrors
+const getUser = s
+  .$route({
+    summary: 'Get user by ID',
+    description: 'Returns a single user by their numeric ID.',
+    tags: ['Users'],
+    operationId: 'getUserById',
+    deprecated: false,
+    successStatus: 200,
+    successDescription: 'User found',
+  })
+  .$input(z.object({ id: z.number() }))
+  .$output(UserSchema)
+  .$errors({ NOT_FOUND: 404 })
+  .$resolve(...)
+```
+
+| Option               | Type       | Default                 | Description                                                    |
+| -------------------- | ---------- | ----------------------- | -------------------------------------------------------------- |
+| `summary`            | `string`   | —                       | Short summary shown in API docs                                |
+| `description`        | `string`   | —                       | Detailed description (supports markdown)                       |
+| `tags`               | `string[]` | auto from router        | Tags for grouping operations                                   |
+| `operationId`        | `string`   | auto from router        | Custom operation ID for SDK generation                         |
+| `deprecated`         | `boolean`  | —                       | Mark as deprecated                                             |
+| `successStatus`      | `number`   | `200`                   | HTTP status code for success response                          |
+| `successDescription` | `string`   | `'Successful response'` | Description for success response                               |
+| `method`             | `string`   | `'POST'`                | HTTP method — used for special cases like auth passthrough     |
+| `path`               | `string`   | auto from router        | Custom URL path — used for special cases like auth passthrough |
+
+<Callout type='info'>
+  The `method` and `path` fields exist for special cases like wildcard passthrough handlers (e.g. `.$route({ method: '*', path: '/api/auth/**' })`). For normal procedures, paths are auto-generated from the router tree structure.
+</Callout>
+
+## Auto-generated paths
+
+OpenAPI paths are generated automatically from the router tree structure. Each procedure's position in the router becomes its path:
+
+```ts twoslash
+// @noErrors
+const appRouter = s.router({
+  users: {
+    list: listUsers, // → POST /users/list
+    create: createUser, // → POST /users/create
+    get: getUser, // → POST /users/get
+  },
+  orders: {
+    list: listOrders, // → POST /orders/list
+  },
+})
+```
+
+No manual path definitions needed — the spec reflects your router structure exactly.
+
+## Security
+
+### Global security
+
+Set a global security scheme in `ScalarOptions`:
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, {
+  scalar: {
+    security: {
+      type: 'http',
+      scheme: 'bearer',
+      bearerFormat: 'JWT',
+    },
+  },
+})
+```
+
+All operations will require this scheme by default.
+
+### Per-procedure override
+
+Override security on individual procedures:
+
+```ts twoslash
+// @noErrors
+// Public endpoint — no auth required
+const health = s.$route({ security: false }).$resolve(() => ({ status: 'ok' }))
+
+// Requires specific scheme
+const admin = s.$route({ security: ['bearerAuth'] }).$resolve(() => ({ secret: true }))
+```
+
+| Value      | Effect                          |
+| ---------- | ------------------------------- |
+| `false`    | Public — `security: []` in spec |
+| `string[]` | Named security schemes required |
+| not set    | Inherits global security        |
+
+## Error responses
+
+### Typed errors
+
+Errors declared with `$errors()` are automatically documented:
+
+```ts twoslash
+// @noErrors
+const deleteUser = s
+  .$errors({
+    NOT_FOUND: 404,
+    FORBIDDEN: { status: 403, message: 'Not allowed' },
+  })
+  .$resolve(...)
+
+// Spec generates: 404 and 403 response entries with error schema
+```
+
+The `message` field appears as `default` in the generated schema.
+
+### Validation errors
+
+Procedures with `$input()` automatically get a `400 BAD_REQUEST` response in the spec with the validation error schema — no configuration needed.
+
+### Guard errors
+
+Errors from guards (`$use(authGuard)`) are merged into the procedure's error responses:
+
+```ts twoslash
+// @noErrors
+const authGuard = s.guard({
+  errors: { UNAUTHORIZED: 401 },
+  fn: (ctx) => { ... },
+})
+
+const secret = s
+  .$use(authGuard)
+  .$errors({ FORBIDDEN: 403 })
+  .$resolve(...)
+
+// Spec: 401 from guard + 403 from procedure
+```
+
+## Custom OpenAPI override
+
+For anything not covered by the built-in options, use `spec` to override or extend the generated operation:
+
+### Object merge
+
+```ts twoslash
+// @noErrors
+s.$route({
+  spec: {
+    externalDocs: { url: 'https://docs.example.com/users' },
+    'x-rate-limit': 100,
+    'x-internal': true,
+  },
+})
+```
+
+### Function override
+
+Receives the auto-generated operation, return the final one:
+
+```ts twoslash
+// @noErrors
+s.$route({
+  spec: (operation) => ({
+    ...operation,
+    'x-codegen-request-body-name': 'body',
+    parameters: [
+      ...(operation.parameters ?? []),
+      { name: 'X-Tenant-ID', in: 'header', required: true, schema: { type: 'string' } },
+    ],
+  }),
+})
+```
+
+<Callout>
+  The `spec` override is applied last — after all auto-generation is complete. It's the escape hatch for any OpenAPI
+  feature not directly supported.
+</Callout>
+
+## Schema conversion
+
+Silgi uses [Standard Schema](https://standardschema.dev) to convert your validator schemas (Zod, Valibot, ArkType) to JSON Schema. This happens via the `~standard.jsonSchema.input()` interface — no Zod-specific introspection needed.
+
+This means the generated OpenAPI spec is accurate for **any** validator that implements Standard Schema v1, not just Zod.
+
+## Tags
+
+Tags are auto-generated from the first router segment:
+
+```ts twoslash
+// @noErrors
+const router = s.router({
+  users: {          // tag: "users"
+    list: ...,
+    create: ...,
+  },
+  orders: {         // tag: "orders"
+    list: ...,
+  },
+})
+```
+
+Override with `$route({ tags: ['Custom', 'Tags'] })`.
+
+## What's next?
+
+- [Code Generation](/docs/codegen) — generate Silgi routes _from_ an OpenAPI spec (the reverse direction)
+- [Server](/docs/server) — Scalar UI configuration and CDN options
+- [Procedures](/docs/procedures) — `$input()`, `$output()`, `$errors()` API
+- [Middleware](/docs/middleware) — guards with typed errors

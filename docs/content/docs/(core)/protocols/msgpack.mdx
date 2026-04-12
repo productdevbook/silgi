@@ -1,0 +1,111 @@
+---
+title: MessagePack
+description: Binary protocol for smaller payloads and faster encoding. One flag on the client, zero changes on the server.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
+
+MessagePack is a binary serialization format. It encodes the same data as JSON, but in fewer bytes. Think of it as "JSON, but binary." The result is smaller payloads and faster parsing.
+
+## Why use it?
+
+JSON is text. Every number, every key name, every bracket is a character that takes up space. MessagePack uses a compact binary representation instead:
+
+| Payload     | JSON      | MessagePack | Savings |
+| ----------- | --------- | ----------- | ------- |
+| 1 object    | 33 bytes  | 22 bytes    | **33%** |
+| 10 objects  | 661 bytes | 493 bytes   | **25%** |
+| 100 objects | 9.5 KB    | 6.7 KB      | **30%** |
+
+This matters most for mobile apps, APIs with large responses, and high-traffic services where bandwidth adds up.
+
+## Client setup
+
+Set the protocol to `'messagepack'`:
+
+```ts twoslash
+// @noErrors
+import { createLink } from 'silgi/client/ofetch'
+import { createClient } from 'silgi/client'
+
+const link = createLink({
+  url: 'http://localhost:3000',
+  protocol: 'messagepack',
+})
+
+const client = createClient<AppRouter>(link)
+
+// Use exactly like before — the encoding is transparent
+const users = await client.users.list({ limit: 10 })
+```
+
+That's it. The client now encodes requests as MessagePack and sets the `Accept: application/x-msgpack` header. The server detects this and responds in MessagePack.
+
+<Callout>
+  Your application code doesn't change at all. You still pass and receive regular JavaScript objects. The binary
+  encoding/decoding happens inside the link.
+</Callout>
+
+## Server behavior
+
+The server handles MessagePack automatically. It checks two headers:
+
+- **`Content-Type: application/x-msgpack`** on the request --> decodes the body as MessagePack
+- **`Accept: application/x-msgpack`** on the request --> encodes the response as MessagePack
+
+No server configuration is needed. Both `serve()` and `handler()` support this out of the box.
+
+## Direct API
+
+If you need to encode/decode MessagePack manually (for example, in a custom transport), Silgi exports the codec:
+
+```ts twoslash
+// @noErrors
+import { encode, decode } from 'silgi/msgpack'
+
+// Encode to binary
+const buf = encode({ name: 'Alice', joined: new Date() })
+// buf is an ArrayBuffer — ready to use as a Response body
+
+// Decode from binary
+const data = decode(new Uint8Array(buf))
+// data.joined is a Date object (preserved natively)
+```
+
+## Supported types
+
+MessagePack natively supports more types than JSON:
+
+| Type                          | JSON                | MessagePack                                     |
+| ----------------------------- | ------------------- | ----------------------------------------------- |
+| String, Number, Boolean, null | Yes                 | Yes                                             |
+| Object, Array                 | Yes                 | Yes                                             |
+| **Date**                      | No (becomes string) | **Yes** (timestamp extension)                   |
+| **undefined**                 | No (dropped)        | **Yes** (distinct from null)                    |
+| Set, Map, Error, RegExp       | No                  | **Yes** (with `moreTypes` — enabled by default) |
+| NaN, Infinity                 | No (becomes null)   | **Yes** (IEEE 754)                              |
+| BigInt                        | No (throws)         | 64-bit integers                                 |
+
+<Callout type='info'>
+  If you need BigInt beyond 64-bit, or need circular references, use [devalue](/docs/protocols/devalue) instead.
+</Callout>
+
+## WebSocket + MessagePack
+
+You can also use MessagePack over WebSocket for even lower overhead:
+
+```ts twoslash
+// @noErrors
+import { attachWebSocket } from 'silgi/ws'
+
+await attachWebSocket(server, appRouter, { protocol: 'messagepack' })
+```
+
+Messages are sent as binary WebSocket frames instead of text.
+
+## What's next?
+
+- [devalue](/docs/protocols/devalue) — rich type serialization for Date, Map, Set, BigInt, and circular refs
+- [WebSocket](/docs/protocols/websocket) — persistent connections for real-time and subscriptions
+- [Client](/docs/client) — the full client setup guide

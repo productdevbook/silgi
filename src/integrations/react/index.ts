@@ -1,156 +1,265 @@
 /**
- * React integration — Server Actions and hooks.
+ * React Server Actions — v2 integration.
  *
- * Provides:
- * - createActionableClient: wraps a procedure for React Server Actions
- * - createFormAction: converts a procedure into a FormData-accepting action
- * - useServerAction: React hook for calling server actions with state management
- */
-
-import type { AnyProcedure } from "../../server/procedure.ts";
-import type { Context } from "../../core/types.ts";
-import { compilePipeline } from "../../core/pipeline.ts";
-import { validateSchema } from "../../core/schema.ts";
-import { createErrorConstructorMap } from "../../server/error.ts";
-import { KatmanError, toKatmanError } from "../../core/error.ts";
-
-// === Actionable Client ===
-
-export type ActionableResult<TOutput, TError> =
-  | [error: null, data: TOutput]
-  | [error: TError, data: undefined];
-
-/**
- * Create a server action from a procedure.
+ * Creates type-safe server actions from v2 procedures.
  * Returns [error, data] tuples instead of throwing.
+ */
+
+import { compileProcedure } from '../../compile.ts'
+import { SilgiError, toSilgiError } from '../../core/error.ts'
+
+import type { ProcedureDef, RouterDef } from '../../types.ts'
+
+export type ActionResult<TOutput> =
+  | [error: null, data: TOutput]
+  | [error: { code: string; status: number; message: string; data?: unknown }, data: undefined]
+
+/**
+ * Create a server action from a v2 ProcedureDef.
  *
- * Special cases: Next.js redirect/notFound errors are rethrown.
+ * @example
+ * ```ts
+ * // app/actions.ts
+ * "use server"
+ * import { createAction } from "silgi/react"
+ *
+ * export const createUser = createAction(appRouter.users.create)
+ *
+ * // app/page.tsx
+ * const [error, user] = await createUser({ name: "Alice" })
+ * ```
  */
-export function createActionableClient<TInput, TOutput>(
-  procedure: AnyProcedure,
-  options?: { context?: Context },
-): (input: TInput) => Promise<ActionableResult<TOutput, unknown>> {
-  const def = procedure["~katman"];
-  const ctx = options?.context ?? {};
+export function createAction<TInput = unknown, TOutput = unknown>(
+  procedure: ProcedureDef,
+): (input: TInput) => Promise<ActionResult<TOutput>> {
+  const handler = compileProcedure(procedure)
 
-  const inputValidate = def.inputSchema
-    ? (v: unknown) => validateSchema(def.inputSchema!, v)
-    : undefined;
-  const outputValidate = def.outputSchema
-    ? (v: unknown) => validateSchema(def.outputSchema!, v)
-    : undefined;
-
-  const pipeline = compilePipeline(
-    def.middlewares,
-    def.handler,
-    inputValidate,
-    outputValidate,
-    { inputValidationIndex: def.inputValidationIndex, outputValidationIndex: def.outputValidationIndex },
-  );
-
-  return async (input: TInput): Promise<ActionableResult<TOutput, unknown>> => {
+  return async (input: TInput): Promise<ActionResult<TOutput>> => {
     try {
-      const errors = createErrorConstructorMap(def.errorMap);
-      const output = await pipeline(
-        ctx,
-        input,
-        AbortSignal.timeout(30_000),
-        [],
-        def.meta,
-        errors,
-      );
-      return [null, output as TOutput];
+      const ctx: Record<string, unknown> = Object.create(null)
+      const ac = new AbortController()
+      const result = handler(ctx, input, ac.signal)
+      const output = result instanceof Promise ? await result : result
+      return [null, output as TOutput]
     } catch (error) {
-      // Rethrow Next.js special errors
-      if (isNextJsError(error)) throw error;
-      // Rethrow TanStack Router errors
-      if (isTanStackRouterError(error)) throw error;
-
-      const katmanError = toKatmanError(error);
-      return [katmanError.toJSON() as unknown, undefined];
+      if (isFrameworkError(error)) throw error
+      const e = error instanceof SilgiError ? error : toSilgiError(error)
+      return [e.toJSON() as any, undefined]
     }
-  };
-}
-
-// === Form Action ===
-
-/**
- * Create a FormData-accepting action from a procedure.
- * Parses form data using bracket notation (user[name] → { user: { name: value } }).
- */
-export function createFormAction<TOutput>(
-  procedure: AnyProcedure,
-  options?: {
-    context?: Context;
-    /** Custom form data parser */
-    parseFormData?: (formData: FormData) => unknown;
-  },
-): (formData: FormData) => Promise<ActionableResult<TOutput, unknown>> {
-  const actionable = createActionableClient<unknown, TOutput>(procedure, options);
-  const parser = options?.parseFormData ?? defaultFormDataParser;
-
-  return async (formData: FormData) => {
-    const input = parser(formData);
-    return actionable(input);
-  };
+  }
 }
 
 /**
- * Default form data parser — supports bracket notation.
- * user[name] → { user: { name: value } }
- * items[0] → { items: [value] }
+ * Create a FormData-accepting server action from a v2 procedure.
  */
+export function createFormAction<TOutput = unknown>(
+  procedure: ProcedureDef,
+  options?: { parseFormData?: (fd: FormData) => unknown },
+): (formData: FormData) => Promise<ActionResult<TOutput>> {
+  const action = createAction<unknown, TOutput>(procedure)
+  const parse = options?.parseFormData ?? defaultFormDataParser
+  return (formData: FormData) => action(parse(formData))
+}
+
+/**
+ * Create actions for all procedures in a router.
+ *
+ * @example
+ * ```ts
+ * const actions = createActions(appRouter)
+ * const [error, users] = await actions.users.list({ limit: 10 })
+ * ```
+ */
+export function createActions<T extends RouterDef>(router: T): ActionRouter<T> {
+  const result: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(router)) {
+    if (isProcedureDef(value)) {
+      result[key] = createAction(value)
+    } else if (typeof value === 'object' && value !== null) {
+      result[key] = createActions(value as RouterDef)
+    }
+  }
+  return result as ActionRouter<T>
+}
+
+// ── Hooks ─────────────────────────────────────────
+
+/**
+ * React hook for calling server actions with loading/error state.
+ *
+ * @example
+ * ```tsx
+ * const { execute, data, error, isPending } = useServerAction(createUser)
+ *
+ * <button onClick={() => execute({ name: "Alice" })} disabled={isPending}>
+ *   {isPending ? "Creating..." : "Create User"}
+ * </button>
+ * ```
+ */
+export function useServerAction<TInput, TOutput>(action: (input: TInput) => Promise<ActionResult<TOutput>>) {
+  // These imports are inline to avoid breaking non-React environments
+  const { useState, useCallback, useRef } = require('react')
+
+  const [data, setData] = useState(undefined as TOutput | undefined)
+  const [error, setError] = useState(null as ActionResult<TOutput>[0] | null)
+  const [isPending, setIsPending] = useState(false)
+  const mountedRef = useRef(true)
+
+  // Cleanup on unmount
+  const { useEffect } = require('react')
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
+  const execute = useCallback(
+    async (input: TInput) => {
+      setIsPending(true)
+      setError(null)
+      try {
+        const [err, result] = await action(input)
+        if (!mountedRef.current) return
+        if (err) {
+          setError(err)
+          setData(undefined)
+        } else {
+          setData(result)
+          setError(null)
+        }
+        return [err, result] as ActionResult<TOutput>
+      } finally {
+        if (mountedRef.current) setIsPending(false)
+      }
+    },
+    [action],
+  )
+
+  const reset = useCallback(() => {
+    setData(undefined)
+    setError(null)
+    setIsPending(false)
+  }, [])
+
+  return { execute, data, error, isPending, reset }
+}
+
+/**
+ * React hook for server actions with optimistic UI updates.
+ *
+ * @example
+ * ```tsx
+ * const { execute, data, optimisticData, isPending } = useOptimisticServerAction(updateUser, {
+ *   optimistic: (input) => ({ ...currentUser, ...input }),
+ * })
+ * ```
+ */
+export function useOptimisticServerAction<TInput, TOutput>(
+  action: (input: TInput) => Promise<ActionResult<TOutput>>,
+  options: { optimistic: (input: TInput) => TOutput },
+) {
+  const { useState, useCallback, useRef } = require('react')
+  const { useEffect } = require('react')
+
+  const [data, setData] = useState(undefined as TOutput | undefined)
+  const [optimisticData, setOptimisticData] = useState(undefined as TOutput | undefined)
+  const [error, setError] = useState(null as ActionResult<TOutput>[0] | null)
+  const [isPending, setIsPending] = useState(false)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
+  const execute = useCallback(
+    async (input: TInput) => {
+      setIsPending(true)
+      setError(null)
+      // Apply optimistic update immediately
+      setOptimisticData(options.optimistic(input))
+
+      try {
+        const [err, result] = await action(input)
+        if (!mountedRef.current) return
+        if (err) {
+          setError(err)
+          setOptimisticData(undefined) // Rollback
+        } else {
+          setData(result)
+          setOptimisticData(undefined) // Real data replaces optimistic
+        }
+        return [err, result] as ActionResult<TOutput>
+      } catch (e) {
+        if (mountedRef.current) setOptimisticData(undefined)
+        throw e
+      } finally {
+        if (mountedRef.current) setIsPending(false)
+      }
+    },
+    [action, options.optimistic],
+  )
+
+  return {
+    execute,
+    /** Confirmed server data */
+    data,
+    /** Optimistic data (shown while pending, cleared on settle) */
+    optimisticData,
+    /** The value to display: optimistic while pending, confirmed otherwise */
+    displayData: optimisticData ?? data,
+    error,
+    isPending,
+  }
+}
+
+// ── Types ──────────────────────────────────────────
+
+type ActionRouter<T extends RouterDef> = {
+  [K in keyof T]: T[K] extends ProcedureDef<any, infer TInput, infer TOutput>
+    ? (input: TInput extends undefined ? void : TInput) => Promise<ActionResult<TOutput>>
+    : T[K] extends RouterDef
+      ? ActionRouter<T[K]>
+      : never
+}
+
+// ── Helpers ────────────────────────────────────────
+
+function isProcedureDef(v: unknown): v is ProcedureDef {
+  return typeof v === 'object' && v !== null && 'type' in v && 'resolve' in v
+}
+
+function isFrameworkError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false
+  // Next.js
+  if (typeof (error as any).digest === 'string' && (error as any).digest.startsWith('NEXT_')) return true
+  // TanStack Router
+  if ((error as any).isNotFound === true) return true
+  // Response (redirect)
+  if (error instanceof Response) return true
+  return false
+}
+
 function defaultFormDataParser(formData: FormData): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-
+  const result: Record<string, unknown> = {}
   for (const [key, value] of formData.entries()) {
-    const actualValue = value instanceof File && value.size === 0 ? undefined : value;
-    setBracketNotation(result, key, actualValue);
+    const v = typeof value === 'object' && 'size' in value && (value as any).size === 0 ? undefined : value
+    setNestedValue(result, key, v)
   }
-
-  return result;
+  return result
 }
 
-function setBracketNotation(obj: Record<string, unknown>, path: string, value: unknown): void {
-  const keys = parseBracketPath(path);
-  let current: any = obj;
-
+function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): void {
+  const keys = path.split('[').map((k) => k.replace(']', ''))
+  let current: any = obj
   for (let i = 0; i < keys.length - 1; i++) {
-    const key = keys[i]!;
-    const nextKey = keys[i + 1];
-    if (!(key in current)) {
-      current[key] = typeof nextKey === "number" ? [] : {};
-    }
-    current = current[key];
+    const k = keys[i]!
+    const next = keys[i + 1]!
+    if (!(k in current)) current[k] = /^\d+$/.test(next) ? [] : {}
+    current = current[k]
   }
-
-  const lastKey = keys[keys.length - 1]!;
-  current[lastKey] = value;
-}
-
-function parseBracketPath(path: string): (string | number)[] {
-  const result: (string | number)[] = [];
-  const parts = path.split("[");
-
-  result.push(parts[0]!);
-  for (let i = 1; i < parts.length; i++) {
-    const part = parts[i]!.replace("]", "");
-    const num = parseInt(part, 10);
-    result.push(isNaN(num) ? part : num);
-  }
-
-  return result;
-}
-
-// === Next.js / TanStack Router Error Detection ===
-
-function isNextJsError(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
-  const digest = (error as any).digest;
-  return typeof digest === "string" && digest.startsWith("NEXT_");
-}
-
-function isTanStackRouterError(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
-  return (error as any).isNotFound === true || error instanceof Response;
+  current[keys[keys.length - 1]!] = value
 }

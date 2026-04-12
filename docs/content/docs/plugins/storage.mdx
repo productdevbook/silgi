@@ -1,0 +1,187 @@
+---
+title: Storage
+description: Key-value storage for cache, sessions, files — Redis, Cloudflare KV, S3, and 30+ backends via unstorage.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+
+Silgi includes [unstorage](https://unstorage.unjs.io) — a universal key-value storage layer with 30+ drivers. Configure storage once, use it everywhere: caching, sessions, file uploads, feature flags, queues.
+
+## Setup
+
+Mount drivers by path prefix. Each prefix routes to a different backend:
+
+```ts twoslash title="server.ts"
+// @noErrors
+import { silgi } from 'silgi'
+import redisDriver from 'unstorage/drivers/redis'
+import memoryDriver from 'unstorage/drivers/memory'
+import s3Driver from 'unstorage/drivers/s3'
+
+const s = silgi({
+  context: () => ({ db }),
+  storage: {
+    cache: redisDriver({ url: 'redis://localhost:6379' }),
+    sessions: memoryDriver(),
+    files: s3Driver({
+      bucket: 'uploads',
+      region: 'eu-west-1',
+      accessKeyId: process.env.AWS_KEY!,
+      secretAccessKey: process.env.AWS_SECRET!,
+    }),
+  },
+})
+```
+
+Keys are routed by prefix:
+
+```
+storage.setItem('cache:users', data)      → Redis
+storage.setItem('sessions:abc123', token) → Memory
+storage.setItem('files:avatar.png', buf)  → S3
+```
+
+## Using in procedures
+
+Access storage via `s.useStorage()`:
+
+```ts twoslash
+// @noErrors
+const getSession = s.$input(z.object({ token: z.string() })).$resolve(async ({ input }) => {
+  const storage = s.useStorage('sessions')
+  const session = await storage.getItem(input.token)
+  if (!session) return { valid: false }
+  return { valid: true, user: session }
+})
+
+const saveFile = s.$input(z.object({ name: z.string(), data: z.string() })).$resolve(async ({ input }) => {
+  const files = s.useStorage('files')
+  await files.setItem(input.name, input.data)
+  return { ok: true }
+})
+```
+
+## Cache integration
+
+When you configure a `cache` mount, `cacheQuery()` uses it automatically — no `setCacheStorage()` needed:
+
+```ts twoslash
+// @noErrors
+import { cacheQuery } from 'silgi/cache'
+
+const s = silgi({
+  context: () => ({ db }),
+  storage: {
+    cache: redisDriver({ url: 'redis://localhost' }),
+  },
+})
+
+// cacheQuery automatically uses the 'cache' mount → Redis
+const listUsers = s.$use(cacheQuery({ maxAge: 60 })).$resolve(({ ctx }) => ctx.db.users.findMany())
+```
+
+Without a `cache` mount, `cacheQuery()` falls back to in-memory (default).
+
+## Analytics integration
+
+When you configure a `data` mount, [analytics](/docs/analytics) automatically persists request and error entries to it. Data survives restarts and is pruned by `retentionDays`:
+
+```ts twoslash
+// @noErrors
+import fsDriver from 'unstorage/drivers/fs'
+
+const s = silgi({
+  context: () => ({}),
+  storage: {
+    data: fsDriver({ base: '.data' }),
+  },
+})
+
+s.serve(appRouter, {
+  analytics: { retentionDays: 90 },
+})
+```
+
+Without a `data` mount, analytics falls back to in-memory (default).
+
+## Available drivers
+
+All [unstorage drivers](https://unstorage.unjs.io/drivers) work. Import from `unstorage/drivers/*`:
+
+| Driver        | Import                                    | Use case                          |
+| ------------- | ----------------------------------------- | --------------------------------- |
+| Memory        | `unstorage/drivers/memory`                | Development, testing, sessions    |
+| Redis         | `unstorage/drivers/redis`                 | Cache, sessions, pub/sub          |
+| Filesystem    | `unstorage/drivers/fs`                    | Config files, local storage       |
+| S3            | `unstorage/drivers/s3`                    | File uploads, media               |
+| Cloudflare KV | `unstorage/drivers/cloudflare-kv-binding` | Edge cache, config                |
+| Vercel KV     | `unstorage/drivers/vercel`                | Serverless cache                  |
+| MongoDB       | `unstorage/drivers/mongodb`               | Document storage                  |
+| LRU Cache     | `unstorage/drivers/lru-cache`             | In-memory with eviction           |
+| HTTP          | `unstorage/drivers/http`                  | Remote storage proxy              |
+| Overlay       | `unstorage/drivers/overlay`               | Multi-tier (L1 memory → L2 Redis) |
+
+## Multi-tier cache (overlay)
+
+Layer memory in front of Redis for the fastest reads:
+
+```ts twoslash
+// @noErrors
+import overlay from 'unstorage/drivers/overlay'
+import memoryDriver from 'unstorage/drivers/memory'
+import redisDriver from 'unstorage/drivers/redis'
+
+const s = silgi({
+  context: () => ({}),
+  storage: {
+    cache: overlay({
+      layers: [memoryDriver(), redisDriver({ url: 'redis://localhost' })],
+    }),
+  },
+})
+```
+
+Read: checks memory first, then Redis. Write: writes to both. Best of both worlds.
+
+## Pre-built storage instance
+
+If you need full control, pass a pre-built unstorage instance:
+
+```ts twoslash
+// @noErrors
+import { createStorage } from 'silgi/unstorage'
+import redisDriver from 'unstorage/drivers/redis'
+
+const storage = createStorage({})
+storage.mount('cache', redisDriver({ url: 'redis://localhost' }))
+storage.mount('data', redisDriver({ url: 'redis://localhost', base: 'app' }))
+
+const s = silgi({
+  context: () => ({}),
+  storage,
+})
+```
+
+## API reference
+
+```ts twoslash
+// @noErrors
+const storage = s.useStorage('cache')
+
+await storage.getItem('key') // Get value
+await storage.setItem('key', value) // Set value
+await storage.removeItem('key') // Delete
+await storage.hasItem('key') // Check existence
+await storage.getKeys() // List all keys
+await storage.clear() // Delete all
+```
+
+<Callout type='info'>
+  Storage credentials (Redis URL, S3 keys) stay in the config — they never leak to procedures, context, or client
+  responses. Only the key-value API is exposed.
+</Callout>
+
+## What's next?
+
+- [Cache](/docs/plugins/cache) — `cacheQuery()` with TTL, SWR, and invalidation
+- [Plugins](/docs/plugins) — all available plugins

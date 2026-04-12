@@ -1,0 +1,249 @@
+---
+title: Migrating from tRPC
+description: Step-by-step guide to migrate from tRPC to Silgi.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
+import { Step, Steps } from 'fumadocs-ui/components/steps'
+
+Migrate incrementally. Start serving your existing tRPC router through Silgi today, then rewrite procedures at your own pace.
+
+## Phase 1: Zero-rewrite interop
+
+Use `fromTRPC()` to convert your entire tRPC router. Everything keeps working — same procedures, same input schemas, same behavior.
+
+```ts twoslash
+// @noErrors
+import { silgi } from 'silgi'
+import { fromTRPC } from 'silgi/trpc'
+import { trpcRouter } from './trpc-router'
+
+const s = silgi({
+  context: (req) => ({
+    headers: Object.fromEntries(req.headers),
+  }),
+})
+
+// Convert the entire tRPC router
+const appRouter = fromTRPC(trpcRouter)
+
+// Serve with Silgi
+s.serve(appRouter, { port: 3000 })
+```
+
+Your existing tRPC client still works. Point it at the new server and everything connects.
+
+<Callout type='info'>
+  `fromTRPC()` wraps each tRPC procedure resolver. tRPC middleware still runs inside the procedure — it is not converted
+  to Silgi guards/wraps. This is intentional: nothing breaks.
+</Callout>
+
+## Phase 2: Incremental rewrite
+
+Convert procedures one by one. Mix tRPC-converted and native Silgi procedures in the same router.
+
+<Steps>
+<Step>
+
+### Pick a procedure to convert
+
+Start with a simple query. Here's the tRPC version:
+
+<Tabs items={['tRPC (before)', 'Silgi (after)']}>
+  <Tab value="tRPC (before)">
+  ```ts twoslash
+  // @noErrors
+  import { z } from "zod"
+  import { t } from "./trpc"
+
+export const listUsers = t.procedure.input(z.object({ limit: z.number().optional() })).query(({ input, ctx }) => {
+  return ctx.db.users.findMany({ take: input.limit })
+})
+
+````
+</Tab>
+<Tab value="Silgi (after)">
+```ts twoslash
+// @noErrors
+import { z } from "zod"
+
+const listUsers = s
+  .$input(z.object({ limit: z.number().optional() }))
+  .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))
+````
+
+  </Tab>
+</Tabs>
+
+</Step>
+<Step>
+
+### Convert middleware to guards
+
+tRPC middleware becomes Silgi guards (for auth/context) or wraps (for before+after logic).
+
+<Tabs items={['tRPC (before)', 'Silgi (after)']}>
+  <Tab value="tRPC (before)">
+  ```ts twoslash
+  // @noErrors
+  const isAuthed = t.middleware(async ({ ctx, next }) => {
+    if (!ctx.session) throw new TRPCError({ code: "UNAUTHORIZED" })
+    return next({ ctx: { user: ctx.session.user } })
+  })
+
+const protectedProcedure = t.procedure.use(isAuthed)
+
+export const createUser = protectedProcedure.input(z.object({ name: z.string() })).mutation(({ input, ctx }) => {
+  return ctx.db.users.create({ ...input, createdBy: ctx.user.id })
+})
+
+````
+</Tab>
+<Tab value="Silgi (after)">
+```ts twoslash
+// @noErrors
+const auth = s.guard(async (ctx) => {
+  if (!ctx.session) throw new SilgiError("UNAUTHORIZED")
+  return { user: ctx.session.user }
+})
+
+const createUser = s
+  .$use(auth)
+  .$input(z.object({ name: z.string() }))
+  .$resolve(({ input, ctx }) => {
+    return ctx.db.users.create({ ...input, createdBy: ctx.user.id })
+  })
+````
+
+  </Tab>
+</Tabs>
+
+</Step>
+<Step>
+
+### Convert error handling
+
+tRPC uses `TRPCError`. Silgi uses `SilgiError` with the same code names, plus typed errors via `fail()`.
+
+<Tabs items={['tRPC (before)', 'Silgi (after)']}>
+  <Tab value="tRPC (before)">
+  ```ts twoslash
+  // @noErrors
+  import { TRPCError } from "@trpc/server"
+
+throw new TRPCError({
+code: "NOT_FOUND",
+message: "User not found",
+})
+
+````
+</Tab>
+<Tab value="Silgi (after)">
+```ts twoslash
+// @noErrors
+import { SilgiError } from "silgi"
+
+// Option 1: Same pattern as tRPC
+throw new SilgiError("NOT_FOUND", { message: "User not found" })
+
+// Option 2: Typed errors with fail()
+const deleteUser = s
+  .$errors({ NOT_FOUND: 404, FORBIDDEN: 403 })
+  .$resolve(({ input, ctx, fail }) => {
+    const user = ctx.db.users.find(input.id)
+    if (!user) fail("NOT_FOUND")           // typed — only these codes allowed
+    if (user.ownerId !== ctx.user.id) fail("FORBIDDEN")
+    return ctx.db.users.delete(input.id)
+  })
+````
+
+  </Tab>
+</Tabs>
+
+</Step>
+<Step>
+
+### Merge into the router
+
+Replace the converted procedure in your router. Unconverted tRPC procedures sit right next to native Silgi ones.
+
+```ts twoslash
+// @noErrors
+const silgiUsers = {
+  list: listUsers, // native Silgi
+  create: createUser, // native Silgi
+  delete: fromTRPC(trpcRouter).users.delete, // still tRPC
+}
+
+const appRouter = s.router({
+  users: silgiUsers,
+  // Other routes still running through fromTRPC
+  posts: fromTRPC(trpcRouter).posts,
+})
+```
+
+</Step>
+</Steps>
+
+## Phase 3: Full migration
+
+Once all procedures are rewritten:
+
+1. Remove all `fromTRPC()` calls
+2. Uninstall `@trpc/server` and `@trpc/client`
+3. Switch the client to Silgi's native client
+
+```ts twoslash
+// @noErrors
+// Before (tRPC client)
+import { createTRPCProxyClient, httpBatchLink } from '@trpc/client'
+
+const trpc = createTRPCProxyClient({
+  links: [httpBatchLink({ url: 'http://localhost:3000' })],
+})
+const users = await trpc.users.list.query({ limit: 10 })
+```
+
+```ts twoslash
+// @noErrors
+// After (Silgi client)
+import { createClient } from 'silgi/client'
+import { createLink } from 'silgi/client/ofetch'
+
+const client = createClient<AppRouter>(createLink({ url: 'http://localhost:3000' }))
+const users = await client.users.list({ limit: 10 })
+```
+
+## Concept mapping
+
+| tRPC                        | Silgi                                    | Notes                                               |
+| --------------------------- | ---------------------------------------- | --------------------------------------------------- |
+| `t.procedure`               | `s.$resolve()` / `s.$input().$resolve()` | Silgi uses builder methods                          |
+| `t.router()`                | `s.router()`                             | Same nesting                                        |
+| `t.middleware()`            | `s.guard()` or `s.wrap()`                | Guards for auth, wraps for before+after             |
+| `TRPCError`                 | `SilgiError`                             | Same code names                                     |
+| `createTRPCProxyClient()`   | `createClient()`                         | Same proxy pattern                                  |
+| `httpBatchLink`             | `createLink()`                           | Batching via separate plugin                        |
+| `@trpc/react-query`         | `silgi/tanstack-query`                   | `createQueryUtils()` instead of `createTRPCReact()` |
+| `ctx` via `createContext()` | `context:` in `silgi()`                  | Factory runs per request                            |
+
+## What you gain
+
+After migrating, you get access to everything tRPC does not have:
+
+- **Single package** — uninstall 4+ tRPC packages, install one
+- **Compiled pipeline** — faster execution, no per-request middleware iteration
+- **Content negotiation** — JSON, MessagePack, devalue automatically
+- **Guard/wrap model** — cleaner separation of concerns
+- **Typed errors** — `fail()` with compile-time checked error codes
+- **15+ framework adapters** — vs tRPC's 4
+- **Built-in React server actions** — `createAction()`, `useServerAction()`
+- **Built-in AI SDK** — `routerToTools()` with zero config
+
+## What's next?
+
+- [Getting Started](/docs/getting-started) — Silgi from scratch
+- [Middleware](/docs/middleware) — guards and wraps in depth
+- [tRPC Interop](/docs/integrations/trpc) — `fromTRPC()` reference
+- [Comparison](/docs/comparison) — full feature matrix

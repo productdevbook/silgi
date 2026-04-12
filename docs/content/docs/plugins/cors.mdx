@@ -1,0 +1,139 @@
+---
+title: CORS
+description: Add cross-origin resource sharing headers to your API responses.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
+
+When your API runs on one domain (like `api.example.com`) and your frontend on another (like `app.example.com`), browsers block the requests by default. CORS headers tell the browser it's safe to proceed.
+
+Silgi provides `corsHeaders()` — a function that returns the right headers for your configuration.
+
+## Basic usage
+
+```ts twoslash
+// @noErrors
+import { corsHeaders } from 'silgi/cors'
+
+const headers = corsHeaders({
+  origin: 'https://app.example.com',
+  credentials: true,
+})
+```
+
+This returns a plain object:
+
+```json
+{
+  "access-control-allow-origin": "https://app.example.com",
+  "access-control-allow-credentials": "true",
+  "access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+  "access-control-allow-headers": "Content-Type, Authorization"
+}
+```
+
+You can merge these headers into your responses however your server setup requires.
+
+## Allow all origins
+
+The default (no `origin` option or `origin: "*"`) allows any origin:
+
+```ts twoslash
+// @noErrors
+import { corsHeaders } from 'silgi/cors'
+
+const headers = corsHeaders()
+// "access-control-allow-origin": "*"
+```
+
+<Callout type='warn'>
+  Using `origin: "*"` with `credentials: true` doesn't work — browsers reject it. If you need credentials, specify the
+  exact origin.
+</Callout>
+
+## Multiple origins
+
+Pass an array to allow several specific origins:
+
+```ts twoslash
+// @noErrors
+import { corsHeaders } from 'silgi/cors'
+
+const headers = corsHeaders(
+  {
+    origin: ['https://app.example.com', 'https://admin.example.com'],
+  },
+  requestOrigin,
+)
+```
+
+The second argument is the requesting origin (from the `Origin` header on the incoming request). Silgi checks if it's in the list and responds with the matching origin. A `Vary: Origin` header is automatically included so caches work correctly.
+
+## Dynamic origin matching
+
+For more complex rules, pass a function:
+
+```ts twoslash
+// @noErrors
+import { corsHeaders } from 'silgi/cors'
+
+const headers = corsHeaders(
+  {
+    origin: (requestOrigin) => {
+      return requestOrigin.endsWith('.example.com')
+    },
+  },
+  req.headers.get('origin'),
+)
+```
+
+The function receives the requesting origin and returns `true` to allow it or `false` to block it. Like array origins, `Vary: Origin` is added automatically.
+
+## All options
+
+| Option           | Type                                        | Default                                                | Description                          |
+| ---------------- | ------------------------------------------- | ------------------------------------------------------ | ------------------------------------ |
+| `origin`         | `string \| string[] \| (origin) => boolean` | `"*"`                                                  | Which origins are allowed            |
+| `methods`        | `string[]`                                  | `["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]` | Allowed HTTP methods                 |
+| `allowedHeaders` | `string[]`                                  | `["Content-Type", "Authorization"]`                    | Headers the client can send          |
+| `exposedHeaders` | `string[]`                                  | none                                                   | Response headers the client can read |
+| `credentials`    | `boolean`                                   | `false`                                                | Allow cookies and auth headers       |
+| `maxAge`         | `number`                                    | none                                                   | Preflight cache duration in seconds  |
+
+## Example with handler()
+
+If you're using `handler()` with a custom server, you can wrap it to add CORS headers:
+
+```ts twoslash
+// @noErrors
+import { corsHeaders } from 'silgi/cors'
+
+const handle = s.handler(appRouter)
+const cors = corsHeaders({ origin: 'https://app.example.com', credentials: true })
+
+async function fetch(request: Request): Promise<Response> {
+  // Handle preflight
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: cors })
+  }
+
+  const response = await handle(request)
+
+  // Add CORS headers to the response
+  const headers = new Headers(response.headers)
+  for (const [key, value] of Object.entries(cors)) {
+    headers.set(key, value)
+  }
+  return new Response(response.body, {
+    status: response.status,
+    headers,
+  })
+}
+```
+
+## What's next?
+
+- [Server](/docs/server) — `serve()` and `handler()` options
+- [Plugins](/docs/plugins) — other available plugins
+- [Client](/docs/client) — setting up the client that sends cross-origin requests

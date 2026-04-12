@@ -1,0 +1,130 @@
+---
+title: 0.1.0-beta.13
+description: Background tasks with cron, pure RPC client, createSafeClient, client-side OpenTelemetry, streaming improvements.
+version: 0.1.0-beta.13
+date: 2026-03-29
+---
+
+## Type-safe background tasks
+
+New task system with the same builder chain as procedures — `$use()`, `$input()`, `$errors()`, `$task()`:
+
+```ts
+const sendEmail = s.$input(z.object({ to: z.string(), subject: z.string(), body: z.string() })).$task({
+  name: 'send-email',
+  resolve: async ({ input, ctx }) => {
+    await ctx.mailer.send(input)
+    return { sent: true }
+  },
+})
+```
+
+### Dispatch from procedures
+
+Call `task.dispatch(input, ctx)` from inside a procedure. Passing `ctx` links the task to the parent request's trace:
+
+```ts
+const createUser = s.$resolve(async ({ input, ctx }) => {
+  const user = await ctx.db.users.create(input)
+  sendEmail.dispatch({ to: input.email, subject: 'Welcome' }, ctx)
+  return user
+})
+```
+
+The analytics dashboard shows the task as a `queue` span on the parent request's waterfall:
+
+```
+users/create — 2 spans, 4.2ms total
+├─ db.users.create     (db)     1.1ms
+└─ task:send-email     (queue)  92.3ms
+```
+
+### Cron scheduling
+
+Add `cron` to `$task()` for automatic scheduling. Tasks are auto-discovered when the router is served:
+
+```ts
+const dailyReport = s.$task({
+  name: 'daily-report',
+  cron: '0 9 * * *',
+  resolve: async ({ ctx }) => ctx.db.reports.generateDaily(),
+})
+```
+
+### Task tracing
+
+Tasks get their own `RequestTrace` instance. Use `ctx.trace()` to record spans visible in the analytics dashboard.
+
+See [Tasks docs](/docs/tasks) and [Analytics docs](/docs/analytics) for the full guide.
+
+---
+
+## `createSafeClient()`
+
+Every procedure returns `{ error, data }` instead of throwing:
+
+```ts
+import { createSafeClient } from 'silgi/client'
+
+const client = createSafeClient<AppRouter>(link)
+const { error, data, isError, isSuccess } = await client.users.list()
+```
+
+## Client-side OpenTelemetry
+
+New `withOtel()` link plugin creates spans for every client call:
+
+```ts
+import { withOtel } from 'silgi/client/plugins'
+
+const link = withOtel(baseLink, {
+  tracer: trace.getTracer('my-frontend'),
+})
+// Spans: rpc.client/users.list, rpc.client/users.create, etc.
+```
+
+## Stream consumption utilities
+
+```ts
+import { consumeWithReconnect } from 'silgi/client/consume'
+
+await consumeWithReconnect({
+  connect: (lastEventId) => client.events.subscribe(undefined, { lastEventId }),
+  onEvent: (data) => updateUI(data),
+  maxReconnects: 10,
+  reconnectDelay: 2000,
+})
+```
+
+## WebSocket client link
+
+```ts
+import { WSLink } from 'silgi/client/ws'
+
+const link = new WSLink({ url: 'ws://localhost:3000/ws' })
+const client = createClient<AppRouter>(link)
+```
+
+## Built-in routes moved under `/api/`
+
+All built-in routes now live under the `/api/` prefix to avoid collisions with application routes:
+
+| Before                     | After                     |
+| -------------------------- | ------------------------- |
+| `/analytics`               | `/api/analytics`          |
+| `/analytics/_api/stats`    | `/api/analytics/stats`    |
+| `/analytics/_api/errors`   | `/api/analytics/errors`   |
+| `/analytics/_api/requests` | `/api/analytics/requests` |
+| `/reference`               | `/api/reference`          |
+| `/openapi.json`            | `/api/openapi.json`       |
+
+The `_api` infix in analytics sub-routes was removed — it's redundant now that everything is under `/api/`.
+
+If you query the JSON API directly, update your URLs accordingly.
+
+## More improvements
+
+- **Async `DynamicLink`**: Selector can return `Promise<ClientLink>`
+- **Retry-After header**: `withRetry` respects `Retry-After` from 429/503 responses
+- **Streaming batch**: `BatchLink` accepts `streaming` option for progressive delivery
+- **Cron cleanup**: `stopCronJobs()` called on `SIGINT`, `SIGTERM`, and `server.close()`

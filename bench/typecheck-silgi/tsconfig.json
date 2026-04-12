@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "incremental": false,
+    "allowImportingTsExtensions": true,
+    "types": [],
+    "paths": {
+      "silgi": ["../../src/index.ts"],
+      "silgi/*": ["../../src/*/index.ts"]
+    }
+  },
+  "include": ["src"]
+}

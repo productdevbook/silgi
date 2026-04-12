@@ -1,0 +1,428 @@
+---
+title: Client
+description: Set up the type-safe client with createLink and createClient — safe clients, streaming, interceptors, and type inference.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
+import { Step, Steps } from 'fumadocs-ui/components/steps'
+
+The Silgi client gives you a fully typed proxy that mirrors your server's router structure. You call procedures like local functions, and TypeScript knows every input and output type.
+
+## Setup
+
+Setting up the client takes two steps: create a **link** (the transport layer) and then create the **client** (the typed proxy).
+
+<Steps>
+<Step>
+
+### Create a link
+
+A link tells the client _how_ to send requests to the server. The built-in link uses [ofetch](https://github.com/unjs/ofetch) for retries, timeouts, and JSON parsing:
+
+```ts twoslash
+// @noErrors
+import { createLink } from 'silgi/client/ofetch'
+
+const link = createLink({
+  url: 'http://localhost:3000',
+})
+```
+
+Relative URLs work too — useful with dev server proxies or same-origin deployments:
+
+```ts twoslash
+// @noErrors
+import { createLink } from 'silgi/client/ofetch'
+
+const link = createLink({ url: '/api' })
+// Calls resolve to /api/users/list, /api/health, etc.
+```
+
+</Step>
+<Step>
+
+### Create the client
+
+Pass the link to `createClient` with your router type as the generic parameter:
+
+```ts twoslash
+// @noErrors
+import { createClient } from 'silgi/client'
+import { createLink } from 'silgi/client/ofetch'
+import type { AppRouter } from './server' // export type AppRouter = typeof appRouter
+
+const link = createLink({ url: 'http://localhost:3000' })
+const client = createClient<AppRouter>(link)
+```
+
+</Step>
+<Step>
+
+### Call procedures
+
+The client mirrors your router structure exactly. Nested routers become nested properties:
+
+```ts twoslash
+// @noErrors
+// Router structure: { users: { list, create }, health }
+
+const users = await client.users.list({ limit: 10 })
+const newUser = await client.users.create({ name: 'Alice' })
+const status = await client.health()
+```
+
+Every call has full autocomplete and type checking. If the procedure expects `{ limit: number }`, TypeScript won't let you pass `{ limit: "ten" }`.
+
+</Step>
+</Steps>
+
+## Type inference
+
+To get the router type on the client side, export it from your server file:
+
+```ts twoslash
+// @noErrors
+// server.ts
+export const appRouter = s.router({
+  users: {
+    list: listUsers,
+    create: createUser,
+  },
+})
+export type AppRouter = typeof appRouter
+```
+
+Then use it when creating the client:
+
+```ts twoslash
+// @noErrors
+import type { AppRouter } from './server'
+
+const client = createClient<AppRouter>(link)
+```
+
+You can also use the `InferClient` utility type, which extracts the client type from any router:
+
+```ts twoslash
+// @noErrors
+import type { InferClient } from 'silgi'
+
+type Client = InferClient<typeof appRouter>
+// Client.users.list: (input: { limit?: number }) => Promise<User[]>
+// Client.users.create: (input: { name: string }) => Promise<User>
+```
+
+<Callout type='info'>
+  In a monorepo, you only need to share the *type* of the router, not the actual code. Use `import type` so no server
+  code leaks into your client bundle.
+</Callout>
+
+## Link options
+
+The `createLink` function accepts these options:
+
+| Option       | Type                                   | Default     | Description                                                   |
+| ------------ | -------------------------------------- | ----------- | ------------------------------------------------------------- |
+| `url`        | `string`                               | (required)  | Server base URL (e.g. `"http://localhost:3000"`)              |
+| `headers`    | `Record<string, string>` or function   | `undefined` | Static headers or a function that returns headers per request |
+| `retry`      | `number \| false`                      | `0`         | Number of retries on failure                                  |
+| `retryDelay` | `number \| (ctx) => number`            | `0`         | Delay between retries in milliseconds                         |
+| `timeout`    | `number`                               | `30000`     | Request timeout in milliseconds                               |
+| `protocol`   | `'json' \| 'messagepack' \| 'devalue'` | `'json'`    | Wire protocol for encoding                                    |
+
+The client always uses POST and resolves procedure paths from the router tree structure (e.g. `client.users.list()` sends `POST /users/list`). No route metadata is needed.
+
+### Authentication headers
+
+The most common use for dynamic headers is passing an auth token:
+
+```ts twoslash
+// @noErrors
+const link = createLink({
+  url: 'http://localhost:3000',
+  headers: () => ({
+    Authorization: `Bearer ${getToken()}`,
+  }),
+})
+```
+
+The header function runs on every request, so it always picks up the latest token. This is important for scenarios like token refresh — when the token changes, the next request automatically uses the new one.
+
+### Retry and timeout
+
+```ts twoslash
+// @noErrors
+const link = createLink({
+  url: 'http://localhost:3000',
+  retry: 3, // retry up to 3 times on failure
+  retryDelay: 1000, // wait 1 second between retries
+  timeout: 10_000, // 10 second timeout per request
+})
+```
+
+For exponential backoff, pass a function:
+
+```ts twoslash
+// @noErrors
+const link = createLink({
+  url: 'http://localhost:3000',
+  retry: 3,
+  retryDelay: (ctx) => Math.pow(2, ctx.options?.retryCount ?? 0) * 500,
+  // 500ms, 1000ms, 2000ms
+})
+```
+
+## Protocol selection
+
+Set `protocol` to choose the wire format. Payloads are smaller and encoding/decoding is faster with MessagePack:
+
+```ts twoslash
+// @noErrors
+const link = createLink({
+  url: 'http://localhost:3000',
+  protocol: 'messagepack',
+})
+```
+
+The client encodes the request body as MessagePack, sets the `Content-Type` and `Accept` headers to `application/x-msgpack`, and the server responds in MessagePack too.
+
+<Callout>
+  Binary mode is completely transparent to your application code. You still pass and receive regular JavaScript objects.
+  The encoding happens inside the link — you never see MessagePack bytes in your code.
+</Callout>
+
+See the [MessagePack protocol](/docs/protocols/msgpack) page for more details on what types are supported.
+
+## Interceptors
+
+The link supports [ofetch interceptors](https://github.com/unjs/ofetch#interceptors) for fine-grained control over the request lifecycle:
+
+```ts twoslash
+// @noErrors
+const link = createLink({
+  url: 'http://localhost:3000',
+  onRequest({ request, options }) {
+    // Runs before every request is sent
+    console.log('Sending:', request)
+  },
+  onResponse({ response }) {
+    // Runs after every successful response
+    console.log('Received:', response.status)
+  },
+  onRequestError({ error }) {
+    // Runs when the request fails (network error, DNS failure, etc.)
+    console.error('Request failed:', error)
+  },
+  onResponseError({ response }) {
+    // Runs when the server responds with an error status
+    console.error('Server error:', response.status)
+  },
+})
+```
+
+Interceptors are useful for:
+
+- **Logging** in development
+- **Token refresh** — intercept 401 responses, refresh the token, and retry
+- **Metrics** — measure request timing and success rates
+
+## Call options
+
+Each procedure call can receive a second argument with per-call options:
+
+```ts twoslash
+// @noErrors
+const controller = new AbortController()
+
+const users = await client.users.list({ limit: 10 }, { signal: controller.signal })
+
+// Cancel the request at any time
+controller.abort()
+```
+
+Available per-call options:
+
+| Option    | Type          | Description                       |
+| --------- | ------------- | --------------------------------- |
+| `signal`  | `AbortSignal` | Cancel the request                |
+| `context` | `Record`      | Custom context passed to the link |
+
+## Error handling
+
+Server errors are reconstructed as `SilgiError` instances on the client. You can catch them with try/catch:
+
+```ts twoslash
+// @noErrors
+import { SilgiError } from 'silgi'
+
+try {
+  await client.users.delete({ id: 1 })
+} catch (error) {
+  if (error instanceof SilgiError) {
+    console.log(error.code) // "FORBIDDEN"
+    console.log(error.status) // 403
+    console.log(error.data) // { reason: "Not the owner" }
+  }
+}
+```
+
+Or use the `safe()` wrapper to avoid try/catch entirely:
+
+```ts twoslash
+// @noErrors
+import { safe } from 'silgi/client'
+
+const { error, data, isError, isSuccess } = await safe(client.users.delete({ id: 1 }))
+
+if (isError) {
+  console.log(error.code) // "FORBIDDEN"
+} else {
+  console.log(data) // the deleted user
+}
+```
+
+For an entire client that never throws, use `createSafeClient`:
+
+```ts twoslash
+// @noErrors
+import { createSafeClient } from 'silgi/client'
+
+const client = createSafeClient<AppRouter>(link)
+
+const { error, data, isError, isSuccess } = await client.users.list({ limit: 10 })
+// Every call returns SafeResult — no try/catch needed anywhere
+```
+
+See the [Typed Errors](/docs/errors) page for the complete error handling guide, including the `defined` flag for distinguishing business errors from unexpected failures.
+
+## Server-side client
+
+For SSR, server components, or testing — use `createServerClient` to get the same typed client interface without any network overhead:
+
+```ts twoslash
+// @noErrors
+import { createServerClient } from 'silgi/client/server'
+
+const client = createServerClient(appRouter, {
+  context: () => ({ db: getDB() }),
+})
+
+// Same API as the HTTP client — but runs in-process
+const users = await client.users.list({ limit: 10 })
+const user = await client.users.create({ name: 'Alice' })
+```
+
+The server client compiles the router once and reuses the compiled handlers. Every call runs the full pipeline (guards, wraps, validation) — the only thing skipped is HTTP serialization.
+
+This is especially useful for:
+
+- **SSR data fetching** — call procedures during server rendering without a network round-trip
+- **Testing** — write integration tests against the real pipeline without starting a server
+- **Server-to-server** — call procedures from background jobs, cron tasks, or other services running in the same process
+
+## DynamicLink
+
+A `DynamicLink` lets you route requests to different links at runtime. The factory function receives the procedure path, input, and call options, and returns the link to use:
+
+```ts twoslash
+// @noErrors
+import { createClient, DynamicLink } from 'silgi/client'
+
+const link = new DynamicLink((path, input, options) => {
+  if (path[0] === 'admin') return adminLink
+  return defaultLink
+})
+
+const client = createClient<AppRouter>(link)
+```
+
+The selector can also be async — useful for lazy-loading a link:
+
+```ts twoslash
+// @noErrors
+const link = new DynamicLink(async (path) => {
+  if (path[0] === 'analytics') {
+    const { createLink } = await import('silgi/client/ofetch')
+    return createLink({ url: 'https://analytics.example.com' })
+  }
+  return defaultLink
+})
+```
+
+This is useful when different parts of your API live on different servers, or when you want to swap between real and mock links based on environment.
+
+## withInterceptors
+
+Wrap any link with lifecycle hooks. Unlike ofetch interceptors (which are HTTP-level), these run at the Silgi procedure level and receive the procedure path and input:
+
+```ts twoslash
+// @noErrors
+import { withInterceptors } from 'silgi/client'
+
+const link = withInterceptors(baseLink, {
+  onRequest({ path, input }) {
+    console.log(`-> ${path.join('/')}`)
+  },
+  onResponse({ path, durationMs }) {
+    console.log(`<- ${path.join('/')} (${durationMs}ms)`)
+  },
+  onError({ path, error }) {
+    reportToSentry(error)
+  },
+})
+```
+
+All three hooks are optional. `onError` fires on any thrown error — the error still propagates to the caller after the hook runs.
+
+## Consuming streams
+
+For subscription procedures that return async iterators, use the consumption utilities from `silgi/client/consume`:
+
+```ts twoslash
+// @noErrors
+import { consumeIterator } from 'silgi/client/consume'
+
+const iterator = await client.events.subscribe()
+
+await consumeIterator(iterator, {
+  onEvent: (data) => console.log('Event:', data),
+  onError: (err) => console.error('Error:', err),
+  onFinish: () => console.log('Stream ended'),
+  signal: controller.signal, // optional abort
+})
+```
+
+For automatic reconnection with `lastEventId` resumption:
+
+```ts twoslash
+// @noErrors
+import { consumeWithReconnect } from 'silgi/client/consume'
+
+await consumeWithReconnect({
+  connect: (lastEventId) => client.events.subscribe(undefined, { lastEventId }),
+  onEvent: (data) => updateUI(data),
+  onReconnect: (attempt) => console.log(`Reconnecting (#${attempt})...`),
+  maxReconnects: 10,
+  reconnectDelay: 2000,
+})
+```
+
+You can also transform stream values with `mapIterator`:
+
+```ts twoslash
+// @noErrors
+import { mapIterator } from 'silgi/client/consume'
+
+const mapped = mapIterator(iterator, (event) => ({
+  ...event,
+  receivedAt: Date.now(),
+}))
+```
+
+## What's next?
+
+- [Typed Errors](/docs/errors) — handle server errors on the client with full type safety
+- [Protocols](/docs/protocols) — JSON, MessagePack, and devalue encoding
+- [TanStack Query](/docs/integrations/tanstack-query) — generate `queryOptions` and `mutationOptions` from the client
+- [Server](/docs/server) — the server-side setup that the client connects to

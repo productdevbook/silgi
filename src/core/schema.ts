@@ -2,31 +2,40 @@
  * Standard Schema bridge — works with Zod, Valibot, ArkType, etc.
  */
 
-import type { StandardSchemaV1 } from "@standard-schema/spec";
+import type { StandardSchemaV1 } from '@standard-schema/spec'
 
-export type Schema<TInput = unknown, TOutput = unknown> = StandardSchemaV1<TInput, TOutput>;
-export type AnySchema = Schema<any, any>;
-export type InferSchemaInput<T extends AnySchema> =
-  T extends Schema<infer I, unknown> ? I : never;
-export type InferSchemaOutput<T extends AnySchema> =
-  T extends Schema<unknown, infer O> ? O : never;
-export type SchemaIssue = StandardSchemaV1.Issue;
+export type Schema<TInput = unknown, TOutput = unknown> = StandardSchemaV1<TInput, TOutput>
+export type AnySchema = Schema<any, any>
+export type InferSchemaInput<T extends AnySchema> = T extends Schema<infer I, unknown> ? I : never
+export type InferSchemaOutput<T extends AnySchema> = T extends Schema<unknown, infer O> ? O : never
+export type SchemaIssue = StandardSchemaV1.Issue
 
 export class ValidationError extends Error {
-  readonly issues: readonly SchemaIssue[];
+  readonly issues: readonly SchemaIssue[]
   constructor(options: { message?: string; issues: readonly SchemaIssue[] }) {
-    super(options.message ?? "Validation failed");
-    this.name = "ValidationError";
-    this.issues = options.issues;
+    super(options.message ?? 'Validation failed')
+    this.name = 'ValidationError'
+    this.issues = options.issues
   }
 }
 
-export async function validateSchema(schema: AnySchema, value: unknown): Promise<unknown> {
-  const result = await schema["~standard"].validate(value);
-  if ("issues" in result && result.issues) {
-    throw new ValidationError({ issues: result.issues });
+/** Sync fast-path: Zod 4 validate() returns sync result — avoid Promise allocation */
+export function validateSchema(schema: AnySchema, value: unknown): unknown {
+  const result = schema['~standard'].validate(value)
+  // Sync result (Zod 4, ArkType, Silgi type()) — no Promise overhead
+  if (typeof (result as any)?.then !== 'function') {
+    if ('issues' in (result as any) && (result as any).issues) {
+      throw new ValidationError({ issues: (result as any).issues })
+    }
+    return (result as { value: unknown }).value
   }
-  return (result as { value: unknown }).value;
+  // Async fallback (Valibot or custom async schemas)
+  return (result as Promise<any>).then((r: any) => {
+    if ('issues' in r && r.issues) {
+      throw new ValidationError({ issues: r.issues })
+    }
+    return r.value
+  })
 }
 
 export function type<TInput, TOutput = TInput>(
@@ -36,14 +45,14 @@ export function type<TInput, TOutput = TInput>(
       : [map: (input: TInput) => TOutput]
     : [map: (input: TInput) => TOutput]
 ): Schema<TInput, TOutput> {
-  const mapFn = args[0];
+  const mapFn = args[0]
   return {
-    "~standard": {
+    '~standard': {
       version: 1,
-      vendor: "katman",
+      vendor: 'silgi',
       validate(value) {
-        return { value: mapFn ? mapFn(value as TInput) : (value as TOutput) };
+        return { value: mapFn ? mapFn(value as TInput) : (value as TOutput) }
       },
     },
-  } as Schema<TInput, TOutput>;
+  } as Schema<TInput, TOutput>
 }

@@ -1,0 +1,197 @@
+---
+title: Client Plugins
+description: Retry, circuit breaker, timeout, batching, deduplication, CSRF, and OpenTelemetry tracing for the Silgi client.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+
+Client plugins wrap the transport link to add resilience, performance, and security features. They are composable — stack them in any order.
+
+```ts twoslash
+// @noErrors
+import { createClient } from 'silgi/client'
+import { createLink } from 'silgi/client/fetch'
+import { withRetry, withCircuitBreaker, withTimeout } from 'silgi/client/plugins'
+
+const baseLink = createLink({ url: 'https://api.example.com' })
+
+const link = withRetry(withCircuitBreaker(withTimeout(baseLink, { timeout: 5000 }), { failureThreshold: 5 }), {
+  maxRetries: 3,
+})
+
+const client = createClient<AppRouter>(link)
+```
+
+## Retry
+
+Automatically retry failed requests with exponential backoff and jitter.
+
+```ts twoslash
+// @noErrors
+import { withRetry } from 'silgi/client/plugins'
+
+const link = withRetry(baseLink, {
+  maxRetries: 3, // default: 3
+  baseDelay: 1000, // 1s → 2s → 4s (exponential)
+  jitter: true, // adds 0-25% random jitter (default: true)
+  retryOn: [500, 502, 503, 504], // status codes to retry on
+  shouldRetry: (error, attempt) => attempt < 5,
+  onRetry: ({ attempt, delay, error, path }) => {
+    console.log(`Retry #${attempt} for ${path.join('/')} in ${delay}ms`)
+  },
+})
+```
+
+| Option              | Type                            | Default                          | Description                                                 |
+| ------------------- | ------------------------------- | -------------------------------- | ----------------------------------------------------------- |
+| `maxRetries`        | `number`                        | `3`                              | Maximum retry attempts                                      |
+| `baseDelay`         | `number \| (attempt) => number` | `1000`                           | Base delay in ms. Actual: `baseDelay * 2^attempt + jitter`  |
+| `jitter`            | `boolean`                       | `true`                           | Add 0-25% random delay to prevent thundering herd           |
+| `retryOn`           | `number[]`                      | `[408, 429, 500, 502, 503, 504]` | HTTP status codes that trigger retry                        |
+| `shouldRetry`       | `(error, attempt) => boolean`   | —                                | Custom predicate to stop retrying                           |
+| `onRetry`           | `(info) => void`                | —                                | Called before each retry with attempt, delay, error, path   |
+| `respectRetryAfter` | `boolean`                       | `true`                           | Parse `Retry-After` header from 429/503 responses for delay |
+
+Network errors (no status code) are always retried unless `shouldRetry` returns false.
+
+When `respectRetryAfter` is enabled (the default), the plugin reads the `Retry-After` header from 429 and 503 responses. It supports both delay-seconds (`Retry-After: 2`) and HTTP-date formats. When present, the header value overrides the exponential backoff delay.
+
+<Callout>
+  The retry plugin respects `AbortSignal` — if the signal is aborted during a delay wait, the retry is cancelled
+  immediately.
+</Callout>
+
+## Circuit Breaker
+
+Prevents cascading failures by blocking requests when a service is down.
+
+```ts twoslash
+// @noErrors
+import { withCircuitBreaker } from 'silgi/client/plugins'
+
+const link = withCircuitBreaker(baseLink, {
+  failureThreshold: 5, // open after 5 consecutive failures
+  resetTimeout: 30000, // try again after 30s
+  onStateChange: (state, { failures }) => {
+    console.log(`Circuit: ${state} (${failures} failures)`)
+  },
+})
+
+// Check state programmatically
+link.getState() // 'closed' | 'open' | 'half-open'
+link.reset() // manually close the circuit
+```
+
+| Option             | Type                    | Default | Description                         |
+| ------------------ | ----------------------- | ------- | ----------------------------------- |
+| `failureThreshold` | `number`                | `5`     | Consecutive failures before opening |
+| `resetTimeout`     | `number`                | `30000` | Ms to wait before half-open test    |
+| `onStateChange`    | `(state, info) => void` | —       | Called on state transitions         |
+
+### State machine
+
+```
+CLOSED → (failures >= threshold) → OPEN
+OPEN → (resetTimeout elapsed) → HALF-OPEN
+HALF-OPEN → (success) → CLOSED
+HALF-OPEN → (failure) → OPEN
+```
+
+When open, requests throw `CircuitBreakerOpenError` immediately — no network call is made.
+
+## Timeout
+
+Set a per-link timeout for all requests.
+
+```ts twoslash
+// @noErrors
+import { withTimeout } from 'silgi/client/plugins'
+
+const link = withTimeout(baseLink, { timeout: 5000 })
+```
+
+| Option    | Type     | Default | Description   |
+| --------- | -------- | ------- | ------------- |
+| `timeout` | `number` | `30000` | Timeout in ms |
+
+The timeout signal is combined with any existing signal using `AbortSignal.any()` — whichever fires first wins.
+
+## Composition
+
+Plugins are pure link wrappers — compose them in any order. The outermost plugin runs first:
+
+```ts twoslash
+// @noErrors
+// Request flow: timeout check → circuit breaker check → retry loop → actual fetch
+const link = withRetry(withCircuitBreaker(withTimeout(baseLink, { timeout: 5000 })))
+```
+
+Recommended order for production:
+
+1. **withRetry** (outermost) — retries the entire inner chain
+2. **withCircuitBreaker** — blocks when service is down
+3. **withTimeout** (innermost) — aborts slow individual requests
+
+## OpenTelemetry
+
+Wrap any link with automatic span creation for distributed tracing:
+
+```ts twoslash
+// @noErrors
+import { withOtel } from 'silgi/client/plugins'
+import { trace } from '@opentelemetry/api'
+
+const link = withOtel(baseLink, {
+  tracer: trace.getTracer('my-service'),
+})
+```
+
+Each call creates a span named `rpc.client/{procedure}` with attributes:
+
+| Attribute    | Value                              |
+| ------------ | ---------------------------------- |
+| `rpc.system` | `silgi`                            |
+| `rpc.method` | Procedure path (e.g. `users.list`) |
+
+On error, the span records an `exception` event and sets status code 2. The same `Tracer` interface works for both server-side (`otelWrap`) and client-side (`withOtel`).
+
+## Other plugins
+
+### Batch
+
+Combine multiple RPC calls into a single HTTP request:
+
+```ts twoslash
+// @noErrors
+import { BatchLink } from 'silgi/client/plugins'
+
+const link = new BatchLink({ url: '/batch', maxBatchSize: 10 })
+```
+
+### Dedupe
+
+Deduplicate identical in-flight requests:
+
+```ts twoslash
+// @noErrors
+import { withDedupe } from 'silgi/client/plugins'
+
+const link = withDedupe(baseLink)
+```
+
+### CSRF
+
+Add CSRF token to requests:
+
+```ts twoslash
+// @noErrors
+import { withCSRF } from 'silgi/client/plugins'
+
+const link = withCSRF(baseLink, { headerName: 'x-csrf-token' })
+```
+
+## What's next?
+
+- [Client](/docs/client) — typed RPC client setup
+- [Testing](/docs/testing) — test procedures with `createCaller()`
+- [Server](/docs/server) — `serve()` and `handler()`

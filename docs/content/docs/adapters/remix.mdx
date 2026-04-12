@@ -1,0 +1,70 @@
+---
+title: Remix
+description: Use Silgi with Remix action/loader routes.
+---
+
+[Remix](https://remix.run) uses file-based routing with `action` and `loader` exports. Silgi integrates via a catch-all splat route.
+
+## Setup
+
+Create a catch-all route:
+
+```ts twoslash
+// @noErrors
+// app/routes/api.$.tsx
+import { createHandler } from 'silgi/remix'
+import { appRouter } from '~/server/rpc'
+
+const handler = createHandler(appRouter, {
+  context: (args) => ({
+    db: getDB(),
+    headers: Object.fromEntries(args.request.headers),
+  }),
+})
+
+export const action = handler
+export const loader = handler
+```
+
+Procedures are accessible at:
+
+```
+POST /api/users/list
+POST /api/users/create
+GET  /api/health
+```
+
+## Context from Remix loaders
+
+The `context` function receives the standard Remix `LoaderFunctionArgs` / `ActionFunctionArgs` object:
+
+```ts twoslash
+// @noErrors
+createHandler(appRouter, {
+  context: (args) => ({
+    user: args.context.user, // from Remix server context
+    params: args.params,
+  }),
+})
+```
+
+## Analytics and Scalar
+
+Enable the built-in [analytics dashboard](/docs/analytics) or [Scalar API reference](/docs/scalar) directly in the adapter:
+
+```ts twoslash
+// @noErrors
+const handler = createHandler(appRouter, {
+  context: (args) => ({ headers: Object.fromEntries(args.request.headers) }),
+  analytics: {
+    auth: process.env.ANALYTICS_TOKEN,
+  },
+  scalar: true,
+})
+```
+
+## What's next?
+
+- [Analytics](/docs/analytics) — built-in monitoring dashboard
+- [Server](/docs/server) — standalone `serve()` as an alternative
+- [Integrations](/docs/integrations) — other available integrations

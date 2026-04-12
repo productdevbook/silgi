@@ -1,0 +1,539 @@
+---
+title: Server
+description: Start your API with serve(), deploy anywhere with handler(), enable HTTP/2, and auto-generate API docs.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
+import { Step, Steps } from 'fumadocs-ui/components/steps'
+
+Silgi gives you two ways to run your API: `serve()` for a universal server (Node.js, Deno, Bun — powered by [srvx](https://srvx.h3.dev)), and `handler()` for a raw Fetch API function you can plug into anything.
+
+## serve()
+
+The simplest way to get a server running. Uses [srvx](https://srvx.h3.dev) under the hood — works on Node.js, Deno, and Bun with zero config:
+
+```ts twoslash
+// @noErrors
+import { silgi } from 'silgi'
+import { z } from 'zod'
+
+const s = silgi({
+  context: (req) => ({ db: getDB() }),
+})
+
+const appRouter = s.router({
+  health: s.$resolve(() => ({ status: 'ok' })),
+})
+
+s.serve(appRouter, {
+  port: 3000,
+})
+```
+
+Run it with `npx tsx src/server.ts` and you'll see:
+
+```
+Silgi server running at http://127.0.0.1:3000
+```
+
+`serve()` returns a `SilgiServer` handle you can use to shut down the server programmatically:
+
+```ts twoslash
+// @noErrors
+const server = await s.serve(appRouter, { port: 3000 })
+
+// Later — gracefully shut down
+await server.close()
+```
+
+### All options
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, {
+  port: 3000, // auto-finds next available if busy
+  hostname: '0.0.0.0', // bind to all interfaces
+  basePath: '/api', // mount under /api prefix
+  scalar: true, // API docs at /api/reference
+  // ws is auto-enabled when the router contains a subscription.
+  // Pass ws: false to disable, or ws: { compress, keepalive, ... } to configure crossws.
+  http2: {
+    // HTTP/2 with TLS
+    cert: './certs/cert.pem',
+    key: './certs/key.pem',
+  },
+  gracefulShutdown: true, // default — shuts down cleanly on SIGINT/SIGTERM
+})
+```
+
+| Option             | Type                                     | Default       | Description                                                                                    |
+| ------------------ | ---------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------- |
+| `port`             | `number`                                 | `3000`        | Port to listen on. If it's taken, Silgi automatically picks the next free port in 3000-3100.   |
+| `hostname`         | `string`                                 | `"127.0.0.1"` | Network interface. Use `"0.0.0.0"` to accept connections from other machines.                  |
+| `basePath`         | `string`                                 | `undefined`   | URL prefix (e.g. `"/api"`). Only requests matching this prefix are handled; others return 404. |
+| `scalar`           | `boolean \| ScalarOptions`               | `false`       | Enable auto-generated API docs at `/api/reference`.                                            |
+| `ws`               | `boolean \| WSAdapterOptions`            | `false`       | Enable WebSocket RPC on the same port. Pass an object for [WS options](#websocket-options).    |
+| `http2`            | `{ cert, key }`                          | `undefined`   | Enable HTTP/2 with TLS certificates. Falls back to HTTP/1.1 for older clients.                 |
+| `gracefulShutdown` | `boolean \| { timeout?, forceTimeout? }` | `true`        | Handle SIGINT/SIGTERM for clean shutdown. See [graceful shutdown](#graceful-shutdown).         |
+
+### Runtime support
+
+`serve()` uses [srvx](https://srvx.h3.dev) — the same server runs on Node.js, Deno, and Bun without code changes. TLS and HTTP/2 work on all runtimes.
+
+## handler()
+
+Returns a standard Fetch API function: `(Request) => Promise<Response>`. Use it with Nitro, Cloudflare Workers, or any platform that supports the Fetch API.
+
+```ts twoslash
+// @noErrors
+const handle = s.handler(appRouter)
+// handle is: (request: Request) => Promise<Response>
+```
+
+### With Nitro / Nuxt
+
+```ts title="server.ts"
+export default { fetch: s.handler(appRouter) }
+```
+
+### With Cloudflare Workers
+
+```ts twoslash
+// @noErrors
+export default {
+  fetch: s.handler(appRouter),
+}
+```
+
+### handler() options
+
+You can pass options to mount under a prefix and enable API docs:
+
+```ts twoslash
+// @noErrors
+const handle = s.handler(appRouter, {
+  basePath: '/api', // only handle /api/* requests, strip prefix before routing
+  scalar: true, // serves /api/openapi.json and /api/reference
+})
+```
+
+| Option     | Type                       | Default     | Description                                                                    |
+| ---------- | -------------------------- | ----------- | ------------------------------------------------------------------------------ |
+| `basePath` | `string`                   | `undefined` | URL prefix (e.g. `"/api"`). Requests not matching this prefix return 404.      |
+| `scalar`   | `boolean \| ScalarOptions` | `false`     | Enable Scalar API docs at `{basePath}/reference` and `{basePath}/openapi.json` |
+
+<Callout type='info'>
+  Both `serve()` and `handler()` support content negotiation automatically. If the client sends an `Accept:
+  application/x-msgpack` header, the response is encoded as MessagePack. Same for devalue. JSON is the default fallback.
+</Callout>
+
+## Content negotiation
+
+Both `serve()` and `handler()` inspect the `Accept` header and respond in the format the client prefers:
+
+| Accept header                | Response format | When to use                         |
+| ---------------------------- | --------------- | ----------------------------------- |
+| `application/json` (or none) | JSON            | Default, works everywhere           |
+| `application/x-msgpack`      | MessagePack     | Smaller payloads, binary            |
+| `application/x-devalue+json` | devalue         | Rich types (Date, Map, Set, BigInt) |
+
+The server also checks `Content-Type` on incoming POST requests to decode the body correctly. No configuration needed on the server side — it all happens automatically.
+
+## Scalar API docs
+
+Silgi can generate an OpenAPI 3.1.0 spec from your router and serve an interactive API reference powered by [Scalar](https://scalar.com):
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, {
+  port: 3000,
+  scalar: true,
+})
+```
+
+This gives you two extra routes:
+
+- **`/api/reference`** — interactive API documentation UI
+- **`/api/openapi.json`** — the raw OpenAPI specification
+
+The spec is generated once at startup, so there is no per-request cost.
+
+### Customizing the docs
+
+Pass an options object instead of `true`:
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, {
+  scalar: {
+    title: 'My API',
+    description: 'Built with Silgi',
+    version: '2.0.0',
+    servers: [{ url: 'https://api.example.com' }],
+    contact: { email: 'dev@example.com' },
+    security: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+  },
+})
+```
+
+### Scalar UI source
+
+By default, the Scalar UI JavaScript is loaded from a CDN. You can change this with the `cdn` option:
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, {
+  scalar: {
+    title: 'My API',
+    cdn: 'local', // serve from node_modules (offline)
+  },
+})
+```
+
+| Value             | Description                                                     |
+| ----------------- | --------------------------------------------------------------- |
+| `'cdn'` (default) | Load from cdn.jsdelivr.net                                      |
+| `'unpkg'`         | Load from unpkg.com                                             |
+| `'local'`         | Serve from `node_modules` — no external requests, fully offline |
+| Custom URL        | Any URL string, e.g. `'/assets/scalar.js'` for self-hosting     |
+
+<Callout>
+  The `'local'` option requires `@scalar/api-reference` as a dependency. If the package is not found, Silgi falls back
+  to CDN with a warning.
+</Callout>
+
+<Tabs items={['pnpm', 'npm', 'bun']}>
+  <Tab value='pnpm'>```bash pnpm add @scalar/api-reference ```</Tab>
+  <Tab value='npm'>```bash npm install @scalar/api-reference ```</Tab>
+  <Tab value='bun'>```bash bun add @scalar/api-reference ```</Tab>
+</Tabs>
+
+### Adding metadata to procedures
+
+The generated docs pull information from your procedure definitions. Add `route` metadata to make the docs more useful:
+
+```ts twoslash
+// @noErrors
+const listUsers = s
+  .$input(z.object({ limit: z.number().optional() }))
+  .$route({
+    summary: 'List all users',
+    description: 'Returns a paginated list of users, ordered by creation date.',
+    tags: ['users'],
+  })
+  .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))
+```
+
+The `route` field accepts:
+
+| Property             | Description                                      |
+| -------------------- | ------------------------------------------------ |
+| `summary`            | Short description shown in the endpoint list     |
+| `description`        | Longer description shown in the detail view      |
+| `tags`               | Group endpoints by tag                           |
+| `deprecated`         | Mark an endpoint as deprecated                   |
+| `successStatus`      | Override the default 200 status                  |
+| `successDescription` | Describe what a successful response looks like   |
+| `cache`              | Cache-Control header for GET procedure responses |
+
+## Caching
+
+Add a `cache` option to `route` to set `Cache-Control` headers on query responses. This enables HTTP-level caching by browsers, CDNs, and reverse proxies.
+
+```ts twoslash
+// @noErrors
+// Shorthand: cache for 60 seconds
+const listUsers = s.$route({ cache: 60 }).$resolve(({ ctx }) => ctx.db.users.findMany())
+
+// Full control: custom Cache-Control value
+const getConfig = s.$route({ cache: 'public, max-age=300, stale-while-revalidate=60' }).$resolve(() => loadConfig())
+```
+
+| Value    | Behavior                                          |
+| -------- | ------------------------------------------------- |
+| `number` | Sets `Cache-Control: public, max-age=N` (seconds) |
+| `string` | Sets the exact `Cache-Control` header value       |
+
+The cache header is compiled once at startup and added to every response for that procedure — zero per-request overhead.
+
+<Callout type='info'>
+  Caching only applies to GET procedures (`.$route({ method: 'GET' })`). POST procedures and subscriptions never get
+  Cache-Control headers, even if you set `cache` on them.
+</Callout>
+
+## HTTP/2
+
+For production deployments that benefit from multiplexing and header compression, pass TLS certificates:
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, {
+  port: 443,
+  http2: {
+    cert: './certs/cert.pem',
+    key: './certs/key.pem',
+  },
+})
+```
+
+Output:
+
+```
+Silgi server running at https://127.0.0.1:443
+  HTTP/2 enabled (with HTTP/1.1 fallback)
+```
+
+HTTP/2 requires TLS. Older clients that don't support HTTP/2 automatically fall back to HTTP/1.1 on the same port.
+
+<Callout>
+  For local development, generate self-signed certificates with [mkcert](https://github.com/FiloSottile/mkcert). For
+  production, use certificates from your hosting provider or Let's Encrypt.
+</Callout>
+
+## WebSocket support
+
+WebSocket RPC is auto-enabled whenever your router contains a subscription. The same code works on Node, Bun, and Deno — silgi detects the runtime and wires crossws accordingly.
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, { port: 3000 })
+```
+
+```
+Silgi server running at http://127.0.0.1:3000
+  WebSocket RPC at ws://127.0.0.1:3000/_ws (node)
+```
+
+HTTP and WebSocket share the same port. Every procedure — queries, mutations, subscriptions — is reachable over both transports. Pass `ws: false` if you want to disable WebSocket even when subscriptions exist.
+
+See the [WebSocket protocol](/docs/protocols/websocket) page for the message format and client usage.
+
+### WebSocket options
+
+Pass an options object instead of `true` to configure compression, keepalive, and payload limits:
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, {
+  port: 3000,
+  ws: {
+    compress: true, // enable per-message-deflate compression
+    maxPayload: 1_048_576, // 1 MB max message size (default)
+    keepalive: 30_000, // ping every 30s, terminate unresponsive peers
+  },
+})
+```
+
+| Option       | Type                | Default     | Description                                                                                                                                 |
+| ------------ | ------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `compress`   | `boolean \| object` | `false`     | Enable per-message-deflate. Pass an object to fine-tune zlib options.                                                                       |
+| `maxPayload` | `number`            | `1_048_576` | Maximum message size in bytes. Connections sending larger messages are terminated.                                                          |
+| `keepalive`  | `number \| false`   | `30_000`    | Ping interval in ms. If the client doesn't respond with pong before the next ping, the connection is terminated. Set to `false` to disable. |
+| `binary`     | `boolean`           | `false`     | Use MessagePack binary protocol instead of JSON.                                                                                            |
+| `context`    | `(peer) => ctx`     | —           | Context factory — receives the crossws peer on each message.                                                                                |
+
+These options also work with `attachWebSocket()` for standalone setups:
+
+```ts twoslash
+// @noErrors
+import { attachWebSocket } from 'silgi/ws'
+
+attachWebSocket(httpServer, appRouter, {
+  compress: true,
+  keepalive: 60_000,
+  maxPayload: 5 * 1024 * 1024, // 5 MB
+})
+```
+
+## Graceful shutdown
+
+By default, Silgi handles `SIGINT` and `SIGTERM` signals to shut down cleanly — waiting for in-flight requests to finish before closing the server.
+
+```ts twoslash
+// @noErrors
+const server = await s.serve(appRouter, {
+  port: 3000,
+  gracefulShutdown: true, // default
+})
+```
+
+### Programmatic shutdown
+
+`serve()` returns a `SilgiServer` handle with a `close()` method:
+
+```ts twoslash
+// @noErrors
+const server = await s.serve(appRouter, { port: 3000 })
+
+// Graceful — waits for in-flight requests
+await server.close()
+
+// Force — immediately terminates all connections
+await server.close(true)
+```
+
+The `SilgiServer` object exposes:
+
+| Property   | Type                                 | Description                                    |
+| ---------- | ------------------------------------ | ---------------------------------------------- |
+| `url`      | `string`                             | Server URL (e.g. `"http://127.0.0.1:3000"`)    |
+| `port`     | `number`                             | Actual listening port (resolved for `port: 0`) |
+| `hostname` | `string`                             | Configured hostname                            |
+| `close()`  | `(force?: boolean) => Promise<void>` | Shut down the server                           |
+
+### Shutdown timeouts
+
+For fine-grained control over shutdown behavior:
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, {
+  gracefulShutdown: {
+    timeout: 10_000, // wait up to 10s for in-flight requests
+    forceTimeout: 15_000, // force-kill after 15s
+  },
+})
+```
+
+### Shutdown hook
+
+The `serve:stop` hook fires when `close()` is called — useful for cleanup like closing database connections:
+
+```ts twoslash
+// @noErrors
+const s = silgi({
+  context: (req) => ({ db: getDB() }),
+  hooks: {
+    'serve:stop': async ({ url }) => {
+      await db.end()
+      console.log(`Server at ${url} stopped`)
+    },
+  },
+})
+```
+
+## Lifecycle hooks
+
+Silgi fires hooks at key points during request processing. Register them in the `hooks` option when creating the instance:
+
+```ts twoslash
+// @noErrors
+const s = silgi({
+  context: (req) => ({ db: getDB() }),
+  hooks: {
+    request: ({ path, input }) => {
+      console.log(`--> ${path}`)
+    },
+    response: ({ path, output, durationMs }) => {
+      console.log(`<-- ${path} (${durationMs.toFixed(1)}ms)`)
+    },
+    error: ({ path, error }) => {
+      console.error(`ERR ${path}:`, error)
+    },
+    'serve:start': ({ url, port, hostname }) => {
+      console.log(`Server ready at ${url}`)
+    },
+  },
+})
+```
+
+You can also add or remove hooks after the instance is created:
+
+```ts twoslash
+// @noErrors
+// Add a hook
+s.hook('error', ({ error }) => reportToSentry(error))
+
+// Remove a hook
+s.removeHook('error', myHookFn)
+```
+
+| Hook          | When it fires                    | Payload                        |
+| ------------- | -------------------------------- | ------------------------------ |
+| `request`     | Before a request is processed    | `{ path, input }`              |
+| `response`    | After a successful response      | `{ path, output, durationMs }` |
+| `error`       | When any error occurs            | `{ path, error }`              |
+| `serve:start` | When the server starts listening | `{ url, port, hostname }`      |
+| `serve:stop`  | When the server is shutting down | `{ url, port, hostname }`      |
+
+<Callout type='info'>
+  Hooks are for side effects like logging and metrics. They don't modify the request or response. For that, use [guards
+  and wraps](/docs/middleware).
+</Callout>
+
+## Raw Response and binary streaming
+
+Procedures can return a `Response` or `ReadableStream` for full control over the HTTP response — useful for file downloads, PDF generation, image serving, and binary data.
+
+### Returning a Response
+
+Return a standard `Response` object for complete control over status, headers, and body:
+
+```ts twoslash
+// @noErrors
+const downloadPdf = s.$input(z.object({ id: z.string() })).$resolve(async ({ input, ctx }) => {
+  const pdf = await ctx.storage.getFile(input.id)
+  return new Response(pdf, {
+    headers: {
+      'content-type': 'application/pdf',
+      'content-disposition': `attachment; filename="${input.id}.pdf"`,
+    },
+  })
+})
+```
+
+### Returning a ReadableStream
+
+Return a `ReadableStream` for binary streaming. Silgi sends it with `application/octet-stream`:
+
+```ts twoslash
+// @noErrors
+const exportCsv = s.$resolve(async ({ ctx }) => {
+  return new ReadableStream({
+    async start(controller) {
+      controller.enqueue(new TextEncoder().encode('id,name\n'))
+      for await (const user of ctx.db.users.cursor()) {
+        controller.enqueue(new TextEncoder().encode(`${user.id},${user.name}\n`))
+      }
+      controller.close()
+    },
+  })
+})
+```
+
+<Callout type='info'>
+  When a procedure returns a `Response` or `ReadableStream`, content negotiation and JSON serialization are skipped
+  entirely. The response is passed through as-is.
+</Callout>
+
+## callable()
+
+For server-side code where you need to call a procedure directly — without HTTP, serialization, or the client proxy. Useful in scripts, cron jobs, and seed files.
+
+```ts twoslash
+// @noErrors
+import { callable } from 'silgi'
+
+const getUsers = s
+  .$input(z.object({ limit: z.number().optional() }))
+  .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit }))
+
+const getUsersFn = callable(getUsers, {
+  context: () => ({ db: getDB() }),
+  timeout: 5000, // optional — default 30s, null to disable
+})
+
+// Direct call — compiled pipeline, no HTTP
+const users = await getUsersFn({ limit: 10 })
+```
+
+Each call gets a fresh `AbortSignal` with the configured timeout. The compiled pipeline (guards, wraps, validation) runs exactly as it would through `serve()` or `handler()`. The only difference is there's no network involved.
+
+## What's next?
+
+- [Testing](/docs/testing) — call procedures directly with `createCaller()` — no HTTP server needed
+- [Client](/docs/client) — connect to your server from the browser or another service
+- [Middleware](/docs/middleware) — guards and wraps that run inside your request pipeline
+- [Plugins](/docs/plugins) — add CORS, logging, rate limiting, and tracing
+- [Protocols](/docs/protocols) — learn about JSON, MessagePack, devalue, and WebSocket

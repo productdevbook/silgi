@@ -1,0 +1,284 @@
+---
+title: WebSocket
+description: Bidirectional RPC over a persistent connection — ideal for real-time features and subscriptions.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
+
+Silgi's default transport is HTTP — every procedure call is a separate request/response. WebSocket gives you a persistent connection instead. Messages skip the TCP handshake, which makes repeated calls faster and enables real-time server-to-client streaming.
+
+## When to use WebSocket
+
+| Scenario                               | Recommendation                      |
+| -------------------------------------- | ----------------------------------- |
+| Standard API calls                     | HTTP (via `serve()` or `handler()`) |
+| High-frequency calls (many per second) | WebSocket                           |
+| Real-time subscriptions                | WebSocket                           |
+| Server-to-client push                  | WebSocket                           |
+
+For most APIs, HTTP is the right choice. WebSocket adds value when you need persistent connections or when you're making many calls per second and want to skip the per-request overhead.
+
+## Enabling WebSocket on procedures
+
+Every procedure is reachable over WebSocket automatically — no flag or configuration required. Queries, mutations, and subscriptions all work over the same connection.
+
+```ts twoslash
+// @noErrors
+import { silgi } from 'silgi'
+
+const s = silgi({ context: () => ({}) })
+
+// Query — reachable via both HTTP and WebSocket
+const listUsers = s.$resolve(({ ctx }) => ctx.db.users.findMany())
+
+// Subscription — streams to the client as an async iterator over WebSocket
+const clock = s.subscription().$resolve(async function* () {
+  for (let i = 5; i > 0; i--) {
+    yield { count: i }
+    await new Promise((r) => setTimeout(r, 1000))
+  }
+})
+```
+
+## Server setup
+
+### With serve() — Node, Bun, Deno (recommended)
+
+`s.serve()` is the universal entry point. WebSocket support is enabled automatically whenever the router contains at least one subscription procedure. The same code works on Node, Bun, and Deno — silgi detects the runtime and wires the right crossws adapter under the hood.
+
+```ts twoslash
+// @noErrors
+s.serve(appRouter, { port: 3000 })
+// HTTP on http://127.0.0.1:3000
+// WebSocket on ws://127.0.0.1:3000/_ws (if router has subscriptions)
+```
+
+Pass `ws: false` to disable auto-WS, or `ws: { compress, keepalive, maxPayload }` to tune crossws options.
+
+### With handler() — Nitro, Nuxt (zero config)
+
+When you use `s.handler(appRouter)` as your entry point, WebSocket support is automatic through srvx's `/_ws` convention. **No extra route file needed.**
+
+```ts title="server.ts" twoslash
+// @noErrors
+import { s } from './rpc/instance'
+import { appRouter } from './rpc/router'
+
+export default {
+  fetch: s.handler(appRouter),
+}
+```
+
+For Nuxt, enable the Nitro WebSocket feature in `nuxt.config.ts`:
+
+```ts
+export default defineNuxtConfig({
+  nitro: { features: { websocket: true } },
+})
+```
+
+Subscriptions in your router are reachable over `ws://host/_ws` out of the box.
+
+### With attachWebSocket — Express, raw Node HTTP (escape hatch)
+
+Only needed when you already manage your own Node `http.Server` (Express, Fastify `.server`, raw Node HTTP). Prefer `s.serve()` when you can.
+
+```ts twoslash
+// @noErrors
+import { attachWebSocket } from 'silgi/ws'
+
+// Express
+const server = app.listen(3000)
+await attachWebSocket(server, appRouter)
+
+// Raw Node HTTP
+import { createServer } from 'node:http'
+const server = createServer(httpHandler)
+await attachWebSocket(server, appRouter)
+server.listen(3000)
+```
+
+`attachWebSocket` accepts a context factory via the `context` option. The factory receives the `Peer` object:
+
+```ts twoslash
+// @noErrors
+import { attachWebSocket } from 'silgi/ws'
+
+await attachWebSocket(server, appRouter, {
+  context: (peer) => ({
+    userId: peer.request?.headers.get('x-user-id'),
+  }),
+})
+```
+
+When a client disconnects, all in-flight requests for that peer are automatically aborted.
+
+## Message protocol
+
+Every WebSocket message is a JSON object. The `id` field links requests to responses, so the client can send multiple requests concurrently and match them up.
+
+### Request and response
+
+The client sends a request with a path and optional input:
+
+```json
+{ "id": "1", "path": "users/list", "input": { "limit": 10 } }
+```
+
+The server responds with the result:
+
+```json
+{ "id": "1", "result": [{ "id": 1, "name": "Alice" }] }
+```
+
+### Errors
+
+If the procedure fails or the path does not exist, the server sends an error:
+
+```json
+{ "id": "2", "error": { "code": "NOT_FOUND", "status": 404, "message": "Procedure not found" } }
+```
+
+### Streaming (subscriptions)
+
+For subscription procedures, the server sends multiple `data` messages followed by a `done` signal:
+
+```json
+{ "id": "3", "data": { "count": 5 } }
+{ "id": "3", "data": { "count": 4 } }
+{ "id": "3", "data": { "count": 3 } }
+{ "id": "3", "data": { "count": 2 } }
+{ "id": "3", "data": { "count": 1 } }
+{ "id": "3", "data": null, "done": true }
+```
+
+The `done: true` message signals that the stream has ended.
+
+## Client
+
+### WSLink
+
+Use the built-in `WSLink` for a type-safe WebSocket client with automatic connection management:
+
+```ts twoslash
+// @noErrors
+import { createClient } from 'silgi/client'
+import { WSLink } from 'silgi/client/ws'
+
+const link = new WSLink({ url: 'ws://localhost:3000/ws' })
+const client = createClient<AppRouter>(link)
+
+// Use it like any other client — connection is established on first call
+const users = await client.users.list({ limit: 10 })
+
+// Clean up when done
+link.dispose()
+```
+
+`WSLink` handles connection lifecycle automatically — it connects on the first call, multiplexes concurrent calls over a single WebSocket, and transparently returns an `AsyncIterableIterator` for subscription procedures:
+
+```ts twoslash
+// @noErrors
+const iter = await client.clock()
+for await (const tick of iter) {
+  console.log(tick.count)
+}
+```
+
+| Option      | Type                      | Default                | Description                  |
+| ----------- | ------------------------- | ---------------------- | ---------------------------- |
+| `url`       | `string \| URL`           | (required)             | WebSocket server URL         |
+| `protocol`  | `'json' \| 'messagepack'` | `'json'`               | Wire protocol                |
+| `WebSocket` | `typeof WebSocket`        | `globalThis.WebSocket` | Custom WebSocket constructor |
+
+### Native WebSocket
+
+For custom scenarios, here's a basic client using the native `WebSocket` API:
+
+```ts twoslash
+// @noErrors
+const ws = new WebSocket('ws://localhost:3000')
+
+// Track pending requests by ID
+const pending = new Map<string, (msg: any) => void>()
+let nextId = 1
+
+function call(path: string, input?: unknown): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const id = String(nextId++)
+    pending.set(id, (msg) => {
+      pending.delete(id)
+      if (msg.error) reject(msg.error)
+      else resolve(msg.result)
+    })
+    ws.send(JSON.stringify({ id, path, input }))
+  })
+}
+
+ws.onopen = async () => {
+  const users = await call('users/list', { limit: 10 })
+  console.log('Users:', users)
+}
+
+ws.onmessage = ({ data }) => {
+  const msg = JSON.parse(data)
+  const handler = pending.get(msg.id)
+  if (handler) handler(msg)
+}
+```
+
+### Receiving streams
+
+For subscriptions, you'll receive multiple messages with the same `id`:
+
+```ts twoslash
+// @noErrors
+ws.onmessage = ({ data }) => {
+  const msg = JSON.parse(data)
+
+  if (msg.done) {
+    console.log('Stream ended for', msg.id)
+  } else if (msg.data !== undefined) {
+    console.log('Stream data:', msg.data)
+  } else if (msg.error) {
+    console.error('Error:', msg.error)
+  } else {
+    console.log('Result:', msg.result)
+  }
+}
+```
+
+## Binary WebSocket
+
+Combine WebSocket with [MessagePack](/docs/protocols/msgpack) for smaller messages. Set `protocol: 'messagepack'` when setting up:
+
+```ts twoslash
+// @noErrors
+import { attachWebSocket } from 'silgi/ws'
+
+await attachWebSocket(server, appRouter, { protocol: 'messagepack' })
+```
+
+With MessagePack protocol, messages are sent as binary WebSocket frames instead of JSON text. On the client side, you'd use `msgpack` to encode/decode instead of `JSON.parse`/`JSON.stringify`.
+
+<Callout type='info'>
+  Binary WebSocket is especially useful for high-throughput scenarios where many small messages are sent per second. The
+  combination of persistent connection + compact encoding gives you the lowest possible overhead.
+</Callout>
+
+## OpenAPI
+
+WebSocket-enabled procedures are documented in the OpenAPI spec with an automatic note in the description field. Scalar and other OpenAPI viewers will display this alongside the regular HTTP documentation.
+
+<Callout type='warn'>
+  OpenAPI 3.x does not have a native WebSocket specification. When Scalar adds AsyncAPI support, Silgi will generate
+  AsyncAPI specs for WebSocket procedures.
+</Callout>
+
+## What's next?
+
+- [MessagePack](/docs/protocols/msgpack) — binary encoding for smaller payloads
+- [devalue](/docs/protocols/devalue) — rich type serialization for Date, Map, Set
+- [Server](/docs/server) — `serve()` options and lifecycle hooks
+- [Procedures](/docs/procedures) — defining subscriptions with `s.subscription()`

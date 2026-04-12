@@ -1,0 +1,187 @@
+---
+title: Cache
+description: Production-grade response caching with TTL, SWR, request deduplication, and pluggable backends.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+
+Cache query results in memory, Redis, Cloudflare KV, or any storage backend. Powered by [ocache](https://github.com/unjs/ocache) with built-in TTL, stale-while-revalidate, and request deduplication.
+
+## Basic usage
+
+Wrap a procedure with `cacheQuery()` to cache its results:
+
+```ts twoslash
+// @noErrors
+import { cacheQuery } from 'silgi/cache'
+
+const listUsers = s.$use(cacheQuery({ maxAge: 60 })).$resolve(({ ctx }) => ctx.db.users.findMany())
+```
+
+The first call runs the resolver and caches the result. Subsequent calls with the same input return the cached value for 60 seconds.
+
+## Options
+
+```ts twoslash
+// @noErrors
+cacheQuery({
+  maxAge: 60, // TTL in seconds (default: 60)
+  swr: true, // stale-while-revalidate (default: true)
+  staleMaxAge: 60, // max stale age in seconds (default: maxAge)
+  name: 'users_list', // cache key prefix (default: auto-generated)
+  getKey: (input) => input.id, // custom cache key from input
+})
+```
+
+| Option                  | Type                 | Default       | Description                                            |
+| ----------------------- | -------------------- | ------------- | ------------------------------------------------------ |
+| `maxAge`                | `number`             | `60`          | Cache TTL in seconds                                   |
+| `swr`                   | `boolean`            | `true`        | Return stale data while revalidating in the background |
+| `staleMaxAge`           | `number`             | `maxAge`      | Maximum seconds to serve stale data during SWR         |
+| `name`                  | `string`             | auto          | Cache key prefix for invalidation                      |
+| `getKey`                | `(input) => string`  | hash          | Custom cache key generator                             |
+| `shouldBypassCache`     | `(input) => boolean` | -             | Skip cache entirely (e.g. admin, debug)                |
+| `shouldInvalidateCache` | `(input) => boolean` | -             | Force re-resolve and update cache                      |
+| `validate`              | `(entry) => boolean` | -             | Return `false` to treat entry as miss                  |
+| `transform`             | `(entry) => T`       | -             | Transform cached value before returning                |
+| `base`                  | `string \| string[]` | `'/cache'`    | Multi-tier storage prefixes                            |
+| `integrity`             | `string`             | auto          | Custom integrity hash (auto-invalidates on redeploy)   |
+| `onError`               | `(error) => void`    | console.error | Error handler for cache read/write failures            |
+
+## Bypass and conditional invalidation
+
+Skip the cache entirely for specific requests, or force a refresh:
+
+```ts twoslash
+// @noErrors
+import { cacheQuery } from 'silgi/cache'
+
+const listUsers = s
+  .$use(
+    cacheQuery({
+      maxAge: 300,
+      // Admin users bypass cache
+      shouldBypassCache: (input) => (input as any)?.asAdmin === true,
+      // Refresh flag forces re-resolve
+      shouldInvalidateCache: (input) => (input as any)?.refresh === true,
+      // Only cache non-empty arrays
+      validate: (entry) => Array.isArray(entry.value) && entry.value.length > 0,
+    }),
+  )
+  .$resolve(({ ctx }) => ctx.db.users.findMany())
+```
+
+## Invalidation
+
+Invalidate cached queries by name — typically after a mutation:
+
+```ts twoslash
+// @noErrors
+import { cacheQuery, invalidateQueryCache } from 'silgi/cache'
+
+const listUsers = s.$use(cacheQuery({ maxAge: 300, name: 'users_list' })).$resolve(({ ctx }) => ctx.db.users.findMany())
+
+const createUser = s.$resolve(async ({ input, ctx }) => {
+  const user = await ctx.db.users.create(input)
+  await invalidateQueryCache('users_list')
+  return user
+})
+```
+
+## Storage backends
+
+By default, cache lives in memory. For production, plug in any storage backend via [unstorage](https://unstorage.unjs.io) (included as a dependency).
+
+Configure it once at server startup — typically in your `server.ts`:
+
+### Redis
+
+```ts twoslash title="server.ts"
+// @noErrors
+import { setCacheStorage, createUnstorageAdapter } from 'silgi/cache'
+import { createStorage } from 'silgi/unstorage'
+import redisDriver from 'unstorage/drivers/redis'
+
+// Set up Redis cache before creating the handler
+const storage = createStorage({
+  driver: redisDriver({ url: 'redis://localhost:6379' }),
+})
+setCacheStorage(createUnstorageAdapter(storage))
+
+// Then create your server
+const s = silgi({ context: () => ({ db }) })
+const appRouter = s.router({ ... })
+export default { fetch: s.handler(appRouter) }
+```
+
+### Cloudflare KV
+
+```ts twoslash title="server.ts"
+// @noErrors
+import { setCacheStorage, createUnstorageAdapter } from 'silgi/cache'
+import { createStorage } from 'silgi/unstorage'
+import cfKvDriver from 'unstorage/drivers/cloudflare-kv-binding'
+
+const storage = createStorage({
+  driver: cfKvDriver({ binding: 'MY_KV' }),
+})
+setCacheStorage(createUnstorageAdapter(storage))
+```
+
+### Custom storage
+
+Any object with `get` and `set` methods works:
+
+```ts twoslash
+// @noErrors
+import { setCacheStorage } from 'silgi/cache'
+
+setCacheStorage({
+  get: (key) => myStore.get(key),
+  set: (key, value, opts) => myStore.set(key, value, opts?.ttl),
+})
+```
+
+## HTTP Cache vs Server Cache
+
+Silgi has two caching mechanisms — they serve different purposes:
+
+| Feature      | `$route({ cache })`    | `cacheQuery()`                |
+| ------------ | ---------------------- | ----------------------------- |
+| Where        | Browser / CDN          | Server memory / Redis / KV    |
+| How          | `Cache-Control` header | ocache (in-process)           |
+| Input-aware  | No                     | Yes (hashes input)            |
+| SWR          | CDN-level              | Built-in                      |
+| Invalidation | TTL only               | `invalidateQueryCache()`      |
+| Use case     | Public, static data    | DB queries, expensive compute |
+
+Use both together for maximum performance:
+
+```ts twoslash
+// @noErrors
+const listUsers = s
+  .$route({ cache: 60 })
+  .$use(cacheQuery({ maxAge: 300, name: 'users' }))
+  .$resolve(({ ctx }) => ctx.db.users.findMany())
+```
+
+## How it works
+
+1. `cacheQuery()` wraps the procedure as onion middleware
+2. On each call, input is hashed to produce a cache key
+3. Cache hit → return immediately (zero resolver overhead)
+4. Cache miss → run resolver, store result, return
+5. With SWR → return stale data immediately, revalidate in background
+6. Concurrent identical requests share one in-flight promise (deduplication)
+7. Cache entries auto-expire after `maxAge` seconds
+
+<Callout type='info'>
+  The cache key is computed from the serialized input using [ohash](https://github.com/unjs/ohash). Two calls with the
+  same input always produce the same key, regardless of property order.
+</Callout>
+
+## What's next?
+
+- [Rate Limiting](/docs/plugins/ratelimit) — protect endpoints from abuse
+- [Server](/docs/server#caching) — HTTP-level `Cache-Control` headers via `route.cache`
+- [Plugins](/docs/plugins) — all available plugins

@@ -1,0 +1,18 @@
+{
+  "name": "typecheck-orpc",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "gen": "tsx scripts/gen.ts",
+    "bench": "tsx scripts/gen.ts && tsc --noEmit --extendedDiagnostics"
+  },
+  "dependencies": {
+    "@orpc/client": "0.0.0-next.66d4d3b",
+    "@orpc/server": "0.0.0-next.66d4d3b"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  }
+}

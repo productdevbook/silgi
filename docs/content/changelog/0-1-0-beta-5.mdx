@@ -1,0 +1,206 @@
+---
+title: 0.1.0-beta.5
+description: createCaller, OpenAPI overhaul, core refactor — unified handler, rou3, security fixes, ecosystem alignment.
+version: 0.1.0-beta.5
+date: 2026-03-24
+---
+
+## createCaller — test procedures without HTTP
+
+New `createCaller()` method on the Silgi instance. Call any procedure directly — no server, no HTTP, no serialization. The full compiled pipeline runs (guards, input/output validation, resolve) exactly like a real request.
+
+```ts
+const caller = s.createCaller(appRouter)
+
+const users = await caller.users.list({ limit: 10 })
+const user = await caller.users.get({ id: 1 })
+```
+
+Fully typed — autocomplete works for procedure names, input shapes, and return types via `InferClient<T>`.
+
+### Context override
+
+Inject mock data or bypass auth for testing:
+
+```ts
+const adminCaller = s.createCaller(appRouter, {
+  contextOverride: { user: { id: 1, role: 'admin' } },
+})
+```
+
+### Per-call options
+
+Pass `signal` or `context` as a second argument to any call:
+
+```ts
+await caller.users.create(
+  { name: 'Alice' },
+  {
+    context: { token: 'valid-jwt' },
+    signal: AbortSignal.timeout(5000),
+  },
+)
+```
+
+### Configurable timeout
+
+Default 30s timeout, configurable per-caller or disabled entirely:
+
+```ts
+const caller = s.createCaller(appRouter, { timeout: 5000 })
+const nolimit = s.createCaller(appRouter, { timeout: null })
+```
+
+### What runs in the pipeline
+
+Everything that runs in HTTP also runs in createCaller:
+
+- Guards (`$use(s.guard(...))`)
+- Input validation (`$input(z.object(...))`)
+- Output validation (`$output(z.object(...))`)
+- Typed errors (`$errors()` + `fail()` → throws `SilgiError`)
+- Route params (parametric routes like `/users/:id`)
+
+The only difference: no HTTP serialization, no response headers, no analytics recording.
+
+### Architecture notes
+
+- Uses the same compiled router cache as `handler()` — compiles once, shared
+- Proxy-based with sub-proxy memoization (`Map<string, any>` per node)
+- Route matching uses method-agnostic fallback (works with GET, POST, PUT, DELETE, any method)
+- Context resolved per-call (not per-caller) for isolation
+- 21 tests covering: basic calls, nested procedures, input/output validation, typed errors, guards, context override, per-call options, async context, timeout, signal, isolation, proxy safety
+
+See [Testing docs](/docs/testing) for full guide with Vitest examples.
+
+## OpenAPI overhaul
+
+### Standard Schema JSON conversion
+
+Replaced the 150-line hand-rolled Zod introspection (`convertZodDef`, `applyStringChecks`, `applyNumberChecks`) with Standard Schema's `~standard.jsonSchema.input()`. This is a single 15-line function that works with **any** validator implementing Standard Schema v1 — Zod v4, Valibot, ArkType — not just Zod.
+
+All Zod-specific edge case bugs (exclusive bounds, ip v6, nativeEnum, ZodBranded/ZodReadonly/ZodCatch) are now handled correctly by the validator's own JSON Schema implementation.
+
+### Path parameter support
+
+`:param` syntax is now converted to OpenAPI `{param}` syntax with proper `parameters` declarations:
+
+```ts
+const getUser = s
+  .$route({ method: 'GET', path: '/users/:id' })
+  .$input(z.object({ id: z.number() }))
+  .$resolve(...)
+
+// Generated spec: GET /users/{id} with parameters: [{ name: "id", in: "path", required: true }]
+```
+
+Also supports `:param(regex)`, `:param?`, and `**` wildcards.
+
+### Per-procedure OpenAPI metadata
+
+New `Route` options for full control over the generated OpenAPI spec:
+
+```ts
+s.$route({
+  operationId: 'getUserById',        // custom operation ID
+  tags: ['Users', 'Public'],         // custom tags (was silently ignored before)
+  security: false,                    // public endpoint (overrides global auth)
+  security: ['bearerAuth'],           // per-procedure security scheme
+  spec: {                             // raw OpenAPI operation override
+    externalDocs: { url: 'https://docs.example.com' },
+    'x-rate-limit': 100,
+  },
+  spec: (op) => ({ ...op, ... }),     // function override (like oRPC)
+})
+```
+
+### Auto-documented validation errors
+
+Procedures with `$input()` now automatically include a `400 BAD_REQUEST` response in the OpenAPI spec with the validation error schema.
+
+### Error message in spec
+
+`$errors({ CONFLICT: { status: 409, message: 'Already exists' } })` — the `message` field is now included as `default` in the generated error schema.
+
+See [Server docs](/docs/server) for the full `$route()` options reference.
+
+---
+
+## Core refactor — h3/unjs ecosystem alignment
+
+The biggest internal refactor since launch. **-3900 lines removed**, zero breaking API changes. The entire core now follows [h3/unjs](https://github.com/unjs) conventions: clean single-responsibility modules, ecosystem packages over custom code, no surprises.
+
+### Unified request handler
+
+The handler had 4 duplicated code paths (sync GET, fast POST, async, minimalHandler). Now there's **one `async handleRequest()`**. Each concern is its own module:
+
+- `core/codec.ts` — response encoding (JSON, MessagePack, devalue)
+- `core/input.ts` — request input parsing (body, query, binary codecs)
+- `core/handler.ts` — orchestration only
+
+### rou3 router
+
+Replaced the 1400-line custom JIT router (`src/route/`, 8 files with `new Function()` code generation) with [rou3](https://github.com/unjs/rou3) — the same radix tree used by h3 and Nitro. Same performance, battle-tested.
+
+### cookie-es integration
+
+Replaced 3 separate custom cookie parsers with [cookie-es](https://github.com/unjs/cookie-es). `silgi/cookies` now exposes the full cookie-es feature set including `partitioned`, `priority`, `parseSetCookie`, and `splitSetCookieString`.
+
+### callable() timeout support
+
+`callable()` now creates a fresh `AbortSignal` per call with configurable timeout:
+
+```ts
+const fn = callable(procedure, {
+  context: () => ({ db }),
+  timeout: 5000, // default 30s, null to disable
+})
+```
+
+### WebSocket context + auto-abort
+
+`createWSHooks` and `attachWebSocket` now accept a `context` option. When a peer disconnects, all in-flight requests are automatically aborted.
+
+```ts
+await attachWebSocket(server, appRouter, {
+  context: (peer) => ({ userId: peer.request?.headers.get('x-user-id') }),
+})
+```
+
+See [WebSocket docs](/docs/protocols/websocket) for the updated API.
+
+## Security fixes
+
+- **Prototype pollution** — `applyGuardResult` now sanitizes nested `__proto__` keys recursively
+- **Cache race condition** — `cacheQuery` now uses unique per-request IDs instead of shared cache keys
+- **CORS** — omits header entirely for disallowed origins (was empty string)
+- **Analytics** — removed `?token=` URL auth, truncated stored input/stack, redacted sensitive headers
+- **Devalue** — `decode()` strips `RegExp` (ReDoS) and `Error` objects
+- **Batch server** — validates `call.path` type, length, and null bytes
+
+## Context lifecycle fixes
+
+- SSE/stream responses no longer release context to pool before stream completes (use-after-release)
+- `createCaller` uses context pool with null-prototype objects (was plain `{}`)
+- `router()` no longer mutates user's original definition via `Object.assign`
+
+## Removed
+
+- **Fastify adapter** (`silgi/fastify`) — use `silgi/express`, `silgi/nextjs`, or the built-in `s.serve()`
+- **fast-stringify.ts** — `new Function()` code injection surface + XSS risk (U+2028/U+2029)
+- **analyze.ts** — fragile `Function.toString()` heuristic that could skip context factory after minification
+
+## Dead code cleanup
+
+- `core/types.ts`, `core/index.ts` — never imported
+- `utils.ts`: `once`, `mergeHeaders`, `flattenHeader`, `mergeAbortSignals` — never used
+- `compile.ts`: duplicate `isProcedureDef`, deprecated `FlatRouter` alias
+- SSE: unused `EVENT_META_SYMBOL`, global `_primitiveMeta` Map
+- Stale competitor references removed from JSDoc comments
+
+## Stats
+
+- **-3900 net lines** removed
+- **0 lint errors**, **0 type errors**
+- **80/80 test files**, **635/635 tests** passing
+- Benchmarks stable — pipeline 6-20x faster than alternatives

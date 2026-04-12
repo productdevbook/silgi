@@ -1,0 +1,178 @@
+---
+title: Testing
+description: Test your procedures directly with createCaller — no HTTP server needed.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs'
+
+`createCaller` lets you call procedures directly without starting an HTTP server. Input validation, output validation, guards, and the full compiled pipeline all run — just like a real request, minus the HTTP overhead.
+
+## Quick start
+
+```ts twoslash
+// @noErrors
+import { silgi } from 'silgi'
+import { z } from 'zod'
+
+const s = silgi({
+  context: () => ({ db: getDB() }),
+})
+
+const appRouter = s.router({
+  users: {
+    list: s
+      .$input(z.object({ limit: z.number().optional() }))
+      .$resolve(({ input, ctx }) => ctx.db.users.findMany({ take: input.limit })),
+  },
+})
+
+// Create a caller — no server needed
+const caller = s.createCaller(appRouter)
+
+const users = await caller.users.list({ limit: 10 })
+```
+
+The caller is fully typed — autocomplete works for procedure names, input shapes, and return types.
+
+## With Vitest
+
+```ts twoslash
+// @noErrors
+import { describe, expect, it } from 'vitest'
+import { s, appRouter } from './server/rpc/router'
+
+describe('users', () => {
+  const caller = s.createCaller(appRouter)
+
+  it('lists users', async () => {
+    const result = await caller.users.list({ limit: 5 })
+    expect(result).toHaveLength(5)
+  })
+
+  it('rejects invalid input', async () => {
+    await expect(caller.users.list({ limit: -1 })).rejects.toThrow()
+  })
+})
+```
+
+## Context override
+
+Override or extend the base context for testing. Useful for injecting mock data or bypassing auth:
+
+```ts twoslash
+// @noErrors
+// Test with a specific user context
+const adminCaller = s.createCaller(appRouter, {
+  contextOverride: { user: { id: 1, role: 'admin' } },
+})
+
+// Test with mock database
+const mockCaller = s.createCaller(appRouter, {
+  contextOverride: {
+    db: { users: { findMany: () => [{ id: 1, name: 'Mock' }] } },
+  },
+})
+```
+
+## Per-call options
+
+Pass `signal` or `context` as a second argument to any procedure call:
+
+```ts twoslash
+// @noErrors
+const caller = s.createCaller(appRouter)
+
+// Per-call context — useful for testing different auth states
+await caller.users.create(
+  { name: 'Alice' },
+  {
+    context: { token: 'valid-jwt' },
+  },
+)
+
+// Per-call signal — useful for testing cancellation
+const controller = new AbortController()
+await caller.users.list({}, { signal: controller.signal })
+```
+
+## Testing guards
+
+Guards run in the compiled pipeline, just like in HTTP requests. Test them by providing or omitting the required context:
+
+```ts twoslash
+// @noErrors
+import { SilgiError } from 'silgi'
+
+// Without auth — guard rejects
+const caller = s.createCaller(appRouter)
+try {
+  await caller.admin.deleteUser({ id: 1 })
+} catch (err) {
+  expect(err).toBeInstanceOf(SilgiError)
+  expect(err.code).toBe('UNAUTHORIZED')
+}
+
+// With auth — guard passes
+const authedCaller = s.createCaller(appRouter, {
+  contextOverride: { token: 'admin-token' },
+})
+await authedCaller.admin.deleteUser({ id: 1 })
+```
+
+## Testing typed errors
+
+Procedures using `$errors()` + `fail()` throw `SilgiError` with the declared code:
+
+```ts twoslash
+// @noErrors
+import { SilgiError } from 'silgi'
+
+const caller = s.createCaller(appRouter)
+
+try {
+  await caller.users.get({ id: 999 })
+} catch (err) {
+  expect(err).toBeInstanceOf(SilgiError)
+  expect(err.code).toBe('NOT_FOUND')
+  expect(err.status).toBe(404)
+}
+```
+
+## Options reference
+
+### `createCaller` options
+
+| Option            | Type                      | Default | Description                              |
+| ----------------- | ------------------------- | ------- | ---------------------------------------- |
+| `contextOverride` | `Record<string, unknown>` | —       | Override or extend the base context      |
+| `headers`         | `Record<string, string>`  | —       | Mock request headers for context factory |
+| `timeout`         | `number \| null`          | `30000` | Default timeout in ms (`null` = none)    |
+
+### Per-call options (second argument)
+
+| Option    | Type                      | Description                         |
+| --------- | ------------------------- | ----------------------------------- |
+| `signal`  | `AbortSignal`             | AbortSignal for this call           |
+| `context` | `Record<string, unknown>` | Per-call context (merged over base) |
+
+## How it works
+
+`createCaller` uses the same compiled pipeline as `handler()`:
+
+1. Compiles the router (shared cache — compiles once, reused by both `handler()` and `createCaller`)
+2. Creates a proxy that mirrors the router's nested structure
+3. On each call: resolves context → injects route params → runs the compiled pipeline (guards + input validation + resolve + output validation)
+
+The only difference from an HTTP request: no serialization, no HTTP headers, no response construction. Everything else — validation, guards, error codes — behaves identically.
+
+<Callout>
+  `createCaller` is the recommended way to test procedures. It runs the full pipeline including guards and validation,
+  catching bugs that unit-testing the resolve function alone would miss.
+</Callout>
+
+## What's next?
+
+- [Server](/docs/server) — `serve()` and `handler()` for HTTP deployment
+- [Middleware](/docs/middleware) — guards and wraps that run in the pipeline
+- [Typed Errors](/docs/errors) — `$errors()` + `fail()` pattern

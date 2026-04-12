@@ -1,0 +1,43 @@
+---
+title: Strict GET
+description: Enforce GET-only access on query procedures — prevents CSRF and accidental POST calls.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+
+The strict GET guard rejects non-GET requests with `405 Method Not Allowed`. Apply it to query procedures to enforce RESTful method semantics and prevent CSRF.
+
+## Usage
+
+```ts twoslash
+// @noErrors
+import { strictGetGuard } from 'silgi/plugins'
+
+const listUsers = s
+  .$route({ method: 'GET' })
+  .$use(strictGetGuard)
+  .$resolve(({ ctx }) => ctx.db.users.findMany())
+```
+
+A `POST` request to this procedure returns:
+
+```json
+{
+  "code": "METHOD_NOT_ALLOWED",
+  "status": 405,
+  "message": "Expected GET, received POST"
+}
+```
+
+`strictGetGuard` is a singleton — no factory call needed. Add it directly to the `use` array.
+
+<Callout type='info'>
+  This guard only works when the request method is available in the context. With `serve()` and `handler()`, the method
+  is part of the Request object. If you're using a custom transport that doesn't set `ctx.method`, the guard passes
+  through without blocking.
+</Callout>
+
+## What's next?
+
+- [CORS](/docs/plugins/cors) — cross-origin request handling
+- [Plugins](/docs/plugins) — other available plugins

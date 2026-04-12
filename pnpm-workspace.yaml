@@ -1,0 +1,5 @@
+packages:
+  - playground
+  - examples/*
+  - docs
+  - dashboard

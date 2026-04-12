@@ -1,0 +1,157 @@
+---
+title: Hey API
+description: Convert Hey API generated OpenAPI clients into Silgi-compatible clients.
+---
+
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs'
+import { Callout } from 'fumadocs-ui/components/callout'
+import { Step, Steps } from 'fumadocs-ui/components/steps'
+
+Convert a [Hey API](https://heyapi.dev/) generated client into a Silgi client to use it with the full Silgi ecosystem — TanStack Query, Pinia Colada, and other integrations.
+
+<Callout type='warn'>
+  [Hey API](https://heyapi.dev/) is still in an unstable stage. This integration may introduce breaking changes in the
+  future.
+</Callout>
+
+## Setup
+
+<Steps>
+<Step>
+
+### Generate a Hey API client
+
+Use `@hey-api/openapi-ts` to generate a typed client from your OpenAPI spec:
+
+```bash
+npx @hey-api/openapi-ts \
+  -i https://api.example.com/api/openapi.json \
+  -o src/client
+```
+
+This outputs the generated SDK into the `src/client` directory.
+
+<Callout type='info'>For more information on Hey API, see the [official documentation](https://heyapi.dev/).</Callout>
+
+</Step>
+<Step>
+
+### Convert to a Silgi client
+
+```ts twoslash
+// @noErrors
+import { toClient } from 'silgi/hey-api'
+import * as sdk from './client/sdk.gen'
+
+export const client = toClient(sdk)
+```
+
+The `client` now behaves like any standard Silgi client — you can use it with [TanStack Query](/docs/libraries/tanstack-query), [Pinia Colada](/docs/libraries/pinia-colada), or call procedures directly.
+
+</Step>
+<Step>
+
+### Use the client
+
+```ts twoslash
+// @noErrors
+// Direct calls
+const { body } = await client.listPlanets()
+console.log(body) // Planet[]
+
+// With query params
+const { body: planet } = await client.getPlanet({
+  path: { planetId: 'earth' },
+})
+
+// With request body
+const { body: newPlanet } = await client.createPlanet({
+  body: { name: 'Mars' },
+})
+```
+
+Each call returns `{ body, request, response }` where:
+
+| Property   | Type       | Description                           |
+| ---------- | ---------- | ------------------------------------- |
+| `body`     | `T`        | The parsed response data              |
+| `request`  | `Request`  | The original `Request` object         |
+| `response` | `Response` | The raw `Response` for headers/status |
+
+</Step>
+</Steps>
+
+## With TanStack Query
+
+Combine with `createQueryUtils` for full query/mutation support:
+
+```ts twoslash
+// @noErrors
+import { toClient } from 'silgi/hey-api'
+import { createQueryUtils } from 'silgi/tanstack-query'
+import * as sdk from './client/sdk.gen'
+
+const client = toClient(sdk)
+const utils = createQueryUtils(client)
+
+// Now use with useQuery, useMutation, etc.
+const options = utils.listPlanets.queryOptions({ input: {} })
+```
+
+## With Pinia Colada
+
+```ts twoslash
+// @noErrors
+import { toClient } from 'silgi/hey-api'
+import { createSilgiVueColadaUtils } from 'silgi/pinia-colada'
+import * as sdk from './client/sdk.gen'
+
+const client = toClient(sdk)
+const utils = createSilgiVueColadaUtils(client)
+```
+
+## Error handling
+
+Internally, Silgi passes `throwOnError: true` to the Hey API client. If the original Hey API client throws an error, it is forwarded as-is without modification.
+
+```ts twoslash
+// @noErrors
+try {
+  const { body } = await client.getPlanet({ path: { planetId: 'unknown' } })
+} catch (error) {
+  // Error from Hey API — same format as the original SDK
+  console.error(error)
+}
+```
+
+## Abort signals
+
+Abort signals are supported from both the input and the client options:
+
+```ts twoslash
+// @noErrors
+const controller = new AbortController()
+
+// From input
+const result = await client.listPlanets({
+  signal: controller.signal,
+})
+
+// From client options
+const result2 = await client.listPlanets(
+  {},
+  {
+    signal: controller.signal,
+  },
+)
+
+// Either signal aborting will cancel the request
+controller.abort()
+```
+
+## What's next?
+
+- [Client](/docs/client) — learn about Silgi clients
+- [TanStack Query](/docs/libraries/tanstack-query) — use the converted client with TanStack Query
+- [Pinia Colada](/docs/libraries/pinia-colada) — use the converted client with Pinia Colada
+- [OpenAPI Client](/docs/libraries/openapi-client) — alternative: consume OpenAPI specs directly with `OpenAPILink`

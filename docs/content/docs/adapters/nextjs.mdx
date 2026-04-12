@@ -1,0 +1,85 @@
+---
+title: Next.js
+description: Use Silgi with Next.js App Router — API routes with full type safety and protocol support.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout'
+
+Silgi integrates with Next.js App Router via catch-all API routes. Full content negotiation (JSON, MessagePack, devalue) works out of the box.
+
+## Setup
+
+Create a catch-all API route:
+
+```ts twoslash
+// @noErrors
+// app/api/[...path]/route.ts
+import { createHandler } from 'silgi/nextjs'
+import { appRouter } from '~/server/rpc'
+
+const handler = createHandler(appRouter, {
+  context: (req) => ({
+    db: getDB(),
+    headers: Object.fromEntries(req.headers),
+  }),
+})
+
+export { handler as GET, handler as POST }
+```
+
+Procedures are accessible at:
+
+```
+POST /api/users/list
+POST /api/users/create
+GET  /api/health
+```
+
+## Server Actions
+
+For server-first React apps, use [React Server Actions](/docs/integrations/react) instead of API routes:
+
+```ts twoslash
+// @noErrors
+// app/actions.ts
+'use server'
+import { createAction } from 'silgi/react'
+
+export const listUsers = createAction(appRouter.users.list)
+```
+
+## Edge Runtime
+
+The handler uses standard Fetch API — works on both Node.js and Edge runtime:
+
+```ts twoslash
+// @noErrors
+export const runtime = 'edge'
+```
+
+<Callout type='info'>
+  Silgi compiles the router once at module load time. Next.js caches module imports across requests, so the compilation
+  cost is paid only once per cold start.
+</Callout>
+
+## Analytics and Scalar
+
+Enable the built-in [analytics dashboard](/docs/analytics) or [Scalar API reference](/docs/scalar) directly in the adapter:
+
+```ts twoslash
+// @noErrors
+const handler = createHandler(appRouter, {
+  context: (req) => ({ headers: Object.fromEntries(req.headers) }),
+  analytics: {
+    auth: process.env.ANALYTICS_TOKEN,
+  },
+  scalar: true,
+})
+```
+
+## What's next?
+
+- [Analytics](/docs/analytics) — built-in monitoring dashboard
+- [React Server Actions](/docs/integrations/react) — `[error, data]` tuple pattern
+- [TanStack Query](/docs/integrations/tanstack-query) — React Query integration
+- [Integrations](/docs/integrations) — other available integrations

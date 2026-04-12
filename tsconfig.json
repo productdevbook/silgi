@@ -10,11 +10,13 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitOverride": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
     "rootDir": "src",
     "outDir": "dist",
     "paths": {
-      "katman": ["./src/index.ts"],
-      "katman/*": ["./src/*/index.ts"]
+      "silgi": ["./src/index.ts"],
+      "silgi/*": ["./src/*/index.ts"]
     }
   },
   "include": ["src"]

@@ -1,0 +1,11 @@
+services:
+  nats:
+    image: nats:2-alpine
+    ports:
+      - '4222:4222'
+    command: ['--js']
+
+  redis:
+    image: redis:8-alpine
+    ports:
+      - '6381:6379'
