@@ -52,7 +52,7 @@ const createUser = s
 | ------------------ | -------- | --------------------------------------------------------------------------------------------- |
 | `.$resolve(fn)`    | Yes      | The function that does the work. Receives `{ input, ctx, fail, signal }`.                     |
 | `.$input(schema)`  | No       | A schema that validates the incoming data.                                                    |
-| `.$output(schema)` | No       | A schema that validates the return value.                                                     |
+| `.$output(schema)` | No       | Validates the return value and populates the response type in the API reference (Scalar/OpenAPI). Without it, no response schema is generated. |
 | `.$use(...mw)`     | No       | Add guards and wraps to run before the procedure.                                             |
 | `.$errors({...})`  | No       | A map of error codes to HTTP status codes. Enables the typed `fail()` function.               |
 | `.$route({...})`   | No       | OpenAPI metadata (tags, summary, description). Also used for special-case passthrough routes. |
@@ -107,9 +107,9 @@ const countdown = s.subscription(async function* () {
 
 Subscriptions stream via SSE over HTTP and are automatically exposed over WebSocket — no flag required. The client receives `{ count: 5 }`, `{ count: 4 }`, ... `{ count: 1 }`.
 
-### IDE autocomplete with `$output`
+## Output schema
 
-When you set `.$output()`, the builder gives you IDE autocomplete on the return value of `.$resolve()`:
+`$output()` does two things: it validates the return value at runtime, and it generates the response schema in the [API reference](/docs/openapi). Without `$output`, Scalar and the raw OpenAPI spec will have no response type for that procedure.
 
 ```ts twoslash
 // @noErrors
@@ -127,7 +127,7 @@ const createPost = s
   .$errors({ CONFLICT: 409 })
   .$resolve(({ input }) => {
     return { id: 1, title: input.title, body: input.body }
-    //     ^ IDE suggests id, title, body
+    //     ^ IDE suggests id, title, body — output schema drives autocomplete
   })
 ```
 
