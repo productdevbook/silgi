@@ -35,11 +35,7 @@ export function createHandler<TCtx extends Record<string, unknown>>(
   options: BunAdapterOptions<TCtx> = {},
 ): { port: number; hostname: string; fetch: FetchHandler } {
   const contextFactory = options.context ?? (() => ({}) as TCtx)
-  const fetch = createFetchHandler(
-    router,
-    contextFactory as (req: Request) => Record<string, unknown>,
-    options.hooks,
-  )
+  const fetch = createFetchHandler(router, contextFactory as (req: Request) => Record<string, unknown>, options.hooks)
 
   return {
     port: options.port ?? 3000,
