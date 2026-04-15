@@ -120,3 +120,94 @@ describe('HTTP + WebSocket on same server', () => {
     expect(wsResult.result.echo).toBe('ws')
   })
 })
+
+// ── Regression: issue #3 — contextFactory must be forwarded to WS hooks ────
+// The fix in silgi.ts handler() wraps contextFactory so peer.request is passed
+// to it. We test the same bridge logic via attachWebSocket + an explicit context
+// option that mirrors what handler() now does internally.
+
+describe('WebSocket context — contextFactory forwarded to procedures', () => {
+  const ctxFactory = (req: Request) => ({
+    customHeader: req.headers.get('x-test-header') ?? 'missing',
+  })
+
+  const kCtx = silgi({ context: ctxFactory })
+
+  const ctxRouter = kCtx.router({
+    echoCtx: kCtx.$resolve(({ ctx }) => ({ customHeader: ctx.customHeader })),
+  })
+
+  let ctxServer: Server
+  let ctxWsUrl: string
+
+  beforeAll(async () => {
+    ctxServer = createServer((_req, res) => {
+      res.writeHead(200)
+      res.end()
+    })
+
+    // Mirror the bridge applied by handler() after the fix:
+    // peer.request is a Request-like (NodeReqProxy extends StubRequest which
+    // sets its prototype to Request.prototype, so instanceof Request is true).
+    await attachWebSocket(ctxServer, ctxRouter, {
+      context: (peer) => {
+        const req: Request = (peer?.request instanceof Request ? peer.request : peer) as Request
+        return ctxFactory(req)
+      },
+    })
+
+    await new Promise<void>((resolve) => {
+      ctxServer.listen(0, '127.0.0.1', () => {
+        const addr = ctxServer.address() as { port: number }
+        ctxWsUrl = `ws://127.0.0.1:${addr.port}`
+        resolve()
+      })
+    })
+  })
+
+  afterAll(() => {
+    ctxServer?.close()
+  })
+
+  it('subscription receives ctx populated from contextFactory', async () => {
+    const result = await new Promise<any>((resolve, reject) => {
+      const ws = new WebSocket(ctxWsUrl, { headers: { 'x-test-header': 'hello-ctx' } })
+      ws.on('open', () => {
+        ws.send(JSON.stringify({ id: '1', path: 'echoCtx' }))
+      })
+      ws.on('message', (data) => {
+        resolve(JSON.parse(data.toString()))
+        ws.close()
+      })
+      ws.on('error', reject)
+      setTimeout(() => {
+        ws.close()
+        reject(new Error('timeout'))
+      }, 5000)
+    })
+
+    // Before fix: result.result.customHeader === 'missing' (ctx was always empty)
+    // After fix: ctx is populated from contextFactory via peer.request
+    expect(result.result.customHeader).toBe('hello-ctx')
+  })
+
+  it('ctx falls back to "missing" when header is absent', async () => {
+    const result = await new Promise<any>((resolve, reject) => {
+      const ws = new WebSocket(ctxWsUrl)
+      ws.on('open', () => {
+        ws.send(JSON.stringify({ id: '1', path: 'echoCtx' }))
+      })
+      ws.on('message', (data) => {
+        resolve(JSON.parse(data.toString()))
+        ws.close()
+      })
+      ws.on('error', reject)
+      setTimeout(() => {
+        ws.close()
+        reject(new Error('timeout'))
+      }, 5000)
+    })
+
+    expect(result.result.customHeader).toBe('missing')
+  })
+})

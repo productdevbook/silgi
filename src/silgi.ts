@@ -346,7 +346,12 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
 
       async function initWsHooks(): Promise<void> {
         const { _createWSHooks } = await import('./ws.ts')
-        wsHooks = _createWSHooks(routerDef) as Record<string, Function>
+        wsHooks = _createWSHooks(routerDef, {
+          context: (peer) => {
+            const req: Request = (peer?.request instanceof Request ? peer.request : peer) as Request
+            return contextFactory(req)
+          },
+        }) as Record<string, Function>
       }
 
       const wsPath = prefix ? `${prefix}/_ws` : '/_ws'
