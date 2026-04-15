@@ -11,13 +11,17 @@
 import { createFetchHandler, wrapHandler } from '../core/handler.ts'
 
 import type { FetchHandler, WrapHandlerOptions } from '../core/handler.ts'
+import type { SilgiHooks } from '../silgi.ts'
 import type { RouterDef } from '../types.ts'
+import type { Hookable } from 'hookable'
 
 export interface FetchAdapterConfig<TCtx extends Record<string, unknown>> extends WrapHandlerOptions {
   /** Route prefix to strip. Default: "/api" */
   prefix?: string
   /** Context factory — receives the Request (or framework event via eventMap). */
   context?: (req: Request) => TCtx | Promise<TCtx>
+  /** Lifecycle hooks (request, response, error). */
+  hooks?: Hookable<SilgiHooks>
 }
 
 /**
@@ -32,6 +36,8 @@ export interface FetchAdapterConfigWithEvent<
   prefix?: string
   /** Context factory — receives the framework event, not raw Request. */
   context?: (event: TEvent) => TCtx | Promise<TCtx>
+  /** Lifecycle hooks (request, response, error). */
+  hooks?: Hookable<SilgiHooks>
 }
 
 /**
@@ -46,7 +52,7 @@ export function createFetchAdapter<TCtx extends Record<string, unknown>>(
   const prefix = options.prefix ?? defaultPrefix
   const contextFactory = options.context ?? (() => ({}) as TCtx)
   return wrapHandler(
-    createFetchHandler(router, contextFactory as (req: Request) => Record<string, unknown>, undefined, prefix),
+    createFetchHandler(router, contextFactory as (req: Request) => Record<string, unknown>, options.hooks, prefix),
     router,
     options,
     prefix,
@@ -76,7 +82,7 @@ export function createEventFetchAdapter<TCtx extends Record<string, unknown>, TE
           return options.context(eventRef) as Record<string, unknown> | Promise<Record<string, unknown>>
         return {} as Record<string, unknown>
       },
-      undefined,
+      options.hooks,
       prefix,
     ),
     router,
