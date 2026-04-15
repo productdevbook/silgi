@@ -14,12 +14,8 @@ const SENSITIVE_HEADER_KEYS = new Set([
   'proxy-authorization',
 ])
 
-function shouldRedactSensitiveData(): boolean {
-  return process.env.NODE_ENV === 'production'
-}
-
 export function redactHeaderValue(key: string, value: string): string {
-  return shouldRedactSensitiveData() && SENSITIVE_HEADER_KEYS.has(key.toLowerCase()) ? REDACTED : value
+  return SENSITIVE_HEADER_KEYS.has(key.toLowerCase()) ? REDACTED : value
 }
 
 export function round(n: number): number {

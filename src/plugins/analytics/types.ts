@@ -152,12 +152,12 @@ export interface AnalyticsOptions {
   /** Time-series history in seconds (default: 120) */
   historySeconds?: number
   /**
-   * Protect dashboard access.
+   * Protect dashboard access. **Required** — the analytics dashboard exposes
+   * request bodies, headers, and stack traces, so authentication is mandatory.
    * - `string` — secret token checked against `Authorization: Bearer <token>` header or `?token=` query param
    * - `(req: Request) => boolean | Promise<boolean>` — custom auth function
-   * - `undefined` — no auth (open access, NOT recommended in production)
    */
-  auth?: string | ((req: Request) => boolean | Promise<boolean>)
+  auth: string | ((req: Request) => boolean | Promise<boolean>)
   /** Interval in ms between storage flushes (default: 5000) */
   flushInterval?: number
   /** Days to retain entries in storage (default: 30). Entries older than this are pruned on flush. */

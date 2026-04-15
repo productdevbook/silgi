@@ -65,7 +65,7 @@ export class AnalyticsCollector {
   /** Cost tracker */
   costTracker: CostTracker
 
-  constructor(options: AnalyticsOptions = {}) {
+  constructor(options: Omit<AnalyticsOptions, 'auth'> = {}) {
     this.#bufferSize = options.bufferSize ?? 1024
     this.#historySeconds = options.historySeconds ?? 120
     this.#ignorePaths = new Set((options.ignorePaths ?? []).map((p) => (p.startsWith('/') ? p.slice(1) : p)))

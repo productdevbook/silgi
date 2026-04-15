@@ -583,7 +583,9 @@ s.serve(appRouter, {
     description: 'Full feature showcase — every Silgi capability in one server',
     security: { type: 'http', scheme: 'bearer', bearerFormat: 'Token' },
   },
-  analytics: true,
+  analytics: {
+    auth: process.env.ANALYTICS_TOKEN ?? 'dev-secret',
+  },
 })
 
 console.log('\n╔══════════════════════════════════════════════╗')

@@ -179,13 +179,21 @@ function extractProcedureSchemas(router: RouterDef): Map<string, ProcedureSchema
 export function wrapWithAnalytics(
   handler: FetchHandler,
   router: RouterDef | undefined,
-  options: AnalyticsOptions = {},
+  options: AnalyticsOptions,
 ): FetchHandler {
   const collector = new AnalyticsCollector(options)
   const procedureSchemas = router ? extractProcedureSchemas(router) : undefined
   if (procedureSchemas) collector.setProcedureSchemas(procedureSchemas)
   const dashboardHtml = analyticsHTML()
   const auth = options.auth
+
+  if (!auth) {
+    throw new Error(
+      '[silgi analytics] `options.auth` is required. ' +
+        'The analytics dashboard exposes request bodies, headers, and stack traces. ' +
+        'Provide an auth token via `analytics: { auth: "your-secret-token" }` to protect it.',
+    )
+  }
 
   // Wire task analytics
   import('../core/task.ts').then(({ setTaskAnalytics }) => {
@@ -201,11 +209,9 @@ export function wrapWithAnalytics(
     const analyticsSub = normalizeAnalyticsPath(pathname)
     if (analyticsSub !== null) {
       const canonical = analyticsSub === '' ? 'api/analytics' : `api/analytics/${analyticsSub}`
-      if (auth) {
-        const authResult = checkAnalyticsAuth(request, auth)
-        const ok = authResult instanceof Promise ? await authResult : authResult
-        if (!ok) return analyticsAuthResponse(canonical)
-      }
+      const authResult = checkAnalyticsAuth(request, auth)
+      const ok = authResult instanceof Promise ? await authResult : authResult
+      if (!ok) return analyticsAuthResponse(canonical)
       return serveAnalyticsRoute(canonical, request, collector, dashboardHtml)
     }
 

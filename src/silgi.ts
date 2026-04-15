@@ -137,8 +137,8 @@ export interface SilgiInstance<TBaseCtx extends Record<string, unknown>> {
       basePath?: string
       /** Enable Scalar API Reference UI at /api/reference and /api/openapi.json */
       scalar?: boolean | ScalarOptions
-      /** Enable analytics dashboard at /api/analytics */
-      analytics?: boolean | AnalyticsOptions
+      /** Enable analytics dashboard at /api/analytics — requires `auth` to be set */
+      analytics?: AnalyticsOptions
     },
   ) => (request: Request) => Response | Promise<Response>
 

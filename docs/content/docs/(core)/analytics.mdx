@@ -9,17 +9,19 @@ Built-in analytics for Silgi. No Prometheus, no Grafana, no external infrastruct
 
 ## Quick start
 
-Pass `analytics: true` to `serve()` or `handler()`:
+Pass an `analytics` options object with a required `auth` token to `serve()` or `handler()`:
 
 ```ts twoslash
 // @noErrors
 s.serve(appRouter, {
   port: 3000,
-  analytics: true,
+  analytics: {
+    auth: process.env.ANALYTICS_TOKEN,
+  },
 })
 ```
 
-Open `http://localhost:3000/api/analytics` in your browser.
+Open `http://localhost:3000/api/analytics` in your browser. The dashboard will prompt for the token on first visit.
 
 ## What it tracks
 
@@ -222,7 +224,7 @@ curl -L 'http://localhost:3000/api/analytics/requests/<request-id>/md' \
 
 ## Protecting the dashboard
 
-By default, the analytics dashboard is open to anyone who can reach the URL. In production you should always set the `auth` option.
+The `auth` option is **required**. The analytics dashboard exposes request bodies, headers, and stack traces, so authentication must be configured before the dashboard is mounted. Omitting `auth` throws a startup error.
 
 ### Token auth
 
@@ -258,8 +260,8 @@ s.serve(appRouter, {
 The function receives the raw `Request` and returns `boolean` or `Promise<boolean>`. Return `true` to allow access, `false` to block with a 401.
 
 <Callout type='warn'>
-  Never deploy analytics without `auth` in production. The dashboard exposes request payloads, headers, error stacks,
-  and internal procedure names.
+  `auth` is mandatory. Silgi will throw at startup if `auth` is not provided. The dashboard exposes request payloads,
+  headers, error stacks, and internal procedure names.
 </Callout>
 
 ## Persistent storage
@@ -306,14 +308,14 @@ s.serve(appRouter, {
 })
 ```
 
-| Option           | Type                                  | Default     | Description                                         |
-| ---------------- | ------------------------------------- | ----------- | --------------------------------------------------- |
-| `auth`           | `string \| (req: Request) => boolean` | `undefined` | Token string or custom auth function                |
-| `bufferSize`     | `number`                              | `1024`      | Latency samples to keep per procedure (ring buffer) |
-| `historySeconds` | `number`                              | `120`       | Time-series sparkline history in seconds            |
-| `retentionDays`  | `number`                              | `30`        | Days to keep request and error entries in storage   |
-| `flushInterval`  | `number`                              | `5000`      | Interval in milliseconds between storage flushes    |
-| `ignorePaths`    | `string[]`                            | `[]`        | Path prefixes to exclude from tracking              |
+| Option           | Type                                  | Default      | Description                                         |
+| ---------------- | ------------------------------------- | ------------ | --------------------------------------------------- |
+| `auth`           | `string \| (req: Request) => boolean` | _(required)_ | Token string or custom auth function                |
+| `bufferSize`     | `number`                              | `1024`       | Latency samples to keep per procedure (ring buffer) |
+| `historySeconds` | `number`                              | `120`        | Time-series sparkline history in seconds            |
+| `retentionDays`  | `number`                              | `30`         | Days to keep request and error entries in storage   |
+| `flushInterval`  | `number`                              | `5000`       | Interval in milliseconds between storage flushes    |
+| `ignorePaths`    | `string[]`                            | `[]`         | Path prefixes to exclude from tracking              |
 
 Latency samples use fixed-size ring buffers — memory usage stays constant regardless of traffic volume. Request and error entries are retained for `retentionDays` and pruned automatically on each storage flush.
 
@@ -323,7 +325,9 @@ Works the same way when using `s.handler()` instead of `s.serve()`:
 
 ```ts twoslash
 // @noErrors
-const handle = s.handler(appRouter, { analytics: true })
+const handle = s.handler(appRouter, {
+  analytics: { auth: process.env.ANALYTICS_TOKEN },
+})
 
 Bun.serve({ port: 3000, fetch: handle })
 // Dashboard at /api/analytics
@@ -356,7 +360,7 @@ import { createHandler } from 'silgi/nextjs'
 
 const handler = createHandler(appRouter, {
   context: (req) => ({ headers: Object.fromEntries(req.headers) }),
-  analytics: true,
+  analytics: { auth: process.env.ANALYTICS_TOKEN },
 })
 
 export { handler as GET, handler as POST }
@@ -568,12 +572,12 @@ const sesMd = sessionToMarkdown(sessionRequests, sessionId)
 
 ## Privacy behavior
 
-Analytics keeps development debugging convenient while still protecting production by default:
+Sensitive HTTP headers are always redacted, regardless of environment:
 
-- On `localhost` in the dashboard, sensitive headers such as `cookie`, `authorization`, and `set-cookie` are shown as-is
-- In production builds (`NODE_ENV=production`), those headers are redacted in stored analytics entries, JSON exports, and markdown exports
+- `authorization`, `cookie`, `set-cookie`, `x-api-key`, `x-auth-token`, and `proxy-authorization` are stored as `[REDACTED]` in all analytics entries, JSON exports, and markdown exports
+- This applies in development, staging, and production — there is no environment-dependent behavior
 
-If you expose analytics outside local development, always enable dashboard auth and assume analytics data may contain request payloads and internal headers.
+Request and response bodies (`input`, `output`) are captured as-is. Avoid recording sensitive fields by not returning them from procedures or by filtering them before returning.
 
 <Callout type='info'>
   Built-in analytics supports [persistent storage](#persistent-storage) for single-service use. For multi-service

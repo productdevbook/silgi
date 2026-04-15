@@ -106,7 +106,7 @@ function makeResponse(
 export type FetchHandler = (request: Request) => Response | Promise<Response>
 
 export interface WrapHandlerOptions {
-  analytics?: boolean | import('../plugins/analytics/types.ts').AnalyticsOptions
+  analytics?: import('../plugins/analytics/types.ts').AnalyticsOptions
   scalar?: boolean | import('../scalar.ts').ScalarOptions
   /** URL path prefix for the handler (e.g. "/api"). Requests not matching this prefix return 404. */
   basePath?: string
@@ -137,8 +137,7 @@ export function wrapHandler(
     }
     if (options!.analytics) {
       const { wrapWithAnalytics } = await import('../plugins/analytics.ts')
-      const analyticsOpts = typeof options!.analytics === 'object' ? options!.analytics : {}
-      h = wrapWithAnalytics(h, router, analyticsOpts)
+      h = wrapWithAnalytics(h, router, options!.analytics)
     }
     wrapped = h
   }

@@ -9,7 +9,7 @@
  *
  * const handler = createHandler(appRouter, {
  *   context: (event) => ({ db: getDB(), user: event.locals.user }),
- *   analytics: true,
+ *   analytics: { auth: "your-secret-token" },
  * })
  *
  * export const GET = handler
