@@ -12,17 +12,16 @@ import { createContext, detachContext, releaseContext } from '../compile.ts'
 import { compileRouter } from '../compile.ts'
 
 import { detectResponseFormat, encodeResponse, makeErrorResponse } from './codec.ts'
-import { runWithCtx } from './context-bridge.ts'
 import { applyContext } from './dispatch.ts'
 import { parseInput } from './input.ts'
 import { routerCache } from './router-utils.ts'
 import { iteratorToEventStream } from './sse.ts'
-import { analyticsTraceMap } from './trace-map.ts'
 import { parseUrlPath } from './url.ts'
 
 import type { CompiledRoute, CompiledRouterFn } from '../compile.ts'
 import type { SilgiHooks } from '../silgi.ts'
 import type { ResponseFormat } from './codec.ts'
+import type { ContextBridge } from './context-bridge.ts'
 import type { Hookable } from 'hookable'
 
 // Re-export for backwards compat
@@ -114,6 +113,18 @@ export interface WrapHandlerOptions {
   scalar?: boolean | import('../scalar.ts').ScalarOptions
   /** URL path prefix for the handler (e.g. "/api"). Requests not matching this prefix return 404. */
   basePath?: string
+  /**
+   * Schema registry for OpenAPI / analytics schema conversion. Built from
+   * `schemaConverters` in the silgi instance config — do not set manually.
+   * @internal
+   */
+  schemaRegistry?: import('./schema-converter.ts').SchemaRegistry
+  /**
+   * Hookable instance — threaded so `wrapWithAnalytics` can register
+   * lifecycle listeners on `request:prepare` / `response:finalize`.
+   * @internal
+   */
+  hooks?: Hookable<SilgiHooks>
 }
 
 /**
@@ -137,11 +148,11 @@ export function wrapHandler(
     if (options!.scalar) {
       const { wrapWithScalar } = await import('../scalar.ts')
       const scalarOpts = typeof options!.scalar === 'object' ? options!.scalar : {}
-      h = wrapWithScalar(h, router, scalarOpts, prefix)
+      h = wrapWithScalar(h, router, scalarOpts, prefix, options!.schemaRegistry)
     }
     if (options!.analytics) {
       const { wrapWithAnalytics } = await import('../plugins/analytics.ts')
-      h = wrapWithAnalytics(h, router, options!.analytics)
+      h = wrapWithAnalytics(h, router, options!.analytics, options!.schemaRegistry, options!.hooks)
     }
     wrapped = h
   }
@@ -158,6 +169,7 @@ export function createFetchHandler(
   contextFactory: (req: Request) => Record<string, unknown> | Promise<Record<string, unknown>>,
   hooks?: Hookable<SilgiHooks>,
   prefix?: string,
+  bridge?: ContextBridge,
 ): FetchHandler {
   // Compile router
   let compiledRouter = routerCache.get(routerDef) as CompiledRouterFn | undefined
@@ -170,12 +182,23 @@ export function createFetchHandler(
   const jsonHeaders = { 'content-type': 'application/json' }
   const notFoundBody = JSON.stringify({ code: 'NOT_FOUND', status: 404, message: 'Procedure not found' })
 
-  // Hook helper
+  // Hook helper — fire-and-forget
   function callHook(name: keyof SilgiHooks, event: any): void {
     if (!hooks) return
     try {
       const result = hooks.callHook(name, event)
       if (result instanceof Promise) result.catch(() => {})
+    } catch {}
+  }
+
+  // Hook helper — awaited (used for critical hooks like `request:prepare`
+  // that must complete before the pipeline runs). Sync fast-path when no
+  // hooks are registered avoids a per-request Promise allocation.
+  function awaitHook(name: keyof SilgiHooks, event: any): void | Promise<void> {
+    if (!hooks) return
+    try {
+      const result = hooks.callHook(name, event)
+      if (result instanceof Promise) return result.catch(() => {})
     } catch {}
   }
 
@@ -225,9 +248,11 @@ export function createFetchHandler(
       applyContext(ctx, baseCtx)
       if (match.params) ctx.params = match.params
 
-      // Inject analytics trace into context (bridges Drizzle/Better Auth tracing)
-      const reqTrace = analyticsTraceMap.get(request)
-      if (reqTrace) ctx.__analyticsTrace = reqTrace
+      // Notify framework plugins (e.g. analytics) that context is ready
+      // so they can set `ctx.trace` before any user code runs. Sync result
+      // (no hooks, or sync listeners) skips the microtask.
+      const prepareResult = awaitHook('request:prepare', { request, ctx })
+      if (prepareResult) await prepareResult
 
       // Input — parse body/query, then merge URL path params
       if (!route.passthrough) rawInput = await parseInput(request, url, qMark)
@@ -238,10 +263,13 @@ export function createFetchHandler(
       callHook('request', { path: pathname, input: rawInput })
 
       // Pipeline
-      const pipelineResult = runWithCtx(ctx, () => route.handler(ctx, rawInput, request.signal))
+      const pipelineResult = bridge
+        ? bridge.run(ctx, () => route.handler(ctx, rawInput, request.signal))
+        : route.handler(ctx, rawInput, request.signal)
       const output = pipelineResult instanceof Promise ? await pipelineResult : pipelineResult
 
       callHook('response', { path: pathname, output, durationMs: 0 })
+      callHook('response:finalize', { request, ctx, output })
 
       // Response — makeResponse detaches ctx for streaming outputs so the
       // stream wrapper owns release; otherwise `using` releases at scope end.

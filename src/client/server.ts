@@ -30,8 +30,33 @@ export interface ServerClientOptions<TCtx extends Record<string, unknown>> {
 /**
  * Create a type-safe client that calls procedures directly in-process.
  *
- * No HTTP, no serialization, no network — just compiled pipeline execution.
- * Uses the same compiled handlers as serve() and handler().
+ * @remarks
+ * No HTTP, no serialization, no network — the client resolves
+ * procedures through the same compiled pipeline as `handler()` and
+ * `serve()`. Intended for SSR, server components, and tests where the
+ * typed client interface is convenient but a network round-trip is not.
+ *
+ * Note that this helper is a thin proxy over `compileRouter`; it does
+ * not run through `silgi.runInContext`, so integrations that read
+ * `silgi.currentContext()` should call `silgi.runInContext` around the
+ * invocation or use `silgi.createCaller()` instead.
+ *
+ * @typeParam TRouter - The router type (usually `typeof appRouter`).
+ * @typeParam TCtx - The context shape returned by `options.context`.
+ * @param router - The router definition to call into.
+ * @param options - Server-client configuration; must include a
+ *   `context` factory.
+ * @returns A typed client mirroring `TRouter`.
+ *
+ * @example
+ * ```ts
+ * import { createServerClient } from 'silgi/client/server'
+ *
+ * const client = createServerClient(appRouter, {
+ *   context: () => ({ db: getDB() }),
+ * })
+ * const users = await client.users.list({ limit: 10 })
+ * ```
  */
 export function createServerClient<TRouter extends RouterDef, TCtx extends Record<string, unknown>>(
   router: TRouter,

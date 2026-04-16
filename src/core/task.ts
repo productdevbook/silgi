@@ -87,7 +87,7 @@ export function createTaskFromProcedure(
     const ctx: any = contextFactory ? await (contextFactory as Function)() : {}
 
     // If parent ctx passed, record span on parent request trace
-    const parentTrace = (parentCtx as any)?.__analyticsTrace
+    const parentTrace = (parentCtx as any)?.trace
     const spanStart = parentTrace ? performance.now() : 0
 
     // Inject RequestTrace for trace() calls inside the task
@@ -95,7 +95,7 @@ export function createTaskFromProcedure(
     try {
       const { RequestTrace } = await import('../plugins/analytics.ts')
       reqTrace = new RequestTrace()
-      ctx.__analyticsTrace = reqTrace
+      ctx.trace = reqTrace
     } catch {}
 
     const t0 = performance.now()

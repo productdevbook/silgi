@@ -8,11 +8,35 @@ import type { InferClient } from '../types.ts'
 import type { ClientLink, ClientContext, ClientOptions } from './types.ts'
 
 /**
- * Create a type-safe client from a link.
+ * Create a type-safe client from a transport-level {@link ClientLink}.
  *
+ * @remarks
+ * The returned value is a `Proxy` that mirrors the shape of your server
+ * router at the type level. Nested property access builds a dotted
+ * procedure path; calling the terminal proxy invokes the link with
+ * `(path, input, options)`.
+ *
+ * Sub-proxies are cached in a `Map` on first access so repeated lookups
+ * on the same branch do not re-allocate a new proxy tree.
+ *
+ * @typeParam T - The inferred server router type (usually
+ *   `typeof appRouter`).
+ * @typeParam TClientContext - Extra per-call context carried through
+ *   `ClientOptions` (e.g. an abort signal, a request id).
+ * @param link - A transport link (fetch, ofetch, websocket, custom).
+ * @returns A typed client whose shape matches `T`.
+ *
+ * @example
  * ```ts
- * const client = createClient<typeof appRouter>(link)
+ * import { createClient, createFetchLink } from 'silgi/client'
+ *
+ * const client = createClient<typeof appRouter>(
+ *   createFetchLink({ url: 'https://api.example.com' }),
+ * )
+ * const users = await client.users.list({ limit: 10 })
  * ```
+ *
+ * @see {@link createSafeClient} for a `[error, data]` variant.
  */
 export function createClient<T, TClientContext extends ClientContext = Record<never, never>>(
   link: ClientLink<TClientContext>,
@@ -69,12 +93,26 @@ export async function safe<TOutput, TError = unknown>(promise: Promise<TOutput>)
 }
 
 /**
- * Create a safe client — every procedure call returns { error, data } instead of throwing.
+ * Create a safe client — every procedure call returns a {@link SafeResult}
+ * tuple instead of throwing.
  *
+ * @remarks
+ * Useful when the caller prefers discriminated-union error handling over
+ * `try`/`catch`. The underlying transport is unchanged; errors are
+ * caught by {@link safe} and surfaced as `{ error, data, isError,
+ * isSuccess }`.
+ *
+ * @typeParam T - The inferred server router type.
+ * @typeParam TClientContext - Extra per-call context.
+ * @param link - A transport link.
+ * @returns A client whose every procedure yields a
+ *   `Promise<SafeResult<Output, SilgiError>>`.
+ *
+ * @example
  * ```ts
  * const safeClient = createSafeClient<typeof appRouter>(link)
  * const { error, data } = await safeClient.users.list()
- * if (error) console.error(error)
+ * if (error) console.error(error.code, error.status)
  * ```
  */
 export function createSafeClient<T, TClientContext extends ClientContext = Record<never, never>>(

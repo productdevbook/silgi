@@ -316,7 +316,7 @@ describe('RequestTrace', () => {
 describe('trace() standalone helper', () => {
   it('uses RequestTrace when available on context', async () => {
     const rt = new RequestTrace()
-    const ctx: Record<string, unknown> = { __analyticsTrace: rt }
+    const ctx: Record<string, unknown> = { trace: rt }
 
     const result = await trace(ctx, 'db.find', () => Promise.resolve(42))
     expect(result).toBe(42)

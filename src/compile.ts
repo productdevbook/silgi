@@ -12,8 +12,11 @@ import { validateSchema } from './core/schema.ts'
 
 import type { ProcedureDef, GuardDef, WrapDef, ErrorDef } from './types.ts'
 
-/** Internal symbol for pipeline raw input — prevents collision with user context keys */
-export const RAW_INPUT = Symbol.for('silgi.rawInput')
+// Framework-internal symbol keys live in one module — see core/ctx-symbols.ts.
+// Re-exported here for backwards compatibility with the previous shape.
+export { RAW_INPUT } from './core/ctx-symbols.ts'
+
+import { RAW_INPUT } from './core/ctx-symbols.ts'
 
 /**
  * Compiled pipeline — called per request.

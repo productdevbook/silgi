@@ -29,9 +29,29 @@
  * })
  * ```
  */
-import { getCtx, runWithCtx } from '../../core/context-bridge.ts'
+import { createContextBridge } from '../../core/context-bridge.ts'
 
 import type { RequestTrace, SpanKind } from '../../plugins/analytics.ts'
+
+/**
+ * Module-level compat bridge — backs the exported `withCtx()` helper for
+ * programmatic and test usage. Production request paths flow through
+ * `silgi.runInContext()` via `src/core/handler.ts` and never touch this
+ * bridge, so there is no cross-instance context bleed during normal
+ * operation. The bridge exists only so `withCtx(ctx, fn)` works without
+ * a silgi instance in scope.
+ *
+ * @internal
+ */
+const _compatBridge = createContextBridge()
+
+function getCtx(): Record<string, unknown> | undefined {
+  return _compatBridge.current()
+}
+
+function runWithCtx<T>(ctx: Record<string, unknown>, fn: () => T): T {
+  return _compatBridge.run(ctx, fn)
+}
 
 // ── Constants ────────────────────────────────────────
 
@@ -144,7 +164,7 @@ function patchSession(session: any, cfg: ResolvedConfig, isTx: boolean): boolean
       if (!prepared || typeof prepared.execute !== 'function') return prepared
 
       const ctx = getCtx()
-      const reqTrace = ctx?.__analyticsTrace as RequestTrace | undefined
+      const reqTrace = ctx?.trace as RequestTrace | undefined
       if (!reqTrace) return prepared
 
       const queryText = extractQueryText(args[0]) ?? prepared.rawQueryConfig?.text ?? prepared.queryConfig?.text ?? null
@@ -167,7 +187,7 @@ function patchSession(session: any, cfg: ResolvedConfig, isTx: boolean): boolean
 
     session.query = function patchedQuery(this: any, queryString: string, params: any[]) {
       const ctx = getCtx()
-      const reqTrace = ctx?.__analyticsTrace as RequestTrace | undefined
+      const reqTrace = ctx?.trace as RequestTrace | undefined
       if (!reqTrace) return originalQuery.call(this, queryString, params)
 
       return traceExecution(reqTrace, cfg, queryString ?? null, isTx, originalQuery, this, [queryString, params])
@@ -221,7 +241,7 @@ function patchRawClient(client: any, cfg: ResolvedConfig): boolean {
 
   client[methodName] = function patchedClientMethod(this: any, ...args: any[]) {
     const ctx = getCtx()
-    const reqTrace = ctx?.__analyticsTrace as RequestTrace | undefined
+    const reqTrace = ctx?.trace as RequestTrace | undefined
     if (!reqTrace) return originalMethod.apply(this, args)
 
     const queryText = extractQueryText(args[0])
@@ -244,7 +264,7 @@ function patchSessionExecute(session: any, cfg: ResolvedConfig): boolean {
 
   session.execute = function patchedDeepExecute(this: any, ...args: any[]) {
     const ctx = getCtx()
-    const reqTrace = ctx?.__analyticsTrace as RequestTrace | undefined
+    const reqTrace = ctx?.trace as RequestTrace | undefined
     if (!reqTrace) return originalExecute.apply(this, args)
 
     const queryText = extractQueryText(args[0])

@@ -61,12 +61,23 @@ export type {
 } from './types.ts'
 
 // ── Error ───────────────────────────────────────────
-export { SilgiError, isDefinedError, toSilgiError } from './core/error.ts'
+export { SilgiError, isSilgiError, isDefinedError, toSilgiError } from './core/error.ts'
 export type { SilgiErrorCode, SilgiErrorOptions, SilgiErrorJSON } from './core/error.ts'
 
 // ── Schema ──────────────────────────────────────────
 export { type, validateSchema, ValidationError } from './core/schema.ts'
 export type { Schema, AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
+
+// ── Schema Converters ───────────────────────────────
+export { createSchemaRegistry, schemaToJsonSchema } from './core/schema-converter.ts'
+export type { SchemaConverter, SchemaRegistry, JSONSchema, ConvertOptions } from './core/schema-converter.ts'
+
+// ── Context Bridge ──────────────────────────────────
+export { createContextBridge } from './core/context-bridge.ts'
+export type { ContextBridge } from './core/context-bridge.ts'
+
+// ── Context ─────────────────────────────────────────
+export type { BaseContext } from './core/context.ts'
 
 // ── SSE/Streaming ───────────────────────────────────
 export { withEventMeta, getEventMeta } from './core/sse.ts'

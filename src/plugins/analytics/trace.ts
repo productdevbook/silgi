@@ -117,7 +117,7 @@ export async function trace<T>(
     procedure?: { input?: unknown; output?: unknown | ((result: T) => unknown) }
   },
 ): Promise<T> {
-  const reqTrace = ctx.__analyticsTrace as RequestTrace | undefined
+  const reqTrace = ctx.trace as RequestTrace | undefined
   if (reqTrace) {
     return reqTrace.trace(name, fn, opts)
   }
