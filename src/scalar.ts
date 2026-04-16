@@ -7,7 +7,7 @@
 
 import { schemaToJsonSchema as _schemaToJsonSchema } from './core/schema-converter.ts'
 
-import type { ConvertOptions } from './core/schema-converter.ts'
+import type { ConvertOptions, SchemaRegistry } from './core/schema-converter.ts'
 import type { AnySchema } from './core/schema.ts'
 import type { ProcedureDef, RouterDef, Route } from './types.ts'
 
@@ -106,7 +106,11 @@ export function generateOpenAPI(
   router: RouterDef,
   options: ScalarOptions = {},
   basePath: string = '',
+  registry?: SchemaRegistry,
 ): Record<string, unknown> {
+  const schemaToJsonSchema = (schema: AnySchema, strategy: ConvertOptions['strategy'] = 'input'): JSONSchema =>
+    _schemaToJsonSchema(schema, strategy, registry) as JSONSchema
+
   const paths: Record<string, Record<string, unknown>> = {}
   const tags = new Map<string, { description?: string }>()
 
@@ -418,17 +422,6 @@ function collectProcedures(node: unknown, path: string[], cb: (path: string[], p
   }
 }
 
-/**
- * Convert a Standard Schema to JSON Schema.
- *
- * Fast path: `~standard.jsonSchema.input()` (StandardJSONSchemaV1 implementors).
- * Fallback: any converter registered via `registerSchemaConverter` (e.g. the
- * Zod converter registered by `silgi/zod`). Core is validator-agnostic.
- */
-function schemaToJsonSchema(schema: AnySchema, strategy: ConvertOptions['strategy'] = 'input'): JSONSchema {
-  return _schemaToJsonSchema(schema, strategy) as JSONSchema
-}
-
 function objectSchemaToParams(schema: JSONSchema): Record<string, unknown>[] {
   if (schema.type !== 'object' || !schema.properties) return []
   const required = new Set(schema.required ?? [])
@@ -454,10 +447,11 @@ export function wrapWithScalar(
   routerDef: RouterDef,
   options: ScalarOptions = {},
   prefix: string = '/api',
+  registry?: SchemaRegistry,
 ): FetchHandler {
   // Normalize prefix: ensure leading slash, strip trailing
   const normPrefix = (prefix.startsWith('/') ? prefix : '/' + prefix).replace(/\/+$/, '')
-  const specJson = JSON.stringify(generateOpenAPI(routerDef, options, normPrefix))
+  const specJson = JSON.stringify(generateOpenAPI(routerDef, options, normPrefix, registry))
   const specUrl = `${normPrefix}/openapi.json`
   const specHtml = scalarHTML(specUrl, options)
   // Interception paths are relative (no leading slash) to match pathname form.

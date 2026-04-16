@@ -11,6 +11,7 @@ import type { SilgiHooks } from '../silgi.ts'
 import type { RouterDef } from '../types.ts'
 import type { WSAdapterOptions } from '../ws.ts'
 import type { FetchHandler } from './handler.ts'
+import type { SchemaRegistry } from './schema-converter.ts'
 import type { Hookable } from 'hookable'
 
 // ── Server Handle ───────────────────────────────────
@@ -97,6 +98,7 @@ export async function createServeHandler(
   contextFactory: (req: Request) => Record<string, unknown> | Promise<Record<string, unknown>>,
   hooks: Hookable<SilgiHooks>,
   options?: ServeOptions,
+  schemaRegistry?: SchemaRegistry,
 ): Promise<SilgiServer> {
   const port = options?.port ?? 3000
   const hostname = options?.hostname ?? '127.0.0.1'
@@ -106,7 +108,7 @@ export async function createServeHandler(
   const httpHandler: FetchHandler = wrapHandler(
     createFetchHandler(routerDef, contextFactory, hooks, prefix),
     routerDef,
-    options,
+    options ? { ...options, schemaRegistry, hooks } : { schemaRegistry, hooks },
     prefix,
   )
 

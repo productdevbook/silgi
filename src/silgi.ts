@@ -17,11 +17,13 @@ import { createCaller } from './caller.ts'
 import { compileRouter } from './compile.ts'
 import { createFetchHandler, wrapHandler } from './core/handler.ts'
 import { assignPaths, routerCache } from './core/router-utils.ts'
+import { createSchemaRegistry } from './core/schema-converter.ts'
 import { createTaskFromProcedure } from './core/task.ts'
 import { normalizePrefix } from './core/url.ts'
 
 import type { ProcedureBuilder } from './builder.ts'
 import type { FetchHandler } from './core/handler.ts'
+import type { SchemaConverter, SchemaRegistry } from './core/schema-converter.ts'
 import type { AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
 import type { ServeOptions, SilgiServer } from './core/serve.ts'
 import type { StorageConfig } from './core/storage.ts'
@@ -55,6 +57,21 @@ export interface SilgiHooks {
   'serve:start': (event: { url: string; port: number; hostname: string }) => void
   /** Called when the server is shutting down */
   'serve:stop': (event: { url: string; port: number; hostname: string }) => void
+  /**
+   * Fires after base context is applied and params are merged, before input parsing.
+   * Framework plugins (e.g. analytics) use this to inject fields into `ctx`
+   * before any user code runs.
+   *
+   * @internal
+   */
+  'request:prepare': (event: { request: Request; ctx: Record<string, unknown> }) => void
+  /**
+   * Fires after the pipeline produces output, before the `Response` is built.
+   * Framework plugins use this to capture output for trace recording.
+   *
+   * @internal
+   */
+  'response:finalize': (event: { request: Request; ctx: Record<string, unknown>; output: unknown }) => void
 }
 
 // ── Silgi Instance ─────────────────────────────────
@@ -63,6 +80,26 @@ export interface SilgiConfig<TCtx extends Record<string, unknown>> {
   context: (req: Request) => TCtx | Promise<TCtx>
   /** Register lifecycle hooks */
   hooks?: Partial<{ [K in keyof SilgiHooks]: SilgiHooks[K] | SilgiHooks[K][] }>
+  /**
+   * Schema converters for OpenAPI spec generation and analytics schema extraction.
+   *
+   * @remarks
+   * Pass a converter for each schema library you use. Schemas with a native
+   * `jsonSchema.input()` implementation (Valibot, ArkType, Zod v4) work
+   * without registering anything. Converters are required for libraries
+   * that do not implement the Standard JSON Schema extension.
+   *
+   * @example
+   * ```ts
+   * import { zodConverter } from 'silgi/zod'
+   *
+   * const k = silgi({
+   *   context: (req) => ({ db: getDB() }),
+   *   schemaConverters: [zodConverter],
+   * })
+   * ```
+   */
+  schemaConverters?: SchemaConverter[]
   /**
    * Storage configuration — mount drivers by path prefix.
    *
@@ -250,6 +287,9 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
 ): SilgiInstance<TBaseCtx> {
   const contextFactory = config.context
 
+  // Per-instance schema registry — no global mutable state
+  const schemaRegistry: SchemaRegistry = createSchemaRegistry(config.schemaConverters ?? [])
+
   // Hooks — synchronous init (hookable is tiny ~2KB, must be sync for API compat)
   const hooks = createHooks<SilgiHooks>()
   if (config.hooks) {
@@ -324,7 +364,7 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
       const fetchHandler = wrapHandler(
         createFetchHandler(routerDef, contextFactory, hooks, prefix),
         routerDef,
-        options,
+        options ? { ...options, schemaRegistry, hooks } : { schemaRegistry, hooks },
         prefix,
       )
 
@@ -375,7 +415,7 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
 
     serve: async (routerDef, options) => {
       const { createServeHandler } = await import('./core/serve.ts')
-      const server = await createServeHandler(routerDef, contextFactory, hooks, options)
+      const server = await createServeHandler(routerDef, contextFactory, hooks, options, schemaRegistry)
 
       // Auto-discover and start cron tasks from router
       const { collectCronTasks, startCronJobs, stopCronJobs } = await import('./core/task.ts')
