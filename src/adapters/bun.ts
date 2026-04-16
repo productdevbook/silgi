@@ -9,14 +9,14 @@
  * ```
  */
 
-import { createFetchHandler } from '../core/handler.ts'
+import { createFetchHandler, wrapHandler } from '../core/handler.ts'
 
-import type { FetchHandler } from '../core/handler.ts'
+import type { FetchHandler, WrapHandlerOptions } from '../core/handler.ts'
 import type { SilgiHooks } from '../silgi.ts'
 import type { RouterDef } from '../types.ts'
 import type { Hookable } from 'hookable'
 
-export interface BunAdapterOptions<TCtx extends Record<string, unknown>> {
+export interface BunAdapterOptions<TCtx extends Record<string, unknown>> extends WrapHandlerOptions {
   /** Context factory — receives the Request */
   context?: (req: Request) => TCtx | Promise<TCtx>
   /** Lifecycle hooks (request, response, error). */
@@ -35,7 +35,17 @@ export function createHandler<TCtx extends Record<string, unknown>>(
   options: BunAdapterOptions<TCtx> = {},
 ): { port: number; hostname: string; fetch: FetchHandler } {
   const contextFactory = options.context ?? (() => ({}) as TCtx)
-  const fetch = createFetchHandler(router, contextFactory as (req: Request) => Record<string, unknown>, options.hooks)
+  const fetch = wrapHandler(
+    createFetchHandler(
+      router,
+      contextFactory as (req: Request) => Record<string, unknown>,
+      options.hooks,
+      options.basePath,
+    ),
+    router,
+    options,
+    options.basePath,
+  )
 
   return {
     port: options.port ?? 3000,
