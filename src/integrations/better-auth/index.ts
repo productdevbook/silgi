@@ -4,18 +4,26 @@
  * Provides a Better Auth plugin factory that auto-traces all auth operations
  * (sign-in, sign-up, OAuth, session management, etc.) into silgi analytics.
  *
- * The silgi request context is passed via `request.__silgiCtx`, set by
- * the silgi auth handler before calling `auth.handler(request)`.
+ * The silgi request context is associated with a `Request` in three ways,
+ * tried in priority order:
+ * 1. {@link setRequestContext}(request, ctx) — the blessed API (GC-friendly
+ *    WeakMap, no mutation of the `Request` object).
+ * 2. `(request as any).__silgiCtx = ctx` — legacy property assignment; kept
+ *    working for existing users but `setRequestContext` is preferred.
+ * 3. `silgi.runInContext(ctx, fn)` / `withCtx(ctx, fn)` — AsyncLocalStorage
+ *    fallback when no Request is in scope (e.g., background jobs).
  *
  * @example
  * ```ts
- * import { tracing } from 'silgi/better-auth'
+ * import { tracing, setRequestContext } from 'silgi/better-auth'
  *
  * const auth = betterAuth({
- *   plugins: [
- *     tracing(),  // auto-traces all auth operations
- *   ],
+ *   plugins: [tracing()],
  * })
+ *
+ * // In your silgi handler:
+ * setRequestContext(request, ctx)
+ * await auth.handler(request)
  * ```
  */
 import { createContextBridge } from '../../core/context-bridge.ts'
@@ -39,6 +47,53 @@ function getCtx(): Record<string, unknown> | undefined {
 
 function runWithCtx<T>(ctx: Record<string, unknown>, fn: () => T): T {
   return _compatBridge.run(ctx, fn)
+}
+
+/**
+ * Keyed on `Request` identity. GC-friendly: entry auto-released when the
+ * `Request` is collected.
+ *
+ * @internal
+ */
+const _requestContextMap = new WeakMap<Request, Record<string, unknown>>()
+
+/**
+ * Associate a silgi context with a `Request` so the Better Auth tracing
+ * plugin can read it without mutating the `Request` object.
+ *
+ * @remarks
+ * Prefer this helper over the legacy `(request as any).__silgiCtx = ctx`
+ * assignment. The underlying storage is a module-level `WeakMap`, so
+ * entries are released automatically when the `Request` is GC'd.
+ *
+ * @param request - The `Request` currently being handled.
+ * @param ctx - The silgi context to associate, typically including `trace`.
+ *
+ * @example
+ * ```ts
+ * import { setRequestContext } from 'silgi/better-auth'
+ *
+ * setRequestContext(request, ctx)
+ * await auth.handler(request)
+ * ```
+ */
+export function setRequestContext(request: Request, ctx: Record<string, unknown>): void {
+  _requestContextMap.set(request, ctx)
+}
+
+/**
+ * Internal resolver that tries, in order: WeakMap (new API), legacy
+ * `__silgiCtx` property (deprecated but supported), and finally the
+ * integration's compat bridge ALS.
+ *
+ * @internal
+ */
+function resolveRequestContext(request: Request): Record<string, unknown> | undefined {
+  const fromMap = _requestContextMap.get(request)
+  if (fromMap) return fromMap
+  const legacy = (request as any).__silgiCtx
+  if (legacy && typeof legacy === 'object') return legacy as Record<string, unknown>
+  return getCtx()
 }
 
 // ── Types ────────────────────────────────────────────
@@ -220,7 +275,7 @@ export function tracing(config?: TracingConfig): any {
               const request = ctx.request as Request | undefined
               if (!request) return
 
-              const silgiCtx = ((request as any).__silgiCtx ?? getCtx()) as Record<string, unknown> | undefined
+              const silgiCtx = resolveRequestContext(request)
               if (!silgiCtx) return
 
               const reqTrace = silgiCtx.trace as RequestTrace | undefined

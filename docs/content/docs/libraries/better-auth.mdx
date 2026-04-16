@@ -41,17 +41,18 @@ export const auth = betterAuth({
 
 ## Handler setup
 
-In your silgi handler, set `request.__silgiCtx = ctx` before passing the request to Better Auth. This bridges the silgi request context to the auth plugin:
+In your silgi handler, call `setRequestContext(request, ctx)` before passing the request to Better Auth. This bridges the silgi request context to the auth plugin via a GC-friendly `WeakMap` — no mutation of the `Request` object.
 
 ```ts twoslash title="server.ts"
 // @noErrors
 import { silgi } from 'silgi'
+import { setRequestContext } from 'silgi/better-auth'
 import { auth } from './auth'
 
 const s = silgi()
 
 const authHandler = s.$resolve(async ({ ctx, request }) => {
-  ;(request as any).__silgiCtx = ctx
+  setRequestContext(request, ctx)
   return auth.handler(request)
 })
 
@@ -63,8 +64,14 @@ export default { fetch: s.handler(appRouter) }
 ```
 
 <Callout type='warn'>
-  `request.__silgiCtx = ctx` must be set before calling `auth.handler(request)`. Without it, the plugin has no access to
-  the request trace and spans are silently skipped.
+  `setRequestContext(request, ctx)` must run before `auth.handler(request)`. Without it the plugin has no access to the
+  request trace and spans are silently skipped.
+</Callout>
+
+<Callout>
+  The legacy `(request as any).__silgiCtx = ctx` assignment still works as a fallback for existing code, but new code
+  should prefer `setRequestContext` — it avoids mutating the `Request` and releases the entry automatically when the
+  `Request` is GC'd.
 </Callout>
 
 ## What gets captured
