@@ -8,6 +8,8 @@
  * wrapper that extracts the framework-specific Request and calls this factory.
  */
 
+import { AsyncLocalStorage } from 'node:async_hooks'
+
 import { createFetchHandler, wrapHandler } from '../core/handler.ts'
 
 import type { FetchHandler, WrapHandlerOptions } from '../core/handler.ts'
@@ -62,16 +64,13 @@ export function createFetchAdapter<TCtx extends Record<string, unknown>>(
 /**
  * Create a fetch-passthrough adapter for frameworks that pass an event object
  * with a `.request` property (SvelteKit, SolidStart).
- * Uses a WeakMap to safely pass the event into the context factory per-request.
  *
- * ⚠️  The event is keyed by `Request` identity. If a middleware layer between
- * the framework and this adapter replaces the Request (cloning for body reads,
- * URL rewrites, or polyfills), the lookup will miss and the context factory
- * will receive no event. In practice SvelteKit/SolidStart pass their own
- * `event.request` through unchanged, so this is safe for default usage;
- * userland middleware that rewrites Request must re-seed the event itself.
+ * Propagates the framework event to the context factory via a per-adapter
+ * AsyncLocalStorage scope, so the lookup rides the async call chain instead
+ * of Request object identity. Middleware that clones or replaces the Request
+ * (body reads, URL rewrites, polyfills) no longer breaks context resolution.
  *
- * Tracking: https://github.com/productdevbook/silgi/issues/4
+ * Resolves: https://github.com/productdevbook/silgi/issues/4
  */
 export function createEventFetchAdapter<TCtx extends Record<string, unknown>, TEvent = any>(
   router: RouterDef,
@@ -80,14 +79,14 @@ export function createEventFetchAdapter<TCtx extends Record<string, unknown>, TE
   extractRequest: (event: TEvent) => Request,
 ): (event: TEvent) => Response | Promise<Response> {
   const prefix = options.prefix ?? defaultPrefix
-  const requestEventMap = new WeakMap<Request, TEvent>()
+  const eventStore = new AsyncLocalStorage<TEvent>()
 
   const handler = wrapHandler(
     createFetchHandler(
       router,
       (_req: Request) => {
-        const eventRef = requestEventMap.get(_req)
-        if (options.context && eventRef)
+        const eventRef = eventStore.getStore()
+        if (options.context && eventRef !== undefined)
           return options.context(eventRef) as Record<string, unknown> | Promise<Record<string, unknown>>
         return {} as Record<string, unknown>
       },
@@ -101,7 +100,6 @@ export function createEventFetchAdapter<TCtx extends Record<string, unknown>, TE
 
   return (event: TEvent): Response | Promise<Response> => {
     const request = extractRequest(event)
-    requestEventMap.set(request, event)
-    return handler(request)
+    return eventStore.run(event, () => handler(request))
   }
 }
