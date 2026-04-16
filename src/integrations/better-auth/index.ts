@@ -18,9 +18,28 @@
  * })
  * ```
  */
-import { getCtx, runWithCtx } from '../../core/context-bridge.ts'
+import { createContextBridge } from '../../core/context-bridge.ts'
 
 import type { RequestTrace, SpanKind, TraceSpan } from '../../plugins/analytics.ts'
+
+/**
+ * Module-level compat bridge — backs the exported `withCtx()` helper so
+ * tests and programmatic callers can still install an ambient context
+ * without needing a silgi instance. The request path in `handler.ts`
+ * uses `silgi.runInContext` on the per-instance bridge and never flows
+ * through this one, so there is no inter-instance context collision.
+ *
+ * @internal
+ */
+const _compatBridge = createContextBridge()
+
+function getCtx(): Record<string, unknown> | undefined {
+  return _compatBridge.current()
+}
+
+function runWithCtx<T>(ctx: Record<string, unknown>, fn: () => T): T {
+  return _compatBridge.run(ctx, fn)
+}
 
 // ── Types ────────────────────────────────────────────
 

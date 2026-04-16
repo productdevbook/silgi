@@ -15,6 +15,7 @@ import { createHooks } from 'hookable'
 import { createProcedureBuilder } from './builder.ts'
 import { createCaller } from './caller.ts'
 import { compileRouter } from './compile.ts'
+import { createContextBridge } from './core/context-bridge.ts'
 import { createFetchHandler, wrapHandler } from './core/handler.ts'
 import { assignPaths, routerCache } from './core/router-utils.ts'
 import { createSchemaRegistry } from './core/schema-converter.ts'
@@ -129,6 +130,26 @@ export interface SilgiInstance<TBaseCtx extends Record<string, unknown>> {
   removeHook: Hookable<SilgiHooks>['removeHook']
   /** Access storage with optional prefix — uses configured mounts */
   useStorage: typeof useStorage
+
+  /**
+   * Run `fn` inside this instance's per-request `AsyncLocalStorage` scope.
+   *
+   * @remarks
+   * Instrumented integrations (Drizzle, Better Auth) read the installed
+   * context via {@link SilgiInstance.currentContext}. Because each silgi
+   * instance owns its own bridge, calls across instances do not collide.
+   *
+   * @param ctx - Context to install for the duration of `fn`.
+   * @param fn - Function executed with `ctx` as the ambient context.
+   * @returns Whatever `fn` returns.
+   */
+  runInContext: <T>(ctx: TBaseCtx, fn: () => T) => T
+
+  /**
+   * Read the context installed by the nearest enclosing
+   * {@link SilgiInstance.runInContext}, or `undefined` if none.
+   */
+  currentContext: () => TBaseCtx | undefined
 
   /** Create a guard middleware (flat, zero-closure) */
   guard: GuardFactory<TBaseCtx>
@@ -290,6 +311,10 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
   // Per-instance schema registry — no global mutable state
   const schemaRegistry: SchemaRegistry = createSchemaRegistry(config.schemaConverters ?? [])
 
+  // Per-instance AsyncLocalStorage bridge — isolates ambient context
+  // between multiple silgi() instances living in the same process.
+  const bridge = createContextBridge<TBaseCtx>()
+
   // Hooks — synchronous init (hookable is tiny ~2KB, must be sync for API compat)
   const hooks = createHooks<SilgiHooks>()
   if (config.hooks) {
@@ -319,6 +344,9 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
     useStorage: (...args: Parameters<typeof import('./core/storage.ts').useStorage>) => {
       return import('./core/storage.ts').then((m) => m.useStorage(...args)) as any
     },
+
+    runInContext: <T>(ctx: TBaseCtx, fn: () => T): T => bridge.run(ctx, fn),
+    currentContext: (): TBaseCtx | undefined => bridge.current(),
 
     guard: (fnOrConfig: any) => {
       if (typeof fnOrConfig === 'function') {
@@ -362,7 +390,13 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
     handler: (routerDef, options) => {
       const prefix = options?.basePath ? normalizePrefix(options.basePath) : undefined
       const fetchHandler = wrapHandler(
-        createFetchHandler(routerDef, contextFactory, hooks, prefix),
+        createFetchHandler(
+          routerDef,
+          contextFactory,
+          hooks,
+          prefix,
+          bridge as import('./core/context-bridge.ts').ContextBridge,
+        ),
         routerDef,
         options ? { ...options, schemaRegistry, hooks } : { schemaRegistry, hooks },
         prefix,
@@ -415,7 +449,14 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
 
     serve: async (routerDef, options) => {
       const { createServeHandler } = await import('./core/serve.ts')
-      const server = await createServeHandler(routerDef, contextFactory, hooks, options, schemaRegistry)
+      const server = await createServeHandler(
+        routerDef,
+        contextFactory,
+        hooks,
+        options,
+        schemaRegistry,
+        bridge as import('./core/context-bridge.ts').ContextBridge,
+      )
 
       // Auto-discover and start cron tasks from router
       const { collectCronTasks, startCronJobs, stopCronJobs } = await import('./core/task.ts')

@@ -10,6 +10,7 @@ import type { ScalarOptions } from '../scalar.ts'
 import type { SilgiHooks } from '../silgi.ts'
 import type { RouterDef } from '../types.ts'
 import type { WSAdapterOptions } from '../ws.ts'
+import type { ContextBridge } from './context-bridge.ts'
 import type { FetchHandler } from './handler.ts'
 import type { SchemaRegistry } from './schema-converter.ts'
 import type { Hookable } from 'hookable'
@@ -99,6 +100,7 @@ export async function createServeHandler(
   hooks: Hookable<SilgiHooks>,
   options?: ServeOptions,
   schemaRegistry?: SchemaRegistry,
+  bridge?: ContextBridge,
 ): Promise<SilgiServer> {
   const port = options?.port ?? 3000
   const hostname = options?.hostname ?? '127.0.0.1'
@@ -106,7 +108,7 @@ export async function createServeHandler(
 
   // Build handler pipeline: base → scalar → analytics
   const httpHandler: FetchHandler = wrapHandler(
-    createFetchHandler(routerDef, contextFactory, hooks, prefix),
+    createFetchHandler(routerDef, contextFactory, hooks, prefix, bridge),
     routerDef,
     options ? { ...options, schemaRegistry, hooks } : { schemaRegistry, hooks },
     prefix,

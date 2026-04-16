@@ -12,7 +12,6 @@ import { createContext, detachContext, releaseContext } from '../compile.ts'
 import { compileRouter } from '../compile.ts'
 
 import { detectResponseFormat, encodeResponse, makeErrorResponse } from './codec.ts'
-import { runWithCtx } from './context-bridge.ts'
 import { applyContext } from './dispatch.ts'
 import { parseInput } from './input.ts'
 import { routerCache } from './router-utils.ts'
@@ -22,6 +21,7 @@ import { parseUrlPath } from './url.ts'
 import type { CompiledRoute, CompiledRouterFn } from '../compile.ts'
 import type { SilgiHooks } from '../silgi.ts'
 import type { ResponseFormat } from './codec.ts'
+import type { ContextBridge } from './context-bridge.ts'
 import type { Hookable } from 'hookable'
 
 // Re-export for backwards compat
@@ -169,6 +169,7 @@ export function createFetchHandler(
   contextFactory: (req: Request) => Record<string, unknown> | Promise<Record<string, unknown>>,
   hooks?: Hookable<SilgiHooks>,
   prefix?: string,
+  bridge?: ContextBridge,
 ): FetchHandler {
   // Compile router
   let compiledRouter = routerCache.get(routerDef) as CompiledRouterFn | undefined
@@ -258,7 +259,9 @@ export function createFetchHandler(
       callHook('request', { path: pathname, input: rawInput })
 
       // Pipeline
-      const pipelineResult = runWithCtx(ctx, () => route.handler(ctx, rawInput, request.signal))
+      const pipelineResult = bridge
+        ? bridge.run(ctx, () => route.handler(ctx, rawInput, request.signal))
+        : route.handler(ctx, rawInput, request.signal)
       const output = pipelineResult instanceof Promise ? await pipelineResult : pipelineResult
 
       callHook('response', { path: pathname, output, durationMs: 0 })

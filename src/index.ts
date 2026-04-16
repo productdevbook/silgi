@@ -72,6 +72,10 @@ export type { Schema, AnySchema, InferSchemaInput, InferSchemaOutput } from './c
 export { createSchemaRegistry, schemaToJsonSchema } from './core/schema-converter.ts'
 export type { SchemaConverter, SchemaRegistry, JSONSchema, ConvertOptions } from './core/schema-converter.ts'
 
+// ── Context Bridge ──────────────────────────────────
+export { createContextBridge } from './core/context-bridge.ts'
+export type { ContextBridge } from './core/context-bridge.ts'
+
 // ── SSE/Streaming ───────────────────────────────────
 export { withEventMeta, getEventMeta } from './core/sse.ts'
 export type { EventMeta } from './core/sse.ts'
