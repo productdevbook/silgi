@@ -151,6 +151,27 @@ export interface SilgiInstance<TBaseCtx extends Record<string, unknown>> {
    */
   currentContext: () => TBaseCtx | undefined
 
+  /**
+   * Await storage initialization.
+   *
+   * @remarks
+   * When `storage` is configured, resolves after `initStorage` completes.
+   * When storage is not configured, resolves immediately (no dynamic
+   * import). Errors during storage init reject this promise — no silent
+   * `console.error` fallback.
+   *
+   * `useStorage()` awaits this promise internally, so calling `ready()`
+   * is optional unless you need an explicit ordering guarantee before
+   * your first `useStorage()` call.
+   *
+   * @example
+   * ```ts
+   * const k = silgi({ context: () => ({}), storage: { cache: redisDriver() } })
+   * await k.ready() // storage driver connected
+   * ```
+   */
+  ready: () => Promise<void>
+
   /** Create a guard middleware (flat, zero-closure) */
   guard: GuardFactory<TBaseCtx>
 
@@ -213,8 +234,27 @@ export interface SilgiInstance<TBaseCtx extends Record<string, unknown>> {
     },
   ) => InferClient<T>
 
-  /** Create & start a Node.js HTTP server. Returns a handle to gracefully shut down. */
-  serve: (router: RouterDef, options?: ServeOptions) => Promise<SilgiServer>
+  /**
+   * Create & start a Node.js HTTP server. Returns a handle to gracefully shut down.
+   *
+   * @remarks
+   * When `options.handleSignals` is `true`, registers `process.once('SIGINT')`
+   * and `process.once('SIGTERM')` listeners that invoke `server.close()`.
+   * Default `false` — opt in explicitly. The srvx-level graceful HTTP drain
+   * is controlled by `ServeOptions.gracefulShutdown`; `handleSignals`
+   * governs only the silgi-layer cron-stop wiring on OS signals.
+   */
+  serve: (
+    router: RouterDef,
+    options?: ServeOptions & {
+      /**
+       * Register `process.once('SIGINT')` / `'SIGTERM'` listeners that call
+       * `server.close()`. Default `false` (opt-in). The close wrapper stops
+       * cron jobs regardless of this setting when called explicitly.
+       */
+      handleSignals?: boolean
+    },
+  ) => Promise<SilgiServer>
 }
 
 // ── Guard Factory ───────────────────────────────────
@@ -327,14 +367,18 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
     }
   }
 
-  // Initialize storage lazily (only if configured)
-  if (config.storage) {
-    import('./core/storage.ts')
-      .then((m) => m.initStorage(config.storage))
-      .catch((e) => {
-        console.error(`[silgi] Failed to initialize storage: ${e instanceof Error ? e.message : e}`)
+  // Storage init — build a ready promise at instance creation time.
+  // - When storage is configured: dynamic import + initStorage; errors
+  //   reject the promise so callers can observe them (no silent logging).
+  // - When storage is not configured: resolves immediately, no dynamic
+  //   import at all.
+  // `useStorage()` awaits this promise internally; users can also call
+  // `await instance.ready()` explicitly for an ordering guarantee.
+  const readyPromise: Promise<void> = config.storage
+    ? import('./core/storage.ts').then((m) => {
+        m.initStorage(config.storage!)
       })
-  }
+    : Promise.resolve()
 
   const ctxFactory = () => contextFactory(new Request('http://localhost'))
 
@@ -342,11 +386,12 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
     hook: hooks.hook.bind(hooks),
     removeHook: hooks.removeHook.bind(hooks),
     useStorage: (...args: Parameters<typeof import('./core/storage.ts').useStorage>) => {
-      return import('./core/storage.ts').then((m) => m.useStorage(...args)) as any
+      return readyPromise.then(() => import('./core/storage.ts')).then((m) => m.useStorage(...args)) as any
     },
 
     runInContext: <T>(ctx: TBaseCtx, fn: () => T): T => bridge.run(ctx, fn),
     currentContext: (): TBaseCtx | undefined => bridge.current(),
+    ready: (): Promise<void> => readyPromise,
 
     guard: (fnOrConfig: any) => {
       if (typeof fnOrConfig === 'function') {
@@ -466,17 +511,29 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
         console.log(`  ${cronTasks.length} cron task(s) scheduled`)
       }
 
-      // Stop cron jobs on server close and process signals
+      // Wrap `close` so explicit shutdown always stops cron jobs.
+      // Return a new object instead of mutating the srvx-owned `server`.
       const originalClose = server.close.bind(server)
-      server.close = async (force?: boolean) => {
+      const wrappedClose = async (force?: boolean): Promise<void> => {
         stopCronJobs()
         return originalClose(force)
       }
-      const onSignal = () => stopCronJobs()
-      process.once('SIGINT', onSignal)
-      process.once('SIGTERM', onSignal)
+      const silgiServer: SilgiServer = Object.assign(Object.create(Object.getPrototypeOf(server)), server, {
+        close: wrappedClose,
+      })
 
-      return server
+      // Opt-in OS signal handling — previously always-on, now explicit.
+      // srvx-level graceful HTTP drain is still controlled by the
+      // `gracefulShutdown` option on `ServeOptions`.
+      if (options?.handleSignals) {
+        const onSignal = () => {
+          wrappedClose().catch(() => {})
+        }
+        process.once('SIGINT', onSignal)
+        process.once('SIGTERM', onSignal)
+      }
+
+      return silgiServer
     },
   }
 
