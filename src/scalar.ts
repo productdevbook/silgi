@@ -7,8 +7,8 @@
 
 import { schemaToJsonSchema as _schemaToJsonSchema } from './core/schema-converter.ts'
 
-import type { AnySchema } from './core/schema.ts'
 import type { ConvertOptions } from './core/schema-converter.ts'
+import type { AnySchema } from './core/schema.ts'
 import type { ProcedureDef, RouterDef, Route } from './types.ts'
 
 // ── OpenAPI Spec Generation ─────────────────────────

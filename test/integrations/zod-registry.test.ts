@@ -24,7 +24,7 @@ describe('schema-converter registry', () => {
     expect((result as any)['x-marker']).toBe('custom')
   })
 
-  it('prefers the schema\'s native jsonSchema.input() over a registered converter', () => {
+  it("prefers the schema's native jsonSchema.input() over a registered converter", () => {
     const withNative: any = {
       '~standard': {
         vendor: 'test-vendor',

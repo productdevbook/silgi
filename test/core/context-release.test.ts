@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
 import { createContext, releaseContext } from '#src/compile.ts'
-import { createFetchHandler } from '#src/core/handler.ts'
 import { SilgiError } from '#src/core/error.ts'
+import { createFetchHandler } from '#src/core/handler.ts'
 import { silgi } from '#src/silgi.ts'
 
 /**
