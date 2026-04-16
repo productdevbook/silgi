@@ -23,6 +23,7 @@
 import { tool, jsonSchema } from 'ai'
 
 import { compileProcedure } from '../../compile.ts'
+import { collectProcedures } from '../../core/router-utils.ts'
 
 import type { RouterDef, ProcedureDef } from '../../types.ts'
 
@@ -72,7 +73,7 @@ export function routerToTools(
 ): Record<string, any> {
   const tools: Record<string, any> = {}
 
-  collectProcedures(router, [], (path, proc) => {
+  collectProcedures(router, (path, proc) => {
     const flatName = path.join('_')
     if (options?.filter && !options.filter(flatName, proc)) return
 
@@ -85,22 +86,6 @@ export function routerToTools(
 }
 
 // ── Helpers ──────────────────────────────────────────
-
-function isProcedureDef(v: unknown): v is ProcedureDef {
-  return typeof v === 'object' && v !== null && 'type' in v && 'resolve' in v
-}
-
-function collectProcedures(node: unknown, path: string[], cb: (path: string[], proc: ProcedureDef) => void): void {
-  if (isProcedureDef(node)) {
-    cb(path, node)
-    return
-  }
-  if (typeof node === 'object' && node !== null) {
-    for (const [key, child] of Object.entries(node as Record<string, unknown>)) {
-      collectProcedures(child, [...path, key], cb)
-    }
-  }
-}
 
 /** Simple Zod → JSON Schema for AI tool parameters */
 function zodToJsonSchemaSimple(schema: any): Record<string, unknown> {

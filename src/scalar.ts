@@ -5,11 +5,12 @@
  * Scalar UI at /api/reference + spec at /api/openapi.json.
  */
 
+import { collectProcedures } from './core/router-utils.ts'
 import { schemaToJsonSchema as _schemaToJsonSchema } from './core/schema-converter.ts'
 
 import type { ConvertOptions, SchemaRegistry } from './core/schema-converter.ts'
 import type { AnySchema } from './core/schema.ts'
-import type { ProcedureDef, RouterDef, Route } from './types.ts'
+import type { RouterDef, Route } from './types.ts'
 
 // ── OpenAPI Spec Generation ─────────────────────────
 
@@ -114,7 +115,7 @@ export function generateOpenAPI(
   const paths: Record<string, Record<string, unknown>> = {}
   const tags = new Map<string, { description?: string }>()
 
-  collectProcedures(router, [], (path, proc) => {
+  collectProcedures(router, (path, proc) => {
     const route = proc.route as Route | null
     const rawPath = route?.path ?? '/' + path.join('/')
     const { httpPath: routePath, pathParams } = toOpenAPIPath(rawPath)
@@ -399,28 +400,6 @@ function escapeHtml(s: string): string {
 }
 
 // ── Helpers ──────────────────────────────────────────
-
-function isProcedureDef(value: unknown): value is ProcedureDef {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'type' in value &&
-    'resolve' in value &&
-    typeof (value as ProcedureDef).resolve === 'function'
-  )
-}
-
-function collectProcedures(node: unknown, path: string[], cb: (path: string[], proc: ProcedureDef) => void): void {
-  if (isProcedureDef(node)) {
-    cb(path, node)
-    return
-  }
-  if (typeof node === 'object' && node !== null) {
-    for (const [key, child] of Object.entries(node as Record<string, unknown>)) {
-      collectProcedures(child, [...path, key], cb)
-    }
-  }
-}
 
 function objectSchemaToParams(schema: JSONSchema): Record<string, unknown>[] {
   if (schema.type !== 'object' || !schema.properties) return []

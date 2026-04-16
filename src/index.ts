@@ -98,6 +98,10 @@ export { mapInput } from './map-input.ts'
 export { compileProcedure, compileRouter, createContext } from './compile.ts'
 export { AsyncIteratorClass, mapAsyncIterator } from './core/iterator.ts'
 
+// ── Router Introspection ────────────────────────────
+export { collectProcedures, getProcedurePaths, isProcedureDef } from './core/router-utils.ts'
+export type { ProcedureSummary } from './core/router-utils.ts'
+
 // ── Lazy Loading ────────────────────────────────────
 export { lazy, isLazy, resolveLazy } from './lazy.ts'
 export type { LazyRouter } from './lazy.ts'
