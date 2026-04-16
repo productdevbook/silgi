@@ -172,43 +172,76 @@ export interface SilgiInstance<TBaseCtx extends Record<string, unknown>> {
    */
   ready: () => Promise<void>
 
-  /** Create a guard middleware (flat, zero-closure) */
+  /**
+   * Create a guard middleware — a flat, zero-closure helper that runs
+   * before the resolver and can throw or return partial context.
+   *
+   * @remarks
+   * Prefer `guard` over `wrap` when you only need a pre-step. The
+   * returned object is passed to `$use(guard)` on any builder.
+   */
   guard: GuardFactory<TBaseCtx>
 
-  /** Create a wrap middleware (onion, before+after) */
+  /**
+   * Create a wrap middleware — onion-style before/after hook that can
+   * short-circuit the pipeline or transform the output.
+   */
   wrap: (fn: WrapFn<TBaseCtx>) => WrapDef<TBaseCtx>
 
-  /** Start a builder — resolve only */
+  /** Start a builder chain — set the resolver for a query procedure. */
   $resolve: ProcedureBuilder<'query', TBaseCtx>['$resolve']
 
-  /** Start a builder — set input schema */
+  /** Start a builder chain — set the input schema (Standard Schema). */
   $input: ProcedureBuilder<'query', TBaseCtx>['$input']
 
-  /** Start a builder — add middleware */
+  /** Start a builder chain — add guard/wrap middleware. */
   $use: ProcedureBuilder<'query', TBaseCtx>['$use']
 
-  /** Start a builder — set output schema */
+  /** Start a builder chain — set the output schema. */
   $output: ProcedureBuilder<'query', TBaseCtx>['$output']
 
-  /** Start a builder — set errors */
+  /** Start a builder chain — declare typed errors. */
   $errors: ProcedureBuilder<'query', TBaseCtx>['$errors']
 
-  /** Start a builder — set route metadata */
+  /** Start a builder chain — set HTTP route metadata (method, path, etc). */
   $route: ProcedureBuilder<'query', TBaseCtx>['$route']
 
-  /** Start a builder — set custom metadata */
+  /** Start a builder chain — attach custom metadata for tooling. */
   $meta: ProcedureBuilder<'query', TBaseCtx>['$meta']
 
-  /** Define a subscription (SSE stream) */
+  /** Define a subscription — returns an SSE stream of events. */
   subscription: SubscriptionFactory<TBaseCtx>
 
-  /** Start a builder — create a background task */
+  /**
+   * Start a builder chain — create a background/cron task.
+   *
+   * @remarks
+   * Tasks are collected from the router on `serve()` and scheduled via
+   * `croner` when a `cron` spec is provided.
+   */
   $task: ProcedureBuilder<'query', TBaseCtx>['$task']
 
-  /** Assemble router and compile pipelines */
+  /**
+   * Assemble a router from nested procedures and pre-compile each
+   * pipeline.
+   *
+   * @remarks
+   * The returned value is the same object you passed in — path
+   * assignment and compilation happen off to the side, cached in a
+   * `WeakMap` keyed on the def. Never mutate the router after handing
+   * it to `router()`; build a new one instead.
+   */
   router: <T extends RouterDef>(def: T) => T
 
-  /** Create a Fetch API handler: (Request) => Response */
+  /**
+   * Create a Fetch API handler — `(Request) => Response | Promise<Response>`.
+   *
+   * @remarks
+   * Use this from any Fetch-compatible adapter (Next.js App Router,
+   * SvelteKit, Remix, srvx, Cloudflare Workers, Bun, Deno, hono over
+   * Lambda, etc.). The router has subscriptions mounted automatically
+   * when `hasWsProcedures` is detected.
+   */
   handler: (
     router: RouterDef,
     options?: {
@@ -332,6 +365,20 @@ function createProcedure(type: ProcedureType, ...args: unknown[]): ProcedureDef 
 /**
  * Create a Silgi RPC instance with typed context.
  *
+ * @remarks
+ * Every call returns a self-contained instance with its own schema
+ * registry, `AsyncLocalStorage` bridge, hook emitter and storage state.
+ * Two `silgi()` instances in the same process never share mutable state
+ * — see [ARCHITECTURE.md §3](../ARCHITECTURE.md) for the "de-magic"
+ * invariants.
+ *
+ * @typeParam TBaseCtx - Shape of the base context returned by
+ *   `config.context(req)`. Flows into every procedure's `ResolveContext`.
+ * @param config - Instance configuration. `context` is required; all
+ *   other fields are opt-in.
+ * @returns A {@link SilgiInstance} exposing builder, router, handler,
+ *   caller and server helpers.
+ *
  * @example
  * ```ts
  * const k = silgi({
@@ -342,6 +389,9 @@ function createProcedure(type: ProcedureType, ...args: unknown[]): ProcedureDef 
  * })
  * // k.$input(), k.$resolve(), k.guard(), k.router(), k.serve()
  * ```
+ *
+ * @see {@link SilgiInstance}
+ * @see {@link SilgiConfig}
  */
 export function silgi<TBaseCtx extends Record<string, unknown>>(
   config: SilgiConfig<TBaseCtx>,

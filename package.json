@@ -255,6 +255,7 @@
     "fix": "oxlint --fix . && oxfmt --ignore-path .oxfmtignore .",
     "test": "vitest run",
     "typecheck": "tsgo --noEmit",
+    "docs:check": "typedoc --options typedoc.json",
     "release": "bumpp"
   },
   "dependencies": {
@@ -307,6 +308,7 @@
     "pinia": "^3.0.4",
     "rou3": "^0.8.1",
     "tsdown": "^0.21.7",
+    "typedoc": "^0.28.19",
     "typescript": "^6.0.2",
     "vitest": "^4.1.2",
     "vue": "^3.5.31",

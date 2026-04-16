@@ -1,0 +1,21 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/index.ts",
+    "src/core/error.ts",
+    "src/core/handler.ts",
+    "src/core/schema-converter.ts",
+    "src/core/context-bridge.ts",
+    "src/core/context.ts"
+  ],
+  "entryPointStrategy": "expand",
+  "tsconfig": "tsconfig.json",
+  "validation": {
+    "invalidLink": true,
+    "notExported": true,
+    "notDocumented": false
+  },
+  "treatValidationWarningsAsErrors": false,
+  "emit": "none",
+  "logLevel": "Warn"
+}
