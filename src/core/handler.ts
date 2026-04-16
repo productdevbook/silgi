@@ -192,11 +192,13 @@ export function createFetchHandler(
   }
 
   // Hook helper — awaited (used for critical hooks like `request:prepare`
-  // that must complete before the pipeline runs).
-  async function awaitHook(name: keyof SilgiHooks, event: any): Promise<void> {
+  // that must complete before the pipeline runs). Sync fast-path when no
+  // hooks are registered avoids a per-request Promise allocation.
+  function awaitHook(name: keyof SilgiHooks, event: any): void | Promise<void> {
     if (!hooks) return
     try {
-      await hooks.callHook(name, event)
+      const result = hooks.callHook(name, event)
+      if (result instanceof Promise) return result.catch(() => {})
     } catch {}
   }
 
@@ -247,8 +249,10 @@ export function createFetchHandler(
       if (match.params) ctx.params = match.params
 
       // Notify framework plugins (e.g. analytics) that context is ready
-      // so they can set `ctx.trace` before any user code runs.
-      await awaitHook('request:prepare', { request, ctx })
+      // so they can set `ctx.trace` before any user code runs. Sync result
+      // (no hooks, or sync listeners) skips the microtask.
+      const prepareResult = awaitHook('request:prepare', { request, ctx })
+      if (prepareResult) await prepareResult
 
       // Input — parse body/query, then merge URL path params
       if (!route.passthrough) rawInput = await parseInput(request, url, qMark)
