@@ -5,10 +5,10 @@
  * Scalar UI at /api/reference + spec at /api/openapi.json.
  */
 
-import { ZodSchemaConverter } from './integrations/zod/converter.ts'
+import { schemaToJsonSchema as _schemaToJsonSchema } from './core/schema-converter.ts'
 
 import type { AnySchema } from './core/schema.ts'
-import type { ConvertOptions } from './integrations/zod/converter.ts'
+import type { ConvertOptions } from './core/schema-converter.ts'
 import type { ProcedureDef, RouterDef, Route } from './types.ts'
 
 // ── OpenAPI Spec Generation ─────────────────────────
@@ -422,33 +422,11 @@ function collectProcedures(node: unknown, path: string[], cb: (path: string[], p
  * Convert a Standard Schema to JSON Schema.
  *
  * Fast path: `~standard.jsonSchema.input()` (StandardJSONSchemaV1 implementors).
- * Fallback: vendor-specific converters (Zod v4 via ZodSchemaConverter).
+ * Fallback: any converter registered via `registerSchemaConverter` (e.g. the
+ * Zod converter registered by `silgi/zod`). Core is validator-agnostic.
  */
-const _zodConverter = new ZodSchemaConverter()
-
 function schemaToJsonSchema(schema: AnySchema, strategy: ConvertOptions['strategy'] = 'input'): JSONSchema {
-  const std = (schema as any)['~standard']
-
-  // Fast path: StandardJSONSchemaV1
-  if (std?.jsonSchema?.input) {
-    try {
-      const result = std.jsonSchema.input({ target: 'draft-2020-12' })
-      if (result && typeof result === 'object') {
-        const { $schema: _, ...rest } = result as Record<string, unknown>
-        return rest as JSONSchema
-      }
-    } catch {}
-  }
-
-  // Fallback: Zod v4 schemas
-  if (_zodConverter.condition(schema)) {
-    try {
-      const [, jsonSchema] = _zodConverter.convert(schema, { strategy })
-      return jsonSchema as JSONSchema
-    } catch {}
-  }
-
-  return {}
+  return _schemaToJsonSchema(schema, strategy) as JSONSchema
 }
 
 function objectSchemaToParams(schema: JSONSchema): Record<string, unknown>[] {

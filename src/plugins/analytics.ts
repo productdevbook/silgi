@@ -13,10 +13,10 @@
  */
 
 import { SilgiError, toSilgiError } from '../core/error.ts'
+import { schemaToJsonSchema } from '../core/schema-converter.ts'
 import { ValidationError } from '../core/schema.ts'
 import { analyticsTraceMap } from '../core/trace-map.ts'
 import { parseUrlPathname } from '../core/url.ts'
-import { ZodSchemaConverter } from '../integrations/zod/converter.ts'
 
 import { RequestAccumulator } from './analytics/accumulator.ts'
 import { AnalyticsCollector } from './analytics/collector.ts'
@@ -125,27 +125,10 @@ function isProcedureDef(value: unknown): value is ProcedureDef {
   )
 }
 
-const _zodConverter = new ZodSchemaConverter()
-
 function schemaToJson(schema: unknown, strategy: 'input' | 'output'): Record<string, unknown> | undefined {
   if (!schema) return undefined
-  const std = (schema as any)['~standard']
-  if (std?.jsonSchema?.input) {
-    try {
-      const result = std.jsonSchema.input({ target: 'draft-2020-12' })
-      if (result && typeof result === 'object') {
-        const { $schema: _, ...rest } = result as Record<string, unknown>
-        return rest
-      }
-    } catch {}
-  }
-  if (_zodConverter.condition(schema as any)) {
-    try {
-      const [, json] = _zodConverter.convert(schema as any, { strategy })
-      return json as Record<string, unknown>
-    } catch {}
-  }
-  return undefined
+  const json = schemaToJsonSchema(schema as any, strategy)
+  return Object.keys(json).length > 0 ? (json as Record<string, unknown>) : undefined
 }
 
 function extractProcedureSchemas(router: RouterDef): Map<string, ProcedureSchemaInfo> {
