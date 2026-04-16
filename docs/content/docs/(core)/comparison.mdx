@@ -20,19 +20,19 @@ Simple POST endpoint returning JSON. Server and load generator run as separate p
 
 | Framework | avg latency | p50     | p95     | p99     | req/s    |
 | --------- | ----------- | ------- | ------- | ------- | -------- |
-| Fastify   | 1,131µs     | 1,036µs | 1,427µs | 4,159µs | 56,520/s |
-| Express   | 1,348µs     | 1,285µs | 1,620µs | 2,503µs | 47,436/s |
-| Silgi     | 1,488µs     | 1,422µs | 1,806µs | 2,731µs | 42,976/s |
-| Hono      | 1,694µs     | 1,556µs | 2,344µs | 3,102µs | 37,772/s |
+| Fastify   | 1,161µs     | 1,061µs | 1,450µs | 4,249µs | 55,074/s |
+| Express   | 1,387µs     | 1,327µs | 1,690µs | 2,526µs | 46,125/s |
+| Silgi     | 1,523µs     | 1,465µs | 1,805µs | 2,831µs | 42,001/s |
+| Hono      | 1,709µs     | 1,571µs | 2,360µs | 3,202µs | 37,433/s |
 
 ## HTTP throughput — 256 concurrent connections
 
 | Framework | avg latency | p50     | p95     | p99     | req/s    |
 | --------- | ----------- | ------- | ------- | ------- | -------- |
-| Fastify   | 4,776µs     | 4,399µs | 7,562µs | 8,493µs | 53,571/s |
-| Express   | 5,621µs     | 5,436µs | 6,661µs | 7,226µs | 45,514/s |
-| Silgi     | 6,044µs     | 5,815µs | 7,050µs | 7,709µs | 42,330/s |
-| Hono      | 6,991µs     | 6,559µs | 8,287µs | 9,294µs | 36,597/s |
+| Fastify   | 4,839µs     | 4,462µs | 7,685µs | 8,594µs | 52,866/s |
+| Express   | 5,585µs     | 5,446µs | 6,427µs | 6,942µs | 45,813/s |
+| Silgi     | 6,408µs     | 6,258µs | 7,378µs | 8,037µs | 39,920/s |
+| Hono      | 7,041µs     | 6,721µs | 8,196µs | 9,154µs | 36,333/s |
 
 Silgi and Hono use the Fetch API (`Request`/`Response`) while Fastify and Express use native Node.js `req`/`res`. This adapter overhead accounts for the throughput gap. Silgi consistently beats Hono, and the gap narrows as middleware complexity grows — see the RPC pipeline benchmarks below.
 
@@ -42,10 +42,10 @@ Measures middleware pipeline overhead in isolation — no TCP, no serialization.
 
 | Scenario           | Silgi      | oRPC     | H3 v2    |
 | ------------------ | ---------- | -------- | -------- |
-| No middleware      | **96 ns**  | 676 ns   | 2,253 ns |
-| Zod validation     | **133 ns** | 819 ns   | 4,334 ns |
-| 3 middleware + Zod | **178 ns** | 1,758 ns | 4,192 ns |
-| 5 middleware + Zod | **330 ns** | 2,396 ns | 4,771 ns |
+| No middleware      | **112 ns** | 752 ns   | 2,859 ns |
+| Zod validation     | **136 ns** | 954 ns   | 4,758 ns |
+| 3 middleware + Zod | **179 ns** | 1,773 ns | 4,152 ns |
+| 5 middleware + Zod | **343 ns** | 2,260 ns | 4,126 ns |
 
 <Callout>
   Hono, Elysia, Fastify, and Express are not included — they don't have an equivalent pipeline concept measurable in
@@ -56,11 +56,11 @@ Measures middleware pipeline overhead in isolation — no TCP, no serialization.
 
 Full request/response latency — 3000 sequential requests per scenario.
 
-| Scenario                      | Silgi               | H3 v2            | oRPC            |
-| ----------------------------- | ------------------- | ---------------- | --------------- |
-| Simple (no mw, no validation) | **90µs** (11,064/s) | 90µs (11,135/s)  | 76µs (13,203/s) |
-| Zod input validation          | **93µs** (10,714/s) | 100µs (10,033/s) | 121µs (8,263/s) |
-| Guard + Zod validation        | **87µs** (11,469/s) | 90µs (11,102/s)  | 118µs (8,500/s) |
+| Scenario                      | Silgi               | H3 v2           | oRPC            |
+| ----------------------------- | ------------------- | --------------- | --------------- |
+| Simple (no mw, no validation) | **77µs** (12,908/s) | 88µs (11,388/s) | 77µs (12,914/s) |
+| Zod input validation          | **89µs** (11,182/s) | 96µs (10,396/s) | 116µs (8,597/s) |
+| Guard + Zod validation        | **83µs** (12,046/s) | 94µs (10,647/s) | 114µs (8,737/s) |
 
 Silgi wins when middleware complexity grows — compiled pipelines eliminate per-request overhead that accumulates in other frameworks.
 
@@ -70,7 +70,7 @@ RPC over WebSocket — 2000 sequential messages on a persistent connection.
 
 | Scenario                       | Silgi    | oRPC | H3 v2 |
 | ------------------------------ | -------- | ---- | ----- |
-| Simple query (persistent conn) | **38µs** | 39µs | 34µs  |
+| Simple query (persistent conn) | **38µs** | 39µs | 32µs  |
 
 All three frameworks are nearly identical on WebSocket — the persistent connection eliminates TCP handshake overhead, leaving only message serialization and pipeline execution.
 
