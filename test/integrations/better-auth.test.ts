@@ -34,7 +34,7 @@ describe('tracing() — path matching', () => {
     await plugin.onRequest(request, {})
 
     const reqTrace = new RequestTrace()
-    ;(request as any).__silgiCtx = { __analyticsTrace: reqTrace }
+    ;(request as any).__silgiCtx = { trace: reqTrace }
 
     await plugin.hooks.after[0].handler({
       request,
@@ -120,7 +120,7 @@ describe('tracing() — hooks.after span recording', () => {
     await plugin.onRequest(request, {})
 
     const reqTrace = new RequestTrace()
-    ;(request as any).__silgiCtx = { __analyticsTrace: reqTrace }
+    ;(request as any).__silgiCtx = { trace: reqTrace }
 
     await plugin.hooks.after[0].handler({
       request,
@@ -153,7 +153,7 @@ describe('tracing() — hooks.after span recording', () => {
     await plugin.onRequest(request, {})
 
     const reqTrace = new RequestTrace()
-    ;(request as any).__silgiCtx = { __analyticsTrace: reqTrace }
+    ;(request as any).__silgiCtx = { trace: reqTrace }
 
     await plugin.hooks.after[0].handler({
       request,
@@ -181,7 +181,7 @@ describe('tracing() — hooks.after span recording', () => {
     await plugin.onRequest(request, {})
 
     const reqTrace = new RequestTrace()
-    ;(request as any).__silgiCtx = { __analyticsTrace: reqTrace }
+    ;(request as any).__silgiCtx = { trace: reqTrace }
 
     await plugin.hooks.after[0].handler({
       request,
@@ -208,7 +208,7 @@ describe('tracing() — hooks.after span recording', () => {
     await plugin.onRequest(request, {})
 
     const reqTrace = new RequestTrace()
-    ;(request as any).__silgiCtx = { __analyticsTrace: reqTrace }
+    ;(request as any).__silgiCtx = { trace: reqTrace }
 
     const body = { email: 'test@example.com', password: 'secret' }
     const returned = { user: { id: 'u1' }, session: { id: 's1' } }
@@ -230,7 +230,7 @@ describe('tracing() — hooks.after span recording', () => {
     await plugin.onRequest(request, {})
 
     const reqTrace = new RequestTrace()
-    ;(request as any).__silgiCtx = { __analyticsTrace: reqTrace }
+    ;(request as any).__silgiCtx = { trace: reqTrace }
 
     await plugin.hooks.after[0].handler({
       request,
@@ -249,7 +249,7 @@ describe('tracing() — hooks.after span recording', () => {
     await plugin.onRequest(request, {})
 
     const reqTrace = new RequestTrace()
-    ;(request as any).__silgiCtx = { __analyticsTrace: reqTrace }
+    ;(request as any).__silgiCtx = { trace: reqTrace }
 
     const returned = { user: { id: 'u1' }, session: { id: 's1' } }
 
@@ -270,7 +270,7 @@ describe('tracing() — hooks.after span recording', () => {
     await plugin.onRequest(request, {})
 
     const reqTrace = new RequestTrace()
-    ;(request as any).__silgiCtx = { __analyticsTrace: reqTrace }
+    ;(request as any).__silgiCtx = { trace: reqTrace }
 
     await plugin.hooks.after[0].handler({
       request,
@@ -290,7 +290,7 @@ describe('tracing() — hooks.after span recording', () => {
     await plugin.onRequest(request, {})
 
     const reqTrace = new RequestTrace()
-    ;(request as any).__silgiCtx = { __analyticsTrace: reqTrace }
+    ;(request as any).__silgiCtx = { trace: reqTrace }
 
     await plugin.hooks.after[0].handler({
       request,
@@ -317,11 +317,11 @@ describe('tracing() — hooks.after span recording', () => {
     // No crash = pass
   })
 
-  it('skips tracing when no __analyticsTrace on ctx', async () => {
+  it('skips tracing when no trace on ctx', async () => {
     const plugin = tracing()
     const request = new Request('http://localhost/api/auth/get-session')
     await plugin.onRequest(request, {})
-    ;(request as any).__silgiCtx = {} // no __analyticsTrace
+    ;(request as any).__silgiCtx = {} // no trace
 
     await plugin.hooks.after[0].handler({
       request,
@@ -339,7 +339,7 @@ describe('tracing() — hooks.after span recording', () => {
 
     const reqTrace = new RequestTrace()
     // No __silgiCtx on request — use withCtx (ALS) instead
-    await withCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ trace: reqTrace }, async () => {
       await plugin.hooks.after[0].handler({
         request,
         path: '/api/auth/get-session',
@@ -361,9 +361,9 @@ describe('tracing() — hooks.after span recording', () => {
 
     const silgiTrace = new RequestTrace()
     const alsTrace = new RequestTrace()
-    ;(request as any).__silgiCtx = { __analyticsTrace: silgiTrace }
+    ;(request as any).__silgiCtx = { trace: silgiTrace }
 
-    await withCtx({ __analyticsTrace: alsTrace }, async () => {
+    await withCtx({ trace: alsTrace }, async () => {
       await plugin.hooks.after[0].handler({
         request,
         path: '/api/auth/sign-in/email',
@@ -462,7 +462,7 @@ describe('instrumentBetterAuth()', () => {
     instrumentBetterAuth(auth)
     const reqTrace = new RequestTrace()
 
-    const result = await withCtx({ __analyticsTrace: reqTrace }, async () => {
+    const result = await withCtx({ trace: reqTrace }, async () => {
       return auth.api.getSession({ headers: {} })
     })
 
@@ -485,7 +485,7 @@ describe('instrumentBetterAuth()', () => {
     instrumentBetterAuth(auth)
     const reqTrace = new RequestTrace()
 
-    await withCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ trace: reqTrace }, async () => {
       return auth.api.signInEmail({ body: { email: 'login@test.com', password: 'pass' } })
     })
 
@@ -501,7 +501,7 @@ describe('instrumentBetterAuth()', () => {
     instrumentBetterAuth(auth)
     const reqTrace = new RequestTrace()
 
-    await withCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ trace: reqTrace }, async () => {
       return auth.api.signUpEmail({ body: { email: 'signup@test.com', password: 'pass' } })
     })
 
@@ -517,7 +517,7 @@ describe('instrumentBetterAuth()', () => {
     const reqTrace = new RequestTrace()
 
     await expect(
-      withCtx({ __analyticsTrace: reqTrace }, async () => {
+      withCtx({ trace: reqTrace }, async () => {
         return auth.api.failingMethod()
       }),
     ).rejects.toThrow('Auth service unavailable')
@@ -534,7 +534,7 @@ describe('instrumentBetterAuth()', () => {
     instrumentBetterAuth(auth)
     const reqTrace = new RequestTrace()
 
-    const result = await withCtx({ __analyticsTrace: reqTrace }, async () => {
+    const result = await withCtx({ trace: reqTrace }, async () => {
       return auth.api.errorReturn()
     })
 
@@ -550,7 +550,7 @@ describe('instrumentBetterAuth()', () => {
     instrumentBetterAuth(auth)
     const reqTrace = new RequestTrace()
 
-    await withCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ trace: reqTrace }, async () => {
       return auth.api.customEndpoint()
     })
 
@@ -594,7 +594,7 @@ describe('instrumentBetterAuth()', () => {
     instrumentBetterAuth(auth)
     const reqTrace = new RequestTrace()
 
-    await withCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ trace: reqTrace }, async () => {
       return auth.api.signOut()
     })
 
@@ -607,7 +607,7 @@ describe('instrumentBetterAuth()', () => {
     instrumentBetterAuth(auth)
     const reqTrace = new RequestTrace()
 
-    await withCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ trace: reqTrace }, async () => {
       await auth.api.getSession({ headers: {} })
       await auth.api.signOut()
       await auth.api.updateUser({ body: { name: 'Alice' } })
@@ -634,7 +634,7 @@ describe('instrumentBetterAuth()', () => {
     instrumentBetterAuth(auth)
     const reqTrace = new RequestTrace()
 
-    await withCtx({ __analyticsTrace: reqTrace }, async () => {
+    await withCtx({ trace: reqTrace }, async () => {
       return auth.api.getSession()
     })
 
@@ -654,10 +654,10 @@ describe('concurrent context isolation', () => {
     const trace2 = new RequestTrace()
 
     await Promise.all([
-      withCtx({ __analyticsTrace: trace1 }, async () => {
+      withCtx({ trace: trace1 }, async () => {
         return auth.api.getSession({ headers: {} })
       }),
-      withCtx({ __analyticsTrace: trace2 }, async () => {
+      withCtx({ trace: trace2 }, async () => {
         return auth.api.signInEmail({ body: {} })
       }),
     ])

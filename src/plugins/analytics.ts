@@ -15,7 +15,6 @@
 import { SilgiError, toSilgiError } from '../core/error.ts'
 import { schemaToJsonSchema } from '../core/schema-converter.ts'
 import { ValidationError } from '../core/schema.ts'
-import { analyticsTraceMap } from '../core/trace-map.ts'
 import { parseUrlPathname } from '../core/url.ts'
 
 import { RequestAccumulator } from './analytics/accumulator.ts'
@@ -26,8 +25,11 @@ import { RequestTrace } from './analytics/trace.ts'
 import { isTrackedRequestPath, normalizeAnalyticsPath, round, sanitizeHeaders } from './analytics/utils.ts'
 
 import type { FetchHandler } from '../core/handler.ts'
+import type { SchemaRegistry } from '../core/schema-converter.ts'
+import type { SilgiHooks } from '../silgi.ts'
 import type { ProcedureDef, RouterDef } from '../types.ts'
 import type { AnalyticsOptions, TraceSpan } from './analytics/types.ts'
+import type { Hookable } from 'hookable'
 
 // ── Re-exports ─────────────────────────────────────
 
@@ -125,20 +127,24 @@ function isProcedureDef(value: unknown): value is ProcedureDef {
   )
 }
 
-function schemaToJson(schema: unknown, strategy: 'input' | 'output'): Record<string, unknown> | undefined {
+function schemaToJson(
+  schema: unknown,
+  strategy: 'input' | 'output',
+  registry?: SchemaRegistry,
+): Record<string, unknown> | undefined {
   if (!schema) return undefined
-  const json = schemaToJsonSchema(schema as any, strategy)
+  const json = schemaToJsonSchema(schema as any, strategy, registry)
   return Object.keys(json).length > 0 ? (json as Record<string, unknown>) : undefined
 }
 
-function extractProcedureSchemas(router: RouterDef): Map<string, ProcedureSchemaInfo> {
+function extractProcedureSchemas(router: RouterDef, registry?: SchemaRegistry): Map<string, ProcedureSchemaInfo> {
   const schemas = new Map<string, ProcedureSchemaInfo>()
 
   function walk(node: unknown, path: string[]): void {
     if (isProcedureDef(node)) {
       const info: ProcedureSchemaInfo = {}
-      if (node.input) info.input = schemaToJson(node.input, 'input')
-      if (node.output) info.output = schemaToJson(node.output, 'output')
+      if (node.input) info.input = schemaToJson(node.input, 'input', registry)
+      if (node.output) info.output = schemaToJson(node.output, 'output', registry)
       if (info.input || info.output) schemas.set(path.join('/'), info)
       return
     }
@@ -163,9 +169,11 @@ export function wrapWithAnalytics(
   handler: FetchHandler,
   router: RouterDef | undefined,
   options: AnalyticsOptions,
+  registry?: SchemaRegistry,
+  hooks?: Hookable<SilgiHooks>,
 ): FetchHandler {
   const collector = new AnalyticsCollector(options)
-  const procedureSchemas = router ? extractProcedureSchemas(router) : undefined
+  const procedureSchemas = router ? extractProcedureSchemas(router, registry) : undefined
   if (procedureSchemas) collector.setProcedureSchemas(procedureSchemas)
   const dashboardHtml = analyticsHTML()
   const auth = options.auth
@@ -212,9 +220,16 @@ export function wrapWithAnalytics(
     const reqTrace = new RequestTrace()
     const t0 = performance.now()
 
-    // Inject trace into request headers so context factory can access it
-    // We use a WeakMap to avoid mutating the request
-    analyticsTraceMap.set(request, reqTrace)
+    // Register a one-shot listener so the handler sets `ctx.trace` before
+    // any user code runs. Request-identity guard prevents cross-talk when
+    // multiple requests are in flight simultaneously.
+    if (hooks) {
+      hooks.hookOnce('request:prepare', (event) => {
+        if (event.request === request) {
+          event.ctx.trace = reqTrace
+        }
+      })
+    }
 
     let response: Response
     try {
@@ -275,8 +290,6 @@ export function wrapWithAnalytics(
         spans: reqTrace.spans ?? [],
       })
       throw error
-    } finally {
-      analyticsTraceMap.delete(request)
     }
 
     // Inject analytics headers
@@ -290,6 +303,3 @@ export function wrapWithAnalytics(
     return injected
   }
 }
-
-// Re-export from core — single shared instance, correct dependency direction
-export { analyticsTraceMap } from '../core/trace-map.ts'

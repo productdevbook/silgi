@@ -144,7 +144,7 @@ function patchSession(session: any, cfg: ResolvedConfig, isTx: boolean): boolean
       if (!prepared || typeof prepared.execute !== 'function') return prepared
 
       const ctx = getCtx()
-      const reqTrace = ctx?.__analyticsTrace as RequestTrace | undefined
+      const reqTrace = ctx?.trace as RequestTrace | undefined
       if (!reqTrace) return prepared
 
       const queryText = extractQueryText(args[0]) ?? prepared.rawQueryConfig?.text ?? prepared.queryConfig?.text ?? null
@@ -167,7 +167,7 @@ function patchSession(session: any, cfg: ResolvedConfig, isTx: boolean): boolean
 
     session.query = function patchedQuery(this: any, queryString: string, params: any[]) {
       const ctx = getCtx()
-      const reqTrace = ctx?.__analyticsTrace as RequestTrace | undefined
+      const reqTrace = ctx?.trace as RequestTrace | undefined
       if (!reqTrace) return originalQuery.call(this, queryString, params)
 
       return traceExecution(reqTrace, cfg, queryString ?? null, isTx, originalQuery, this, [queryString, params])
@@ -221,7 +221,7 @@ function patchRawClient(client: any, cfg: ResolvedConfig): boolean {
 
   client[methodName] = function patchedClientMethod(this: any, ...args: any[]) {
     const ctx = getCtx()
-    const reqTrace = ctx?.__analyticsTrace as RequestTrace | undefined
+    const reqTrace = ctx?.trace as RequestTrace | undefined
     if (!reqTrace) return originalMethod.apply(this, args)
 
     const queryText = extractQueryText(args[0])
@@ -244,7 +244,7 @@ function patchSessionExecute(session: any, cfg: ResolvedConfig): boolean {
 
   session.execute = function patchedDeepExecute(this: any, ...args: any[]) {
     const ctx = getCtx()
-    const reqTrace = ctx?.__analyticsTrace as RequestTrace | undefined
+    const reqTrace = ctx?.trace as RequestTrace | undefined
     if (!reqTrace) return originalExecute.apply(this, args)
 
     const queryText = extractQueryText(args[0])

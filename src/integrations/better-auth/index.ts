@@ -204,7 +204,7 @@ export function tracing(config?: TracingConfig): any {
               const silgiCtx = ((request as any).__silgiCtx ?? getCtx()) as Record<string, unknown> | undefined
               if (!silgiCtx) return
 
-              const reqTrace = silgiCtx.__analyticsTrace as RequestTrace | undefined
+              const reqTrace = silgiCtx.trace as RequestTrace | undefined
               if (!reqTrace) return
 
               // Get timing from onRequest, or fallback
@@ -363,7 +363,7 @@ function wrapApiMethod(
 ): (...args: any[]) => Promise<any> {
   return async function instrumented(this: any, ...args: any[]): Promise<any> {
     const ctx = getCtx()
-    const reqTrace = ctx?.__analyticsTrace as RequestTrace | undefined
+    const reqTrace = ctx?.trace as RequestTrace | undefined
 
     if (!reqTrace) return originalFn.apply(this, args)
 
