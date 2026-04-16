@@ -76,6 +76,9 @@ export type { SchemaConverter, SchemaRegistry, JSONSchema, ConvertOptions } from
 export { createContextBridge } from './core/context-bridge.ts'
 export type { ContextBridge } from './core/context-bridge.ts'
 
+// ── Context ─────────────────────────────────────────
+export type { BaseContext } from './core/context.ts'
+
 // ── SSE/Streaming ───────────────────────────────────
 export { withEventMeta, getEventMeta } from './core/sse.ts'
 export type { EventMeta } from './core/sse.ts'
