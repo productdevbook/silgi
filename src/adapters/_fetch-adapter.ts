@@ -63,6 +63,15 @@ export function createFetchAdapter<TCtx extends Record<string, unknown>>(
  * Create a fetch-passthrough adapter for frameworks that pass an event object
  * with a `.request` property (SvelteKit, SolidStart).
  * Uses a WeakMap to safely pass the event into the context factory per-request.
+ *
+ * ⚠️  The event is keyed by `Request` identity. If a middleware layer between
+ * the framework and this adapter replaces the Request (cloning for body reads,
+ * URL rewrites, or polyfills), the lookup will miss and the context factory
+ * will receive no event. In practice SvelteKit/SolidStart pass their own
+ * `event.request` through unchanged, so this is safe for default usage;
+ * userland middleware that rewrites Request must re-seed the event itself.
+ *
+ * Tracking: https://github.com/productdevbook/silgi/issues/4
  */
 export function createEventFetchAdapter<TCtx extends Record<string, unknown>, TEvent = any>(
   router: RouterDef,
