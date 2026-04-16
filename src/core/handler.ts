@@ -256,7 +256,7 @@ export function createFetchHandler(
 
       // Input — parse body/query, then merge URL path params
       if (!route.passthrough) rawInput = await parseInput(request, url, qMark)
-      if (match.params && Object.keys(match.params).length > 0) {
+      if (match.params) {
         rawInput = rawInput != null && typeof rawInput === 'object' ? { ...match.params, ...rawInput } : match.params
       }
 
