@@ -8,7 +8,7 @@
  * (see wrapWithAnalytics / wrapWithScalar in their respective modules).
  */
 
-import { createContext, releaseContext } from '../compile.ts'
+import { createContext, detachContext, releaseContext } from '../compile.ts'
 import { compileRouter } from '../compile.ts'
 
 import { detectResponseFormat, encodeResponse, makeErrorResponse } from './codec.ts'
@@ -66,6 +66,11 @@ function wrapStreamWithRelease(
   })
 }
 
+/**
+ * Build the Response for a handler's output. The pooled `ctx` is released
+ * by the caller's `using` scope; for streaming outputs we detach `ctx` first
+ * so the stream becomes the sole owner (releases on stream end/cancel).
+ */
 function makeResponse(
   output: unknown,
   route: CompiledRoute,
@@ -73,22 +78,21 @@ function makeResponse(
   ctx: Record<string, unknown>,
 ): Response | Promise<Response> {
   if (output instanceof Response) {
-    releaseContext(ctx)
     return output
   }
   if (output instanceof ReadableStream) {
+    detachContext(ctx)
     return new Response(wrapStreamWithRelease(output as ReadableStream<Uint8Array>, ctx), {
       headers: { 'content-type': 'application/octet-stream' },
     })
   }
   if (output && typeof output === 'object' && Symbol.asyncIterator in (output as object)) {
+    detachContext(ctx)
     const stream = iteratorToEventStream(output as AsyncIterableIterator<unknown>)
     return new Response(wrapStreamWithRelease(stream, ctx), {
       headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
     })
   }
-
-  releaseContext(ctx)
 
   const cacheHeaders = route.cacheControl ? { 'cache-control': route.cacheControl } : undefined
   if (format !== 'json') {
@@ -208,7 +212,10 @@ export function createFetchHandler(
     }
 
     const format = detectResponseFormat(request)
-    const ctx = createContext()
+    // Pooled context — `using` releases back to the pool on any exit path
+    // (success, throw, early return). Stream responses transfer ownership
+    // via detachContext so the stream becomes responsible for release.
+    using ctx = createContext()
     let rawInput: unknown
 
     try {
@@ -236,11 +243,11 @@ export function createFetchHandler(
 
       callHook('response', { path: pathname, output, durationMs: 0 })
 
-      // Response — makeResponse handles context release for all paths (including streams)
+      // Response — makeResponse detaches ctx for streaming outputs so the
+      // stream wrapper owns release; otherwise `using` releases at scope end.
       const response = makeResponse(output, route, format, ctx)
       return response instanceof Promise ? await response : response
     } catch (error) {
-      releaseContext(ctx)
       callHook('error', { path: pathname, error })
 
       const errorResponse = makeErrorResponse(error, format)

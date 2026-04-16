@@ -492,10 +492,33 @@ export function compileRouter(def: Record<string, unknown>): CompiledRouterFn {
 const CTX_POOL: Record<string, unknown>[] = []
 const CTX_POOL_MAX = 128
 
+/**
+ * Pooled context with built-in `using` support. `Symbol.dispose` calls
+ * `releaseContext` unless ownership has been transferred elsewhere
+ * (e.g. to a streaming Response) — in that case the new owner is
+ * expected to call `releaseContext` when the stream ends.
+ *
+ * Transfer ownership by calling `detachContext(ctx)` before returning.
+ */
+export type PooledContext = Record<string, unknown> & Disposable
+
 /** Acquire a context object from the pool (or create one). */
-export function createContext(): Record<string, unknown> {
-  return CTX_POOL.length > 0 ? CTX_POOL.pop()! : Object.create(null)
+export function createContext(): PooledContext {
+  const ctx = (CTX_POOL.length > 0 ? CTX_POOL.pop()! : Object.create(null)) as PooledContext
+  ctx[Symbol.dispose] = disposeContext
+  return ctx
 }
+
+/** Mark the context as owned elsewhere so `using` won't release it. */
+export function detachContext(ctx: Record<string, unknown>): void {
+  ;(ctx as any)[Symbol.dispose] = noopDispose
+}
+
+function disposeContext(this: Record<string, unknown>): void {
+  releaseContext(this)
+}
+
+function noopDispose(): void {}
 
 /** Return a context object to the pool after request completes. */
 export function releaseContext(ctx: Record<string, unknown>): void {
