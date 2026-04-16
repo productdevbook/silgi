@@ -115,7 +115,7 @@ describe('handler() — passthrough (wildcard catch-all)', () => {
     })
 
     const router = k2.router({ ext: { handler: externalHandler } })
-    const handle2 = k2.handler(router, { analytics: true })
+    const handle2 = k2.handler(router, { analytics: { auth: 'test-token' } })
 
     const res = await handle2(
       new Request('http://localhost/api/ext/create', {
@@ -147,7 +147,7 @@ describe('handler() — passthrough (wildcard catch-all)', () => {
       .$resolve(() => new Response('not found', { status: 404 }))
 
     const router = k2.router({ proxy })
-    const handle2 = k2.handler(router, { analytics: true })
+    const handle2 = k2.handler(router, { analytics: { auth: 'test-token' } })
 
     const res = await handle2(new Request('http://localhost/proxy/missing'))
     expect(res.status).toBe(404)
@@ -167,7 +167,7 @@ describe('handler() — passthrough (wildcard catch-all)', () => {
     })
 
     const router = k2.router({ proxy: { handler } })
-    const handle2 = k2.handler(router, { analytics: true })
+    const handle2 = k2.handler(router, { analytics: { auth: 'test-token' } })
 
     const payload = { users: [1, 2, 3], action: 'batch' }
     const res = await handle2(

@@ -359,7 +359,7 @@ describe('errorToMarkdown', () => {
     expect(md).toContain('"Alice"')
     expect(md).toContain('### Stack Trace')
     expect(md).toContain('server.ts:42')
-    expect(md).toContain('`authorization`: `Bearer token`')
+    expect(md).toContain('`authorization`: `[REDACTED]`')
     expect(md).toContain('### Traced Operations')
     expect(md).toContain('db.users.find')
     expect(md).toContain('cache miss')
