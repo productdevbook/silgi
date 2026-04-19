@@ -63,6 +63,12 @@ export type {
 // ── Error ───────────────────────────────────────────
 export { SilgiError, isSilgiError, isDefinedError, toSilgiError } from './core/error.ts'
 export type { SilgiErrorCode, SilgiErrorOptions, SilgiErrorJSON } from './core/error.ts'
+export { mapDomainErrors } from './error-mapper.ts'
+export type { DomainErrorMapper } from './error-mapper.ts'
+
+// ── Route Kit (factory for isolated packages) ───────
+export { defineRouteKit } from './route-kit.ts'
+export type { RouteKit, RouteKitDeps, GuardMap, GuardDeps } from './route-kit.ts'
 
 // ── Schema ──────────────────────────────────────────
 export { type, validateSchema, ValidationError } from './core/schema.ts'
