@@ -59,7 +59,7 @@ describe('SilgiError — brand and type guards', () => {
 
   it('toJSON() produces exactly the five expected keys', () => {
     const e = new SilgiError('NOT_FOUND', { data: { foo: 'bar' } })
-    const keys = Object.keys(e.toJSON()).toSorted()
+    const keys = Object.keys(e.toJSON()).sort()
     expect(keys).toEqual(['code', 'data', 'defined', 'message', 'status'])
   })
 })

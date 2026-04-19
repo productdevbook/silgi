@@ -51,18 +51,6 @@ export interface ProcedureBuilder<
   /** Add a wrap middleware — does not change context type */
   $use(wrap: WrapDef<any>): ProcedureBuilder<TType, TBaseCtx, TCtx, TInput, TErrors>
 
-  /**
-   * Add a middleware of unknown variant (`GuardDef | WrapDef`).
-   *
-   * @remarks
-   * Used by factory-pattern builders that accept middleware through a
-   * dependency boundary where the concrete variant isn't known at the
-   * call site. Context is not enriched — if you need guard-added fields
-   * in `.$resolve()`, pass the guard with its concrete type or use
-   * `defineRouteKit` to bind the ctx shape up front.
-   */
-  $use(mw: MiddlewareDef): ProcedureBuilder<TType, TBaseCtx, TCtx, TInput, TErrors>
-
   /** Set input schema */
   $input<TSchema extends AnySchema>(
     schema: TSchema,
@@ -123,16 +111,6 @@ export interface ProcedureBuilderWithOutput<
 
   /** Add a wrap middleware — does not change context type */
   $use(wrap: WrapDef<any>): ProcedureBuilderWithOutput<TType, TBaseCtx, TCtx, TInput, TOutputResolved, TErrors>
-
-  /**
-   * Add a middleware of unknown variant (`GuardDef | WrapDef`).
-   *
-   * @remarks
-   * Used by factory-pattern builders that accept middleware through a
-   * dependency boundary where the concrete variant isn't known at the
-   * call site.
-   */
-  $use(mw: MiddlewareDef): ProcedureBuilderWithOutput<TType, TBaseCtx, TCtx, TInput, TOutputResolved, TErrors>
 
   /** Set typed errors */
   $errors<TNewErrors extends ErrorDef>(
