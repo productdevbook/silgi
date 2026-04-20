@@ -229,7 +229,8 @@ export function cacheQuery<T = unknown>(options: CacheQueryOptions<T> = {}): Wra
       // the procedure path off `ctx` (set by the pipeline) rather than
       // asking the user to pass a `name` manually.
       if (!cachedFn) {
-        cacheName ??= (ctx as { __procedurePath?: string }).__procedurePath ?? `proc_${hash(next.toString()).slice(0, 8)}`
+        cacheName ??=
+          (ctx as { __procedurePath?: string }).__procedurePath ?? `proc_${hash(next.toString()).slice(0, 8)}`
         const resolvedName = cacheName
         const resolvedBase = options.base ?? '/cache'
         const keySet = new Set<string>()

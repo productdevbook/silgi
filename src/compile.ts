@@ -26,8 +26,8 @@
 
 import { createRouter as createRou3, addRoute as addRou3Route, findRoute as findRou3Route } from 'rou3'
 
-import { SilgiError } from './core/error.ts'
 import { RAW_INPUT, ROOT_WRAPS } from './core/ctx-symbols.ts'
+import { SilgiError } from './core/error.ts'
 import { isProcedureDef } from './core/router-utils.ts'
 import { validateSchema } from './core/schema.ts'
 
@@ -41,11 +41,7 @@ export { RAW_INPUT } from './core/ctx-symbols.ts'
  * Compiled pipeline — always async. Returning a Promise uniformly keeps
  * callers (handler, caller, ws) from branching on sync vs async results.
  */
-export type CompiledHandler = (
-  ctx: Record<string, unknown>,
-  rawInput: unknown,
-  signal: AbortSignal,
-) => Promise<unknown>
+export type CompiledHandler = (ctx: Record<string, unknown>, rawInput: unknown, signal: AbortSignal) => Promise<unknown>
 
 // ─── Error reporting helpers ──────────────────────────────────────────
 

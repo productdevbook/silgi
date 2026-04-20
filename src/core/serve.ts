@@ -339,9 +339,7 @@ export async function createServeHandler(
     fetch: wiring.fetch,
     gracefulShutdown: resolveShutdown(options?.gracefulShutdown),
     silent: true,
-    ...(options?.http2
-      ? { tls: { cert: options.http2.cert, key: options.http2.key } }
-      : {}),
+    ...(options?.http2 ? { tls: { cert: options.http2.cert, key: options.http2.key } } : {}),
     ...(wiring.bunWebsocket ? ({ bun: { websocket: wiring.bunWebsocket } } as any) : {}),
   })
 

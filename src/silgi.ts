@@ -370,11 +370,7 @@ interface SubscriptionFactory<TBaseCtx extends Record<string, unknown>> {
  * funnelling construction through this helper keeps the shape in one
  * place so new slots do not have to be added to every short form.
  */
-function makeProcedureDef(
-  type: ProcedureType,
-  input: AnySchema | null,
-  resolve: Function,
-): ProcedureDef {
+function makeProcedureDef(type: ProcedureType, input: AnySchema | null, resolve: Function): ProcedureDef {
   return {
     type,
     input,
@@ -455,10 +451,7 @@ function prepareRootWraps(wraps: WrapDef<any>[] | undefined): readonly WrapDef[]
  * Accepts either a single function or an array of functions per hook,
  * matching the shape documented on `SilgiConfig['hooks']`.
  */
-function registerHooks(
-  hooks: Hookable<SilgiHooks>,
-  config: SilgiConfig<any>['hooks'],
-): void {
+function registerHooks(hooks: Hookable<SilgiHooks>, config: SilgiConfig<any>['hooks']): void {
   if (!config) return
   for (const [name, fn] of Object.entries(config)) {
     const key = name as keyof SilgiHooks

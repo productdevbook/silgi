@@ -151,8 +151,7 @@ export function createCaller(
           if (match.params) ctx.params = match.params
 
           const signal =
-            callOptions?.signal ??
-            (defaultTimeoutMs !== null ? AbortSignal.timeout(defaultTimeoutMs) : NEVER_ABORTS)
+            callOptions?.signal ?? (defaultTimeoutMs !== null ? AbortSignal.timeout(defaultTimeoutMs) : NEVER_ABORTS)
 
           return await match.data.handler(ctx, input, signal)
         })()

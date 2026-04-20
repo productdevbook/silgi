@@ -191,8 +191,9 @@ export function _createWSHooks<TCtx extends Record<string, unknown>>(
    */
   const installKeepalive = (peer: Peer): void => {
     if (keepaliveMs <= 0) return
-    const ws = (peer as unknown as { _internal?: { ws?: { ping?: () => void; on?: Function; terminate?: () => void } } })
-      ._internal?.ws
+    const ws = (
+      peer as unknown as { _internal?: { ws?: { ping?: () => void; on?: Function; terminate?: () => void } } }
+    )._internal?.ws
     if (!ws || typeof ws.ping !== 'function' || typeof ws.on !== 'function' || typeof ws.terminate !== 'function') {
       return
     }
