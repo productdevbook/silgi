@@ -47,4 +47,42 @@ describe('resolveLazy', () => {
     const l = lazy(() => Promise.reject(new Error('import failed')))
     await expect(resolveLazy(l)).rejects.toThrow('import failed')
   })
+
+  it('does not cache rejections — retries succeed after a transient failure', async () => {
+    const routerDef = { hello: { type: 'query', resolve: () => 'hi' } }
+    let attempt = 0
+    const loader = vi.fn(() => {
+      attempt++
+      if (attempt === 1) return Promise.reject(new Error('transient'))
+      return Promise.resolve({ default: routerDef })
+    })
+    const l = lazy(loader)
+
+    await expect(resolveLazy(l)).rejects.toThrow('transient')
+    // Second call must retry — not see the cached rejection
+    const result = await resolveLazy(l)
+    expect(result).toBe(routerDef)
+    expect(loader).toHaveBeenCalledTimes(2)
+  })
+
+  it('concurrent callers during a rejection all see the error, then next call retries', async () => {
+    let attempt = 0
+    const loader = vi.fn(() => {
+      attempt++
+      if (attempt === 1) return Promise.reject(new Error('boom'))
+      return Promise.resolve({ default: { ok: true } as any })
+    })
+    const l = lazy(loader)
+
+    // Two concurrent calls share the first in-flight rejection
+    const [a, b] = await Promise.allSettled([resolveLazy(l), resolveLazy(l)])
+    expect(a.status).toBe('rejected')
+    expect(b.status).toBe('rejected')
+    expect(loader).toHaveBeenCalledTimes(1)
+
+    // After settle, a fresh call retries
+    const ok = await resolveLazy(l)
+    expect((ok as any).ok).toBe(true)
+    expect(loader).toHaveBeenCalledTimes(2)
+  })
 })
