@@ -16,7 +16,7 @@ import type { ProcedureDef, GuardDef, WrapDef, ErrorDef } from './types.ts'
 // Re-exported here for backwards compatibility with the previous shape.
 export { RAW_INPUT } from './core/ctx-symbols.ts'
 
-import { RAW_INPUT } from './core/ctx-symbols.ts'
+import { RAW_INPUT, ROOT_WRAPS } from './core/ctx-symbols.ts'
 
 /**
  * Compiled pipeline — called per request.
@@ -297,10 +297,18 @@ function _validateAndResolve(
  * - Pre-computed fail function (singleton per procedure)
  * - Sync fast path when all guards are sync
  */
-export function compileProcedure(procedure: ProcedureDef): CompiledHandler {
+export function compileProcedure(procedure: ProcedureDef, rootWraps?: readonly WrapDef[] | null): CompiledHandler {
   const middlewares = procedure.use ?? []
   const guards: GuardDef[] = []
   const wraps: WrapDef[] = []
+
+  // Root wraps are outermost — prepended in order so index 0 wraps index N-1
+  // wraps the resolver. Zero-cost when `rootWraps` is nullish/empty: the
+  // `wraps` array stays empty and every subsequent fast-path check still
+  // short-circuits on `wraps.length === 0`.
+  if (rootWraps && rootWraps.length > 0) {
+    for (let i = 0; i < rootWraps.length; i++) wraps.push(rootWraps[i]!)
+  }
 
   for (const mw of middlewares) {
     if (mw.kind === 'guard') guards.push(mw)
@@ -448,6 +456,14 @@ export type CompiledRouterFn = (method: string, path: string) => MatchedRoute<Co
 export function compileRouter(def: Record<string, unknown>): CompiledRouterFn {
   const router = createRou3<CompiledRoute>()
 
+  // Root wraps are branded onto the def by `silgi({ wraps }).router(def)`.
+  // Reading once here and passing into every `compileProcedure` avoids any
+  // per-adapter plumbing — every compile site already routes through here.
+  // When the brand is absent (no wraps, or def compiled from outside a
+  // silgi instance), `rootWraps` is `undefined` and `compileProcedure`
+  // walks its existing zero-cost fast paths unchanged.
+  const rootWraps = (def as { [ROOT_WRAPS]?: readonly WrapDef[] })[ROOT_WRAPS]
+
   function walk(node: unknown, path: string[]): void {
     if (isProcedureDef(node)) {
       const proc = node as ProcedureDef
@@ -465,7 +481,7 @@ export function compileRouter(def: Record<string, unknown>): CompiledRouterFn {
       }
 
       const compiled: CompiledRoute = {
-        handler: compileProcedure(proc),
+        handler: compileProcedure(proc, rootWraps),
         cacheControl,
         passthrough: routePath.includes('**') || undefined,
         method,

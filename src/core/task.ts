@@ -7,7 +7,7 @@
 
 import { validateSchema } from './schema.ts'
 
-import type { MiddlewareDef } from '../types.ts'
+import type { MiddlewareDef, WrapDef } from '../types.ts'
 import type { AnySchema } from './schema.ts'
 
 // ── Types ────────────────────────────────────────────
@@ -71,6 +71,15 @@ export function createTaskFromProcedure(
   inputSchema: AnySchema | null,
   use: readonly MiddlewareDef[] | null,
   contextFactory: (() => unknown | Promise<unknown>) | null,
+  /**
+   * Instance-level root wraps, read lazily so that a task constructed
+   * before `s.router()` has stamped wraps still picks them up. The
+   * silgi instance passes a live getter; dispatch calls it once per
+   * dispatch. When no wraps are configured the getter returns null and
+   * the dispatch path stays a straight `await resolveFn(...)` — zero
+   * additional closure, zero onion, zero cost.
+   */
+  rootWrapsGetter: (() => readonly WrapDef[] | null) | null = null,
 ): TaskDef<any, any> {
   const { name, cron = null, description } = config
 
@@ -98,9 +107,27 @@ export function createTaskFromProcedure(
       ctx.trace = reqTrace
     } catch {}
 
+    // Build the same root-wrap onion that the pipeline uses. When no
+    // wraps are configured this whole block compiles down to a direct
+    // `await resolveFn(...)` — the `rootWraps` ref is null, the if-guard
+    // short-circuits and V8 removes the dead branch after the first IC hit.
+    const rootWraps = rootWrapsGetter ? rootWrapsGetter() : null
+    const runResolver = () => resolveFn({ input, ctx, name, scheduledTime: undefined })
+
     const t0 = performance.now()
     try {
-      const output = await resolveFn({ input, ctx, name, scheduledTime: undefined })
+      let output: unknown
+      if (rootWraps && rootWraps.length > 0) {
+        let execute: () => Promise<unknown> = () => Promise.resolve(runResolver())
+        for (let i = rootWraps.length - 1; i >= 0; i--) {
+          const wrapFn = rootWraps[i]!.fn
+          const next = execute
+          execute = () => wrapFn(ctx, next)
+        }
+        output = await execute()
+      } else {
+        output = await runResolver()
+      }
 
       if (parentTrace) {
         parentTrace.spans.push({

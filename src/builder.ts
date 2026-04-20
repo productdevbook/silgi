@@ -27,6 +27,8 @@ import type {
   Meta,
 } from './types.ts'
 
+export type RootWrapsGetter = (() => readonly WrapDef[] | null) | null
+
 // ── Builder Interfaces ──────────────────────────────
 
 /** Initial builder — no input, no output, no errors yet */
@@ -153,6 +155,7 @@ class ProcBuilder {
 
   // Set by createProcedureBuilder when created via silgi instance
   _contextFactory: (() => unknown | Promise<unknown>) | null = null
+  _rootWrapsGetter: RootWrapsGetter = null
 
   constructor(type: ProcedureType) {
     this.type = type
@@ -195,15 +198,24 @@ class ProcBuilder {
   }
 
   $task(config: TaskConfig & { resolve: Function }): TaskDef {
-    return createTaskFromProcedure(config, config.resolve, this.input, this.use, this._contextFactory)
+    return createTaskFromProcedure(
+      config,
+      config.resolve,
+      this.input,
+      this.use,
+      this._contextFactory,
+      this._rootWrapsGetter,
+    )
   }
 }
 
 export function createProcedureBuilder<TType extends ProcedureType, TBaseCtx extends Record<string, unknown>>(
   type: TType,
   contextFactory?: (() => unknown | Promise<unknown>) | null,
+  rootWrapsGetter?: RootWrapsGetter,
 ): ProcedureBuilder<TType, TBaseCtx> {
   const b = new ProcBuilder(type)
   if (contextFactory) b._contextFactory = contextFactory
+  if (rootWrapsGetter) b._rootWrapsGetter = rootWrapsGetter
   return b as unknown as ProcedureBuilder<TType, TBaseCtx>
 }
