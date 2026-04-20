@@ -174,4 +174,38 @@ describe('lifecycle hooks', () => {
     const body = await res.json()
     expect(body.status).toBe('ok')
   })
+
+  it('throwing hooks are logged but never fail the request', async () => {
+    // Prior impl silently swallowed hook errors via `catch {}` — a
+    // misspelled property or failed `fetch` inside a user hook just
+    // vanished, with no signal that anything was wrong. Now we log.
+    const calls: Array<[string, unknown]> = []
+    const origError = console.error
+    console.error = (...args: unknown[]) => calls.push(['error', args])
+    try {
+      const { handle } = createApp({
+        request: () => {
+          throw new Error('sync hook boom')
+        },
+        response: async () => {
+          throw new Error('async hook boom')
+        },
+      })
+
+      const res = await get(handle, 'health')
+      // Request itself succeeds
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.status).toBe('ok')
+
+      // Wait a tick for the async hook rejection to surface
+      await new Promise((r) => setTimeout(r, 10))
+
+      const messages = calls.map(([, args]) => (args as unknown[]).join(' '))
+      expect(messages.some((m) => m.includes('sync hook boom'))).toBe(true)
+      expect(messages.some((m) => m.includes('async hook boom'))).toBe(true)
+    } finally {
+      console.error = origError
+    }
+  })
 })

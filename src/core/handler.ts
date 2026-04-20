@@ -194,13 +194,23 @@ export function createFetchHandler(
   const jsonHeaders = { 'content-type': 'application/json' }
   const notFoundBody = JSON.stringify({ code: 'NOT_FOUND', status: 404, message: 'Procedure not found' })
 
-  // Hook helper — fire-and-forget
+  // Hook helper — fire-and-forget. We surface hook errors via
+  // `console.error` rather than swallowing: a silent catch hides user
+  // coding mistakes (a misspelled field, a thrown assertion) and the
+  // dashboard, trace, or logging pipeline just… stops working with no
+  // signal. Hook errors never fail the request itself.
+  function reportHookError(name: string, err: unknown): void {
+    console.error(`[silgi] hook "${name}" threw:`, err)
+  }
+
   function callHook(name: keyof SilgiHooks, event: any): void {
     if (!hooks) return
     try {
       const result = hooks.callHook(name, event)
-      if (result instanceof Promise) result.catch(() => {})
-    } catch {}
+      if (result instanceof Promise) result.catch((err) => reportHookError(name, err))
+    } catch (err) {
+      reportHookError(name, err)
+    }
   }
 
   // Hook helper — awaited (used for critical hooks like `request:prepare`
@@ -210,8 +220,10 @@ export function createFetchHandler(
     if (!hooks) return
     try {
       const result = hooks.callHook(name, event)
-      if (result instanceof Promise) return result.catch(() => {})
-    } catch {}
+      if (result instanceof Promise) return result.catch((err) => reportHookError(name, err))
+    } catch (err) {
+      reportHookError(name, err)
+    }
   }
 
   // ── Unified Request Handler ───────────────────────
