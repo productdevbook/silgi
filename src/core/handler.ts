@@ -1,14 +1,26 @@
 /**
- * Fetch API handler — single unified request handler.
+ * Fetch API handler
+ * -------------------
  *
- * Orchestrates: routing → context → input parsing → pipeline → response encoding.
- * Each concern lives in its own module (codec.ts, input.ts, sse.ts).
+ * Every adapter that speaks the Fetch API (Next.js App Router, SvelteKit,
+ * srvx, Bun, Cloudflare Workers, Deno) ends up calling the handler built
+ * here. It is the single place that turns a `Request` into a `Response`
+ * by running the compiled pipeline produced by `compileRouter`.
  *
- * Analytics / Scalar are NOT here — they wrap the handler externally
- * (see wrapWithAnalytics / wrapWithScalar in their respective modules).
+ * Responsibilities, in order:
+ *
+ *   1. URL parsing and `basePath` stripping.
+ *   2. Route lookup + HTTP method enforcement.
+ *   3. Context construction (factory + optional `AsyncLocalStorage` bridge).
+ *   4. `request:prepare` hook so plugins (analytics, etc.) can seed `ctx`.
+ *   5. Input parsing (body / query / URL params).
+ *   6. Pipeline execution — the compiled handler from `compileProcedure`.
+ *   7. Response encoding (JSON, msgpack, stream, SSE, raw `Response`).
+ *
+ * Analytics and the Scalar UI are layered on top via `wrapHandler` — they
+ * do not live inside the hot path.
  */
 
-import { createContext, detachContext, releaseContext } from '../compile.ts'
 import { compileRouter } from '../compile.ts'
 
 import { detectResponseFormat, encodeResponse, makeErrorResponse } from './codec.ts'
@@ -24,79 +36,46 @@ import type { ResponseFormat } from './codec.ts'
 import type { ContextBridge } from './context-bridge.ts'
 import type { Hookable } from 'hookable'
 
-// Re-export for backwards compat
+// Re-exports kept for external callers that imported these from handler.ts.
 export type { ResponseFormat } from './codec.ts'
 export { encodeResponse } from './codec.ts'
 
-// ── Response Builder ────────────────────────────────
-
-/** Wrap a stream to release pooled context on completion or cancellation. */
-function wrapStreamWithRelease(
-  source: ReadableStream<Uint8Array>,
-  ctx: Record<string, unknown>,
-): ReadableStream<Uint8Array> {
-  let released = false
-  const release = () => {
-    if (!released) {
-      released = true
-      releaseContext(ctx)
-    }
-  }
-  const reader = source.getReader()
-  return new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      try {
-        const { done, value } = await reader.read()
-        if (done) {
-          release()
-          controller.close()
-        } else {
-          controller.enqueue(value)
-        }
-      } catch (err) {
-        release()
-        controller.error(err)
-      }
-    },
-    cancel() {
-      release()
-      reader.cancel()
-    },
-  })
-}
+// ─── Response builder ─────────────────────────────────────────────────
 
 /**
- * Build the Response for a handler's output. The pooled `ctx` is released
- * by the caller's `using` scope; for streaming outputs we detach `ctx` first
- * so the stream becomes the sole owner (releases on stream end/cancel).
+ * Convert a pipeline output into an HTTP `Response`.
+ *
+ * We handle four shapes:
+ *   - `Response` — user returned one directly; pass through.
+ *   - `ReadableStream` — wrap in a binary response.
+ *   - Async iterator — render as Server-Sent Events.
+ *   - Plain value — encode as JSON (or msgpack when the client asked for it).
+ *
+ * The function is async so callers have a single `await` point and do not
+ * have to branch on sync-vs-async encoders underneath.
  */
-function makeResponse(
-  output: unknown,
-  route: CompiledRoute,
-  format: ResponseFormat,
-  ctx: Record<string, unknown>,
-): Response | Promise<Response> {
-  if (output instanceof Response) {
-    return output
-  }
+async function makeResponse(output: unknown, route: CompiledRoute, format: ResponseFormat): Promise<Response> {
+  if (output instanceof Response) return output
+
   if (output instanceof ReadableStream) {
-    detachContext(ctx)
-    return new Response(wrapStreamWithRelease(output as ReadableStream<Uint8Array>, ctx), {
+    return new Response(output, {
       headers: { 'content-type': 'application/octet-stream' },
     })
   }
+
   if (output && typeof output === 'object' && Symbol.asyncIterator in (output as object)) {
-    detachContext(ctx)
     const stream = iteratorToEventStream(output as AsyncIterableIterator<unknown>)
-    return new Response(wrapStreamWithRelease(stream, ctx), {
+    return new Response(stream, {
       headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' },
     })
   }
 
   const cacheHeaders = route.cacheControl ? { 'cache-control': route.cacheControl } : undefined
+
   if (format !== 'json') {
     return encodeResponse(output, 200, format, cacheHeaders)
   }
+
   return new Response(JSON.stringify(output), {
     headers: cacheHeaders
       ? { 'content-type': 'application/json', ...cacheHeaders }
@@ -104,14 +83,14 @@ function makeResponse(
   })
 }
 
-// ── Fetch Handler ───────────────────────────────────
+// ─── Public types ─────────────────────────────────────────────────────
 
 export type FetchHandler = (request: Request) => Response | Promise<Response>
 
 export interface WrapHandlerOptions {
   analytics?: import('../plugins/analytics/types.ts').AnalyticsOptions
   scalar?: boolean | import('../scalar.ts').ScalarOptions
-  /** URL path prefix for the handler (e.g. "/api"). Requests not matching this prefix return 404. */
+  /** URL path prefix for the handler (e.g. `/api`). Requests outside the prefix return 404. */
   basePath?: string
   /**
    * Schema registry for OpenAPI / analytics schema conversion. Built from
@@ -120,17 +99,26 @@ export interface WrapHandlerOptions {
    */
   schemaRegistry?: import('./schema-converter.ts').SchemaRegistry
   /**
-   * Hookable instance — threaded so `wrapWithAnalytics` can register
-   * lifecycle listeners on `request:prepare` / `response:finalize`.
+   * Hookable instance threaded through so `wrapWithAnalytics` can register
+   * listeners on `request:prepare` / `response:finalize`.
    * @internal
    */
   hooks?: Hookable<SilgiHooks>
 }
 
+// ─── Lazy wrapper composition (scalar / analytics) ────────────────────
+
 /**
- * Lazily wrap a FetchHandler with analytics and/or scalar.
- * Returns a new handler that applies wrappers on first request (async import).
- * If no wrappers are needed, returns the original handler as-is.
+ * Wrap a `FetchHandler` with Scalar UI and/or analytics, if configured.
+ *
+ * Both wrappers have non-trivial imports (Scalar pulls in the API
+ * reference, analytics pulls in the dashboard). We defer those imports
+ * until the first request so that a handler you never hit does not pay
+ * the cost.
+ *
+ * If the lazy init fails (network blip, broken import) we fall back to
+ * the raw handler and log once — one failed init must not wedge every
+ * subsequent request.
  */
 export function wrapHandler(
   handler: FetchHandler,
@@ -140,28 +128,24 @@ export function wrapHandler(
 ): FetchHandler {
   if (!options?.scalar && !options?.analytics) return handler
 
-  // Initialised to `handler` so a failed init falls back to the raw handler
-  // rather than wedging every request on `wrapped!` being undefined.
   let wrapped: FetchHandler = handler
   let initDone = false
   let initPromise: Promise<void> | undefined
 
-  async function init(): Promise<void> {
+  const init = async (): Promise<void> => {
     try {
-      let h = handler
-      if (options!.scalar) {
+      let next = handler
+      if (options.scalar) {
         const { wrapWithScalar } = await import('../scalar.ts')
-        const scalarOpts = typeof options!.scalar === 'object' ? options!.scalar : {}
-        h = wrapWithScalar(h, router, scalarOpts, prefix, options!.schemaRegistry)
+        const scalarOpts = typeof options.scalar === 'object' ? options.scalar : {}
+        next = wrapWithScalar(next, router, scalarOpts, prefix, options.schemaRegistry)
       }
-      if (options!.analytics) {
+      if (options.analytics) {
         const { wrapWithAnalytics } = await import('../plugins/analytics.ts')
-        h = wrapWithAnalytics(h, router, options!.analytics, options!.schemaRegistry, options!.hooks)
+        next = wrapWithAnalytics(next, router, options.analytics, options.schemaRegistry, options.hooks)
       }
-      wrapped = h
+      wrapped = next
     } catch (err) {
-      // Log once and keep serving with the raw handler. Otherwise a
-      // transient import failure at boot would 500 every request.
       console.error('[silgi] Failed to initialise scalar/analytics wrapper:', err)
       wrapped = handler
     } finally {
@@ -169,12 +153,14 @@ export function wrapHandler(
     }
   }
 
-  return (request: Request): Response | Promise<Response> => {
+  return (request) => {
     if (initDone) return wrapped(request)
     initPromise ??= init()
     return initPromise.then(() => wrapped(request))
   }
 }
+
+// ─── Main handler factory ─────────────────────────────────────────────
 
 export function createFetchHandler(
   routerDef: import('../types.ts').RouterDef,
@@ -183,7 +169,8 @@ export function createFetchHandler(
   prefix?: string,
   bridge?: ContextBridge,
 ): FetchHandler {
-  // Compile router
+  // Router compilation is keyed off the user's def via a `WeakMap` so two
+  // adapters sharing the same def also share the compiled router.
   let compiledRouter = routerCache.get(routerDef) as CompiledRouterFn | undefined
   if (!compiledRouter) {
     compiledRouter = compileRouter(routerDef)
@@ -194,46 +181,45 @@ export function createFetchHandler(
   const jsonHeaders = { 'content-type': 'application/json' }
   const notFoundBody = JSON.stringify({ code: 'NOT_FOUND', status: 404, message: 'Procedure not found' })
 
-  // Hook helper — fire-and-forget. We surface hook errors via
-  // `console.error` rather than swallowing: a silent catch hides user
-  // coding mistakes (a misspelled field, a thrown assertion) and the
-  // dashboard, trace, or logging pipeline just… stops working with no
-  // signal. Hook errors never fail the request itself.
-  function reportHookError(name: string, err: unknown): void {
+  /**
+   * Hook dispatch helpers.
+   *
+   * Hook errors never fail the request. But we do log them: silently
+   * swallowing a hook throw hides genuine user bugs (a typo'd field, a
+   * thrown assertion) and the dashboard / trace / logging pipeline just
+   * stops working with no visible signal.
+   */
+  const reportHookError = (name: string, err: unknown): void => {
     console.error(`[silgi] hook "${name}" threw:`, err)
   }
 
-  function callHook(name: keyof SilgiHooks, event: any): void {
+  const callHook = (name: keyof SilgiHooks, event: unknown): void => {
     if (!hooks) return
     try {
-      const result = hooks.callHook(name, event)
+      const result = hooks.callHook(name, event as never)
       if (result instanceof Promise) result.catch((err) => reportHookError(name, err))
     } catch (err) {
       reportHookError(name, err)
     }
   }
 
-  // Hook helper — awaited (used for critical hooks like `request:prepare`
-  // that must complete before the pipeline runs). Sync fast-path when no
-  // hooks are registered avoids a per-request Promise allocation.
-  function awaitHook(name: keyof SilgiHooks, event: any): void | Promise<void> {
+  const awaitHook = async (name: keyof SilgiHooks, event: unknown): Promise<void> => {
     if (!hooks) return
     try {
-      const result = hooks.callHook(name, event)
-      if (result instanceof Promise) return result.catch((err) => reportHookError(name, err))
+      await hooks.callHook(name, event as never)
     } catch (err) {
       reportHookError(name, err)
     }
   }
 
-  // ── Unified Request Handler ───────────────────────
+  // ─── Request handler ───────────────────────────────────────────────
 
   return async function handleRequest(request: Request): Promise<Response> {
     const url = request.url
     let fullPath = parseUrlPath(url)
 
-    // Strip basePath prefix — zero allocation, pure string slice. Require
-    // a segment boundary so `prefix='/api'` never matches `/api2/...`.
+    // `basePath` stripping. We require a segment boundary so that
+    // `prefix = '/api'` never matches `/api2/...`.
     if (prefix) {
       if (fullPath !== prefix && !fullPath.startsWith(prefix + '/')) {
         return new Response(notFoundBody, { status: 404, headers: jsonHeaders })
@@ -244,14 +230,15 @@ export function createFetchHandler(
     const pathname = fullPath.length > 1 ? fullPath.slice(1) : ''
     const qMark = url.indexOf('?', url.indexOf('/', url.indexOf('//') + 2))
 
-    // Route lookup
     const match = compiledRouter!(request.method, fullPath)
     if (!match) return new Response(notFoundBody, { status: 404, headers: jsonHeaders })
 
     const route = match.data
     const reqMethod = request.method
 
-    // Method enforcement
+    // HTTP method enforcement. `GET` against a `POST` route is allowed so
+    // that clients can read the procedure via a query string; `OPTIONS`
+    // is always allowed so that CORS preflights succeed.
     if (route.method !== '*' && reqMethod !== route.method && reqMethod !== 'OPTIONS') {
       if (!(reqMethod === 'GET' && route.method === 'POST')) {
         return new Response(
@@ -262,26 +249,26 @@ export function createFetchHandler(
     }
 
     const format = detectResponseFormat(request)
-    // Pooled context — `using` releases back to the pool on any exit path
-    // (success, throw, early return). Stream responses transfer ownership
-    // via detachContext so the stream becomes responsible for release.
-    using ctx = createContext()
+
+    // Per-request context. We use a null-prototype object so user-supplied
+    // keys cannot accidentally shadow `Object.prototype` members and so
+    // property lookups stay on the object itself.
+    const ctx = Object.create(null) as Record<string, unknown>
     let rawInput: unknown
 
     try {
-      // Context
-      const baseCtxResult = contextFactory(request)
-      const baseCtx = baseCtxResult instanceof Promise ? await baseCtxResult : baseCtxResult
+      const baseCtx = await contextFactory(request)
       applyContext(ctx, baseCtx)
       if (match.params) ctx.params = match.params
 
-      // Notify framework plugins (e.g. analytics) that context is ready
-      // so they can set `ctx.trace` before any user code runs. Sync result
-      // (no hooks, or sync listeners) skips the microtask.
-      const prepareResult = awaitHook('request:prepare', { request, ctx })
-      if (prepareResult) await prepareResult
+      // `request:prepare` runs before any user code — framework plugins
+      // (e.g. analytics) rely on it to seed `ctx.trace`. It is awaited
+      // because the plugin's work must land on `ctx` before the pipeline
+      // reads it.
+      await awaitHook('request:prepare', { request, ctx })
 
-      // Input — parse body/query, then merge URL path params
+      // Input comes from the body (or query string for GETs), then URL
+      // path params are merged on top so named routes can use `{ id }`.
       if (!route.passthrough) rawInput = await parseInput(request, url, qMark)
       if (match.params) {
         rawInput = rawInput != null && typeof rawInput === 'object' ? { ...match.params, ...rawInput } : match.params
@@ -289,24 +276,21 @@ export function createFetchHandler(
 
       callHook('request', { path: pathname, input: rawInput })
 
-      // Pipeline
-      const pipelineResult = bridge
+      // Pipeline execution. `bridge.run` installs `ctx` into this silgi
+      // instance's `AsyncLocalStorage` so that instrumented integrations
+      // (Drizzle, Better Auth) can read it from anywhere inside the
+      // resolver call tree.
+      const output = await (bridge
         ? bridge.run(ctx, () => route.handler(ctx, rawInput, request.signal))
-        : route.handler(ctx, rawInput, request.signal)
-      const output = pipelineResult instanceof Promise ? await pipelineResult : pipelineResult
+        : route.handler(ctx, rawInput, request.signal))
 
       callHook('response', { path: pathname, output, durationMs: 0 })
       callHook('response:finalize', { request, ctx, output })
 
-      // Response — makeResponse detaches ctx for streaming outputs so the
-      // stream wrapper owns release; otherwise `using` releases at scope end.
-      const response = makeResponse(output, route, format, ctx)
-      return response instanceof Promise ? await response : response
+      return await makeResponse(output, route, format)
     } catch (error) {
       callHook('error', { path: pathname, error })
-
-      const errorResponse = makeErrorResponse(error, format)
-      return errorResponse instanceof Promise ? await errorResponse : errorResponse
+      return await makeErrorResponse(error, format)
     }
   }
 }

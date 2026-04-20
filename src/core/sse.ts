@@ -1,50 +1,65 @@
 /**
- * Server-Sent Events (SSE) encoding/decoding.
+ * Server-Sent Events
+ * -------------------
  *
- * Supports three event types:
- * - message: a yielded value
- * - error: an error event with data
- * - done: the return value (stream complete)
+ * silgi subscriptions are yielded to the client as an SSE event stream.
+ * This module holds the encoder, the streaming decoder (for client-side
+ * consumption), and the iterator ↔ stream bridges in both directions.
  *
- * Event metadata (id, retry) can be attached to object values
- * via withEventMeta() using a WeakMap side-channel.
+ * Wire vocabulary
+ * ---------------
+ *
+ *   `event: message`  → one yielded value
+ *   `event: error`    → resolver threw (sanitized for undefined errors)
+ *   `event: done`     → generator returned; `data` is the return value
+ *   `: <comment>`     → keepalive or boot marker; ignored by clients
+ *
+ * Event metadata (SSE `id` / `retry`) can be attached to any object
+ * value via `withEventMeta()` and round-trips through the decoder.
  */
 
 import { SilgiError } from './error.ts'
 import { AsyncIteratorClass } from './iterator.ts'
 
-// === Event Metadata ===
+// ─── Event metadata side channel ──────────────────────────────────────
 
 export interface EventMeta {
   id?: string
   retry?: number
 }
 
-// Per-event metadata cache — scoped per iterator, not global
-const _eventMeta = new WeakMap<object, EventMeta>()
+/**
+ * Metadata store for SSE `id` / `retry` fields.
+ *
+ * This `WeakMap` is module-scoped (i.e. shared across every subscription
+ * in the process). That is safe: entries are keyed by the *value object*
+ * the user passes in, and GC reclaims entries as soon as those objects
+ * become unreachable. A per-iterator store would add plumbing for
+ * nothing — two subscriptions yielding distinct objects never collide.
+ */
+const metaStore = new WeakMap<object, EventMeta>()
 
 /**
- * Attach SSE metadata (id, retry) to a value.
+ * Attach SSE `id` / `retry` metadata to a yielded value.
  *
- * Only works with object values (arrays, plain objects, etc.).
- * Primitives cannot carry metadata — wrap them in an object first.
+ * Only object-shaped values can carry metadata; primitives cannot be
+ * keyed in the `WeakMap` and are returned unchanged. Wrap primitives
+ * in a one-field object when you need metadata on them.
  */
 export function withEventMeta<T>(value: T, meta: EventMeta): T {
   if (typeof value === 'object' && value !== null) {
-    _eventMeta.set(value as object, meta)
+    metaStore.set(value as object, meta)
   }
   return value
 }
 
-/**
- * Read SSE metadata from a value (if attached).
- */
+/** Read SSE metadata previously attached via `withEventMeta`. */
 export function getEventMeta(value: unknown): EventMeta | undefined {
   if (typeof value !== 'object' || value === null) return undefined
-  return _eventMeta.get(value as object)
+  return metaStore.get(value as object)
 }
 
-// === SSE Message Types ===
+// ─── Wire format ──────────────────────────────────────────────────────
 
 export interface EventMessage {
   event?: string
@@ -54,48 +69,40 @@ export interface EventMessage {
   comment?: string
 }
 
-// === SSE Encoder ===
-
 /**
- * Encode an EventMessage into SSE wire format.
+ * Serialize an `EventMessage` into SSE wire format (one event terminated
+ * by a blank line). Multi-line `data` and `comment` are split across
+ * multiple fields per the SSE spec so embedded newlines survive.
  */
 export function encodeEventMessage(msg: EventMessage): string {
   const lines: string[] = []
 
   if (msg.comment !== undefined) {
-    for (const line of msg.comment.split('\n')) {
-      lines.push(`: ${line}`)
-    }
+    for (const line of msg.comment.split('\n')) lines.push(`: ${line}`)
   }
-
-  if (msg.event !== undefined) {
-    lines.push(`event: ${msg.event}`)
-  }
-
-  if (msg.id !== undefined) {
-    lines.push(`id: ${msg.id}`)
-  }
-
-  if (msg.retry !== undefined) {
-    lines.push(`retry: ${msg.retry}`)
-  }
-
+  if (msg.event !== undefined) lines.push(`event: ${msg.event}`)
+  if (msg.id !== undefined) lines.push(`id: ${msg.id}`)
+  if (msg.retry !== undefined) lines.push(`retry: ${msg.retry}`)
   if (msg.data !== undefined) {
-    for (const line of msg.data.split('\n')) {
-      lines.push(`data: ${line}`)
-    }
+    for (const line of msg.data.split('\n')) lines.push(`data: ${line}`)
   }
 
   return lines.join('\n') + '\n\n'
 }
 
-// === SSE Decoder (Streaming) ===
+// ─── Streaming decoder ────────────────────────────────────────────────
 
 /**
- * Stateful SSE decoder for streaming text.
+ * Incremental SSE decoder for chunked text input.
+ *
+ * Feed it text as it arrives from the network; it emits a full
+ * `EventMessage` through the `onEvent` callback once it has seen a
+ * blank-line terminator. The trailing partial event (if any) is held
+ * over until the next `feed()` call — or flushed explicitly on stream
+ * end via `flush()`.
  */
 export class EventDecoder {
-  #incomplete = ''
+  #partial = ''
   #onEvent: (msg: EventMessage) => void
 
   constructor(onEvent: (msg: EventMessage) => void) {
@@ -103,10 +110,10 @@ export class EventDecoder {
   }
 
   feed(chunk: string): void {
-    this.#incomplete += chunk
-    const blocks = this.#incomplete.split('\n\n')
-    // Last block may be incomplete
-    this.#incomplete = blocks.pop() ?? ''
+    this.#partial += chunk
+    const blocks = this.#partial.split('\n\n')
+    // Whatever is after the last `\n\n` is still mid-event; save it.
+    this.#partial = blocks.pop() ?? ''
 
     for (const block of blocks) {
       if (!block.trim()) continue
@@ -115,11 +122,12 @@ export class EventDecoder {
     }
   }
 
+  /** Parse any remaining partial block. Call once at end-of-stream. */
   flush(): void {
-    if (this.#incomplete.trim()) {
-      const msg = this.#parseBlock(this.#incomplete)
+    if (this.#partial.trim()) {
+      const msg = this.#parseBlock(this.#partial)
       if (msg) this.#onEvent(msg)
-      this.#incomplete = ''
+      this.#partial = ''
     }
   }
 
@@ -128,17 +136,18 @@ export class EventDecoder {
     let hasContent = false
 
     for (const line of block.split('\n')) {
+      // Lines starting with `:` are comments (keepalives, boot markers).
       if (line.startsWith(':')) {
         msg.comment = (msg.comment ? msg.comment + '\n' : '') + line.slice(2)
         hasContent = true
         continue
       }
 
-      const colonIdx = line.indexOf(':')
-      if (colonIdx === -1) continue
+      const colon = line.indexOf(':')
+      if (colon === -1) continue
 
-      const field = line.slice(0, colonIdx)
-      const value = line.slice(colonIdx + 1).trimStart()
+      const field = line.slice(0, colon)
+      const value = line.slice(colon + 1).trimStart()
 
       switch (field) {
         case 'event':
@@ -146,6 +155,8 @@ export class EventDecoder {
           hasContent = true
           break
         case 'data':
+          // Per the SSE spec, multiple `data:` lines within one event
+          // are concatenated with `\n` between them.
           msg.data = (msg.data ? msg.data + '\n' : '') + value
           hasContent = true
           break
@@ -164,12 +175,20 @@ export class EventDecoder {
   }
 }
 
-// === Iterator ↔ SSE Stream Conversion ===
+// ─── Iterator → SSE stream ────────────────────────────────────────────
 
 /**
- * Convert an async iterator to an SSE ReadableStream.
- * Each yielded value becomes a "message" event.
- * Errors become "error" events. Return value becomes "done".
+ * Build an SSE `ReadableStream` that consumes an async iterator.
+ *
+ * Each yielded value becomes a `message` event; the iterator's return
+ * value becomes the `done` event; a thrown error becomes an `error`
+ * event (and only the message is exposed when the error is not a
+ * `SilgiError` flagged `defined` — undefined errors must not leak
+ * internals).
+ *
+ * A comment-only `keepalive` event is emitted every `keepAliveMs` so
+ * intermediaries (proxies, load balancers) do not close the connection
+ * while the resolver is quiet.
  */
 export function iteratorToEventStream(
   iterator: AsyncIterableIterator<unknown>,
@@ -185,13 +204,47 @@ export function iteratorToEventStream(
   let keepAliveTimer: ReturnType<typeof setInterval> | undefined
   let cancelled = false
 
+  /** Build the wire form of one yielded value, carrying any attached meta. */
+  const encodeValue = (value: unknown): string => {
+    const meta = getEventMeta(value)
+    return encodeEventMessage({
+      event: 'message',
+      data: serialize(value),
+      id: meta?.id,
+      retry: meta?.retry,
+    })
+  }
+
+  /** Build the wire form of the terminal `done` event, if a return value was yielded. */
+  const encodeDone = (value: unknown): string => {
+    const data = value !== undefined ? serialize(value) : undefined
+    return encodeEventMessage({ event: 'done', data })
+  }
+
+  /**
+   * Build the wire form of an `error` event.
+   *
+   * Only `SilgiError` with `defined === true` surfaces its `code` and
+   * `message` to the wire — the author opted into publishing those by
+   * declaring the error. Everything else collapses to a generic 500
+   * shape so we do not leak stack traces or internal codes.
+   */
+  const encodeError = (err: unknown): string => {
+    const data =
+      err instanceof SilgiError && err.defined
+        ? JSON.stringify({ message: err.message, code: err.code })
+        : JSON.stringify({ message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' })
+    return encodeEventMessage({ event: 'error', data })
+  }
+
   const textStream = new ReadableStream<string>({
     start(controller) {
-      // Flush headers immediately with a comment
+      // Flush headers immediately: clients waiting on the first byte
+      // (including the browser's EventSource) stall until something
+      // arrives, and a boot comment is the cheapest thing to send.
       if (options.initialComment !== undefined) {
         controller.enqueue(encodeEventMessage({ comment: options.initialComment }))
       }
-      // Single long-running keepalive timer — avoids per-pull start/stop race
       keepAliveTimer = setInterval(() => {
         if (!cancelled) controller.enqueue(encodeEventMessage({ comment: 'keepalive' }))
       }, keepAliveMs)
@@ -200,42 +253,20 @@ export function iteratorToEventStream(
     async pull(controller) {
       try {
         const result = await iterator.next()
-
         if (cancelled) return
 
         if (result.done) {
           clearInterval(keepAliveTimer)
-          // Stream complete — send done event
-          const data = result.value !== undefined ? serialize(result.value) : undefined
-          controller.enqueue(encodeEventMessage({ event: 'done', data }))
+          controller.enqueue(encodeDone(result.value))
           controller.close()
           return
         }
 
-        // Regular value — send message event
-        const meta = getEventMeta(result.value)
-        const msg: EventMessage = {
-          event: 'message',
-          data: serialize(result.value),
-          id: meta?.id,
-          retry: meta?.retry,
-        }
-        controller.enqueue(encodeEventMessage(msg))
+        controller.enqueue(encodeValue(result.value))
       } catch (error) {
         clearInterval(keepAliveTimer)
         if (cancelled) return
-
-        // Send error event — sanitize message to prevent leaking internal details
-        let errorData: string
-        if (error instanceof SilgiError && error.defined) {
-          // SilgiError with defined=true — safe to expose
-          errorData = JSON.stringify({ message: error.message, code: error.code })
-        } else {
-          // Internal error — generic message only
-          errorData = JSON.stringify({ message: 'Internal server error', code: 'INTERNAL_SERVER_ERROR' })
-        }
-
-        controller.enqueue(encodeEventMessage({ event: 'error', data: errorData }))
+        controller.enqueue(encodeError(error))
         controller.close()
       }
     },
@@ -247,13 +278,21 @@ export function iteratorToEventStream(
     },
   })
 
-  // Pipe through text encoder
   return textStream.pipeThrough(new TextEncoderStream())
 }
 
+// ─── SSE stream → iterator ────────────────────────────────────────────
+
 /**
- * Convert an SSE ReadableStream back to an async iterator.
- * "message" events are yielded. "error" events throw. "done" events return.
+ * Turn an SSE `ReadableStream` back into an async iterator.
+ *
+ *   `message` events → yielded values (deserialized)
+ *   `error`   events → thrown exceptions
+ *   `done`    event  → normal iterator completion
+ *
+ * The decoder runs on its own microtask loop, buffering decoded events
+ * into a queue that `next()` drains. The queue is needed because the
+ * network read loop and the consumer run at different cadences.
  */
 export function eventStreamToIterator<T = unknown>(
   stream: ReadableStream<Uint8Array>,
@@ -265,73 +304,79 @@ export function eventStreamToIterator<T = unknown>(
   const decodedStream = stream.pipeThrough(new TextDecoderStream() as any)
   const reader = decodedStream.getReader()
 
-  const eventQueue: EventMessage[] = []
-  let eventResolve: (() => void) | undefined
-  let streamDone = false
-  let streamError: Error | undefined
+  const events: EventMessage[] = []
+  let wakeUp: (() => void) | undefined
+  let done = false
+  let error: Error | undefined
 
-  const pushEvent = (msg: EventMessage) => {
-    eventQueue.push(msg)
-    eventResolve?.()
-    eventResolve = undefined
-  }
+  const decoder = new EventDecoder((msg) => {
+    events.push(msg)
+    wakeUp?.()
+    wakeUp = undefined
+  })
 
-  const sseDecoder = new EventDecoder(pushEvent)
-
-  // Background reader
-  const readLoop = async () => {
+  /** Background reader — drains `stream` into `decoder` until end/err. */
+  const readLoop = async (): Promise<void> => {
     try {
       while (true) {
-        const { done, value } = await reader.read()
-        if (done) {
-          sseDecoder.flush()
-          streamDone = true
-          eventResolve?.()
-          break
+        const { done: readerDone, value } = await reader.read()
+        if (readerDone) {
+          decoder.flush()
+          done = true
+          wakeUp?.()
+          return
         }
-        sseDecoder.feed(value as string)
+        decoder.feed(value as string)
       }
     } catch (err) {
-      streamDone = true
-      streamError = err instanceof Error ? err : new Error(String(err))
-      eventResolve?.()
+      done = true
+      error = err instanceof Error ? err : new Error(String(err))
+      wakeUp?.()
     }
   }
 
   void readLoop()
 
+  /** Wait until either a new event lands or the stream ends. */
+  const waitForEvent = (): Promise<void> =>
+    new Promise<void>((resolve) => {
+      wakeUp = resolve
+    })
+
+  /** Translate one decoded `EventMessage` into an iterator step. */
+  const interpret = (msg: EventMessage): IteratorResult<T, void> | 'skip' => {
+    switch (msg.event) {
+      case 'message': {
+        const value = msg.data ? deserialize(msg.data) : (undefined as T)
+        const withMeta =
+          msg.id || msg.retry ? (withEventMeta(value as any, { id: msg.id, retry: msg.retry }) as T) : value
+        return { done: false, value: withMeta }
+      }
+      case 'error': {
+        const payload = msg.data ? JSON.parse(msg.data) : {}
+        throw new Error(payload.message ?? 'Stream error')
+      }
+      case 'done': {
+        return { done: true, value: undefined }
+      }
+      default:
+        return 'skip'
+    }
+  }
+
   return new AsyncIteratorClass<T>(
     async () => {
       while (true) {
-        if (eventQueue.length > 0) {
-          const msg = eventQueue.shift()!
-          switch (msg.event) {
-            case 'message': {
-              const value = msg.data ? deserialize(msg.data) : (undefined as T)
-              const result =
-                msg.id || msg.retry ? (withEventMeta(value as any, { id: msg.id, retry: msg.retry }) as T) : value
-              return { done: false, value: result }
-            }
-            case 'error': {
-              const errorData = msg.data ? JSON.parse(msg.data) : {}
-              throw new Error(errorData.message ?? 'Stream error')
-            }
-            case 'done': {
-              return { done: true, value: undefined } as IteratorReturnResult<void>
-            }
-            default:
-              continue
-          }
+        if (events.length > 0) {
+          const step = interpret(events.shift()!)
+          if (step !== 'skip') return step
+          continue
         }
-
-        if (streamDone) {
-          if (streamError) throw streamError
-          return { done: true, value: undefined } as IteratorReturnResult<void>
+        if (done) {
+          if (error) throw error
+          return { done: true, value: undefined }
         }
-
-        await new Promise<void>((resolve) => {
-          eventResolve = resolve
-        })
+        await waitForEvent()
       }
     },
     async () => {
@@ -345,9 +390,9 @@ export function eventStreamToIterator<T = unknown>(
   )
 }
 
-/**
- * Check if headers indicate an SSE stream.
- */
+// ─── Helpers ──────────────────────────────────────────────────────────
+
+/** Returns `true` when the given headers identify an SSE response. */
 export function isEventStreamHeaders(headers: Record<string, string | string[] | undefined>): boolean {
   const ct = headers['content-type']
   if (typeof ct === 'string') return ct.includes('text/event-stream')

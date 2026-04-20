@@ -393,18 +393,18 @@ describe('silgi({ wraps })', () => {
     }
   })
 
-  it('sync fast path preserved when no root wraps are configured', async () => {
-    // Compile-level assertion — with no wraps, the handler is NOT async.
-    // We detect this by observing that the compiled handler returns a
-    // synchronous (non-Promise) value for a sync resolver, via the sync
-    // fast-path branch in compileProcedure.
+  it('compiled handler is always async and resolves to the resolver output', async () => {
+    // The compiled handler is uniformly async — no sync fast-path, no
+    // sync-vs-async branching in callers. This test pins the contract so
+    // future changes that reintroduce a sync path (and the branching it
+    // forces on every consumer) are caught at CI time.
     const s = silgi({ context: () => ({}) })
     const proc = s.$resolve(() => 'sync')
     const { compileProcedure } = await import('#src/compile.ts')
     const handler = compileProcedure(proc as any)
     const ctx: Record<string, unknown> = {}
     const result = handler(ctx, undefined, AbortSignal.timeout(5000))
-    expect(result).toBe('sync')
-    expect(result).not.toBeInstanceOf(Promise)
+    expect(result).toBeInstanceOf(Promise)
+    await expect(result).resolves.toBe('sync')
   })
 })

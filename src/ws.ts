@@ -1,17 +1,30 @@
 /**
- * WebSocket RPC adapter — powered by crossws.
+ * WebSocket RPC adapter
+ * -----------------------
  *
- * Bidirectional type-safe RPC over WebSocket.
- * Supports subscriptions (server → client streaming) natively.
+ * Exposes silgi procedures over a WebSocket connection using the
+ * `crossws` runtime-agnostic adapter underneath. Every procedure
+ * registered via `router()` is reachable — no opt-in flag required.
  *
- * Protocol:
- *   Client → Server: { id: string, path: string, input?: unknown }
- *   Server → Client: { id: string, result?: unknown, error?: unknown }
- *   Server → Client (stream): { id: string, data: unknown, done?: boolean }
+ * Wire protocol
+ * -------------
+ *
+ *   Client → Server:  { id, path, input? }
+ *   Server → Client:  { id, result?, error? }                  (single value)
+ *   Server → Client:  { id, data, done? }                      (streaming chunk)
+ *
+ * Requests are correlated by `id`. A subscription (any resolver that returns
+ * an async iterable) streams back one `{ id, data }` frame per yielded
+ * value, followed by a terminal `{ id, data: null, done: true }`. Clients
+ * close a subscription by closing the socket; the peer disconnect aborts
+ * every in-flight resolver for that peer.
+ *
+ * Two encodings are supported: UTF-8 JSON (default) and binary MessagePack.
+ * The choice is per-adapter, not per-message.
  */
 
 import { encode as msgpackEncode, decode as msgpackDecode } from './codec/msgpack.ts'
-import { compileRouter, createContext, releaseContext } from './compile.ts'
+import { compileRouter } from './compile.ts'
 import { SilgiError, toSilgiError } from './core/error.ts'
 import { stringifyJSON } from './core/utils.ts'
 
@@ -23,24 +36,24 @@ export interface WSAdapterOptions<TCtx extends Record<string, unknown> = Record<
   /**
    * Wire protocol for WebSocket message encoding.
    *
-   * - `'json'` — default, text frames with JSON
-   * - `'messagepack'` — binary frames with MessagePack
+   * - `'json'` — default, text frames with JSON.
+   * - `'messagepack'` — binary frames with MessagePack.
    *
    * @default 'json'
    */
   protocol?: 'json' | 'messagepack'
 
-  /**
-   * @deprecated Use `protocol: 'messagepack'` instead.
-   */
+  /** @deprecated Use `protocol: 'messagepack'` instead. */
   binary?: boolean
-  /** Context factory — receives the peer on each message */
+
+  /** Context factory — invoked for every incoming peer message. */
   context?: (peer: Peer) => TCtx | Promise<TCtx>
+
   /**
    * Enable per-message-deflate compression.
    *
-   * - `true`: enable with defaults
-   * - `object`: fine-tune zlib options (passed to ws `perMessageDeflate`)
+   * - `true`  — enable with library defaults.
+   * - object  — zlib tuning, forwarded to `ws.perMessageDeflate`.
    *
    * @default false
    */
@@ -53,21 +66,23 @@ export interface WSAdapterOptions<TCtx extends Record<string, unknown> = Record<
         serverMaxWindowBits?: number
         clientMaxWindowBits?: number
       }
+
   /**
-   * Maximum allowed message size in bytes.
-   * Messages exceeding this limit will cause the connection to be closed.
+   * Maximum allowed message size in bytes. Exceeding the limit closes
+   * the connection.
    *
    * @default 1_048_576 (1 MB)
    */
   maxPayload?: number
+
   /**
-   * Keepalive ping interval in milliseconds.
-   * Server sends a ping frame at this interval; if the client
-   * does not respond with a pong before the next ping, the connection is terminated.
+   * Keepalive ping interval in milliseconds. The server sends a ping
+   * every `keepalive` ms; if the client does not pong before the next
+   * ping, the socket is terminated.
    *
-   * Set to `0` or `false` to disable.
+   * Set to `0` or `false` to disable keepalive entirely.
    *
-   * @default 30_000 (30 seconds)
+   * @default 30_000
    */
   keepalive?: number | false
 }
@@ -79,30 +94,33 @@ interface RPCRequest {
 }
 
 /**
- * Internal — build crossws-compatible hooks for Silgi RPC over WebSocket.
+ * Build the crossws hook set that implements silgi's WebSocket RPC.
  *
- * Used by `attachWebSocket()`, `serve({ ws: true })`, and `handler()` auto-WS.
- * Not part of the public API; callers should use one of those higher-level entry points.
+ * @internal
+ *
+ * This is not part of the public API — `silgi({...}).handler()`,
+ * `serve({ ws: true })`, and `attachWebSocket()` are the three supported
+ * entry points. They all go through this builder so protocol behavior
+ * stays identical everywhere.
  */
-/** @internal — exported only for use by silgi.ts handler() and attachWebSocket(). Not part of the public API. */
 export function _createWSHooks<TCtx extends Record<string, unknown>>(
   routerDef: RouterDef,
   options: WSAdapterOptions<TCtx> = {},
 ): Partial<WSHooks> {
-  const flat = compileRouter(routerDef)
+  const compiled = compileRouter(routerDef)
   const useMsgpack = options.protocol === 'messagepack' || (options.protocol == null && (options.binary ?? false))
   const contextFactory = options.context
   const keepaliveMs = options.keepalive === false ? 0 : (options.keepalive ?? 30_000)
 
-  // Per-hookset registries — closed over by the returned open/message/close
-  // handlers. Scoped here (not module-global) so two silgi instances sharing
-  // a process cannot scribble into each other's peer state. Keys are the
-  // Peer objects crossws hands us; GC releases entries when the peer is
-  // collected, same as WeakMap semantics dictate.
+  // Per-hookset state. Kept on `WeakMap`s keyed by the peer so that two
+  // silgi instances running in the same process never cross-contaminate
+  // each other's peer state. Entries get collected automatically when
+  // the peer object is GC'd.
   const peerAbortControllers = new WeakMap<Peer, Set<AbortController>>()
   const peerKeepaliveTimers = new WeakMap<Peer, ReturnType<typeof setInterval>>()
 
-  function send(peer: Peer, data: unknown): void {
+  /** Send a single frame, applying the peer's chosen encoding and compression. */
+  const send = (peer: Peer, data: unknown): void => {
     const compress = !!options.compress
     if (useMsgpack) {
       peer.send(msgpackEncode(data) as ArrayBuffer, { compress })
@@ -111,38 +129,94 @@ export function _createWSHooks<TCtx extends Record<string, unknown>>(
     }
   }
 
-  function parseMessage(message: Message): RPCRequest {
+  /** Decode an incoming frame into an `RPCRequest`. Throws on parse error. */
+  const parseMessage = (message: Message): RPCRequest => {
     if (useMsgpack) {
       return msgpackDecode(message.uint8Array()) as RPCRequest
     }
     return message.json<RPCRequest>()
   }
 
+  /**
+   * Build the per-request context.
+   *
+   * Isolated here so the message handler stays readable; the caller
+   * handles send-back-error on failure.
+   */
+  const buildContext = async (peer: Peer): Promise<Record<string, unknown>> => {
+    const ctx = Object.create(null) as Record<string, unknown>
+    if (contextFactory) {
+      const base = await contextFactory(peer)
+      for (const key of Object.keys(base)) {
+        ctx[key] = (base as Record<string, unknown>)[key]
+      }
+    }
+    return ctx
+  }
+
+  /**
+   * Stream a subscription result back to the peer. Returns when the
+   * iterator is exhausted, the peer disconnects, or the resolver throws.
+   *
+   * `iter.return?.()` is called in `finally` so the resolver's cleanup
+   * (database cursors, external watchers, etc.) runs even on disconnect.
+   */
+  const streamSubscription = async (
+    peer: Peer,
+    id: string,
+    iter: AsyncIterableIterator<unknown>,
+    signal: AbortSignal,
+  ): Promise<void> => {
+    try {
+      for await (const data of iter) {
+        if (signal.aborted) break
+        send(peer, { id, data })
+      }
+      if (!signal.aborted) {
+        send(peer, { id, data: null, done: true })
+      }
+    } catch (err) {
+      if (!signal.aborted) {
+        send(peer, { id, error: toClientError(err) })
+      }
+    } finally {
+      await iter.return?.()
+    }
+  }
+
+  /**
+   * Install a keepalive ping loop on a peer, if the runtime gives us
+   * access to the underlying `ws` instance. Silently no-ops when it
+   * does not — some adapters (e.g. Bun) do not expose that handle.
+   */
+  const installKeepalive = (peer: Peer): void => {
+    if (keepaliveMs <= 0) return
+    const ws = (peer as unknown as { _internal?: { ws?: { ping?: () => void; on?: Function; terminate?: () => void } } })
+      ._internal?.ws
+    if (!ws || typeof ws.ping !== 'function' || typeof ws.on !== 'function' || typeof ws.terminate !== 'function') {
+      return
+    }
+
+    let alive = true
+    ws.on('pong', () => {
+      alive = true
+    })
+    const timer = setInterval(() => {
+      if (!alive) {
+        clearInterval(timer)
+        ws.terminate!()
+        return
+      }
+      alive = false
+      ws.ping!()
+    }, keepaliveMs)
+    peerKeepaliveTimers.set(peer, timer)
+  }
+
   return {
     open(peer) {
       peerAbortControllers.set(peer, new Set())
-
-      // Keepalive — ping at interval, terminate if no pong before next ping
-      if (keepaliveMs > 0) {
-        const ws = (peer as any)._internal?.ws
-        if (ws && typeof ws.ping === 'function') {
-          let alive = true
-          ws.on('pong', () => {
-            alive = true
-          })
-          const timer = setInterval(() => {
-            if (!alive) {
-              clearInterval(timer)
-              ws.terminate()
-              return
-            }
-            alive = false
-            ws.ping()
-          }, keepaliveMs)
-          // Store timer for cleanup
-          peerKeepaliveTimers.set(peer, timer)
-        }
-      }
+      installKeepalive(peer)
     },
 
     async message(peer, message) {
@@ -156,80 +230,48 @@ export function _createWSHooks<TCtx extends Record<string, unknown>>(
 
       const { id, path, input } = req
 
-      // Route lookup — all procedures are accessible via WS, no flag required
-      const route = flat('POST', '/' + path)?.data
+      const route = compiled('POST', '/' + path)?.data
       if (!route) {
         send(peer, { id, error: { code: 'NOT_FOUND', status: 404, message: `Procedure "${path}" not found` } })
         return
       }
 
-      // Build context from pool
-      const ctx = createContext()
-      if (contextFactory) {
-        try {
-          const baseResult = contextFactory(peer)
-          const base = baseResult instanceof Promise ? await baseResult : baseResult
-          const keys = Object.keys(base)
-          for (let i = 0; i < keys.length; i++) ctx[keys[i]!] = (base as Record<string, unknown>)[keys[i]!]
-        } catch (err) {
-          releaseContext(ctx)
-          const e = err instanceof SilgiError ? err : toSilgiError(err)
-          send(peer, { id, error: e.toJSON() })
-          return
-        }
+      let ctx: Record<string, unknown>
+      try {
+        ctx = await buildContext(peer)
+      } catch (err) {
+        send(peer, { id, error: toClientError(err) })
+        return
       }
 
-      // AbortController per call — aborted on peer disconnect
+      // A fresh `AbortController` per call lets us abort every in-flight
+      // resolver when the peer disconnects. The `close` hook walks the
+      // set and calls `.abort()` on each.
       const ac = new AbortController()
-      const controllers = peerAbortControllers.get(peer)
-      controllers?.add(ac)
+      peerAbortControllers.get(peer)?.add(ac)
 
       try {
-        const result = route.handler(ctx, input ?? {}, ac.signal)
-        const output = result instanceof Promise ? await result : result
+        const output = await route.handler(ctx, input ?? {}, ac.signal)
 
-        // Streaming (subscription)
         if (output && typeof output === 'object' && Symbol.asyncIterator in (output as object)) {
-          const iter = output as AsyncIterableIterator<unknown>
-          try {
-            for await (const data of iter) {
-              if (ac.signal.aborted) break
-              send(peer, { id, data })
-            }
-            if (!ac.signal.aborted) {
-              send(peer, { id, data: null, done: true })
-            }
-          } catch (err) {
-            if (!ac.signal.aborted) {
-              const e = err instanceof SilgiError ? err : toSilgiError(err)
-              send(peer, { id, error: e.toJSON() })
-            }
-          } finally {
-            await iter.return?.()
-          }
-          return
+          await streamSubscription(peer, id, output as AsyncIterableIterator<unknown>, ac.signal)
+        } else {
+          send(peer, { id, result: output })
         }
-
-        // Single response
-        send(peer, { id, result: output })
       } catch (err) {
-        const e = err instanceof SilgiError ? err : toSilgiError(err)
-        send(peer, { id, error: e.toJSON() })
+        send(peer, { id, error: toClientError(err) })
       } finally {
-        controllers?.delete(ac)
-        releaseContext(ctx)
+        peerAbortControllers.get(peer)?.delete(ac)
       }
     },
 
-    close(peer, _details) {
-      // Clear keepalive timer
+    close(peer) {
       const timer = peerKeepaliveTimers.get(peer)
       if (timer) {
         clearInterval(timer)
         peerKeepaliveTimers.delete(peer)
       }
 
-      // Abort all in-flight requests for this peer
       const controllers = peerAbortControllers.get(peer)
       if (controllers) {
         for (const ac of controllers) ac.abort()
@@ -244,18 +286,21 @@ export function _createWSHooks<TCtx extends Record<string, unknown>>(
   }
 }
 
+/** Normalize any thrown value into the `{ code, status, message, ... }` shape clients expect. */
+function toClientError(err: unknown): ReturnType<SilgiError['toJSON']> {
+  return (err instanceof SilgiError ? err : toSilgiError(err)).toJSON()
+}
+
 /**
- * Attach WebSocket RPC handler to an existing Node.js HTTP server.
+ * Attach silgi's WebSocket RPC to an existing Node.js `http.Server`.
  *
  * @example
- * ```ts
- * import { createServer } from "node:http";
- * import { attachWebSocket } from "silgi/ws";
+ *   import { createServer } from 'node:http'
+ *   import { attachWebSocket } from 'silgi/ws'
  *
- * const server = createServer(httpHandler);
- * attachWebSocket(server, appRouter);
- * server.listen(3000);
- * ```
+ *   const server = createServer(httpHandler)
+ *   await attachWebSocket(server, appRouter)
+ *   server.listen(3000)
  */
 export async function attachWebSocket<TCtx extends Record<string, unknown>>(
   server: HttpServer,
@@ -264,13 +309,13 @@ export async function attachWebSocket<TCtx extends Record<string, unknown>>(
 ): Promise<void> {
   const nodeAdapter = (await import('crossws/adapters/node')).default
 
-  // Build ws ServerOptions for compression and maxPayload
+  // Forward compression / payload-limit options through to the
+  // underlying `ws` library (the `serverOptions` slot on crossws is the
+  // pass-through hatch for those).
   const serverOptions: Record<string, unknown> = {}
-
   if (options.compress) {
     serverOptions.perMessageDeflate = typeof options.compress === 'object' ? options.compress : true
   }
-
   if (options.maxPayload !== undefined) {
     serverOptions.maxPayload = options.maxPayload
   }

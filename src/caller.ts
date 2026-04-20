@@ -1,25 +1,24 @@
 /**
- * createCaller — call procedures directly without HTTP.
+ * Direct caller
+ * --------------
  *
- * Compiles the router, creates context, and runs the pipeline
- * for each procedure call. Perfect for testing and server-side usage.
+ * `createCaller` returns a proxy that mirrors the router's nested shape.
+ * Calling a leaf procedure invokes the compiled pipeline directly — no
+ * HTTP, no body serialization, no response encoding. This is what tests
+ * and server-side orchestration code use.
  *
  * @example
- * ```ts
- * const caller = s.createCaller(appRouter)
+ *   const caller = s.createCaller(appRouter)
+ *   const users = await caller.users.list({ limit: 10 })
+ *   const user  = await caller.users.get({ id: 1 })
  *
- * // Call procedures directly
- * const users = await caller.users.list({ limit: 10 })
- * const user = await caller.users.get({ id: 1 })
- *
- * // With custom context override
- * const adminCaller = s.createCaller(appRouter, {
- *   contextOverride: { user: { id: 1, role: 'admin' } },
- * })
- * ```
+ *   // Override the context for this caller (e.g. for admin tests):
+ *   const admin = s.createCaller(appRouter, {
+ *     contextOverride: { user: { id: 1, role: 'admin' } },
+ *   })
  */
 
-import { compileRouter, createContext, releaseContext } from './compile.ts'
+import { compileRouter } from './compile.ts'
 import { applyContext } from './core/dispatch.ts'
 import { routerCache } from './core/router-utils.ts'
 
@@ -27,65 +26,74 @@ import type { CompiledRouterFn } from './compile.ts'
 import type { RouterDef } from './types.ts'
 
 /**
- * Never-aborting signal used when `timeout: null` is opted into and the
- * caller passes no per-call signal. Allocated once at module load; compiled
- * handlers can still `.addEventListener('abort', …)` safely — the listener
- * simply never fires.
+ * Placeholder signal for callers that opt out of timeouts (`timeout: null`)
+ * and do not pass their own signal. We still hand the pipeline a real
+ * `AbortSignal` so that user code doing `signal.addEventListener('abort', …)`
+ * does not crash on `undefined` — this signal just never fires.
  */
-const NEVER = new AbortController().signal
+const NEVER_ABORTS = new AbortController().signal
 
 export interface CreateCallerOptions {
-  /** Override or extend the base context for all calls */
+  /** Override or extend the base context for every call made through this caller. */
   contextOverride?: Record<string, unknown>
-  /** Mock request headers (used by context factory if it reads request) */
+  /** Mock request headers — passed to the context factory as if a request carried them. */
   headers?: Record<string, string>
-  /** Default timeout in ms for all calls (default: 30000, null = no timeout) */
+  /** Default timeout in ms for all calls. Default: 30000. Pass `null` to disable. */
   timeout?: number | null
 }
 
 export interface CallerCallOptions {
-  /** AbortSignal for this specific call */
+  /** `AbortSignal` scoped to this single call. Overrides the default timeout signal. */
   signal?: AbortSignal
-  /** Per-call context override (merged over base context) */
+  /** Per-call context patch, merged on top of the base context. */
   context?: Record<string, unknown>
 }
 
 /**
- * Create a direct caller for a router — no HTTP, no serialization.
+ * Build a direct caller for a router.
  *
- * Returns a proxy that mirrors the router's nested structure.
- * Calling a leaf procedure invokes the compiled pipeline directly.
+ * The returned value is a proxy that mirrors the router tree: accessing
+ * `caller.users.list` returns another proxy; calling it at the leaf
+ * dispatches to the compiled pipeline for that procedure.
  */
 export function createCaller(
   routerDef: RouterDef,
   contextFactory: ((req: Request) => Record<string, unknown> | Promise<Record<string, unknown>>) | undefined,
   options?: CreateCallerOptions,
 ): any {
-  let compiledRouter = routerCache.get(routerDef) as CompiledRouterFn | undefined
-  if (!compiledRouter) {
-    compiledRouter = compileRouter(routerDef)
-    routerCache.set(routerDef, compiledRouter)
+  // Router compilation is keyed off the user's def via a `WeakMap`, so the
+  // caller, fetch handler, and WS adapter all share the same compiled tree.
+  let compiled = routerCache.get(routerDef) as CompiledRouterFn | undefined
+  if (!compiled) {
+    compiled = compileRouter(routerDef)
+    routerCache.set(routerDef, compiled)
   }
 
-  const router = compiledRouter
-  const defaultTimeout = options?.timeout !== undefined ? options.timeout : 30_000
+  const defaultTimeoutMs = options?.timeout !== undefined ? options.timeout : 30_000
 
-  function createMockRequest(extraHeaders?: Record<string, string>): Request {
+  /**
+   * Construct a mock `Request` to feed into the user's context factory.
+   * Tests rarely care about the URL — only the headers matter, because
+   * that is the surface most factories actually read.
+   */
+  const mockRequest = (extraHeaders?: Record<string, string>): Request => {
     const headers = new Headers(options?.headers)
     if (extraHeaders) {
-      for (const [k, v] of Object.entries(extraHeaders)) headers.set(k, v)
+      for (const [key, value] of Object.entries(extraHeaders)) headers.set(key, value)
     }
     return new Request('http://localhost/__caller', { headers })
   }
 
-  // Resolve context using the pool — null-prototype, consistent with handler path
-  async function resolveContext(perCallContext?: Record<string, unknown>): Promise<Record<string, unknown>> {
-    const ctx = createContext()
+  /**
+   * Build a fresh context for a single call. Layers are applied in the
+   * order they would be on the HTTP path: context factory → caller-level
+   * `contextOverride` → per-call override.
+   */
+  const buildContext = async (perCallContext?: Record<string, unknown>): Promise<Record<string, unknown>> => {
+    const ctx = Object.create(null) as Record<string, unknown>
 
     if (contextFactory) {
-      const mockReq = createMockRequest()
-      const result = contextFactory(mockReq)
-      const baseCtx = result instanceof Promise ? await result : result
+      const baseCtx = await contextFactory(mockRequest())
       applyContext(ctx, baseCtx)
     }
 
@@ -95,50 +103,58 @@ export function createCaller(
     return ctx
   }
 
-  function createProxy(segments: string[]): any {
+  /**
+   * Build a proxy node for the current `segments` path. Each property
+   * access descends one level; each function call dispatches to the
+   * compiled pipeline.
+   *
+   * The `cache` map ensures repeated property access (e.g.
+   * `caller.users.list`) returns the same proxy object so equality
+   * checks and `.bind` in user tests stay stable.
+   */
+  const createProxy = (segments: string[]): any => {
     const cache = new Map<string, any>()
 
     return new Proxy(() => {}, {
-      get(_target, prop: string | symbol) {
+      get(_target, prop) {
         if (typeof prop === 'symbol') return undefined
+
+        // These are properties Promise-like and serializer code probes for;
+        // returning `undefined` stops the proxy from pretending it is one,
+        // which would confuse `await` and `JSON.stringify` callers.
         if (prop === 'then' || prop === 'toJSON' || prop === 'toString' || prop === '$$typeof') {
           return undefined
         }
 
-        let sub = cache.get(prop)
-        if (!sub) {
-          sub = createProxy([...segments, prop])
-          cache.set(prop, sub)
+        let child = cache.get(prop)
+        if (!child) {
+          child = createProxy([...segments, prop])
+          cache.set(prop, child)
         }
-        return sub
+        return child
       },
 
       apply(_target, _thisArg, args) {
         const path = '/' + segments.join('/')
-        const input = args[0]
+        const input = args[0] as unknown
         const callOptions = args[1] as CallerCallOptions | undefined
 
         return (async () => {
-          const match = router!('', path)
+          // The empty-method slot is what `compileRouter` registers for
+          // direct (non-HTTP) callers. See `compile.ts` → `register`.
+          const match = compiled!('', path)
           if (!match) {
             throw new Error(`Procedure not found: ${path}`)
           }
 
-          const ctx = await resolveContext(callOptions?.context)
+          const ctx = await buildContext(callOptions?.context)
           if (match.params) ctx.params = match.params
 
-          // Compiled handlers may read `signal.aborted` / `.addEventListener`.
-          // When `timeout: null` is opted into and no per-call signal is
-          // supplied, we still hand over a real (never-aborting) signal
-          // instead of `undefined` to avoid NPEs deep inside wraps/resolvers.
-          const signal = callOptions?.signal ?? (defaultTimeout !== null ? AbortSignal.timeout(defaultTimeout) : NEVER)
+          const signal =
+            callOptions?.signal ??
+            (defaultTimeoutMs !== null ? AbortSignal.timeout(defaultTimeoutMs) : NEVER_ABORTS)
 
-          try {
-            const result = match.data.handler(ctx, input, signal)
-            return result instanceof Promise ? await result : result
-          } finally {
-            releaseContext(ctx)
-          }
+          return await match.data.handler(ctx, input, signal)
         })()
       },
     })
