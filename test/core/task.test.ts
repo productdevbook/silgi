@@ -1,7 +1,7 @@
 import { describe, it, expect, expectTypeOf, afterEach } from 'vitest'
 import { z } from 'zod'
 
-import { runTask, collectCronTasks, setTaskAnalytics } from '#src/core/task.ts'
+import { runTask, collectCronTasks, createCronRegistry, setTaskAnalytics } from '#src/core/task.ts'
 import { silgi } from '#src/silgi.ts'
 
 import type { TaskDef } from '#src/core/task.ts'
@@ -155,6 +155,39 @@ describe('collectCronTasks', () => {
     const noCron = s.$task({ name: 'no-cron', resolve: async () => 'ok' })
     const router = s.router({ tasks: { noCron } })
     expect(collectCronTasks(router)).toHaveLength(0)
+  })
+})
+
+// ── createCronRegistry — per-instance isolation ──────
+
+describe('createCronRegistry()', () => {
+  it('returns an isolated registry — two registries do not share state', async () => {
+    const a = createCronRegistry()
+    const b = createCronRegistry()
+
+    const task = s.$task({ name: 'noop', cron: '0 0 1 1 *', resolve: async () => 'ok' })
+    await a.start([{ cron: '0 0 1 1 *', task }])
+
+    expect(a.list()).toHaveLength(1)
+    expect(b.list()).toHaveLength(0)
+
+    a.stop()
+    expect(a.list()).toHaveLength(0)
+    expect(b.list()).toHaveLength(0)
+  })
+
+  it('stop() clears entries but leaves other registries intact', async () => {
+    const a = createCronRegistry()
+    const b = createCronRegistry()
+
+    const task = s.$task({ name: 'noop2', cron: '0 0 1 1 *', resolve: async () => 'ok' })
+    await a.start([{ cron: '0 0 1 1 *', task }])
+    await b.start([{ cron: '0 0 1 1 *', task }])
+
+    a.stop()
+    expect(a.list()).toHaveLength(0)
+    expect(b.list()).toHaveLength(1)
+    b.stop()
   })
 })
 

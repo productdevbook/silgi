@@ -195,6 +195,66 @@ only module-global state in the schema subsystem and it stores only
 vendor-name strings — never user schemas, never request data. The
 tradeoff: we deduplicate noisy warnings in long-running processes.
 
+### `_msgpack` / `_devalue` codec module caches — `src/core/codec.ts`, `src/core/input.ts`
+
+Two `let` slots that hold lazily-imported codec modules (`msgpackr`,
+`devalue`). They exist to avoid paying the dynamic-import round-trip
+on every request once the codec has been needed once. The slots hold
+ES modules, not user data — functionally equivalent to the ES module
+resolver cache. Safe across instances because the modules are
+stateless.
+
+### `_running` — `src/core/task.ts`
+
+`Map<TaskDef, Promise>` used by `runTask()` to dedup concurrent calls
+on the same task def. Keys are `TaskDef` references, values are the
+in-flight dispatch Promise. Entries are deleted in a `finally` block so
+the map drains naturally; no unbounded growth. Task dedup is inherently
+process-wide semantics (the same task def in two silgi instances is
+logically the same job), so a module-level map matches the intent.
+
+### `_eventMeta` — `src/core/sse.ts`
+
+`WeakMap<object, EventMeta>` side-channel for `withEventMeta()` ids and
+retry hints. Keys are user-yielded event payload objects; GC reclaims
+entries when the user's payload is no longer referenced. No cross-
+instance leakage because keys are uniquely owned by the yielding code.
+
+### `_dashboardCache` — `src/plugins/analytics/routes.ts`
+
+Caches the analytics dashboard HTML read from disk on first request.
+Immutable static asset; multiple instances reading it produce identical
+bytes. Included here only to make the grep audit exhaustive.
+
+### `_lastTime` / `_counter` — `src/plugins/analytics/request-id.ts`
+
+Snowflake-style request ID generator. Monotonicity is a process-wide
+property by design — splitting this state per instance would violate
+the uniqueness guarantee callers rely on.
+
+### `_defaultRegistry` — `src/core/task.ts`
+
+Process-default `CronRegistry` backing the legacy top-level
+`startCronJobs` / `stopCronJobs` / `getScheduledTasks` exports. New
+code should use `createCronRegistry()` and own the registry
+explicitly. The process default stays only so that the analytics
+dashboard's `/api/analytics/scheduled` route keeps showing jobs
+registered via `silgi({}).serve()` without threading the registry
+through every analytics-plugin call site — a future refactor will
+move this to explicit injection.
+
+### `_requestContextMap` — `src/integrations/better-auth/index.ts`
+
+`WeakMap<Request, Record<string, unknown>>` backing the public
+`setRequestContext(request, ctx)` API. Strictly speaking this violates
+§3 rule 2 ("no WeakMap keyed on Request identity"). It remains only
+because `setRequestContext` is a public API consumed by user code;
+removing it is a breaking change reserved for the next major. New
+integrations must not introduce similar WeakMaps — use
+`silgi.runInContext(ctx, fn)` for ambient context or a plugin-factory
+closure (see `requestMetas` inside `tracing()` for the correct
+pattern) for per-request side channels.
+
 ## 5. Extending Silgi
 
 ### Add a schema converter

@@ -16,6 +16,7 @@ import { createProcedureBuilder } from './builder.ts'
 import { createCaller } from './caller.ts'
 import { compileRouter } from './compile.ts'
 import { createContextBridge } from './core/context-bridge.ts'
+import { ROOT_WRAPS } from './core/ctx-symbols.ts'
 import { createFetchHandler, wrapHandler } from './core/handler.ts'
 import { assignPaths, routerCache } from './core/router-utils.ts'
 import { createSchemaRegistry } from './core/schema-converter.ts'
@@ -36,6 +37,7 @@ import type {
   ProcedureType,
   ErrorDef,
   GuardDef,
+  MiddlewareDef,
   WrapDef,
   GuardFn,
   WrapFn,
@@ -101,6 +103,41 @@ export interface SilgiConfig<TCtx extends Record<string, unknown>> {
    * ```
    */
   schemaConverters?: SchemaConverter[]
+  /**
+   * Root-level wrap middleware applied to every procedure in the router.
+   *
+   * @remarks
+   * Each entry must be created via `instance.wrap(fn)`. Root wraps run
+   * as the outermost layer of the onion: root wraps → route-level
+   * `.$use()` guards/wraps → resolver. Use this for concerns that must
+   * apply to every route (tenant scoping, `AsyncLocalStorage` setup,
+   * trace propagation), where missing one route would be a bug.
+   *
+   * Root wraps cannot mutate the context type — use a route-level
+   * `$use(guard)` for that. The ambient context passed to `next()` is
+   * `TBaseCtx`, identical to the one seen by route-level wraps.
+   *
+   * Applies to every procedure reachable through `handler()`,
+   * `createCaller()`, and HTTP/cron task invocation. Task `dispatch()`
+   * (programmatic, bypasses the pipeline) is not wrapped.
+   *
+   * @example
+   * ```ts
+   * const tenantScopeWrap: WrapDef = {
+   *   kind: 'wrap',
+   *   fn: (ctx, next) => tenantScope.run({ orgId: ctx.user.orgId }, next),
+   * }
+   *
+   * const s = silgi({
+   *   context: (req) => ({ db, user: readUser(req) }),
+   *   wraps: [tenantScopeWrap],
+   * })
+   * ```
+   *
+   * For convenience you can also create wraps with the standalone
+   * helper or from another silgi instance's `wrap()` method.
+   */
+  wraps?: WrapDef<TCtx>[]
   /**
    * Storage configuration — mount drivers by path prefix.
    *
@@ -363,6 +400,31 @@ function createProcedure(type: ProcedureType, ...args: unknown[]): ProcedureDef 
 }
 
 /**
+ * Stamp root wraps onto a router def as a non-enumerable Symbol-keyed
+ * property. Idempotent — if the def is already branded with the same
+ * reference, this is a no-op. Multiple silgi instances registering the
+ * same def throws, because a single compiled router cannot serve two
+ * context shapes.
+ *
+ * @internal
+ */
+function stampRootWraps(def: object, wraps: readonly WrapDef[]): void {
+  const existing = (def as { [ROOT_WRAPS]?: readonly WrapDef[] })[ROOT_WRAPS]
+  if (existing === wraps) return
+  if (existing) {
+    throw new TypeError(
+      'silgi: this router def is already registered with a different silgi instance — build a fresh router object.',
+    )
+  }
+  Object.defineProperty(def, ROOT_WRAPS, {
+    value: wraps,
+    enumerable: false,
+    writable: false,
+    configurable: false,
+  })
+}
+
+/**
  * Create a Silgi RPC instance with typed context.
  *
  * @remarks
@@ -432,6 +494,26 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
 
   const ctxFactory = () => contextFactory(new Request('http://localhost'))
 
+  // Freeze root wraps once so routers built later share the same reference.
+  // Enforce WrapDef shape — guards are rejected because they would need to
+  // flow their return type into every procedure's context, which can't be
+  // expressed at the instance-config type level.
+  let rootWraps: readonly WrapDef[] | null = null
+  if (config.wraps && config.wraps.length > 0) {
+    for (const w of config.wraps) {
+      if (!w || (w as MiddlewareDef).kind !== 'wrap') {
+        throw new TypeError('silgi({ wraps }) only accepts wrap middleware — use route-level .$use() for guards.')
+      }
+    }
+    rootWraps = Object.freeze([...config.wraps]) as readonly WrapDef[]
+  }
+
+  // Lazy getter handed to tasks so `task.dispatch()` applies the same
+  // root-wrap onion as HTTP/cron invocation. Null when no wraps configured
+  // — task dispatch stays a straight `await resolveFn(...)` with zero
+  // additional closure.
+  const rootWrapsGetter: (() => readonly WrapDef[] | null) | null = rootWraps ? () => rootWraps : null
+
   const instance: SilgiInstance<TBaseCtx> = {
     hook: hooks.hook.bind(hooks),
     removeHook: hooks.removeHook.bind(hooks),
@@ -452,25 +534,37 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
     wrap: (fn) => ({ kind: 'wrap' as const, fn }),
 
     $resolve: ((fn: any) => createProcedure('query', fn)) as any,
-    $input: ((schema: any) => createProcedureBuilder('query', ctxFactory).$input(schema)) as any,
+    $input: ((schema: any) => createProcedureBuilder('query', ctxFactory, rootWrapsGetter).$input(schema)) as any,
     $use: ((...middleware: any[]) => {
-      const b = createProcedureBuilder('query', ctxFactory) as any
+      const b = createProcedureBuilder('query', ctxFactory, rootWrapsGetter) as any
       for (const m of middleware) b.$use(m)
       return b
     }) as any,
-    $output: ((schema: any) => createProcedureBuilder('query', ctxFactory).$output(schema)) as any,
-    $errors: ((errors: any) => createProcedureBuilder('query', ctxFactory).$errors(errors)) as any,
-    $route: ((route: any) => createProcedureBuilder('query', ctxFactory).$route(route)) as any,
-    $meta: ((meta: any) => createProcedureBuilder('query', ctxFactory).$meta(meta)) as any,
+    $output: ((schema: any) => createProcedureBuilder('query', ctxFactory, rootWrapsGetter).$output(schema)) as any,
+    $errors: ((errors: any) => createProcedureBuilder('query', ctxFactory, rootWrapsGetter).$errors(errors)) as any,
+    $route: ((route: any) => createProcedureBuilder('query', ctxFactory, rootWrapsGetter).$route(route)) as any,
+    $meta: ((meta: any) => createProcedureBuilder('query', ctxFactory, rootWrapsGetter).$meta(meta)) as any,
 
     subscription: ((...args: unknown[]) => createProcedure('subscription', ...args)) as SubscriptionFactory<TBaseCtx>,
 
     $task: ((config: any) => {
-      return createTaskFromProcedure(config, config.resolve, null, null, ctxFactory)
+      return createTaskFromProcedure(config, config.resolve, null, null, ctxFactory, rootWrapsGetter)
     }) as any,
 
     router: (def) => {
       const assigned = assignPaths(def)
+      // Brand the def with this instance's root wraps (if any) so every
+      // downstream compile site — handler(), createCaller(), auto-WS, and
+      // external adapters (Express, Lambda, NestJS, message-port, broker,
+      // batch-server, server-client) — picks them up automatically via
+      // `compileRouter` reading `def[ROOT_WRAPS]`. The brand is a non-
+      // enumerable Symbol, so `Object.entries(def)` in the router walker
+      // never sees it. When `rootWraps` is null we don't stamp anything,
+      // so the def is byte-identical to the pre-feature shape.
+      if (rootWraps) {
+        stampRootWraps(def, rootWraps)
+        stampRootWraps(assigned, rootWraps)
+      }
       const flat = compileRouter(assigned)
       // Cache against the original def — don't mutate user's object
       routerCache.set(def, flat)
@@ -553,7 +647,13 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
         bridge as import('./core/context-bridge.ts').ContextBridge,
       )
 
-      // Auto-discover and start cron tasks from router
+      // Auto-discover and start cron tasks from router.
+      // NOTE: currently uses the process-default registry so the analytics
+      // dashboard (which reads `getScheduledTasks()` via the same default)
+      // keeps showing scheduled jobs. `createCronRegistry()` is exported
+      // for users who want fully-isolated registries; a future refactor
+      // will thread that registry through the analytics route so this
+      // serve() can drop to per-instance.
       const { collectCronTasks, startCronJobs, stopCronJobs } = await import('./core/task.ts')
       const cronTasks = collectCronTasks(routerDef)
       if (cronTasks.length > 0) {

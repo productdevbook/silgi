@@ -78,12 +78,6 @@ interface RPCRequest {
   input?: unknown
 }
 
-// Track active AbortControllers per peer for cleanup on disconnect
-const peerAbortControllers = new WeakMap<Peer, Set<AbortController>>()
-
-// Track keepalive timers per peer for cleanup on disconnect
-const peerKeepaliveTimers = new WeakMap<Peer, ReturnType<typeof setInterval>>()
-
 /**
  * Internal — build crossws-compatible hooks for Silgi RPC over WebSocket.
  *
@@ -99,6 +93,14 @@ export function _createWSHooks<TCtx extends Record<string, unknown>>(
   const useMsgpack = options.protocol === 'messagepack' || (options.protocol == null && (options.binary ?? false))
   const contextFactory = options.context
   const keepaliveMs = options.keepalive === false ? 0 : (options.keepalive ?? 30_000)
+
+  // Per-hookset registries — closed over by the returned open/message/close
+  // handlers. Scoped here (not module-global) so two silgi instances sharing
+  // a process cannot scribble into each other's peer state. Keys are the
+  // Peer objects crossws hands us; GC releases entries when the peer is
+  // collected, same as WeakMap semantics dictate.
+  const peerAbortControllers = new WeakMap<Peer, Set<AbortController>>()
+  const peerKeepaliveTimers = new WeakMap<Peer, ReturnType<typeof setInterval>>()
 
   function send(peer: Peer, data: unknown): void {
     const compress = !!options.compress

@@ -101,8 +101,6 @@ export interface RedisBrokerOptions {
 
 // ── Driver ──────────────────────────────────────────
 
-let globalSeq = 0
-
 /**
  * Create a Redis broker driver from a RedisTransport.
  *
@@ -115,7 +113,10 @@ let globalSeq = 0
  * Wire format: `"inbox-channel\npayload"` (newline separator, no double-serialization)
  */
 export function redisBroker(transport: RedisTransport, options: RedisBrokerOptions = {}): BrokerDriver {
-  const inboxPrefix = options.inbox ?? `silgi:inbox:${Date.now().toString(36)}:${(++globalSeq).toString(36)}`
+  // Unique inbox prefix per-driver — random suffix instead of a process-wide
+  // counter so two redisBroker() calls cannot share an inbox namespace.
+  const inboxPrefix =
+    options.inbox ?? `silgi:inbox:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 10)}`
   let requestSeq = 0
 
   return {
