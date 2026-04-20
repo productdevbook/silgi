@@ -1,64 +1,41 @@
 /**
- * Pipeline Compiler
- * ------------------
+ * Pipeline Compiler — guard unrolling, context pooling, rou3 routing.
  *
- * Takes a user-authored procedure (input schema, guards, wraps, resolver,
- * output schema) and produces a single async handler:
- *
- *     (ctx, rawInput, signal) => Promise<output>
- *
- * The pipeline runs in this order for every request:
- *
- *   1. Guards — pre-steps that may mutate `ctx` or throw.
- *   2. Input validation — via Standard Schema if `input` is set.
- *   3. Wraps — onion middleware around the resolver (root wraps first).
- *   4. Resolver — user's business logic.
- *   5. Output validation — via Standard Schema if `output` is set.
- *
- * The compiled handler is called per request, but everything that can be
- * decided up-front (the merged error map, the guard/wrap lists, whether
- * validation exists) is closed over here so the hot path is simple.
- *
- * Router compilation lives in `compileRouter` below. It walks the nested
- * router definition, compiles each procedure, and registers the result
- * with a rou3 radix tree.
+ * 1. UNROLLED GUARDS — 0-4 guard specialization (no loop, V8 inlines)
+ * 2. ZERO-ALLOC CONTEXT — Object.create(null) + pool reuse
+ * 3. ROU3 ROUTER — unjs radix tree (same as h3/nitro)
  */
 
-import { createRouter as createRou3, addRoute as addRou3Route, findRoute as findRou3Route } from 'rou3'
-
-import { RAW_INPUT, ROOT_WRAPS } from './core/ctx-symbols.ts'
 import { SilgiError } from './core/error.ts'
 import { isProcedureDef } from './core/router-utils.ts'
 import { validateSchema } from './core/schema.ts'
 
-import type { AnySchema } from './core/schema.ts'
-import type { ProcedureDef, GuardDef, WrapDef, ErrorDef, Route } from './types.ts'
+import type { ProcedureDef, GuardDef, WrapDef, ErrorDef } from './types.ts'
 
-/** Re-exported for backwards compatibility with consumers that read the slot directly. */
+// Framework-internal symbol keys live in one module — see core/ctx-symbols.ts.
+// Re-exported here for backwards compatibility with the previous shape.
 export { RAW_INPUT } from './core/ctx-symbols.ts'
 
-/**
- * Compiled pipeline — always async. Returning a Promise uniformly keeps
- * callers (handler, caller, ws) from branching on sync vs async results.
- */
-export type CompiledHandler = (ctx: Record<string, unknown>, rawInput: unknown, signal: AbortSignal) => Promise<unknown>
-
-// ─── Error reporting helpers ──────────────────────────────────────────
+import { RAW_INPUT, ROOT_WRAPS } from './core/ctx-symbols.ts'
 
 /**
- * Build the `fail(code, data?)` function passed to resolvers.
- *
- * When the procedure declared typed errors, `fail` uses the declared status
- * and message. Otherwise it throws an undefined error that error middleware
- * can convert to a generic 500.
+ * Compiled pipeline — called per request.
+ * May return sync value OR Promise — caller uses instanceof check.
  */
-function buildFail(errors: ErrorDef | null | undefined): (code: string, data?: unknown) => never {
-  if (!errors) {
-    return (code, data) => {
-      throw new SilgiError(code, { data, defined: false })
-    }
-  }
-  return (code, data) => {
+export type CompiledHandler = (
+  ctx: Record<string, unknown>,
+  rawInput: unknown,
+  signal: AbortSignal,
+) => unknown | Promise<unknown>
+
+// ── Helpers ─────────────────────────────────────────
+
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return value !== null && typeof value === 'object' && typeof (value as any).then === 'function'
+}
+
+function createFail(errors: ErrorDef): (code: string, data?: unknown) => never {
+  return (code: string, data?: unknown): never => {
     const def = errors[code]
     const status = typeof def === 'number' ? def : (def?.status ?? 500)
     const message =
@@ -67,113 +44,282 @@ function buildFail(errors: ErrorDef | null | undefined): (code: string, data?: u
   }
 }
 
-// ─── Prototype-pollution protection ───────────────────────────────────
+function noopFail(code: string, data?: unknown): never {
+  throw new SilgiError(code, { data, defined: false })
+}
 
-/**
- * Keys forbidden anywhere in a guard's return value. Blocking these at
- * every level protects `ctx` (which is a plain object) from attacker-supplied
- * nested payloads that could silently reach `Object.prototype`.
- */
-const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+// ── Guard Application (inline, no closure) ──────────
 
-/**
- * Return a copy of `value` with any `__proto__` / `constructor` / `prototype`
- * keys removed from plain-object nodes. Arrays and class instances are left
- * alone; only plain objects are rebuilt, and only when they actually contain
- * a forbidden key.
- *
- * This is pure (no in-place mutation) so guards cannot surprise callers that
- * still hold a reference to the original input.
- */
-function sanitize(value: unknown): unknown {
-  if (value === null || typeof value !== 'object') return value
+const UNSAFE_KEYS = /* @__PURE__ */ new Set(['__proto__', 'constructor', 'prototype'])
 
+/** Pre-frozen empty params — avoids per-request {} allocation */
+const EMPTY_PARAMS: Record<string, string> = /* @__PURE__ */ Object.freeze(Object.create(null))
+
+/** Sanitize a value to prevent prototype pollution from nested __proto__ keys */
+function sanitizeValue(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null) return value
   if (Array.isArray(value)) {
-    return value.map(sanitize)
+    for (let i = 0; i < value.length; i++) value[i] = sanitizeValue(value[i])
+    return value
   }
-
-  // Leave class instances (anything not produced by an object literal) alone.
+  // Only sanitize plain objects — class instances are safe
   const proto = Object.getPrototypeOf(value)
   if (proto !== Object.prototype && proto !== null) return value
 
-  const source = value as Record<string, unknown>
-  const cleaned: Record<string, unknown> = Object.create(null)
-  for (const key of Object.keys(source)) {
-    if (UNSAFE_KEYS.has(key)) continue
-    cleaned[key] = sanitize(source[key])
+  const obj = value as Record<string, unknown>
+  const hasUnsafe = Object.prototype.hasOwnProperty.call(obj, '__proto__')
+
+  if (hasUnsafe) {
+    // Has __proto__ key — create a clean copy without it, recurse into values
+    const clean: Record<string, unknown> = Object.create(null)
+    const keys = Object.keys(obj)
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i]!
+      if (!UNSAFE_KEYS.has(k)) clean[k] = sanitizeValue(obj[k])
+    }
+    return clean
   }
-  return cleaned
+
+  // No unsafe keys at this level — still recurse into nested values
+  const keys = Object.keys(obj)
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i]!
+    obj[k] = sanitizeValue(obj[k])
+  }
+  return value
 }
 
-// ─── Guards ───────────────────────────────────────────────────────────
-
-/**
- * Apply a guard's return value to the live context. Guards typically return
- * a partial context patch (e.g. `{ user }`) that we merge in; returning
- * nothing is fine and is how guards that only validate are expressed.
- */
-function mergeGuardResult(ctx: Record<string, unknown>, result: unknown): void {
-  if (result === null || typeof result !== 'object') return
-  const patch = result as Record<string, unknown>
-  for (const key of Object.keys(patch)) {
-    if (UNSAFE_KEYS.has(key)) continue
-    ctx[key] = sanitize(patch[key])
+/** Apply a single guard result to context — direct property set */
+function applyGuardResult(ctx: Record<string, unknown>, result: unknown): void {
+  if (result === null || result === undefined || typeof result !== 'object') return
+  const keys = Object.keys(result)
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i]!
+    if (UNSAFE_KEYS.has(k)) continue
+    ctx[k] = sanitizeValue((result as Record<string, unknown>)[k])
   }
 }
 
-/** Run every guard in order, awaiting any that return a Promise. */
-async function runGuards(ctx: Record<string, unknown>, guards: readonly GuardDef[]): Promise<void> {
+/** Apply a single guard (sync fast-path, async fallback) */
+async function applyGuard(ctx: Record<string, unknown>, guard: GuardDef): Promise<void> {
+  const result = guard.fn(ctx)
+  applyGuardResult(ctx, isThenable(result) ? await result : result)
+}
+
+// ── UNROLLED GUARD RUNNERS ──────────────────────────
+// V8 Maglev can inline these because:
+// - No loop → fixed call count
+// - Each guard.fn is a direct reference
+// - TurboFan can specialize per call site
+
+function runGuards0(): Promise<void> | void {
+  // noop — zero overhead
+}
+
+function runGuards1(ctx: Record<string, unknown>, g0: GuardDef): Promise<void> | void {
+  const r0 = g0.fn(ctx)
+  if (isThenable(r0)) return (r0 as Promise<unknown>).then((v) => applyGuardResult(ctx, v))
+  applyGuardResult(ctx, r0)
+}
+
+function runGuards2(ctx: Record<string, unknown>, g0: GuardDef, g1: GuardDef): Promise<void> | void {
+  const r0 = g0.fn(ctx)
+  if (isThenable(r0)) {
+    return (r0 as Promise<unknown>).then((v) => {
+      applyGuardResult(ctx, v)
+      return applyGuard(ctx, g1)
+    })
+  }
+  applyGuardResult(ctx, r0)
+  const r1 = g1.fn(ctx)
+  if (isThenable(r1)) return (r1 as Promise<unknown>).then((v) => applyGuardResult(ctx, v))
+  applyGuardResult(ctx, r1)
+}
+
+function runGuards3(ctx: Record<string, unknown>, g0: GuardDef, g1: GuardDef, g2: GuardDef): Promise<void> | void {
+  const r0 = g0.fn(ctx)
+  if (isThenable(r0)) {
+    return (r0 as Promise<unknown>).then(async (v) => {
+      applyGuardResult(ctx, v)
+      await applyGuard(ctx, g1)
+      await applyGuard(ctx, g2)
+    })
+  }
+  applyGuardResult(ctx, r0)
+  const r1 = g1.fn(ctx)
+  if (isThenable(r1)) {
+    return (r1 as Promise<unknown>).then(async (v) => {
+      applyGuardResult(ctx, v)
+      await applyGuard(ctx, g2)
+    })
+  }
+  applyGuardResult(ctx, r1)
+  const r2 = g2.fn(ctx)
+  if (isThenable(r2)) return (r2 as Promise<unknown>).then((v) => applyGuardResult(ctx, v))
+  applyGuardResult(ctx, r2)
+}
+
+function runGuards4(
+  ctx: Record<string, unknown>,
+  g0: GuardDef,
+  g1: GuardDef,
+  g2: GuardDef,
+  g3: GuardDef,
+): Promise<void> | void {
+  const r0 = g0.fn(ctx)
+  if (isThenable(r0)) {
+    return (r0 as Promise<unknown>).then(async (v) => {
+      applyGuardResult(ctx, v)
+      await applyGuard(ctx, g1)
+      await applyGuard(ctx, g2)
+      await applyGuard(ctx, g3)
+    })
+  }
+  applyGuardResult(ctx, r0)
+  const r1 = g1.fn(ctx)
+  if (isThenable(r1)) {
+    return (r1 as Promise<unknown>).then(async (v) => {
+      applyGuardResult(ctx, v)
+      await applyGuard(ctx, g2)
+      await applyGuard(ctx, g3)
+    })
+  }
+  applyGuardResult(ctx, r1)
+  const r2 = g2.fn(ctx)
+  if (isThenable(r2)) {
+    return (r2 as Promise<unknown>).then(async (v) => {
+      applyGuardResult(ctx, v)
+      await applyGuard(ctx, g3)
+    })
+  }
+  applyGuardResult(ctx, r2)
+  const r3 = g3.fn(ctx)
+  if (isThenable(r3)) return (r3 as Promise<unknown>).then((v) => applyGuardResult(ctx, v))
+  applyGuardResult(ctx, r3)
+}
+
+/** Fallback for 5+ guards — loop */
+async function runGuardsN(ctx: Record<string, unknown>, guards: readonly GuardDef[]): Promise<void> {
   for (const guard of guards) {
-    mergeGuardResult(ctx, await guard.fn(ctx))
+    const result = guard.fn(ctx)
+    applyGuardResult(ctx, isThenable(result) ? await result : result)
   }
 }
 
-// ─── Wrap onion ───────────────────────────────────────────────────────
-
 /**
- * Compose the wrap chain around `core`. Wraps run outermost-first, so we
- * fold from the end of the list: the last wrap wraps `core`, the one before
- * it wraps that, and so on.
- *
- * When there are no wraps we just return `core` unchanged — no extra layer.
+ * Select the optimal guard runner based on count.
+ * Returns a function that applies all guards to a context.
  */
-function composeWraps(
-  wraps: readonly WrapDef[],
-  core: (ctx: Record<string, unknown>) => Promise<unknown>,
-): (ctx: Record<string, unknown>) => Promise<unknown> {
-  let chain = core
-  for (let i = wraps.length - 1; i >= 0; i--) {
-    const wrap = wraps[i]!
-    const next = chain
-    chain = (ctx) => Promise.resolve(wrap.fn(ctx, () => next(ctx)))
+function selectGuardRunner(guards: readonly GuardDef[]): (ctx: Record<string, unknown>) => Promise<void> | void {
+  // Pre-extract function references at compile time (avoid .fn property access at runtime)
+  switch (guards.length) {
+    case 0:
+      return runGuards0
+    case 1: {
+      const g0 = guards[0]!
+      return (ctx) => runGuards1(ctx, g0)
+    }
+    case 2: {
+      const [g0, g1] = guards
+      return (ctx) => runGuards2(ctx, g0!, g1!)
+    }
+    case 3: {
+      const [g0, g1, g2] = guards
+      return (ctx) => runGuards3(ctx, g0!, g1!, g2!)
+    }
+    case 4: {
+      const [g0, g1, g2, g3] = guards
+      return (ctx) => runGuards4(ctx, g0!, g1!, g2!, g3!)
+    }
+    default:
+      return (ctx) => runGuardsN(ctx, guards)
   }
-  return chain
 }
 
-// ─── Procedure compilation ────────────────────────────────────────────
+// ── Resolve + output validation helper ──────────────
+
+/** Call resolve, then validate output (sync-first, async fallback) */
+function _resolveWithOutput(
+  resolveFn: Function,
+  input: unknown,
+  ctx: Record<string, unknown>,
+  failFn: (code: string, data?: unknown) => never,
+  signal: AbortSignal,
+  outputSchema: import('./core/schema.ts').AnySchema | null,
+): unknown {
+  const output = resolveFn({
+    input,
+    ctx,
+    fail: failFn,
+    signal,
+    params: (ctx.params ?? EMPTY_PARAMS) as Record<string, string>,
+  })
+  if (!outputSchema) return output
+  if (isThenable(output)) {
+    return (output as Promise<unknown>).then((o) => validateSchema(outputSchema, o))
+  }
+  return validateSchema(outputSchema, output)
+}
+
+/** Validate input, resolve, validate output — sync-first with rejected Promise fallback.
+ *  All sync throws (validation errors, fail() calls, resolver errors) are converted
+ *  to rejected Promises for consistent error handling in .then().catch() chains. */
+function _validateAndResolve(
+  inputSchema: import('./core/schema.ts').AnySchema | null,
+  outputSchema: import('./core/schema.ts').AnySchema | null,
+  resolveFn: Function,
+  rawInput: unknown,
+  ctx: Record<string, unknown>,
+  failFn: (code: string, data?: unknown) => never,
+  signal: AbortSignal,
+): unknown {
+  try {
+    const input = inputSchema ? validateSchema(inputSchema, rawInput ?? {}) : rawInput
+    if (isThenable(input)) {
+      return (input as Promise<unknown>).then((resolvedInput) =>
+        _resolveWithOutput(resolveFn, resolvedInput, ctx, failFn, signal, outputSchema),
+      )
+    }
+    return _resolveWithOutput(resolveFn, input, ctx, failFn, signal, outputSchema)
+  } catch (e) {
+    return Promise.reject(e)
+  }
+}
+
+// ── Main Compiler ───────────────────────────────────
 
 /**
- * Compile a single procedure into its request handler.
+ * Compile a procedure into the fastest possible handler.
  *
- * `rootWraps` is the instance-level wrap stack (from `silgi({ wraps })`).
- * Root wraps are the outermost layer, so they are prepended before any
- * procedure-level wraps added via `$use(wrap)`.
+ * Optimizations applied:
+ * - Guard count specialization (unrolled for 0-4)
+ * - Separate fast path for no-wrap case (zero closures per request)
+ * - Pre-computed fail function (singleton per procedure)
+ * - Sync fast path when all guards are sync
  */
 export function compileProcedure(procedure: ProcedureDef, rootWraps?: readonly WrapDef[] | null): CompiledHandler {
-  // Split `$use` entries into guards (pre-steps) and wraps (onion middleware).
   const middlewares = procedure.use ?? []
   const guards: GuardDef[] = []
-  const procedureWraps: WrapDef[] = []
-  for (const mw of middlewares) {
-    if (mw.kind === 'guard') guards.push(mw)
-    else procedureWraps.push(mw)
+  const wraps: WrapDef[] = []
+
+  // Root wraps are outermost — prepended in order so index 0 wraps index N-1
+  // wraps the resolver. Zero-cost when `rootWraps` is nullish/empty: the
+  // `wraps` array stays empty and every subsequent fast-path check still
+  // short-circuits on `wraps.length === 0`.
+  if (rootWraps && rootWraps.length > 0) {
+    for (let i = 0; i < rootWraps.length; i++) wraps.push(rootWraps[i]!)
   }
 
-  // Root wraps sit outside procedure wraps in the onion.
-  const wraps: WrapDef[] = rootWraps && rootWraps.length > 0 ? [...rootWraps, ...procedureWraps] : procedureWraps
+  for (const mw of middlewares) {
+    if (mw.kind === 'guard') guards.push(mw)
+    else wraps.push(mw)
+  }
 
-  // Guards can declare their own typed errors. Merge them into the procedure's
-  // error map so `fail('CODE')` works from inside a guard-introduced code.
+  const inputSchema = procedure.input
+  const outputSchema = procedure.output
+  const resolveFn = procedure.resolve
+
+  // Merge guard errors into procedure errors (runtime)
   let mergedErrors = procedure.errors
   for (const guard of guards) {
     if (guard.errors) {
@@ -181,192 +327,210 @@ export function compileProcedure(procedure: ProcedureDef, rootWraps?: readonly W
     }
   }
 
-  const fail = buildFail(mergedErrors)
-  const inputSchema = procedure.input
-  const outputSchema = procedure.output
-  const resolve = procedure.resolve
+  // Pre-compute fail function — use typed errors when defined, noop otherwise
+  const failFn = mergedErrors ? createFail(mergedErrors) : noopFail
 
-  /**
-   * Core pipeline step called from inside the wrap onion. Reads the
-   * (already-validated) input back off `ctx[RAW_INPUT]` so that a wrap
-   * like `mapInput` can still rewrite it between wraps and the resolver,
-   * then calls the resolver.
-   *
-   * Input validation runs *outside* `core` — before the wrap onion —
-   * because schemas (e.g. `z.number()`) rejecting a raw string is the
-   * documented behavior. Wraps that need to transform the raw request
-   * (like `coerceGuard`) must use an input schema that accepts the raw
-   * shape, or pair with `z.coerce.*`.
-   */
-  const core = async (ctx: Record<string, unknown>): Promise<unknown> => {
-    const input = (ctx as Record<PropertyKey, unknown>)[RAW_INPUT]
-    const output = await resolve({
-      input,
-      ctx,
-      fail,
-      signal: (ctx as Record<PropertyKey, unknown>)[SIGNAL_KEY] as AbortSignal,
-      params: (ctx.params ?? EMPTY_PARAMS) as Record<string, string>,
-    })
-    return output
+  // Pre-select the optimal guard runner (compiled once, used per-request)
+  const runGuards = selectGuardRunner(guards)
+
+  // ── SYNC FAST PATH: no wraps, no validation ──
+  // try/catch converts sync throws (guard errors, fail() calls, resolver errors)
+  // to rejected Promises for consistent error handling across all paths.
+  if (wraps.length === 0 && !inputSchema && !outputSchema) {
+    return (ctx, rawInput, signal) => {
+      try {
+        const guardResult = runGuards(ctx)
+        if (guardResult && isThenable(guardResult)) {
+          return (guardResult as Promise<void>).then(() =>
+            resolveFn({
+              input: rawInput,
+              ctx,
+              fail: failFn,
+              signal,
+              params: (ctx.params ?? EMPTY_PARAMS) as Record<string, string>,
+            }),
+          )
+        }
+        return resolveFn({
+          input: rawInput,
+          ctx,
+          fail: failFn,
+          signal,
+          params: (ctx.params ?? EMPTY_PARAMS) as Record<string, string>,
+        })
+      } catch (e) {
+        return Promise.reject(e)
+      }
+    }
   }
 
-  const wrapped = composeWraps(wraps, core)
+  // ── SEMI-SYNC: no wraps, has validation ────────────
+  // All sync throws (guards, validation, resolve) converted to rejected Promises.
+  if (wraps.length === 0) {
+    return (ctx, rawInput, signal) => {
+      try {
+        const guardResult = runGuards(ctx)
+        if (guardResult && isThenable(guardResult)) {
+          return (guardResult as Promise<void>).then(() =>
+            _validateAndResolve(inputSchema, outputSchema, resolveFn, rawInput, ctx, failFn, signal),
+          )
+        }
+        return _validateAndResolve(inputSchema, outputSchema, resolveFn, rawInput, ctx, failFn, signal)
+      } catch (e) {
+        return Promise.reject(e)
+      }
+    }
+  }
 
+  // ── WRAP PATH: onion only for wraps ────────────────
+  // Wraps always need async (onion model requires chained next() calls)
   return async (ctx, rawInput, signal) => {
-    // Guards run first — they can throw to short-circuit the whole pipeline
-    // and may also patch the context for downstream steps.
-    await runGuards(ctx, guards)
+    const guardResult = runGuards(ctx)
+    if (guardResult && isThenable(guardResult)) await guardResult
 
-    // Input validation happens here, *before* the wrap onion. This order
-    // is deliberate and load-bearing; see the `core` doc-comment above.
-    const input = inputSchema ? await validateSchema(inputSchema, rawInput ?? {}) : rawInput
+    let input: unknown
+    if (inputSchema) {
+      const validated = validateSchema(inputSchema, rawInput ?? {})
+      input = isThenable(validated) ? await validated : validated
+    } else {
+      input = rawInput
+    }
 
-    // Park request-scoped values on the context so `core` and any wrap
-    // (e.g. `mapInput`) can read/rewrite them without extra parameters.
-    ;(ctx as Record<PropertyKey, unknown>)[RAW_INPUT] = input
-    ;(ctx as Record<PropertyKey, unknown>)[SIGNAL_KEY] = signal
+    // Store input on context so wraps (e.g. mapInput) can read/modify it
+    ;(ctx as any)[RAW_INPUT] = input
 
-    const output = await wrapped(ctx)
-    return outputSchema ? await validateSchema(outputSchema, output) : output
+    let execute: () => Promise<unknown> = () => {
+      const resolvedInput = (ctx as any)[RAW_INPUT] ?? input
+      return Promise.resolve(
+        resolveFn({
+          input: resolvedInput,
+          ctx,
+          fail: failFn,
+          signal,
+          params: (ctx.params ?? EMPTY_PARAMS) as Record<string, string>,
+        }),
+      )
+    }
+
+    for (let i = wraps.length - 1; i >= 0; i--) {
+      const wrapFn = wraps[i]!.fn
+      const next = execute
+      execute = () => wrapFn(ctx, next)
+    }
+
+    const output = await execute()
+    if (!outputSchema) return output
+    const validated = validateSchema(outputSchema, output)
+    return isThenable(validated) ? await validated : validated
   }
 }
 
-/**
- * Internal slot where we park the `AbortSignal` for the duration of a
- * request, alongside the raw input. Kept as a symbol so it cannot collide
- * with a user-defined context field.
- */
-const SIGNAL_KEY = Symbol.for('silgi.signal')
+// ── COMPILED ROUTER ─────────────────────────────────
 
-/** Shared empty params object. Only read, never mutated, never exposed. */
-const EMPTY_PARAMS: Record<string, string> = Object.freeze(Object.create(null))
-
-// ─── Router compilation ───────────────────────────────────────────────
+import { createRouter as createRou3, addRoute as addRou3Route, findRoute as findRou3Route } from 'rou3'
 
 export interface CompiledRoute {
   handler: CompiledHandler
-  /** Pre-computed `Cache-Control` header value, or `undefined` when caching is off. */
+  /** Pre-computed Cache-Control header value, or undefined if no caching */
   cacheControl?: string
-  /** When true, the adapter skips body parsing and hands the raw request to the resolver. */
+  /** Skip body parsing — procedure receives raw request (e.g. catch-all proxy) */
   passthrough?: boolean
-  /** Uppercase HTTP method this route was registered for. */
+  /** HTTP method this route is registered for (uppercase) */
   method: string
 }
 
+/** Match result from the router */
 export interface MatchedRoute<T = unknown> {
   data: T
   params?: Record<string, string>
 }
 
-/** Looks up a compiled route by (method, path). Returns `undefined` on miss. */
+/** Compiled router function — returns matched route + params */
 export type CompiledRouterFn = (method: string, path: string) => MatchedRoute<CompiledRoute> | undefined
 
 /**
- * Walk the router definition tree and compile every procedure into a
- * rou3 radix router. Non-procedure nodes are namespaces and their keys
- * become path segments.
+ * Compile a router tree into a rou3 radix router.
+ *
+ * Powered by rou3 (unjs) — battle-tested, fast, minimal.
  */
 export function compileRouter(def: Record<string, unknown>): CompiledRouterFn {
   const router = createRou3<CompiledRoute>()
 
-  // `silgi({ wraps }).router(def)` stamps root wraps onto the def via a
-  // non-enumerable symbol. Reading them here means every adapter that
-  // goes through `compileRouter` (handler, caller, WS, etc.) gets root
-  // wraps wired in automatically — no per-adapter plumbing.
+  // Root wraps are branded onto the def by `silgi({ wraps }).router(def)`.
+  // Reading once here and passing into every `compileProcedure` avoids any
+  // per-adapter plumbing — every compile site already routes through here.
+  // When the brand is absent (no wraps, or def compiled from outside a
+  // silgi instance), `rootWraps` is `undefined` and `compileProcedure`
+  // walks its existing zero-cost fast paths unchanged.
   const rootWraps = (def as { [ROOT_WRAPS]?: readonly WrapDef[] })[ROOT_WRAPS]
 
-  const register = (proc: ProcedureDef, autoPath: string[]): void => {
-    const route = proc.route as Route | null
-
-    // Explicit route path wins; otherwise we derive one from the tree position.
-    const routePath = route?.path || '/' + autoPath.join('/')
-    const method = route?.method?.toUpperCase() || 'POST'
-
-    let cacheControl: string | undefined
-    if (route?.cache != null) {
-      cacheControl = typeof route.cache === 'number' ? `public, max-age=${route.cache}` : route.cache
-    }
-
-    const compiled: CompiledRoute = {
-      handler: compileProcedure(proc, rootWraps),
-      cacheControl,
-      passthrough: routePath.includes('**') || undefined,
-      method,
-    }
-
-    addRou3Route(router, method, routePath, compiled)
-
-    // The empty-method slot exists for `createCaller`, which dispatches
-    // procedures directly without an HTTP method.
-    addRou3Route(router, '', routePath, compiled)
-  }
-
-  const walk = (node: unknown, path: string[]): void => {
+  function walk(node: unknown, path: string[]): void {
     if (isProcedureDef(node)) {
-      register(node as ProcedureDef, path)
+      const proc = node as ProcedureDef
+      const route = proc.route as import('./types.ts').Route | null
+
+      // Use custom route path or auto-generated from tree
+      const routePath = route?.path || '/' + path.join('/')
+
+      // HTTP method from route config, default POST
+      const method = route?.method?.toUpperCase() || 'POST'
+
+      let cacheControl: string | undefined
+      if (route?.cache != null) {
+        cacheControl = typeof route.cache === 'number' ? `public, max-age=${route.cache}` : route.cache
+      }
+
+      const compiled: CompiledRoute = {
+        handler: compileProcedure(proc, rootWraps),
+        cacheControl,
+        passthrough: routePath.includes('**') || undefined,
+        method,
+      }
+
+      addRou3Route(router, method, routePath, compiled)
+
+      // Also add empty method for internal callers (createCaller uses '' method)
+      addRou3Route(router, '', routePath, compiled)
+
       return
     }
     if (typeof node === 'object' && node !== null) {
-      for (const [key, child] of Object.entries(node)) {
-        walk(child, [...path, key])
+      for (const [k, v] of Object.entries(node)) {
+        walk(v, [...path, k])
       }
     }
   }
 
   walk(def, [])
 
-  return (method, path) => findRou3Route(router, method, path) as MatchedRoute<CompiledRoute> | undefined
+  return (method: string, path: string) =>
+    findRou3Route(router, method, path) as MatchedRoute<CompiledRoute> | undefined
 }
 
-// ─── Request context ──────────────────────────────────────────────────
+/** Pool of pre-allocated null-prototype context objects — eliminates per-request GC pressure. */
+const CTX_POOL: Record<string, unknown>[] = []
+const CTX_POOL_MAX = 128
 
 /**
- * Disposable wrapper around the pipeline context. The `using` support lets
- * handlers write:
+ * Pooled context with built-in `using` support. `Symbol.dispose` calls
+ * `releaseContext` unless ownership has been transferred elsewhere
+ * (e.g. to a streaming Response) — in that case the new owner is
+ * expected to call `releaseContext` when the stream ends.
  *
- *     using ctx = createContext()
- *
- * which releases the context automatically at scope exit — unless ownership
- * has been transferred (e.g. to a streaming Response that keeps reading
- * from `ctx` after the handler returns). In that case the handler calls
- * `detachContext(ctx)` and the new owner is responsible for cleanup.
+ * Transfer ownership by calling `detachContext(ctx)` before returning.
  */
 export type PooledContext = Record<string, unknown> & Disposable
 
-/**
- * Create a fresh context object. We use a null-prototype object so user
- * fields cannot accidentally shadow `Object.prototype` members, and so
- * that property lookups never walk the prototype chain.
- *
- * The object was once drawn from a pool; the pool has been removed because
- * its win was marginal and the indirection made the code harder to read.
- * The `createContext` / `releaseContext` / `detachContext` API is kept
- * intact so existing call sites continue to work.
- */
+/** Acquire a context object from the pool (or create one). */
 export function createContext(): PooledContext {
-  const ctx = Object.create(null) as PooledContext
+  const ctx = (CTX_POOL.length > 0 ? CTX_POOL.pop()! : Object.create(null)) as PooledContext
   ctx[Symbol.dispose] = disposeContext
   return ctx
 }
 
-/**
- * Mark the context as owned elsewhere so the enclosing `using` block will
- * not release it. Call this when you hand `ctx` to something that outlives
- * the handler scope (an SSE stream, a WebSocket subscription, etc.).
- */
+/** Mark the context as owned elsewhere so `using` won't release it. */
 export function detachContext(ctx: Record<string, unknown>): void {
-  ;(ctx as Record<PropertyKey, unknown>)[Symbol.dispose] = noopDispose
-}
-
-/**
- * Release a context object. Called automatically at `using` scope exit
- * and explicitly by stream handlers when their stream ends. The body is
- * intentionally empty: we no longer pool, so there is nothing to reset.
- * The function is kept so callers have a single symmetrical API — every
- * `createContext` has a matching `releaseContext`.
- */
-export function releaseContext(_ctx: Record<string, unknown>): void {
-  // No pool to return to; the GC handles reclamation.
+  ;(ctx as any)[Symbol.dispose] = noopDispose
 }
 
 function disposeContext(this: Record<string, unknown>): void {
@@ -374,3 +538,11 @@ function disposeContext(this: Record<string, unknown>): void {
 }
 
 function noopDispose(): void {}
+
+/** Return a context object to the pool after request completes. */
+export function releaseContext(ctx: Record<string, unknown>): void {
+  // Wipe all properties so the next request starts clean
+  for (const key of Object.keys(ctx)) delete ctx[key]
+  for (const sym of Object.getOwnPropertySymbols(ctx)) delete (ctx as any)[sym]
+  if (CTX_POOL.length < CTX_POOL_MAX) CTX_POOL.push(ctx)
+}
