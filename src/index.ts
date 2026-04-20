@@ -114,12 +114,13 @@ export type { StorageConfig, Storage, StorageValue, Driver } from './core/storag
 export {
   runTask,
   collectCronTasks,
+  createCronRegistry,
   startCronJobs,
   stopCronJobs,
   setTaskAnalytics,
   getScheduledTasks,
 } from './core/task.ts'
-export type { TaskDef, TaskEvent, ScheduledTaskInfo } from './core/task.ts'
+export type { TaskDef, TaskEvent, ScheduledTaskInfo, CronRegistry } from './core/task.ts'
 
 // ── Server ─────────────────────────────────────────
 export type { SilgiServer, ServeOptions } from './core/serve.ts'

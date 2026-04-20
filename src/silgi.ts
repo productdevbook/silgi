@@ -647,7 +647,13 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
         bridge as import('./core/context-bridge.ts').ContextBridge,
       )
 
-      // Auto-discover and start cron tasks from router
+      // Auto-discover and start cron tasks from router.
+      // NOTE: currently uses the process-default registry so the analytics
+      // dashboard (which reads `getScheduledTasks()` via the same default)
+      // keeps showing scheduled jobs. `createCronRegistry()` is exported
+      // for users who want fully-isolated registries; a future refactor
+      // will thread that registry through the analytics route so this
+      // serve() can drop to per-instance.
       const { collectCronTasks, startCronJobs, stopCronJobs } = await import('./core/task.ts')
       const cronTasks = collectCronTasks(routerDef)
       if (cronTasks.length > 0) {

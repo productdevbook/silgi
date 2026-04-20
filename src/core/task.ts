@@ -242,35 +242,6 @@ interface CronJobEntry {
   errors: number
 }
 
-let _cronEntries: CronJobEntry[] = []
-
-export async function startCronJobs(cronTasks: Array<{ cron: string; task: TaskDef<any, any> }>): Promise<void> {
-  if (cronTasks.length === 0) return
-  const { Cron } = await import('croner')
-  for (const { cron, task } of cronTasks) {
-    const taskName = (task as any).route?.summary || cron
-    const entry: CronJobEntry = {
-      name: taskName,
-      cron,
-      description: task.route?.summary,
-      job: null as any,
-      lastRun: null,
-      runs: 0,
-      errors: 0,
-    }
-    const job = new Cron(cron, async () => {
-      entry.lastRun = Date.now()
-      entry.runs++
-      task.dispatch(undefined).catch((err: unknown) => {
-        entry.errors++
-        console.error(`[silgi] Cron task failed:`, err instanceof Error ? err.message : err)
-      })
-    })
-    entry.job = job
-    _cronEntries.push(entry)
-  }
-}
-
 export interface ScheduledTaskInfo {
   name: string
   cron: string
@@ -281,19 +252,83 @@ export interface ScheduledTaskInfo {
   errors: number
 }
 
-export function getScheduledTasks(): ScheduledTaskInfo[] {
-  return _cronEntries.map((e) => ({
-    name: e.name,
-    cron: e.cron,
-    description: e.description,
-    nextRun: e.job.nextRun()?.getTime() ?? null,
-    lastRun: e.lastRun,
-    runs: e.runs,
-    errors: e.errors,
-  }))
+export interface CronRegistry {
+  start: (cronTasks: Array<{ cron: string; task: TaskDef<any, any> }>) => Promise<void>
+  stop: () => void
+  list: () => ScheduledTaskInfo[]
 }
 
-export function stopCronJobs(): void {
-  for (const e of _cronEntries) e.job.stop()
-  _cronEntries = []
+/**
+ * Create an isolated cron registry. Each silgi instance owns one, so
+ * `server.close()` on instance A never stops instance B's jobs and
+ * `list()` never returns jobs from another instance.
+ */
+export function createCronRegistry(): CronRegistry {
+  const entries: CronJobEntry[] = []
+
+  return {
+    async start(cronTasks) {
+      if (cronTasks.length === 0) return
+      const { Cron } = await import('croner')
+      for (const { cron, task } of cronTasks) {
+        const taskName = (task as any).route?.summary || cron
+        const entry: CronJobEntry = {
+          name: taskName,
+          cron,
+          description: task.route?.summary,
+          job: null as any,
+          lastRun: null,
+          runs: 0,
+          errors: 0,
+        }
+        const job = new Cron(cron, async () => {
+          entry.lastRun = Date.now()
+          entry.runs++
+          task.dispatch(undefined).catch((err: unknown) => {
+            entry.errors++
+            console.error(`[silgi] Cron task failed:`, err instanceof Error ? err.message : err)
+          })
+        })
+        entry.job = job
+        entries.push(entry)
+      }
+    },
+
+    stop() {
+      for (const e of entries) e.job.stop()
+      entries.length = 0
+    },
+
+    list() {
+      return entries.map((e) => ({
+        name: e.name,
+        cron: e.cron,
+        description: e.description,
+        nextRun: e.job.nextRun()?.getTime() ?? null,
+        lastRun: e.lastRun,
+        runs: e.runs,
+        errors: e.errors,
+      }))
+    },
+  }
 }
+
+// ── Process-default registry (backwards-compat, deprecated) ──
+
+/**
+ * Process-default cron registry. Shared state — use {@link createCronRegistry}
+ * when a silgi instance should own its own jobs.
+ *
+ * @deprecated Prefer per-instance registries. The module-default is
+ * retained so existing imports of `startCronJobs` / `stopCronJobs` /
+ * `getScheduledTasks` keep working; a future major will remove these
+ * top-level re-exports.
+ */
+const _defaultRegistry = createCronRegistry()
+
+/** @deprecated Use {@link createCronRegistry} — each silgi instance owns its own. */
+export const startCronJobs = _defaultRegistry.start
+/** @deprecated Use {@link createCronRegistry} — each silgi instance owns its own. */
+export const stopCronJobs = _defaultRegistry.stop
+/** @deprecated Use {@link createCronRegistry} — each silgi instance owns its own. */
+export const getScheduledTasks = _defaultRegistry.list
