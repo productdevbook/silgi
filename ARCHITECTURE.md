@@ -243,6 +243,18 @@ registered via `silgi({}).serve()` without threading the registry
 through every analytics-plugin call site — a future refactor will
 move this to explicit injection.
 
+### `_requestContextMap` — `src/integrations/better-auth/index.ts`
+
+`WeakMap<Request, Record<string, unknown>>` backing the public
+`setRequestContext(request, ctx)` API. Strictly speaking this violates
+§3 rule 2 ("no WeakMap keyed on Request identity"). It remains only
+because `setRequestContext` is a public API consumed by user code;
+removing it is a breaking change reserved for the next major. New
+integrations must not introduce similar WeakMaps — use
+`silgi.runInContext(ctx, fn)` for ambient context or a plugin-factory
+closure (see `requestMetas` inside `tracing()` for the correct
+pattern) for per-request side channels.
+
 ## 5. Extending Silgi
 
 ### Add a schema converter

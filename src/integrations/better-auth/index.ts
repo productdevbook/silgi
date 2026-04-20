@@ -53,6 +53,14 @@ function runWithCtx<T>(ctx: Record<string, unknown>, fn: () => T): T {
  * Keyed on `Request` identity. GC-friendly: entry auto-released when the
  * `Request` is collected.
  *
+ * @remarks
+ * This is a documented exception to ARCHITECTURE §3 ("no WeakMap keyed on
+ * Request identity"). Kept only because `setRequestContext` is a public
+ * API consumed by user code outside silgi's control — removing it is a
+ * breaking change reserved for the next major. New integrations must
+ * use `silgi.runInContext(ctx, fn)` or the per-plugin closure pattern
+ * (see `requestMetas` inside `tracing()` below).
+ *
  * @internal
  */
 const _requestContextMap = new WeakMap<Request, Record<string, unknown>>()
@@ -226,10 +234,6 @@ function extractUserData(returned: any): { userId?: string; userEmail?: string; 
   return result
 }
 
-// ── WeakMap for per-request metadata ─────────────────
-
-const requestMetas = new WeakMap<Request, RequestMeta>()
-
 // ── Plugin Factory ───────────────────────────────────
 
 /**
@@ -243,6 +247,13 @@ export function tracing(config?: TracingConfig): any {
   const captureInput = config?.captureInput ?? true
   const captureOutput = config?.captureOutput ?? true
   const wrapMiddleware = config?.createAuthMiddleware ?? ((fn: any) => fn)
+
+  // Per-plugin request metadata — scoped to this `tracing()` call, so two
+  // auth instances running side-by-side never observe each other's state.
+  // Still a WeakMap<Request> because better-auth's onRequest and hooks.after
+  // receive separate contexts but share the same `Request` identity; the
+  // module-global version was a §3 violation, this closure version is not.
+  const requestMetas = new WeakMap<Request, RequestMeta>()
 
   return {
     id: 'silgi-tracing',
