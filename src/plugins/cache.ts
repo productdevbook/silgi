@@ -49,16 +49,23 @@ function ensureStorageConnected(): void {
   if (_storageConnected) return
   _storageConnected = true
   try {
-    // Connect ocache to silgi's storage under the 'cache' mount
+    // Connect ocache to silgi's storage under the 'cache' mount.
+    // Each op returns the underlying Promise so ocache can await writes
+    // and surface errors. The prior impl returned void, hiding storage
+    // failures entirely — a Redis/SET timeout silently looked like a
+    // successful cache write and the entry was never persisted.
     const storage = useStorage('cache')
     setStorage({
       get: <T>(key: string) => storage.getItem(key) as Promise<T | null>,
       set: <T>(key: string, value: T, opts?: { ttl?: number }) => {
         if (value === null || value === undefined) {
-          storage.removeItem(key)
-          return
+          return storage.removeItem(key) as unknown as Promise<void>
         }
-        storage.setItem(key, value as string, opts?.ttl ? { ttl: opts.ttl } : undefined)
+        return storage.setItem(
+          key,
+          value as string,
+          opts?.ttl ? { ttl: opts.ttl } : undefined,
+        ) as unknown as Promise<void>
       },
     })
   } catch {
@@ -334,11 +341,12 @@ export function createUnstorageAdapter(storage: UnstorageCompatible): StorageInt
   return {
     get: <T>(key: string) => storage.getItem<T>(key),
     set: <T>(key: string, value: T, opts?: { ttl?: number }) => {
+      // Return the underlying Promise so ocache can await writes and
+      // surface storage errors (Redis timeouts, quota exceeded, etc.).
       if (value === null || value === undefined) {
-        storage.removeItem(key)
-        return
+        return storage.removeItem(key) as unknown as Promise<void>
       }
-      storage.setItem(key, value, opts)
+      return storage.setItem(key, value, opts) as unknown as Promise<void>
     },
   }
 }

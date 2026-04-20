@@ -119,6 +119,35 @@ describe('withRetry', () => {
     const retryLink = withRetry(link, { baseDelay: () => 5 })
     expect(await retryLink.call(['test'], undefined, {})).toBe('ok')
   })
+
+  it('does not leak abort listeners on long-lived signals', async () => {
+    // Simulate a page-level AbortController reused across many retry waves.
+    // Prior impl added a new `abort` listener on every retry and never
+    // removed them when the retry timer fired, so the signal slowly
+    // accumulated listeners.
+    const controller = new AbortController()
+    const addSpy = vi.spyOn(controller.signal, 'addEventListener')
+    const removeSpy = vi.spyOn(controller.signal, 'removeEventListener')
+
+    // 3 retries per call → 3 adds + 3 removes per call.
+    for (let i = 0; i < 3; i++) {
+      const link = mockLink([
+        { error: errorWithStatus(500) },
+        { error: errorWithStatus(500) },
+        { error: errorWithStatus(500) },
+        { value: 'ok' },
+      ])
+      const retryLink = withRetry(link, { baseDelay: 1, jitter: false, maxRetries: 3 })
+      await retryLink.call(['test'], undefined, { signal: controller.signal })
+    }
+
+    // Each retry adds exactly one listener and removes it on timer fire —
+    // net adds must equal net removes.
+    const abortAdds = addSpy.mock.calls.filter(([ev]) => ev === 'abort').length
+    const abortRemoves = removeSpy.mock.calls.filter(([ev]) => ev === 'abort').length
+    expect(abortAdds).toBeGreaterThan(0)
+    expect(abortRemoves).toBe(abortAdds)
+  })
 })
 
 // ── withCircuitBreaker ──

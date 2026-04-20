@@ -212,6 +212,25 @@ describe('createCaller', () => {
     expect(result.status).toBe('ok')
   })
 
+  it('null timeout still hands resolvers a real AbortSignal — not undefined', async () => {
+    // Regression: old impl passed `undefined as AbortSignal`; any resolver
+    // that read `signal.aborted` or `signal.addEventListener` NPE'd.
+    const sigS = silgi({ context: () => ({}) })
+    const sigRouter = sigS.router({
+      peek: sigS.$resolve(({ signal }) => {
+        // Both reads must succeed without throwing
+        const aborted = signal.aborted
+        let listenerAttached = false
+        signal.addEventListener('abort', () => {}, { once: true })
+        listenerAttached = true
+        return { aborted, listenerAttached, hasSignal: signal instanceof AbortSignal }
+      }),
+    })
+    const caller = sigS.createCaller(sigRouter, { timeout: null })
+    const out = await caller.peek()
+    expect(out).toEqual({ aborted: false, listenerAttached: true, hasSignal: true })
+  })
+
   it('passes signal to handler', async () => {
     const signalS = silgi({ context: () => ({}) })
     const signalRouter = signalS.router({

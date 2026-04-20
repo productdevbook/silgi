@@ -134,6 +134,23 @@ function jsonResponse(data: unknown, headers: HeadersInit): Response {
   return new Response(JSON.stringify(data), { headers })
 }
 
+/**
+ * Parse a request body as JSON without throwing. Returns `null` on any
+ * failure (empty body, malformed JSON, non-JSON content). Used by the
+ * analytics hidden-paths endpoint so a bad request produces a 400 instead
+ * of an uncaught exception that surfaces as a 500 to the client.
+ */
+async function parseJsonBody(request: Request): Promise<Record<string, unknown> | null> {
+  try {
+    const text = await request.text()
+    if (!text) return null
+    const parsed = JSON.parse(text)
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null
+  } catch {
+    return null
+  }
+}
+
 // ── Main Router ─────────────────────────────────────
 
 /** Serve analytics dashboard and API routes. */
@@ -157,20 +174,16 @@ export async function serveAnalyticsRoute(
     if (request.method === 'GET') {
       return jsonResponse(collector.getHiddenPaths(), jsonCacheHeaders)
     }
-    if (request.method === 'POST') {
-      const body = (await request.json()) as { path?: string }
-      if (typeof body.path !== 'string')
+    if (request.method === 'POST' || request.method === 'DELETE') {
+      const body = await parseJsonBody(request)
+      if (!body || typeof body.path !== 'string') {
         return new Response('{"error":"path required"}', { status: 400, headers: jsonCacheHeaders })
-      collector.addHiddenPath(body.path)
+      }
+      if (request.method === 'POST') collector.addHiddenPath(body.path)
+      else collector.removeHiddenPath(body.path)
       return jsonResponse(collector.getHiddenPaths(), jsonCacheHeaders)
     }
-    if (request.method === 'DELETE') {
-      const body = (await request.json()) as { path?: string }
-      if (typeof body.path !== 'string')
-        return new Response('{"error":"path required"}', { status: 400, headers: jsonCacheHeaders })
-      collector.removeHiddenPath(body.path)
-      return jsonResponse(collector.getHiddenPaths(), jsonCacheHeaders)
-    }
+    return new Response('{"error":"method not allowed"}', { status: 405, headers: jsonCacheHeaders })
   }
   if (pathname === 'api/analytics/errors') {
     const errors = (await collector.getErrors()).filter((e) => !collector.isHidden(e.procedure))

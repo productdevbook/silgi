@@ -26,6 +26,14 @@ import { routerCache } from './core/router-utils.ts'
 import type { CompiledRouterFn } from './compile.ts'
 import type { RouterDef } from './types.ts'
 
+/**
+ * Never-aborting signal used when `timeout: null` is opted into and the
+ * caller passes no per-call signal. Allocated once at module load; compiled
+ * handlers can still `.addEventListener('abort', …)` safely — the listener
+ * simply never fires.
+ */
+const NEVER = new AbortController().signal
+
 export interface CreateCallerOptions {
   /** Override or extend the base context for all calls */
   contextOverride?: Record<string, unknown>
@@ -119,11 +127,14 @@ export function createCaller(
           const ctx = await resolveContext(callOptions?.context)
           if (match.params) ctx.params = match.params
 
-          const signal =
-            callOptions?.signal ?? (defaultTimeout !== null ? AbortSignal.timeout(defaultTimeout) : undefined)
+          // Compiled handlers may read `signal.aborted` / `.addEventListener`.
+          // When `timeout: null` is opted into and no per-call signal is
+          // supplied, we still hand over a real (never-aborting) signal
+          // instead of `undefined` to avoid NPEs deep inside wraps/resolvers.
+          const signal = callOptions?.signal ?? (defaultTimeout !== null ? AbortSignal.timeout(defaultTimeout) : NEVER)
 
           try {
-            const result = match.data.handler(ctx, input, signal as AbortSignal)
+            const result = match.data.handler(ctx, input, signal)
             return result instanceof Promise ? await result : result
           } finally {
             releaseContext(ctx)

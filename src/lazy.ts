@@ -83,11 +83,19 @@ export async function resolveLazy(value: LazyRouter): Promise<RouterDef | Proced
 
   let pending = loading.get(value)
   if (!pending) {
-    pending = value.load().then((mod) => {
-      resolved.set(value, mod.default)
-      loading.delete(value)
-      return mod.default
-    })
+    pending = value.load().then(
+      (mod) => {
+        resolved.set(value, mod.default)
+        loading.delete(value)
+        return mod.default
+      },
+      (err) => {
+        // Transient import errors must not wedge the router forever.
+        // Clear the in-flight slot so the next caller can retry.
+        loading.delete(value)
+        throw err
+      },
+    )
     loading.set(value, pending)
   }
   return pending

@@ -28,13 +28,15 @@ import type { WrapDef } from './types.ts'
 /**
  * Create a wrap that transforms the procedure input before execution.
  *
- * The mapper function receives the raw input and returns the transformed input.
- * The mapped input is set on the context as `__mappedInput` and picked up
- * by the pipeline.
+ * @remarks
+ * The mapper receives the raw input and returns the transformed input.
+ * Internally this wrap replaces the value in the pipeline's `RAW_INPUT`
+ * symbol slot on `ctx`; the resolver reads the same slot to get the
+ * rewritten input. Users never interact with the slot directly — it's
+ * framework-internal (see `src/core/ctx-symbols.ts`).
  *
- * Note: Since Silgi's pipeline receives input as a separate argument
- * (not on ctx), mapInput works as a wrap that intercepts and transforms
- * before calling next().
+ * Must run inside the wrap onion (not as a guard) so it can observe and
+ * mutate the already-parsed input after schema validation.
  */
 export function mapInput<TIn = unknown, TOut = unknown>(mapper: (input: TIn) => TOut | Promise<TOut>): WrapDef {
   return {

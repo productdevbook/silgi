@@ -130,4 +130,10 @@ describe('handler() — basePath option', () => {
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ status: 'ok' })
   })
+
+  it('does not match prefix as a substring — /api2/... returns 404', async () => {
+    // Boundary check: `/api2/health` must not silently route to `/health`.
+    const res = await handle(new Request('http://localhost/api2/health', { method: 'POST' }))
+    expect(res.status).toBe(404)
+  })
 })

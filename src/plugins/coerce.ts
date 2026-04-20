@@ -5,17 +5,33 @@
  * query parameters. This wrap coerces common types automatically:
  * "123" → 123, "true" → true, "null" → null, etc.
  *
+ * @remarks
+ * **Ordering caveat.** The pipeline validates `$input` schemas *before*
+ * running the wrap onion. That means a plain `z.number()` rejects "123"
+ * before this wrap can see it. You have three options:
+ *
+ * 1. **Use Zod's own coercion** — `z.coerce.number()`, `z.coerce.boolean()`.
+ *    Zero extra wrap, works for simple cases.
+ * 2. **Skip the input schema and validate inside the resolver** — pairs
+ *    naturally with `coerceGuard` because the wrap always runs first.
+ * 3. **Use a string-accepting schema and coerce with `.transform()`** —
+ *    e.g. `z.object({ id: z.string().transform(Number) })`. Again no
+ *    wrap needed.
+ *
+ * `coerceGuard` itself is useful when you have NO input schema but still
+ * want `"42"` / `"true"` / `"null"` normalised before your resolver runs.
+ *
  * @example
  * ```ts
- * import { coerceGuard } from "silgi/plugins"
- *
+ * // Works: no schema → wrap can reshape freely.
  * const getUser = k
  *   .$use(coerceGuard)
- *   .$input(z.object({ id: z.number(), active: z.boolean().optional() }))
- *   .$resolve(({ input }) => db.users.find(input.id))
+ *   .$resolve(({ input }) => db.users.find((input as any).id))
  *
- * // GET /users/get?data={"id":"42","active":"true"}
- * // → input is coerced to { id: 42, active: true }
+ * // Works: schema uses z.coerce.
+ * const getUser2 = k
+ *   .$input(z.object({ id: z.coerce.number() }))
+ *   .$resolve(({ input }) => db.users.find(input.id))
  * ```
  */
 
@@ -35,8 +51,9 @@ import type { WrapDef } from '../types.ts'
  * - "" → undefined (empty strings become undefined)
  * - Everything else → kept as-is
  *
- * Implemented as a wrap (not a guard) so it runs after __rawInput is populated
- * by the pipeline compiler.
+ * Implemented as a wrap so it runs after the pipeline has populated the
+ * `RAW_INPUT` slot on ctx — see the caveat in the top-level docstring
+ * about ordering vs. input schema validation.
  */
 export const coerceGuard: WrapDef<Record<string, unknown>> = {
   kind: 'wrap',

@@ -816,4 +816,35 @@ describe('hidden paths API', () => {
 
     await c.dispose()
   })
+
+  it('returns 400 (not an uncaught 500) for malformed JSON body', async () => {
+    const c = new AnalyticsCollector({ flushInterval: 999_999 })
+    const req = new Request('http://localhost/api/analytics/hidden', {
+      method: 'POST',
+      body: '{not json',
+      headers: { 'content-type': 'application/json' },
+    })
+    const res = await serveAnalyticsRoute('api/analytics/hidden', req, c, undefined)
+    expect(res.status).toBe(400)
+    await c.dispose()
+  })
+
+  it('returns 400 for empty body', async () => {
+    const c = new AnalyticsCollector({ flushInterval: 999_999 })
+    const req = new Request('http://localhost/api/analytics/hidden', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+    })
+    const res = await serveAnalyticsRoute('api/analytics/hidden', req, c, undefined)
+    expect(res.status).toBe(400)
+    await c.dispose()
+  })
+
+  it('returns 405 for unsupported method on /hidden', async () => {
+    const c = new AnalyticsCollector({ flushInterval: 999_999 })
+    const req = new Request('http://localhost/api/analytics/hidden', { method: 'PUT' })
+    const res = await serveAnalyticsRoute('api/analytics/hidden', req, c, undefined)
+    expect(res.status).toBe(405)
+    await c.dispose()
+  })
 })
