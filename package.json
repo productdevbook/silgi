@@ -41,9 +41,7 @@
     "lib"
   ],
   "type": "module",
-  "sideEffects": [
-    "./dist/integrations/zod/index.mjs"
-  ],
+  "sideEffects": false,
   "exports": {
     ".": {
       "import": "./dist/index.mjs",
