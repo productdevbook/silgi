@@ -117,16 +117,20 @@ export function withRetry<TClientContext extends ClientContext>(
           onRetry?.({ attempt: attempt + 1, delay, error, path })
 
           await new Promise<void>((resolve, reject) => {
-            const timer = setTimeout(resolve, delay)
-            // Cancel wait if signal aborts during delay
-            callOptions.signal?.addEventListener(
-              'abort',
-              () => {
-                clearTimeout(timer)
-                reject(callOptions.signal!.reason)
-              },
-              { once: true },
-            )
+            const signal = callOptions.signal
+            const onAbort = (): void => {
+              clearTimeout(timer)
+              reject(signal!.reason)
+            }
+            const timer = setTimeout(() => {
+              signal?.removeEventListener('abort', onAbort)
+              resolve()
+            }, delay)
+            // Cancel wait if signal aborts during delay. Explicit
+            // `removeEventListener` on the timer path prevents an accumulated
+            // listener set on long-lived signals (e.g. page AbortControllers
+            // spanning many retries).
+            signal?.addEventListener('abort', onAbort, { once: true })
           })
         }
       }
