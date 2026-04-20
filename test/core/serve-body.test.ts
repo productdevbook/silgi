@@ -31,6 +31,31 @@ describe('handler() — body parsing safety', () => {
     expect(res.status).toBeLessThan(600)
   })
 
+  it('does not match ?userdata= as the data= parameter', async () => {
+    // Regression: old impl used indexOf('data=') which matched any key
+    // ending in "data". The resolver would then parse `"oops"` as input.
+    // Proper impl sees no `data=` parameter at a key boundary → input
+    // stays undefined.
+    const k2 = silgi({ context: () => ({}) })
+    const r = k2.router({ echo2: k2.$resolve(({ input }) => ({ got: input ?? 'no-input' })) })
+    const h = k2.handler(r)
+    const res = await h(new Request('http://localhost/echo2?userdata=%22oops%22', { method: 'POST' }))
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { got: unknown }
+    expect(body.got).toBe('no-input')
+  })
+
+  it('correctly parses data= when preceded by other params', async () => {
+    const k2 = silgi({ context: () => ({}) })
+    const r = k2.router({ echo3: k2.$resolve(({ input }) => ({ got: input })) })
+    const h = k2.handler(r)
+    const encoded = encodeURIComponent(JSON.stringify({ n: 42 }))
+    const res = await h(new Request(`http://localhost/echo3?other=x&data=${encoded}`))
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { got: unknown }
+    expect(body.got).toEqual({ n: 42 })
+  })
+
   it('handles UTF-8 multibyte response correctly', async () => {
     const k2 = silgi({ context: () => ({}) })
     const r = k2.router({
