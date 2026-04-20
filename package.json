@@ -1,6 +1,6 @@
 {
   "name": "silgi",
-  "version": "0.52.2",
+  "version": "0.53.0",
   "private": false,
   "description": "The fastest end-to-end type-safe RPC framework for TypeScript — compiled pipelines, single package, every runtime",
   "keywords": [
