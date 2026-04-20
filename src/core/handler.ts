@@ -140,27 +140,39 @@ export function wrapHandler(
 ): FetchHandler {
   if (!options?.scalar && !options?.analytics) return handler
 
-  let wrapped: FetchHandler | undefined
+  // Initialised to `handler` so a failed init falls back to the raw handler
+  // rather than wedging every request on `wrapped!` being undefined.
+  let wrapped: FetchHandler = handler
+  let initDone = false
   let initPromise: Promise<void> | undefined
 
   async function init(): Promise<void> {
-    let h = handler
-    if (options!.scalar) {
-      const { wrapWithScalar } = await import('../scalar.ts')
-      const scalarOpts = typeof options!.scalar === 'object' ? options!.scalar : {}
-      h = wrapWithScalar(h, router, scalarOpts, prefix, options!.schemaRegistry)
+    try {
+      let h = handler
+      if (options!.scalar) {
+        const { wrapWithScalar } = await import('../scalar.ts')
+        const scalarOpts = typeof options!.scalar === 'object' ? options!.scalar : {}
+        h = wrapWithScalar(h, router, scalarOpts, prefix, options!.schemaRegistry)
+      }
+      if (options!.analytics) {
+        const { wrapWithAnalytics } = await import('../plugins/analytics.ts')
+        h = wrapWithAnalytics(h, router, options!.analytics, options!.schemaRegistry, options!.hooks)
+      }
+      wrapped = h
+    } catch (err) {
+      // Log once and keep serving with the raw handler. Otherwise a
+      // transient import failure at boot would 500 every request.
+      console.error('[silgi] Failed to initialise scalar/analytics wrapper:', err)
+      wrapped = handler
+    } finally {
+      initDone = true
     }
-    if (options!.analytics) {
-      const { wrapWithAnalytics } = await import('../plugins/analytics.ts')
-      h = wrapWithAnalytics(h, router, options!.analytics, options!.schemaRegistry, options!.hooks)
-    }
-    wrapped = h
   }
 
   return (request: Request): Response | Promise<Response> => {
-    if (wrapped) return wrapped(request)
+    if (initDone) return wrapped(request)
     initPromise ??= init()
-    return initPromise.then(() => wrapped!(request))
+    return initPromise.then(() => wrapped(request))
   }
 }
 
@@ -208,9 +220,12 @@ export function createFetchHandler(
     const url = request.url
     let fullPath = parseUrlPath(url)
 
-    // Strip basePath prefix — zero allocation, pure string slice
+    // Strip basePath prefix — zero allocation, pure string slice. Require
+    // a segment boundary so `prefix='/api'` never matches `/api2/...`.
     if (prefix) {
-      if (!fullPath.startsWith(prefix)) return new Response(notFoundBody, { status: 404, headers: jsonHeaders })
+      if (fullPath !== prefix && !fullPath.startsWith(prefix + '/')) {
+        return new Response(notFoundBody, { status: 404, headers: jsonHeaders })
+      }
       fullPath = fullPath.slice(prefixLen) || '/'
     }
 

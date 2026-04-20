@@ -57,4 +57,22 @@ describe('createHandler()', () => {
     expect(result.statusCode).toBe(200)
     expect(JSON.parse(result.body)).toEqual({ ok: true })
   })
+
+  it('does not strip prefix that only matches as substring', async () => {
+    // `/api2/health` must NOT be treated as `/health` when prefix is `/api`.
+    // The previous impl used `startsWith(prefix)` without a segment boundary
+    // check and silently routed the wrong path.
+    const router = k.router({ health: k.$resolve(() => ({ ok: true })) })
+    const handler = createHandler(router, { prefix: '/api', context: () => ({}) })
+
+    const result = await handler({
+      httpMethod: 'POST',
+      path: '/api2/health',
+      body: null,
+      headers: {},
+      queryStringParameters: null,
+    })
+
+    expect(result.statusCode).toBe(404)
+  })
 })

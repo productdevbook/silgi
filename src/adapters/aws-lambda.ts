@@ -70,7 +70,10 @@ export function createHandler<TCtx extends Record<string, unknown>>(
     const method = isV2 ? (event.requestContext?.http?.method ?? 'GET') : (event.httpMethod ?? 'GET')
     let pathname = isV2 ? (event.rawPath ?? '/') : (event.path ?? '/')
 
-    if (prefix && pathname.startsWith(prefix)) {
+    // Only strip the prefix on a path-segment boundary. Without the boundary
+    // check, `prefix='/api'` would match `/api2/...` and silently route the
+    // wrong request.
+    if (prefix && (pathname === prefix || pathname.startsWith(prefix + '/'))) {
       pathname = pathname.slice(prefix.length)
     }
     if (pathname.startsWith('/')) pathname = pathname.slice(1)
