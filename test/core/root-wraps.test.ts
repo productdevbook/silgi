@@ -77,6 +77,95 @@ describe('silgi({ wraps })', () => {
     expect(order).toEqual(['root:before', 'route:before', 'resolve', 'route:after', 'root:after'])
   })
 
+  it('root wraps wrap route-level guards too (issue #14)', async () => {
+    // A root wrap must sit *outside* guards — that is the contract
+    // documented on `SilgiConfig.wraps`. AsyncLocalStorage-based
+    // tenant scoping relies on it: a guard calling into an als store
+    // set up by the root wrap would otherwise read `undefined`.
+    const order: string[] = []
+    const probe = silgi({ context: () => ({}) })
+
+    const rootWrap = probe.wrap(async (_ctx, next) => {
+      order.push('root:before')
+      const out = await next()
+      order.push('root:after')
+      return out
+    })
+
+    const g = probe.guard(() => {
+      order.push('guard')
+      return {}
+    })
+
+    const s = silgi({
+      context: () => ({}),
+      wraps: [rootWrap],
+    })
+
+    const r = s.router({
+      hello: s.$use(g).$resolve(() => {
+        order.push('resolve')
+        return 'ok'
+      }),
+    })
+
+    await s.createCaller(r).hello()
+    expect(order).toEqual(['root:before', 'guard', 'resolve', 'root:after'])
+  })
+
+  it('AsyncLocalStorage set by a root wrap is visible inside guards (issue #14)', async () => {
+    // The real-world repro from issue #14: a root wrap installs an
+    // ALS scope and a guard reads from it. Before the fix, the guard
+    // ran before the wrap and saw `undefined`.
+    const { AsyncLocalStorage } = await import('node:async_hooks')
+    const store = new AsyncLocalStorage<{ org: string }>()
+    const probe = silgi({ context: () => ({}) })
+
+    const rootWrap = probe.wrap((_ctx, next) => store.run({ org: 'org-123' }, () => next()))
+    const scopedGuard = probe.guard(() => ({ scopeInGuard: store.getStore() }))
+
+    const s = silgi({
+      context: () => ({}),
+      wraps: [rootWrap],
+    })
+
+    let scopeInResolve: unknown
+    const r = s.router({
+      hello: s.$use(scopedGuard).$resolve(({ ctx }) => {
+        scopeInResolve = store.getStore()
+        return (ctx as { scopeInGuard?: unknown }).scopeInGuard
+      }),
+    })
+
+    const scopeSeenByGuard = await s.createCaller(r).hello()
+    expect(scopeSeenByGuard).toEqual({ org: 'org-123' })
+    expect(scopeInResolve).toEqual({ org: 'org-123' })
+  })
+
+  it('sync throw inside a root wrap surfaces as a rejected Promise', async () => {
+    // The outer onion wraps each root-wrap call in `Promise.resolve(...)`
+    // so sync throws cross the async boundary cleanly. A future refactor
+    // that drops the `Promise.resolve` — plausible during a perf pass —
+    // would silently break this invariant. Pinning the behaviour here
+    // means a regression fails at this file instead of deep inside a
+    // downstream caller's catch.
+    const probe = silgi({ context: () => ({}) })
+    const boom = probe.wrap(() => {
+      throw new Error('sync-throw')
+    })
+
+    const s = silgi({
+      context: () => ({}),
+      wraps: [boom],
+    })
+
+    const r = s.router({
+      hello: s.$resolve(() => 'never'),
+    })
+
+    await expect(s.createCaller(r).hello()).rejects.toThrow('sync-throw')
+  })
+
   it('multiple root wraps run in declared order (first = outermost)', async () => {
     const order: string[] = []
     const probe = silgi({ context: () => ({}) })
