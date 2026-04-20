@@ -142,6 +142,30 @@ describe('silgi({ wraps })', () => {
     expect(scopeInResolve).toEqual({ org: 'org-123' })
   })
 
+  it('sync throw inside a root wrap surfaces as a rejected Promise', async () => {
+    // The outer onion wraps each root-wrap call in `Promise.resolve(...)`
+    // so sync throws cross the async boundary cleanly. A future refactor
+    // that drops the `Promise.resolve` — plausible during a perf pass —
+    // would silently break this invariant. Pinning the behaviour here
+    // means a regression fails at this file instead of deep inside a
+    // downstream caller's catch.
+    const probe = silgi({ context: () => ({}) })
+    const boom = probe.wrap(() => {
+      throw new Error('sync-throw')
+    })
+
+    const s = silgi({
+      context: () => ({}),
+      wraps: [boom],
+    })
+
+    const r = s.router({
+      hello: s.$resolve(() => 'never'),
+    })
+
+    await expect(s.createCaller(r).hello()).rejects.toThrow('sync-throw')
+  })
+
   it('multiple root wraps run in declared order (first = outermost)', async () => {
     const order: string[] = []
     const probe = silgi({ context: () => ({}) })
