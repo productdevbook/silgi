@@ -6,8 +6,6 @@
 let _msgpack: typeof import('../codec/msgpack.ts') | undefined
 let _devalue: typeof import('../codec/devalue.ts') | undefined
 
-const isBun = typeof globalThis.Bun !== 'undefined'
-
 import { SilgiError } from './error.ts'
 
 /** Max allowed size for GET ?data= parameter (bytes). Prevents JSON bomb via URL. */
@@ -48,14 +46,18 @@ export async function parseInput(request: Request, url: string, qMark: number): 
     }
   }
 
-  // JSON body
-  if (isBun) {
-    try {
-      return await request.json()
-    } catch {
-      return undefined
-    }
-  }
+  // JSON body — same semantics across runtimes:
+  //   empty body → undefined (input schema sees `undefined` / default)
+  //   non-empty malformed body → throw BAD_REQUEST
+  //
+  // Bun's `request.json()` is a fast path but throws a generic SyntaxError
+  // on BOTH empty and malformed bodies, so we can't blanket-swallow. Read
+  // text first to distinguish the two cases — Bun's text() is also fast.
   const text = await request.text()
-  return text ? JSON.parse(text) : undefined
+  if (!text) return undefined
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new SilgiError('BAD_REQUEST', { message: 'Malformed JSON body' })
+  }
 }

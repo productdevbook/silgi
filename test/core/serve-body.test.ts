@@ -18,9 +18,11 @@ describe('handler() — body parsing safety', () => {
         body: '{broken json',
       }),
     )
-    // Should not crash — should return an error response
-    expect(res.status).toBeGreaterThanOrEqual(400)
-    expect(res.status).toBeLessThan(600)
+    // Must be a 400 — same semantics across Node, Bun, Deno. A silent
+    // undefined would let malformed payloads reach resolvers.
+    expect(res.status).toBe(400)
+    const body = (await res.json()) as { code: string }
+    expect(body.code).toBe('BAD_REQUEST')
   })
 
   it('returns 400 for malformed GET ?data= JSON', async () => {
