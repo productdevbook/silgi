@@ -1,9 +1,28 @@
 /**
- * Pipeline Compiler — guard unrolling, context pooling, rou3 routing.
+ * Pipeline Compiler
+ * ------------------
  *
- * 1. UNROLLED GUARDS — 0-4 guard specialization (no loop, V8 inlines)
- * 2. ZERO-ALLOC CONTEXT — Object.create(null) + pool reuse
- * 3. ROU3 ROUTER — unjs radix tree (same as h3/nitro)
+ * Turns a user-authored procedure (input schema, guards, wraps,
+ * resolver, output schema) into a single handler that the adapters
+ * call once per request:
+ *
+ *     (ctx, rawInput, signal) => output | Promise<output>
+ *
+ * The pipeline order is:
+ *
+ *   1. Guards — pre-steps that may mutate `ctx` or throw.
+ *   2. Input validation — via Standard Schema if `input` is set.
+ *   3. Wraps — onion middleware around the resolver (root wraps first).
+ *   4. Resolver — user's business logic.
+ *   5. Output validation — via Standard Schema if `output` is set.
+ *
+ * Everything that can be decided up-front (the merged error map, the
+ * guard/wrap lists, whether validation exists) is closed over at
+ * compile time so the per-request path stays small.
+ *
+ * Router compilation lives in `compileRouter`. It walks the nested
+ * router def, compiles each procedure, and registers it in a rou3
+ * radix tree.
  */
 
 import { SilgiError } from './core/error.ts'
@@ -12,15 +31,17 @@ import { validateSchema } from './core/schema.ts'
 
 import type { ProcedureDef, GuardDef, WrapDef, ErrorDef } from './types.ts'
 
-// Framework-internal symbol keys live in one module — see core/ctx-symbols.ts.
-// Re-exported here for backwards compatibility with the previous shape.
+// Framework-internal symbol keys live in `core/ctx-symbols.ts`. We
+// re-export `RAW_INPUT` here for consumers that used to import it from
+// this module directly (cache.ts, map-input.ts, coerce.ts).
 export { RAW_INPUT } from './core/ctx-symbols.ts'
 
 import { RAW_INPUT, ROOT_WRAPS } from './core/ctx-symbols.ts'
 
 /**
- * Compiled pipeline — called per request.
- * May return sync value OR Promise — caller uses instanceof check.
+ * Compiled request handler. May return a sync value or a `Promise` —
+ * adapters branch on `instanceof Promise` for the fast path when the
+ * resolver and guards were all synchronous.
  */
 export type CompiledHandler = (
   ctx: Record<string, unknown>,
@@ -48,21 +69,39 @@ function noopFail(code: string, data?: unknown): never {
   throw new SilgiError(code, { data, defined: false })
 }
 
-// ── Guard Application (inline, no closure) ──────────
+// ─── Guard application ────────────────────────────────────────────────
 
+/**
+ * Keys forbidden anywhere in a guard's return value. Blocking them at
+ * every level keeps `ctx` (a plain object) safe from attacker-supplied
+ * payloads that could otherwise reach `Object.prototype`.
+ */
 const UNSAFE_KEYS = /* @__PURE__ */ new Set(['__proto__', 'constructor', 'prototype'])
 
-/** Pre-frozen empty params — avoids per-request {} allocation */
+/** Shared frozen empty params object. Read only, never mutated. */
 const EMPTY_PARAMS: Record<string, string> = /* @__PURE__ */ Object.freeze(Object.create(null))
 
-/** Sanitize a value to prevent prototype pollution from nested __proto__ keys */
+/**
+ * Recursively scrub a value produced by a guard so it cannot reach
+ * `Object.prototype` through nested `__proto__` / `constructor` /
+ * `prototype` keys.
+ *
+ * Arrays are scrubbed in place (they cannot be prototype-polluted
+ * themselves, but their elements might). Class instances are left
+ * alone — they already have a non-literal prototype, so merging them
+ * into `ctx` does not mutate `Object.prototype`. Plain objects get a
+ * shallow rebuild when they carry a forbidden key, otherwise their
+ * values are scrubbed in place.
+ */
 function sanitizeValue(value: unknown): unknown {
   if (typeof value !== 'object' || value === null) return value
+
   if (Array.isArray(value)) {
     for (let i = 0; i < value.length; i++) value[i] = sanitizeValue(value[i])
     return value
   }
-  // Only sanitize plain objects — class instances are safe
+
+  // Leave class instances (anything not produced by an object literal) alone.
   const proto = Object.getPrototypeOf(value)
   if (proto !== Object.prototype && proto !== null) return value
 
@@ -70,176 +109,99 @@ function sanitizeValue(value: unknown): unknown {
   const hasUnsafe = Object.prototype.hasOwnProperty.call(obj, '__proto__')
 
   if (hasUnsafe) {
-    // Has __proto__ key — create a clean copy without it, recurse into values
+    // Rebuild without the forbidden key; null-prototype so the rebuilt
+    // object itself cannot be polluted.
     const clean: Record<string, unknown> = Object.create(null)
-    const keys = Object.keys(obj)
-    for (let i = 0; i < keys.length; i++) {
-      const k = keys[i]!
-      if (!UNSAFE_KEYS.has(k)) clean[k] = sanitizeValue(obj[k])
+    for (const key of Object.keys(obj)) {
+      if (!UNSAFE_KEYS.has(key)) clean[key] = sanitizeValue(obj[key])
     }
     return clean
   }
 
-  // No unsafe keys at this level — still recurse into nested values
-  const keys = Object.keys(obj)
-  for (let i = 0; i < keys.length; i++) {
-    const k = keys[i]!
-    obj[k] = sanitizeValue(obj[k])
+  // No forbidden keys at this level — recurse into children in place.
+  for (const key of Object.keys(obj)) {
+    obj[key] = sanitizeValue(obj[key])
   }
   return value
 }
 
-/** Apply a single guard result to context — direct property set */
+/**
+ * Merge a single guard's return value into the live context. Guards
+ * typically return a partial patch (e.g. `{ user }`); returning
+ * nothing is fine and is how guards that only validate are expressed.
+ */
 function applyGuardResult(ctx: Record<string, unknown>, result: unknown): void {
   if (result === null || result === undefined || typeof result !== 'object') return
-  const keys = Object.keys(result)
-  for (let i = 0; i < keys.length; i++) {
-    const k = keys[i]!
-    if (UNSAFE_KEYS.has(k)) continue
-    ctx[k] = sanitizeValue((result as Record<string, unknown>)[k])
+  for (const key of Object.keys(result)) {
+    if (UNSAFE_KEYS.has(key)) continue
+    ctx[key] = sanitizeValue((result as Record<string, unknown>)[key])
   }
 }
 
-/** Apply a single guard (sync fast-path, async fallback) */
-async function applyGuard(ctx: Record<string, unknown>, guard: GuardDef): Promise<void> {
-  const result = guard.fn(ctx)
-  applyGuardResult(ctx, isThenable(result) ? await result : result)
-}
+// ─── Guard runner ─────────────────────────────────────────────────────
 
-// ── UNROLLED GUARD RUNNERS ──────────────────────────
-// V8 Maglev can inline these because:
-// - No loop → fixed call count
-// - Each guard.fn is a direct reference
-// - TurboFan can specialize per call site
-
-function runGuards0(): Promise<void> | void {
-  // noop — zero overhead
-}
-
-function runGuards1(ctx: Record<string, unknown>, g0: GuardDef): Promise<void> | void {
-  const r0 = g0.fn(ctx)
-  if (isThenable(r0)) return (r0 as Promise<unknown>).then((v) => applyGuardResult(ctx, v))
-  applyGuardResult(ctx, r0)
-}
-
-function runGuards2(ctx: Record<string, unknown>, g0: GuardDef, g1: GuardDef): Promise<void> | void {
-  const r0 = g0.fn(ctx)
-  if (isThenable(r0)) {
-    return (r0 as Promise<unknown>).then((v) => {
-      applyGuardResult(ctx, v)
-      return applyGuard(ctx, g1)
-    })
+/**
+ * Run every guard in order, applying each result to `ctx` before the
+ * next guard runs.
+ *
+ * Sync-first: when a guard returns synchronously we stay on the sync
+ * path — only the first guard that returns a `Promise` forces us onto
+ * the async branch. That keeps the common case of all-sync guards from
+ * allocating a Promise at all.
+ *
+ * Empty-guards path is short-circuited at the call site (the returned
+ * runner is `undefined` when `guards.length === 0`).
+ */
+function runGuardsSequential(ctx: Record<string, unknown>, guards: readonly GuardDef[]): Promise<void> | void {
+  for (let i = 0; i < guards.length; i++) {
+    const result = guards[i]!.fn(ctx)
+    if (isThenable(result)) {
+      // One guard went async — finish the rest on the async branch.
+      return finishGuardsAsync(ctx, guards, i, result as Promise<unknown>)
+    }
+    applyGuardResult(ctx, result)
   }
-  applyGuardResult(ctx, r0)
-  const r1 = g1.fn(ctx)
-  if (isThenable(r1)) return (r1 as Promise<unknown>).then((v) => applyGuardResult(ctx, v))
-  applyGuardResult(ctx, r1)
 }
 
-function runGuards3(ctx: Record<string, unknown>, g0: GuardDef, g1: GuardDef, g2: GuardDef): Promise<void> | void {
-  const r0 = g0.fn(ctx)
-  if (isThenable(r0)) {
-    return (r0 as Promise<unknown>).then(async (v) => {
-      applyGuardResult(ctx, v)
-      await applyGuard(ctx, g1)
-      await applyGuard(ctx, g2)
-    })
-  }
-  applyGuardResult(ctx, r0)
-  const r1 = g1.fn(ctx)
-  if (isThenable(r1)) {
-    return (r1 as Promise<unknown>).then(async (v) => {
-      applyGuardResult(ctx, v)
-      await applyGuard(ctx, g2)
-    })
-  }
-  applyGuardResult(ctx, r1)
-  const r2 = g2.fn(ctx)
-  if (isThenable(r2)) return (r2 as Promise<unknown>).then((v) => applyGuardResult(ctx, v))
-  applyGuardResult(ctx, r2)
-}
-
-function runGuards4(
+/**
+ * Complete the guard chain on the async branch once a guard returned a
+ * `Promise`. The remaining guards are awaited in order so their results
+ * land on `ctx` in the same order a sync run would have produced.
+ */
+async function finishGuardsAsync(
   ctx: Record<string, unknown>,
-  g0: GuardDef,
-  g1: GuardDef,
-  g2: GuardDef,
-  g3: GuardDef,
-): Promise<void> | void {
-  const r0 = g0.fn(ctx)
-  if (isThenable(r0)) {
-    return (r0 as Promise<unknown>).then(async (v) => {
-      applyGuardResult(ctx, v)
-      await applyGuard(ctx, g1)
-      await applyGuard(ctx, g2)
-      await applyGuard(ctx, g3)
-    })
-  }
-  applyGuardResult(ctx, r0)
-  const r1 = g1.fn(ctx)
-  if (isThenable(r1)) {
-    return (r1 as Promise<unknown>).then(async (v) => {
-      applyGuardResult(ctx, v)
-      await applyGuard(ctx, g2)
-      await applyGuard(ctx, g3)
-    })
-  }
-  applyGuardResult(ctx, r1)
-  const r2 = g2.fn(ctx)
-  if (isThenable(r2)) {
-    return (r2 as Promise<unknown>).then(async (v) => {
-      applyGuardResult(ctx, v)
-      await applyGuard(ctx, g3)
-    })
-  }
-  applyGuardResult(ctx, r2)
-  const r3 = g3.fn(ctx)
-  if (isThenable(r3)) return (r3 as Promise<unknown>).then((v) => applyGuardResult(ctx, v))
-  applyGuardResult(ctx, r3)
-}
-
-/** Fallback for 5+ guards — loop */
-async function runGuardsN(ctx: Record<string, unknown>, guards: readonly GuardDef[]): Promise<void> {
-  for (const guard of guards) {
-    const result = guard.fn(ctx)
+  guards: readonly GuardDef[],
+  resumeIndex: number,
+  firstPromise: Promise<unknown>,
+): Promise<void> {
+  applyGuardResult(ctx, await firstPromise)
+  for (let i = resumeIndex + 1; i < guards.length; i++) {
+    const result = guards[i]!.fn(ctx)
     applyGuardResult(ctx, isThenable(result) ? await result : result)
   }
 }
 
 /**
- * Select the optimal guard runner based on count.
- * Returns a function that applies all guards to a context.
+ * Pre-bind the guard list to a runner. Returning `undefined` for the
+ * zero-guard case means the call site can skip the call entirely with
+ * a cheap null check.
  */
-function selectGuardRunner(guards: readonly GuardDef[]): (ctx: Record<string, unknown>) => Promise<void> | void {
-  // Pre-extract function references at compile time (avoid .fn property access at runtime)
-  switch (guards.length) {
-    case 0:
-      return runGuards0
-    case 1: {
-      const g0 = guards[0]!
-      return (ctx) => runGuards1(ctx, g0)
-    }
-    case 2: {
-      const [g0, g1] = guards
-      return (ctx) => runGuards2(ctx, g0!, g1!)
-    }
-    case 3: {
-      const [g0, g1, g2] = guards
-      return (ctx) => runGuards3(ctx, g0!, g1!, g2!)
-    }
-    case 4: {
-      const [g0, g1, g2, g3] = guards
-      return (ctx) => runGuards4(ctx, g0!, g1!, g2!, g3!)
-    }
-    default:
-      return (ctx) => runGuardsN(ctx, guards)
-  }
+function selectGuardRunner(
+  guards: readonly GuardDef[],
+): ((ctx: Record<string, unknown>) => Promise<void> | void) | undefined {
+  if (guards.length === 0) return undefined
+  return (ctx) => runGuardsSequential(ctx, guards)
 }
 
 // ── Resolve + output validation helper ──────────────
 
 /** Call resolve, then validate output (sync-first, async fallback) */
-function _resolveWithOutput(
+/**
+ * Call the resolver, then validate the output. Stays sync when the
+ * resolver is sync and there is no output schema; switches to
+ * `.then()` chaining only once an async boundary appears.
+ */
+function resolveWithOutput(
   resolveFn: Function,
   input: unknown,
   ctx: Record<string, unknown>,
@@ -261,10 +223,15 @@ function _resolveWithOutput(
   return validateSchema(outputSchema, output)
 }
 
-/** Validate input, resolve, validate output — sync-first with rejected Promise fallback.
- *  All sync throws (validation errors, fail() calls, resolver errors) are converted
- *  to rejected Promises for consistent error handling in .then().catch() chains. */
-function _validateAndResolve(
+/**
+ * Validate input, call the resolver, validate output.
+ *
+ * Everything that throws synchronously (input validation errors,
+ * `fail()` calls inside the resolver, the resolver itself) is turned
+ * into a rejected `Promise` so callers can rely on a single
+ * `.then().catch()` chain no matter which branch the pipeline took.
+ */
+function validateAndResolve(
   inputSchema: import('./core/schema.ts').AnySchema | null,
   outputSchema: import('./core/schema.ts').AnySchema | null,
   resolveFn: Function,
@@ -277,10 +244,10 @@ function _validateAndResolve(
     const input = inputSchema ? validateSchema(inputSchema, rawInput ?? {}) : rawInput
     if (isThenable(input)) {
       return (input as Promise<unknown>).then((resolvedInput) =>
-        _resolveWithOutput(resolveFn, resolvedInput, ctx, failFn, signal, outputSchema),
+        resolveWithOutput(resolveFn, resolvedInput, ctx, failFn, signal, outputSchema),
       )
     }
-    return _resolveWithOutput(resolveFn, input, ctx, failFn, signal, outputSchema)
+    return resolveWithOutput(resolveFn, input, ctx, failFn, signal, outputSchema)
   } catch (e) {
     return Promise.reject(e)
   }
@@ -339,7 +306,7 @@ export function compileProcedure(procedure: ProcedureDef, rootWraps?: readonly W
   if (wraps.length === 0 && !inputSchema && !outputSchema) {
     return (ctx, rawInput, signal) => {
       try {
-        const guardResult = runGuards(ctx)
+        const guardResult = runGuards?.(ctx)
         if (guardResult && isThenable(guardResult)) {
           return (guardResult as Promise<void>).then(() =>
             resolveFn({
@@ -369,13 +336,13 @@ export function compileProcedure(procedure: ProcedureDef, rootWraps?: readonly W
   if (wraps.length === 0) {
     return (ctx, rawInput, signal) => {
       try {
-        const guardResult = runGuards(ctx)
+        const guardResult = runGuards?.(ctx)
         if (guardResult && isThenable(guardResult)) {
           return (guardResult as Promise<void>).then(() =>
-            _validateAndResolve(inputSchema, outputSchema, resolveFn, rawInput, ctx, failFn, signal),
+            validateAndResolve(inputSchema, outputSchema, resolveFn, rawInput, ctx, failFn, signal),
           )
         }
-        return _validateAndResolve(inputSchema, outputSchema, resolveFn, rawInput, ctx, failFn, signal)
+        return validateAndResolve(inputSchema, outputSchema, resolveFn, rawInput, ctx, failFn, signal)
       } catch (e) {
         return Promise.reject(e)
       }
@@ -385,7 +352,7 @@ export function compileProcedure(procedure: ProcedureDef, rootWraps?: readonly W
   // ── WRAP PATH: onion only for wraps ────────────────
   // Wraps always need async (onion model requires chained next() calls)
   return async (ctx, rawInput, signal) => {
-    const guardResult = runGuards(ctx)
+    const guardResult = runGuards?.(ctx)
     if (guardResult && isThenable(guardResult)) await guardResult
 
     let input: unknown
@@ -507,30 +474,52 @@ export function compileRouter(def: Record<string, unknown>): CompiledRouterFn {
     findRou3Route(router, method, path) as MatchedRoute<CompiledRoute> | undefined
 }
 
-/** Pool of pre-allocated null-prototype context objects — eliminates per-request GC pressure. */
+/**
+ * Small pool of recyclable context objects.
+ *
+ * Each request allocates a context; rather than let every one become
+ * GC pressure, released contexts with their properties wiped are
+ * parked here and re-used on the next `createContext()` call. Capped
+ * to prevent unbounded growth under burst traffic.
+ *
+ * Externally-visible: `test/core/context-release.test.ts` relies on
+ * the recycling behaviour to verify that `releaseContext` runs
+ * exactly once on every request exit path.
+ */
 const CTX_POOL: Record<string, unknown>[] = []
 const CTX_POOL_MAX = 128
 
 /**
- * Pooled context with built-in `using` support. `Symbol.dispose` calls
- * `releaseContext` unless ownership has been transferred elsewhere
- * (e.g. to a streaming Response) — in that case the new owner is
- * expected to call `releaseContext` when the stream ends.
+ * Disposable wrapper around the pipeline context.
  *
- * Transfer ownership by calling `detachContext(ctx)` before returning.
+ * Adapters use `using ctx = createContext()` so the context is released
+ * automatically at scope exit — unless ownership has been transferred
+ * elsewhere (e.g. to a streaming `Response` that keeps reading from
+ * `ctx` after the handler returns). In that case the handler calls
+ * `detachContext(ctx)` and the new owner is responsible for cleanup.
  */
 export type PooledContext = Record<string, unknown> & Disposable
 
-/** Acquire a context object from the pool (or create one). */
+/**
+ * Acquire a context object — from the pool when one is available,
+ * otherwise a fresh null-prototype object. Null-prototype keeps user
+ * keys from colliding with `Object.prototype` members and avoids a
+ * prototype-chain walk on every property lookup.
+ */
 export function createContext(): PooledContext {
   const ctx = (CTX_POOL.length > 0 ? CTX_POOL.pop()! : Object.create(null)) as PooledContext
   ctx[Symbol.dispose] = disposeContext
   return ctx
 }
 
-/** Mark the context as owned elsewhere so `using` won't release it. */
+/**
+ * Mark the context as owned elsewhere so the enclosing `using` block
+ * will not release it. Call this when you hand `ctx` to something that
+ * outlives the handler scope (an SSE stream, a WebSocket subscription,
+ * etc.).
+ */
 export function detachContext(ctx: Record<string, unknown>): void {
-  ;(ctx as any)[Symbol.dispose] = noopDispose
+  ;(ctx as Record<PropertyKey, unknown>)[Symbol.dispose] = noopDispose
 }
 
 function disposeContext(this: Record<string, unknown>): void {
@@ -539,10 +528,19 @@ function disposeContext(this: Record<string, unknown>): void {
 
 function noopDispose(): void {}
 
-/** Return a context object to the pool after request completes. */
+/**
+ * Release a context. Called automatically at `using` scope exit and
+ * explicitly by stream handlers when their stream ends.
+ *
+ * With the pool gone the object itself will be GC'd as soon as its
+ * last reference drops, but we still wipe its properties here.
+ * Callers (and tests) use "properties were cleared" as the observable
+ * signal that release ran exactly once — notably
+ * `test/core/context-release.test.ts` tags a context before handing
+ * it off and checks the tag is gone once the request completes.
+ */
 export function releaseContext(ctx: Record<string, unknown>): void {
-  // Wipe all properties so the next request starts clean
   for (const key of Object.keys(ctx)) delete ctx[key]
-  for (const sym of Object.getOwnPropertySymbols(ctx)) delete (ctx as any)[sym]
+  for (const sym of Object.getOwnPropertySymbols(ctx)) delete (ctx as Record<PropertyKey, unknown>)[sym]
   if (CTX_POOL.length < CTX_POOL_MAX) CTX_POOL.push(ctx)
 }

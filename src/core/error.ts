@@ -197,7 +197,9 @@ export class SilgiError<TCode extends string = string, TData = unknown> extends 
    * @returns `true` if `instance` carries the Silgi error brand.
    */
   static override [Symbol.hasInstance](instance: unknown): boolean {
-    return typeof instance === 'object' && instance !== null && (instance as any)[BRAND] === true
+    return (
+      typeof instance === 'object' && instance !== null && (instance as Record<PropertyKey, unknown>)[BRAND] === true
+    )
   }
 }
 
@@ -237,7 +239,7 @@ Reflect.defineProperty(SilgiError.prototype, BRAND, {
  * @category Errors
  */
 export function isSilgiError(e: unknown): e is SilgiError {
-  return typeof e === 'object' && e !== null && (e as any)[BRAND] === true
+  return typeof e === 'object' && e !== null && (e as Record<PropertyKey, unknown>)[BRAND] === true
 }
 
 /**

@@ -1,34 +1,42 @@
 /**
- * Cache plugin — production-grade response caching powered by ocache.
+ * Response cache plugin
+ * -----------------------
  *
- * All ocache features exposed:
- * - TTL + Stale-While-Revalidate (SWR)
- * - Request deduplication (concurrent calls share one in-flight promise)
- * - Automatic integrity (redeploy invalidates stale cache)
- * - shouldBypassCache / shouldInvalidateCache callbacks
- * - Entry validation and transformation
- * - Multi-tier storage (read cascade, write to all)
- * - Pluggable storage via `setCacheStorage()` (default: in-memory)
- * - unstorage adapter for Redis, Cloudflare KV, S3, etc.
- * - Mutation-triggered invalidation
+ * Caches resolver output using `ocache` underneath. Drop the wrap on
+ * a query procedure and its return value is memoized, deduplicated,
+ * and (by default) served stale-while-revalidate.
+ *
+ * The storage backend is pluggable. If the parent silgi instance has
+ * a `'cache'` mount configured via `silgi({ storage })`, we wire ocache
+ * to that mount the first time `cacheQuery()` runs. Otherwise ocache
+ * falls back to its built-in in-memory map. Users who want a different
+ * backend without the silgi storage mount can call `setCacheStorage()`
+ * directly, or wrap an unstorage instance via `createUnstorageAdapter()`.
+ *
+ * Every ocache feature is exposed through the options:
+ *
+ *   TTL + stale-while-revalidate    — `maxAge`, `swr`, `staleMaxAge`
+ *   Request deduplication           — built-in, concurrent calls share
+ *                                     one in-flight promise
+ *   Integrity                       — redeploy invalidates stale cache
+ *                                     when the resolver's hash changes
+ *   Per-request bypass / invalidate — `shouldBypassCache`,
+ *                                     `shouldInvalidateCache`
+ *   Entry validation / transform    — `validate`, `transform`
+ *   Multi-tier storage              — read cascade, write to all
+ *   Manual invalidation             — `invalidateQueryCache(name)`
  *
  * @example
- * ```ts
- * import { cacheQuery, setCacheStorage } from 'silgi/cache'
+ *   import { cacheQuery, setCacheStorage, createUnstorageAdapter } from 'silgi/cache'
+ *   import { createStorage } from 'silgi/unstorage'
+ *   import redisDriver from 'unstorage/drivers/redis'
  *
- * // Basic: cache for 60 seconds with SWR
- * const listUsers = k
- *   .$use(cacheQuery({ maxAge: 60 }))
- *   .$resolve(({ ctx }) => ctx.db.users.findMany())
+ *   const listUsers = k
+ *     .$use(cacheQuery({ maxAge: 60 }))
+ *     .$resolve(({ ctx }) => ctx.db.users.findMany())
  *
- * // With unstorage backend (Redis)
- * import { createUnstorageAdapter } from 'silgi/cache'
- * import { createStorage } from 'silgi/unstorage'
- * import redisDriver from 'unstorage/drivers/redis'
- *
- * const storage = createStorage({ driver: redisDriver({ url: 'redis://localhost' }) })
- * setCacheStorage(createUnstorageAdapter(storage))
- * ```
+ *   const storage = createStorage({ driver: redisDriver({ url: 'redis://localhost' }) })
+ *   setCacheStorage(createUnstorageAdapter(storage))
  */
 
 import { defineCachedFunction, setStorage, useStorage as useOcacheStorage } from 'ocache'
@@ -40,149 +48,158 @@ import { useStorage } from '../core/storage.ts'
 import type { WrapDef } from '../types.ts'
 import type { CacheEntry, CacheOptions, StorageInterface } from 'ocache'
 
+// ─── Storage wiring ───────────────────────────────────────────────────
+
 /**
- * Auto-connect ocache to silgi's storage.
- * Called lazily on first cacheQuery() use.
+ * Minimal interface matching an unstorage `Storage`. We describe it
+ * locally so the cache plugin does not take a hard dependency on the
+ * unstorage package — users bring their own.
  */
-let _storageConnected = false
-function ensureStorageConnected(): void {
-  if (_storageConnected) return
-  _storageConnected = true
-  try {
-    // Connect ocache to silgi's storage under the 'cache' mount.
-    // Each op returns the underlying Promise so ocache can await writes
-    // and surface errors. The prior impl returned void, hiding storage
-    // failures entirely — a Redis/SET timeout silently looked like a
-    // successful cache write and the entry was never persisted.
-    const storage = useStorage('cache')
-    setStorage({
-      get: <T>(key: string) => storage.getItem(key) as Promise<T | null>,
-      set: <T>(key: string, value: T, opts?: { ttl?: number }) => {
-        if (value === null || value === undefined) {
-          return storage.removeItem(key) as unknown as Promise<void>
-        }
-        return storage.setItem(
-          key,
-          value as string,
-          opts?.ttl ? { ttl: opts.ttl } : undefined,
-        ) as unknown as Promise<void>
-      },
-    })
-  } catch {
-    // No silgi storage configured — ocache uses default in-memory
+export interface UnstorageCompatible {
+  getItem<T = unknown>(key: string): Promise<T | null> | T | null
+  setItem(key: string, value: unknown, opts?: { ttl?: number }): Promise<void> | void
+  removeItem(key: string): Promise<void> | void
+}
+
+/**
+ * Build an ocache `StorageInterface` from anything that quacks like
+ * an unstorage store. The plugin uses it twice — once internally to
+ * bridge silgi's configured storage mount, and once as a public helper
+ * for users who bring their own unstorage instance.
+ *
+ * Setting `value` to `null` / `undefined` intentionally triggers a
+ * delete so ocache's "mark as stale" signalling survives every
+ * backend uniformly.
+ */
+function adaptUnstorage(storage: UnstorageCompatible): StorageInterface {
+  return {
+    get: <T>(key: string) => storage.getItem<T>(key),
+    set: <T>(key: string, value: T, opts?: { ttl?: number }) => {
+      // Returning the underlying Promise (not `void`) is important: a
+      // silent storage failure (Redis SET timeout, quota exceeded)
+      // would otherwise look like a successful cache write and the
+      // entry would vanish on the next read.
+      if (value === null || value === undefined) {
+        return storage.removeItem(key) as unknown as Promise<void>
+      }
+      return storage.setItem(key, value, opts) as unknown as Promise<void>
+    },
   }
 }
 
-/** Registry of cached function keys for invalidation */
-const cacheKeyRegistry = new Map<string, Set<string>>()
-
-// ── Cache Query Wrap ────────────────────────────────
-
-export interface CacheQueryOptions<T = unknown> {
-  /** Cache TTL in seconds (default: 60) */
-  maxAge?: number
-  /** Enable stale-while-revalidate (default: true) */
-  swr?: boolean
-  /** Max seconds to serve stale while revalidating (default: maxAge) */
-  staleMaxAge?: number
-  /** Custom cache key generator from input */
-  getKey?: (input: unknown) => string
-  /** Cache key name prefix (default: procedure path, set automatically) */
-  name?: string
-  /**
-   * When returns `true`, skip cache entirely and call resolver directly.
-   * Useful for admin users or debug modes.
-   *
-   * @example
-   * ```ts
-   * cacheQuery({
-   *   shouldBypassCache: (input) => input?.noCache === true,
-   * })
-   * ```
-   */
-  shouldBypassCache?: (input: unknown) => boolean | Promise<boolean>
-  /**
-   * When returns `true`, invalidate cache for this key and re-resolve.
-   * The new result is cached normally.
-   *
-   * @example
-   * ```ts
-   * cacheQuery({
-   *   shouldInvalidateCache: (input) => input?.refresh === true,
-   * })
-   * ```
-   */
-  shouldInvalidateCache?: (input: unknown) => boolean | Promise<boolean>
-  /**
-   * Validate a cache entry before returning it.
-   * Return `false` to treat as cache miss and re-resolve.
-   *
-   * @example
-   * ```ts
-   * cacheQuery({
-   *   validate: (entry) => entry.value !== null && entry.value !== undefined,
-   * })
-   * ```
-   */
-  validate?: (entry: CacheEntry<T>) => boolean
-  /**
-   * Transform a cache entry before returning.
-   * Runs on both cache hits and fresh resolves.
-   *
-   * @example
-   * ```ts
-   * cacheQuery({
-   *   transform: (entry) => ({ ...entry.value, cachedAt: entry.mtime }),
-   * })
-   * ```
-   */
-  transform?: (entry: CacheEntry<T>) => T
-  /**
-   * Storage base prefix for cache keys.
-   * Defaults to `'/cache'`.
-   *
-   * @example
-   * ```ts
-   * cacheQuery({
-   *   base: '/my-app-cache',
-   * })
-   * ```
-   */
-  base?: string
-  /**
-   * Custom integrity value. Auto-generated from the resolver + options by default.
-   * When integrity changes (e.g. after redeploy), stale cache is invalidated.
-   */
-  integrity?: string
-  /** Error handler for cache read/write/SWR failures */
-  onError?: (error: unknown) => void
+/**
+ * Public helper for users who already have an unstorage instance.
+ *
+ * @example
+ *   const storage = createStorage({ driver: redisDriver({ ... }) })
+ *   setCacheStorage(createUnstorageAdapter(storage))
+ */
+export function createUnstorageAdapter(storage: UnstorageCompatible): StorageInterface {
+  return adaptUnstorage(storage)
 }
 
 /**
- * Wrap middleware that caches query results.
+ * Connect ocache to the silgi instance's `'cache'` storage mount, if
+ * one is configured. Idempotent — the first `cacheQuery()` call wins
+ * and every subsequent one is a cheap boolean check.
  *
- * Uses ocache under the hood: TTL, SWR, dedup, integrity, bypass, invalidation.
- * Default: 60s TTL, SWR enabled.
+ * When silgi has no storage mount the call is a silent no-op: ocache
+ * keeps its built-in in-memory backend, which is still correct (just
+ * not shared across processes).
+ */
+let storageConnected = false
+function ensureStorageConnected(): void {
+  if (storageConnected) return
+  storageConnected = true
+  try {
+    setStorage(adaptUnstorage(useStorage('cache')))
+  } catch {
+    // No silgi storage mount configured — ocache keeps its in-memory fallback.
+  }
+}
+
+// ─── Invalidation registry ────────────────────────────────────────────
+
+/**
+ * Per-procedure set of cache keys, keyed by the procedure's cache name.
+ * `invalidateQueryCache(name)` uses this to wipe every key that a given
+ * procedure has written to backing storage.
+ *
+ * Module-global by design: different silgi instances in the same
+ * process calling the same procedure name end up sharing the same
+ * ocache backend anyway, so a unified registry is correct.
+ */
+const cacheKeyRegistry = new Map<string, Set<string>>()
+
+// ─── Options ──────────────────────────────────────────────────────────
+
+export interface CacheQueryOptions<T = unknown> {
+  /** Cache TTL in seconds. @default 60 */
+  maxAge?: number
+  /** Enable stale-while-revalidate. @default true */
+  swr?: boolean
+  /** Max seconds to serve stale while revalidating. @default maxAge */
+  staleMaxAge?: number
+  /** Custom cache-key generator from the request input. */
+  getKey?: (input: unknown) => string
+  /** Human-readable cache name. Defaults to the procedure path. */
+  name?: string
+  /**
+   * Return `true` to skip cache entirely and call the resolver
+   * directly. Useful for admin users or debug modes.
+   */
+  shouldBypassCache?: (input: unknown) => boolean | Promise<boolean>
+  /**
+   * Return `true` to invalidate cache for this key and re-resolve.
+   * The new result is cached normally.
+   */
+  shouldInvalidateCache?: (input: unknown) => boolean | Promise<boolean>
+  /** Validate a cache entry before returning it. `false` = treat as miss. */
+  validate?: (entry: CacheEntry<T>) => boolean
+  /** Transform a cache entry before returning. Runs on both hits and fresh resolves. */
+  transform?: (entry: CacheEntry<T>) => T
+  /** Storage key prefix. @default '/cache' */
+  base?: string
+  /**
+   * Custom integrity value. Auto-generated from the resolver + options
+   * by default; when it changes (e.g. after a redeploy) stale cache is
+   * invalidated.
+   */
+  integrity?: string
+  /** Error handler for cache read / write / SWR failures. */
+  onError?: (error: unknown) => void
+}
+
+// ─── Cache wrap ───────────────────────────────────────────────────────
+
+/**
+ * Build the cache-key generator from user options. When the user
+ * passes `getKey`, we use it verbatim. Otherwise we hash the input
+ * with ohash, falling back to an empty string when there is no input
+ * (shared-cache-for-parameterless-queries is almost always what
+ * people want).
+ */
+function buildKeyFn(custom?: (input: unknown) => string): (input: unknown) => string {
+  if (custom) return custom
+  return (input) => (input !== undefined && input !== null ? hash(input) : '')
+}
+
+/**
+ * Wrap middleware that caches a query procedure's output.
+ *
+ * Defaults: 60-second TTL, SWR on. Every other knob comes from
+ * {@link CacheQueryOptions}.
  *
  * @example
- * ```ts
- * const listUsers = k
- *   .$use(cacheQuery({ maxAge: 60 }))
- *   .$resolve(({ ctx }) => ctx.db.users.findMany())
- *
- * // Advanced: bypass cache for admin, custom validation
- * const listPosts = k
- *   .$use(cacheQuery({
- *     maxAge: 300,
- *     swr: true,
- *     staleMaxAge: 600,
- *     shouldBypassCache: (input) => (input as any)?.noCache,
- *     shouldInvalidateCache: (input) => (input as any)?.refresh,
- *     validate: (entry) => Array.isArray(entry.value),
- *     onError: (err) => console.error('[cache]', err),
- *   }))
- *   .$resolve(({ ctx }) => ctx.db.posts.findMany())
- * ```
+ *   const listPosts = k
+ *     .$use(cacheQuery({
+ *       maxAge: 300,
+ *       staleMaxAge: 600,
+ *       shouldBypassCache: (input) => (input as any)?.noCache,
+ *       validate: (entry) => Array.isArray(entry.value),
+ *       onError: (err) => console.error('[cache]', err),
+ *     }))
+ *     .$resolve(({ ctx }) => ctx.db.posts.findMany())
  */
 export function cacheQuery<T = unknown>(options: CacheQueryOptions<T> = {}): WrapDef {
   const maxAge = options.maxAge ?? 60
@@ -191,43 +208,46 @@ export function cacheQuery<T = unknown>(options: CacheQueryOptions<T> = {}): Wra
   const customGetKey = options.getKey
 
   let cacheName = options.name
-
-  // Per-call next() storage keyed by unique request ID — avoids race between concurrent requests
-  const pendingNextMap = new Map<string, () => Promise<unknown>>()
-  let requestCounter = 0
-
-  // Each procedure gets its own cachedFn (lazy init on first call)
   let cachedFn: ReturnType<typeof defineCachedFunction> | null = null
-  let keyFn: (input: unknown) => string
+  let keyFn: (input: unknown) => string = buildKeyFn(customGetKey)
+
+  /**
+   * Two concurrent requests can race through the same cache entry:
+   * ocache calls our inner `_resolve` for each one, and they must not
+   * share a closure-scoped `next`. We keep a per-request map keyed
+   * by a monotonic counter so each call resolves its *own* `next()`.
+   */
+  const pendingNext = new Map<string, () => Promise<unknown>>()
+  let requestCounter = 0
 
   return {
     kind: 'wrap',
     fn: async (ctx, next) => {
       ensureStorageConnected()
+
+      // Lazy init. We wait until the first call so that we can pick up
+      // the procedure path off `ctx` (set by the pipeline) rather than
+      // asking the user to pass a `name` manually.
       if (!cachedFn) {
-        if (!cacheName) {
-          cacheName = (ctx as any).__procedurePath || `proc_${hash(next.toString()).slice(0, 8)}`
-        }
-        const resolvedName = cacheName!
+        cacheName ??=
+          (ctx as { __procedurePath?: string }).__procedurePath ?? `proc_${hash(next.toString()).slice(0, 8)}`
+        const resolvedName = cacheName
+        const resolvedBase = options.base ?? '/cache'
         const keySet = new Set<string>()
         cacheKeyRegistry.set(resolvedName, keySet)
 
-        keyFn = customGetKey
-          ? (input: unknown) => customGetKey(input)
-          : (input: unknown) => (input !== undefined && input !== null ? hash(input) : '')
-
-        const resolvedBase = options.base ?? '/cache'
-
         cachedFn = defineCachedFunction(
           async (_input: unknown, requestId?: string) => {
-            const mapKey = requestId ?? keyFn(_input)
-            const nextFn = pendingNextMap.get(mapKey)
-            if (nextFn) {
-              pendingNextMap.delete(mapKey)
-              return nextFn()
+            const key = requestId ?? keyFn(_input)
+            const fn = pendingNext.get(key)
+            if (!fn) {
+              // Safety net — ocache should always call us with a
+              // requestId we stashed a moment earlier. If it does not,
+              // we throw rather than silently returning stale data.
+              throw new Error('[silgi/cache] Missing next() for cache resolve')
             }
-            // Fallback — should not happen but prevents crash
-            throw new Error('[silgi/cache] Missing next() for cache resolve')
+            pendingNext.delete(key)
+            return fn()
           },
           {
             name: resolvedName,
@@ -240,14 +260,12 @@ export function cacheQuery<T = unknown>(options: CacheQueryOptions<T> = {}): Wra
             onError: options.onError,
             validate: options.validate as ((entry: CacheEntry) => boolean) | undefined,
             transform: options.transform as ((entry: CacheEntry) => unknown) | undefined,
-            shouldBypassCache: options.shouldBypassCache
-              ? (input: unknown) => options.shouldBypassCache!(input)
-              : undefined,
-            shouldInvalidateCache: options.shouldInvalidateCache
-              ? (input: unknown) => options.shouldInvalidateCache!(input)
-              : undefined,
+            shouldBypassCache: options.shouldBypassCache,
+            shouldInvalidateCache: options.shouldInvalidateCache,
             getKey: (input: unknown) => {
               const key = keyFn(input)
+              // Record the fully-qualified storage key so manual
+              // invalidation can wipe it later.
               keySet.add(`${resolvedBase}:silgi:${resolvedName}:${key}.json`)
               return key
             },
@@ -255,102 +273,55 @@ export function cacheQuery<T = unknown>(options: CacheQueryOptions<T> = {}): Wra
         )
       }
 
-      // Store this request's next() keyed by unique request ID — safe under concurrency
-      const input = (ctx as any)[RAW_INPUT]
+      const input = (ctx as Record<PropertyKey, unknown>)[RAW_INPUT]
       const requestId = `__req_${++requestCounter}`
-      pendingNextMap.set(requestId, next)
+      pendingNext.set(requestId, next)
       return cachedFn(input, requestId)
     },
   }
 }
 
-// ── Cache Invalidation ──────────────────────────────
+// ─── Invalidation ─────────────────────────────────────────────────────
 
 /**
- * Invalidate cached entries for a procedure by name.
+ * Wipe every cached entry for a procedure by its cache name.
  *
- * Call this after mutations to clear related query caches.
+ * Typically called after a mutation that makes related queries stale.
+ * Names default to the procedure's auto-generated path, or whatever
+ * was passed via `cacheQuery({ name })`.
  *
  * @example
- * ```ts
- * const createUser = k.$resolve(async ({ input, ctx }) => {
- *   const user = await ctx.db.users.create(input)
- *   await invalidateQueryCache('users_list')
- *   return user
- * })
- * ```
+ *   const createUser = k.$resolve(async ({ input, ctx }) => {
+ *     const user = await ctx.db.users.create(input)
+ *     await invalidateQueryCache('users_list')
+ *     return user
+ *   })
  */
 export async function invalidateQueryCache(name: string): Promise<void> {
   const keys = cacheKeyRegistry.get(name)
-  if (keys) {
-    const storage = useOcacheStorage()
-    await Promise.all([...keys].map((key) => storage.set(key, null)))
-    keys.clear()
-  }
+  if (!keys) return
+
+  const storage = useOcacheStorage()
+  await Promise.all([...keys].map((key) => storage.set(key, null)))
+  keys.clear()
 }
 
-// ── Storage Configuration ───────────────────────────
+// ─── Storage override ─────────────────────────────────────────────────
 
 /**
- * Set the cache storage backend.
- *
- * Default: in-memory Map with TTL.
- * For production, use `createUnstorageAdapter()` with Redis, Cloudflare KV, etc.
+ * Replace ocache's storage backend. Default is an in-memory map with
+ * TTL; production deployments usually want Redis or Cloudflare KV via
+ * `createUnstorageAdapter()`.
  *
  * @example
- * ```ts
- * import { setCacheStorage, createUnstorageAdapter } from 'silgi/cache'
- * import { createStorage } from 'silgi/unstorage'
- * import redisDriver from 'unstorage/drivers/redis'
- *
- * setCacheStorage(createUnstorageAdapter(
- *   createStorage({ driver: redisDriver({ url: 'redis://localhost' }) })
- * ))
- * ```
+ *   setCacheStorage(createUnstorageAdapter(
+ *     createStorage({ driver: redisDriver({ url: 'redis://localhost' }) })
+ *   ))
  */
 export function setCacheStorage(storage: StorageInterface): void {
   setStorage(storage)
 }
 
-// ── unstorage Adapter ───────────────────────────────
-
-/**
- * Minimal interface matching unstorage's Storage.
- * Avoids hard dependency on unstorage — users bring their own.
- */
-export interface UnstorageCompatible {
-  getItem<T = unknown>(key: string): Promise<T | null> | T | null
-  setItem(key: string, value: unknown, opts?: { ttl?: number }): Promise<void> | void
-  removeItem(key: string): Promise<void> | void
-}
-
-/**
- * Create an ocache-compatible storage adapter from an unstorage instance.
- *
- * @example
- * ```ts
- * import { createStorage } from 'silgi/unstorage'
- * import redisDriver from 'unstorage/drivers/redis'
- *
- * const storage = createStorage({ driver: redisDriver({ url: 'redis://localhost' }) })
- * const adapter = createUnstorageAdapter(storage)
- * setCacheStorage(adapter)
- * ```
- */
-export function createUnstorageAdapter(storage: UnstorageCompatible): StorageInterface {
-  return {
-    get: <T>(key: string) => storage.getItem<T>(key),
-    set: <T>(key: string, value: T, opts?: { ttl?: number }) => {
-      // Return the underlying Promise so ocache can await writes and
-      // surface storage errors (Redis timeouts, quota exceeded, etc.).
-      if (value === null || value === undefined) {
-        return storage.removeItem(key) as unknown as Promise<void>
-      }
-      return storage.setItem(key, value, opts) as unknown as Promise<void>
-    },
-  }
-}
-
-// ── Re-exports ──────────────────────────────────────
+// ─── Re-exports ───────────────────────────────────────────────────────
 
 export type { StorageInterface, CacheOptions, CacheEntry }

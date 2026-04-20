@@ -141,8 +141,27 @@ export interface ProcedureBuilderWithOutput<
   }): TaskDef<TInput, TOutputResolved>
 }
 
-// ── Builder Implementation ──────────────────────────
+// ─── Builder implementation ───────────────────────────────────────────
 
+/**
+ * A `ProcBuilder` plays two roles in its lifetime:
+ *
+ *   1. While the user is chaining methods it is a *builder* — each `$x()`
+ *      mutates a slot and returns `this`.
+ *   2. Once `$resolve()` is called, the *same instance* is returned typed
+ *      as `ProcedureDef`. This works because `isProcedureDef` (see
+ *      `core/router-utils.ts`) only checks for `type` and a callable
+ *      `resolve`, both of which we now have.
+ *
+ * Using one object for both roles avoids copying the slots into a fresh
+ * frozen record at the end — callers hold the object directly, so the
+ * shape they see is the same object we wrote into.
+ *
+ * All slots default to `null` rather than an empty array / object so
+ * that downstream code can branch on presence without caring about
+ * length, and so that we do not allocate sentinels the user never ends
+ * up needing.
+ */
 class ProcBuilder {
   type: ProcedureType
   input: AnySchema | null = null
@@ -153,7 +172,13 @@ class ProcBuilder {
   route: Route | null = null
   meta: Meta | null = null
 
-  // Set by createProcedureBuilder when created via silgi instance
+  /**
+   * Underscore-prefixed slots are framework-internal. They are set by
+   * `createProcedureBuilder` when the builder is constructed through a
+   * `silgi({...})` instance and are threaded through to `$task()` so
+   * that background tasks share the instance's context factory and
+   * root wraps.
+   */
   _contextFactory: (() => unknown | Promise<unknown>) | null = null
   _rootWrapsGetter: RootWrapsGetter = null
 
@@ -161,39 +186,41 @@ class ProcBuilder {
     this.type = type
   }
 
-  $use(...middleware: MiddlewareDef[]) {
-    if (this.use) (this.use as MiddlewareDef[]).push(...middleware)
-    else this.use = [...middleware]
+  $use(...middleware: MiddlewareDef[]): this {
+    this.use ??= []
+    this.use.push(...middleware)
     return this
   }
 
-  $input(schema: AnySchema) {
+  $input(schema: AnySchema): this {
     this.input = schema
     return this
   }
 
-  $output(schema: AnySchema) {
+  $output(schema: AnySchema): this {
     this.output = schema
     return this
   }
 
-  $errors(errors: ErrorDef) {
-    this.errors = this.errors ? { ...(this.errors as ErrorDef), ...errors } : errors
+  $errors(errors: ErrorDef): this {
+    this.errors = this.errors ? { ...this.errors, ...errors } : errors
     return this
   }
 
-  $route(route: Route) {
+  $route(route: Route): this {
     this.route = route
     return this
   }
 
-  $meta(meta: Meta) {
+  $meta(meta: Meta): this {
     this.meta = meta
     return this
   }
 
   $resolve(fn: Function): ProcedureDef {
     this.resolve = fn
+    // The double cast is the role switch described in the class comment:
+    // the same instance now satisfies `ProcedureDef`.
     return this as unknown as ProcedureDef
   }
 
@@ -214,8 +241,8 @@ export function createProcedureBuilder<TType extends ProcedureType, TBaseCtx ext
   contextFactory?: (() => unknown | Promise<unknown>) | null,
   rootWrapsGetter?: RootWrapsGetter,
 ): ProcedureBuilder<TType, TBaseCtx> {
-  const b = new ProcBuilder(type)
-  if (contextFactory) b._contextFactory = contextFactory
-  if (rootWrapsGetter) b._rootWrapsGetter = rootWrapsGetter
-  return b as unknown as ProcedureBuilder<TType, TBaseCtx>
+  const builder = new ProcBuilder(type)
+  if (contextFactory) builder._contextFactory = contextFactory
+  if (rootWrapsGetter) builder._rootWrapsGetter = rootWrapsGetter
+  return builder as unknown as ProcedureBuilder<TType, TBaseCtx>
 }

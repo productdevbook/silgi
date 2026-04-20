@@ -360,51 +360,54 @@ interface SubscriptionFactory<TBaseCtx extends Record<string, unknown>> {
   ): ProcedureDef<'subscription', InferSchemaInput<TSchema>, TOutput, {}>
 }
 
-// ── Implementation ──────────────────────────────────
+// ─── Implementation ───────────────────────────────────────────────────
 
+/**
+ * Build a `ProcedureDef` with all optional slots set to `null`.
+ *
+ * Procedures carry eight slots — `type`, `input`, `output`, `errors`,
+ * `use`, `resolve`, `route`, `meta`. Most call sites set only a couple;
+ * funnelling construction through this helper keeps the shape in one
+ * place so new slots do not have to be added to every short form.
+ */
+function makeProcedureDef(type: ProcedureType, input: AnySchema | null, resolve: Function): ProcedureDef {
+  return {
+    type,
+    input,
+    output: null,
+    errors: null,
+    use: null,
+    resolve,
+    route: null,
+    meta: null,
+  }
+}
+
+/**
+ * Dispatch on the call shape of `$resolve` / `subscription`.
+ *
+ *   createProcedure(type)                 → chainable builder
+ *   createProcedure(type, resolve)        → single-shot procedure
+ *   createProcedure(type, input, resolve) → single-shot with input schema
+ */
 function createProcedure(type: ProcedureType, ...args: unknown[]): ProcedureDef | ProcedureBuilder<any, any> {
-  // Builder form: no arguments → return chainable builder
   if (args.length === 0) {
     return createProcedureBuilder(type)
   }
-
-  // Short form: (resolve)
   if (args.length === 1 && typeof args[0] === 'function') {
-    return {
-      type,
-      input: null,
-      output: null,
-      errors: null,
-      use: null,
-      resolve: args[0] as Function,
-      route: null,
-      meta: null,
-    }
+    return makeProcedureDef(type, null, args[0] as Function)
   }
-
-  // Short form: (input, resolve)
   if (args.length === 2 && typeof args[1] === 'function') {
-    return {
-      type,
-      input: args[0] as AnySchema,
-      output: null,
-      errors: null,
-      use: null,
-      resolve: args[1] as Function,
-      route: null,
-      meta: null,
-    }
+    return makeProcedureDef(type, args[0] as AnySchema, args[1] as Function)
   }
-
   throw new TypeError(`Invalid arguments for ${type}()`)
 }
 
 /**
- * Stamp root wraps onto a router def as a non-enumerable Symbol-keyed
- * property. Idempotent — if the def is already branded with the same
- * reference, this is a no-op. Multiple silgi instances registering the
- * same def throws, because a single compiled router cannot serve two
- * context shapes.
+ * Stamp root wraps onto a router def via a non-enumerable Symbol-keyed
+ * property. Idempotent for the same wrap reference; throws when a
+ * different silgi instance has already registered the def, because a
+ * single compiled router cannot serve two different context shapes.
  *
  * @internal
  */
@@ -422,6 +425,68 @@ function stampRootWraps(def: object, wraps: readonly WrapDef[]): void {
     writable: false,
     configurable: false,
   })
+}
+
+/**
+ * Validate + freeze the `wraps` config array.
+ *
+ * Guards are rejected at the instance level because a guard's return
+ * type must flow into every procedure's context, and the instance-level
+ * config cannot express that across an unknown router shape. Guards
+ * must be attached via route-level `.$use()` where the context
+ * enrichment can be typed.
+ */
+function prepareRootWraps(wraps: WrapDef<any>[] | undefined): readonly WrapDef[] | null {
+  if (!wraps || wraps.length === 0) return null
+  for (const w of wraps) {
+    if (!w || (w as MiddlewareDef).kind !== 'wrap') {
+      throw new TypeError('silgi({ wraps }) only accepts wrap middleware — use route-level .$use() for guards.')
+    }
+  }
+  return Object.freeze([...wraps]) as readonly WrapDef[]
+}
+
+/**
+ * Register the user-provided hook listeners on a fresh `Hookable`.
+ * Accepts either a single function or an array of functions per hook,
+ * matching the shape documented on `SilgiConfig['hooks']`.
+ */
+function registerHooks(hooks: Hookable<SilgiHooks>, config: SilgiConfig<any>['hooks']): void {
+  if (!config) return
+  for (const [name, fn] of Object.entries(config)) {
+    const key = name as keyof SilgiHooks
+    if (Array.isArray(fn)) {
+      for (const f of fn) hooks.hook(key, f as any)
+    } else if (fn) {
+      hooks.hook(key, fn as any)
+    }
+  }
+}
+
+/**
+ * Build the storage-ready promise. Resolves immediately when no storage
+ * is configured — and crucially, never triggers the dynamic import in
+ * that case, so tree-shakers can drop the driver code entirely.
+ */
+function makeStorageReady(storage: StorageConfig | undefined): Promise<void> {
+  if (!storage) return Promise.resolve()
+  return import('./core/storage.ts').then((m) => {
+    m.initStorage(storage)
+  })
+}
+
+/**
+ * Recursively search a router def for any `subscription` procedure.
+ * Used to decide whether `handler()` should bother to lazy-load the
+ * crossws hooks for the `/_ws` mount.
+ */
+function routerHasSubscriptions(def: unknown): boolean {
+  if (!def || typeof def !== 'object') return false
+  if ((def as { type?: string }).type === 'subscription') return true
+  for (const child of Object.values(def as Record<string, unknown>)) {
+    if (routerHasSubscriptions(child)) return true
+  }
+  return false
 }
 
 /**
@@ -460,59 +525,168 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
 ): SilgiInstance<TBaseCtx> {
   const contextFactory = config.context
 
-  // Per-instance schema registry — no global mutable state
+  // Everything in this block is per-instance — the framework holds no
+  // global mutable state. Two `silgi()` instances in the same process
+  // never observe each other's hooks, schemas, bridges, or storage.
   const schemaRegistry: SchemaRegistry = createSchemaRegistry(config.schemaConverters ?? [])
-
-  // Per-instance AsyncLocalStorage bridge — isolates ambient context
-  // between multiple silgi() instances living in the same process.
   const bridge = createContextBridge<TBaseCtx>()
-
-  // Hooks — synchronous init (hookable is tiny ~2KB, must be sync for API compat)
   const hooks = createHooks<SilgiHooks>()
-  if (config.hooks) {
-    for (const [name, fn] of Object.entries(config.hooks)) {
-      if (Array.isArray(fn)) {
-        for (const f of fn) hooks.hook(name as keyof SilgiHooks, f as any)
-      } else if (fn) {
-        hooks.hook(name as keyof SilgiHooks, fn as any)
-      }
-    }
-  }
+  registerHooks(hooks, config.hooks)
+  const readyPromise = makeStorageReady(config.storage)
+  const rootWraps = prepareRootWraps(config.wraps)
 
-  // Storage init — build a ready promise at instance creation time.
-  // - When storage is configured: dynamic import + initStorage; errors
-  //   reject the promise so callers can observe them (no silent logging).
-  // - When storage is not configured: resolves immediately, no dynamic
-  //   import at all.
-  // `useStorage()` awaits this promise internally; users can also call
-  // `await instance.ready()` explicitly for an ordering guarantee.
-  const readyPromise: Promise<void> = config.storage
-    ? import('./core/storage.ts').then((m) => {
-        m.initStorage(config.storage!)
-      })
-    : Promise.resolve()
-
+  // Builders and tasks need a zero-argument context factory — the real
+  // factory takes a `Request`, so here we supply a synthetic one that
+  // carries no headers. Callers that genuinely need request data must
+  // use the HTTP path; `createCaller` / `$task` give you the direct
+  // pipeline but not a live `Request`.
   const ctxFactory = () => contextFactory(new Request('http://localhost'))
 
-  // Freeze root wraps once so routers built later share the same reference.
-  // Enforce WrapDef shape — guards are rejected because they would need to
-  // flow their return type into every procedure's context, which can't be
-  // expressed at the instance-config type level.
-  let rootWraps: readonly WrapDef[] | null = null
-  if (config.wraps && config.wraps.length > 0) {
-    for (const w of config.wraps) {
-      if (!w || (w as MiddlewareDef).kind !== 'wrap') {
-        throw new TypeError('silgi({ wraps }) only accepts wrap middleware — use route-level .$use() for guards.')
-      }
+  // Tasks receive a *getter* so that a later `router()` call can still
+  // see the wraps array even if tasks were constructed first. When no
+  // wraps are configured we pass `null`; `createTaskFromProcedure`
+  // walks a straight path in that case.
+  const rootWrapsGetter: (() => readonly WrapDef[] | null) | null = rootWraps ? () => rootWraps : null
+
+  // ─── Builder factories ───────────────────────────────────────────
+  //
+  // Each `$x()` method starts a chainable builder preconfigured with
+  // this instance's context factory and root wraps. We build a small
+  // helper for the common case.
+
+  const startBuilder = () => createProcedureBuilder('query', ctxFactory, rootWrapsGetter)
+
+  // ─── Router registration ─────────────────────────────────────────
+
+  const registerRouter = <T extends RouterDef>(def: T): T => {
+    const assigned = assignPaths(def)
+    // Stamping the wraps on both `def` and `assigned` means every
+    // downstream compile site — `handler()`, `createCaller()`, auto-WS,
+    // external adapters (Express, Lambda, NestJS, message-port, broker,
+    // batch-server) — picks them up through `compileRouter` reading
+    // `def[ROOT_WRAPS]`. The brand is a non-enumerable Symbol so the
+    // router walker in `compileRouter` never sees it. When `rootWraps`
+    // is null we skip the stamp entirely and `def` stays byte-identical
+    // to its pre-call shape.
+    if (rootWraps) {
+      stampRootWraps(def, rootWraps)
+      stampRootWraps(assigned, rootWraps)
     }
-    rootWraps = Object.freeze([...config.wraps]) as readonly WrapDef[]
+    const compiled = compileRouter(assigned)
+    routerCache.set(def, compiled)
+    routerCache.set(assigned, compiled)
+    return def
   }
 
-  // Lazy getter handed to tasks so `task.dispatch()` applies the same
-  // root-wrap onion as HTTP/cron invocation. Null when no wraps configured
-  // — task dispatch stays a straight `await resolveFn(...)` with zero
-  // additional closure.
-  const rootWrapsGetter: (() => readonly WrapDef[] | null) | null = rootWraps ? () => rootWraps : null
+  // ─── Handler factory (Fetch API) ─────────────────────────────────
+
+  const buildHandler: SilgiInstance<TBaseCtx>['handler'] = (routerDef, options) => {
+    const prefix = options?.basePath ? normalizePrefix(options.basePath) : undefined
+    const fetchHandler = wrapHandler(
+      createFetchHandler(
+        routerDef,
+        contextFactory,
+        hooks,
+        prefix,
+        bridge as import('./core/context-bridge.ts').ContextBridge,
+      ),
+      routerDef,
+      options ? { ...options, schemaRegistry, hooks } : { schemaRegistry, hooks },
+      prefix,
+    )
+
+    // Routes without any subscriptions go through the plain fetch
+    // handler; we never even import the WS module.
+    if (!routerHasSubscriptions(routerDef)) return fetchHandler
+
+    // Lazy WS init. `/_ws` requests get a synthetic `Response` with
+    // the crossws hooks attached on a side property — this is the
+    // convention Nitro / h3 look for to mount the WebSocket upgrade.
+    let wsHooks: Record<string, Function> | undefined
+    let wsInitPromise: Promise<void> | undefined
+
+    const initWsHooks = async (): Promise<void> => {
+      const { _createWSHooks } = await import('./ws.ts')
+      wsHooks = _createWSHooks(routerDef, {
+        context: (peer) => {
+          const req: Request = (peer?.request instanceof Request ? peer.request : peer) as Request
+          return contextFactory(req)
+        },
+      }) as Record<string, Function>
+    }
+
+    const wsPath = prefix ? `${prefix}/_ws` : '/_ws'
+
+    return async (request: Request): Promise<Response> => {
+      const url = new URL(request.url)
+      if (url.pathname === wsPath) {
+        if (!wsHooks) {
+          wsInitPromise ??= initWsHooks()
+          await wsInitPromise
+        }
+        const response = new Response(null, { status: 200 })
+        ;(response as unknown as { crossws: unknown }).crossws = wsHooks
+        return response
+      }
+      return fetchHandler(request)
+    }
+  }
+
+  // ─── serve() orchestrator ────────────────────────────────────────
+
+  const buildServe: SilgiInstance<TBaseCtx>['serve'] = async (routerDef, options) => {
+    const { createServeHandler } = await import('./core/serve.ts')
+    const server = await createServeHandler(
+      routerDef,
+      contextFactory,
+      hooks,
+      options,
+      schemaRegistry,
+      bridge as import('./core/context-bridge.ts').ContextBridge,
+    )
+
+    // Cron auto-discovery. This currently uses the process-default
+    // registry so the analytics dashboard (which reads
+    // `getScheduledTasks()` from the same default) keeps showing
+    // scheduled jobs. `createCronRegistry()` exists for users who want
+    // fully-isolated registries; a future refactor will thread that
+    // through the analytics route so this `serve()` can drop to
+    // per-instance.
+    const { collectCronTasks, startCronJobs, stopCronJobs } = await import('./core/task.ts')
+    const cronTasks = collectCronTasks(routerDef)
+    if (cronTasks.length > 0) {
+      await startCronJobs(cronTasks)
+      console.log(`  ${cronTasks.length} cron task(s) scheduled`)
+    }
+
+    // Wrap `close()` so an explicit shutdown always stops cron jobs.
+    // We return a *new* object instead of mutating the srvx-owned
+    // server — mutating it would surprise anyone who held a reference
+    // through a non-silgi code path.
+    const originalClose = server.close.bind(server)
+    const wrappedClose = async (force?: boolean): Promise<void> => {
+      stopCronJobs()
+      return originalClose(force)
+    }
+    const silgiServer: SilgiServer = Object.assign(Object.create(Object.getPrototypeOf(server)), server, {
+      close: wrappedClose,
+    })
+
+    // OS signal handling is opt-in. `gracefulShutdown` on srvx still
+    // controls the HTTP drain; this flag only governs silgi's cron-stop
+    // wiring to SIGINT / SIGTERM.
+    if (options?.handleSignals) {
+      const onSignal = () => {
+        wrappedClose().catch(() => {})
+      }
+      process.once('SIGINT', onSignal)
+      process.once('SIGTERM', onSignal)
+    }
+
+    return silgiServer
+  }
+
+  // ─── Assemble the instance ───────────────────────────────────────
 
   const instance: SilgiInstance<TBaseCtx> = {
     hook: hooks.hook.bind(hooks),
@@ -534,157 +708,25 @@ export function silgi<TBaseCtx extends Record<string, unknown>>(
     wrap: (fn) => ({ kind: 'wrap' as const, fn }),
 
     $resolve: ((fn: any) => createProcedure('query', fn)) as any,
-    $input: ((schema: any) => createProcedureBuilder('query', ctxFactory, rootWrapsGetter).$input(schema)) as any,
+    $input: ((schema: any) => startBuilder().$input(schema)) as any,
     $use: ((...middleware: any[]) => {
-      const b = createProcedureBuilder('query', ctxFactory, rootWrapsGetter) as any
+      const b = startBuilder() as any
       for (const m of middleware) b.$use(m)
       return b
     }) as any,
-    $output: ((schema: any) => createProcedureBuilder('query', ctxFactory, rootWrapsGetter).$output(schema)) as any,
-    $errors: ((errors: any) => createProcedureBuilder('query', ctxFactory, rootWrapsGetter).$errors(errors)) as any,
-    $route: ((route: any) => createProcedureBuilder('query', ctxFactory, rootWrapsGetter).$route(route)) as any,
-    $meta: ((meta: any) => createProcedureBuilder('query', ctxFactory, rootWrapsGetter).$meta(meta)) as any,
+    $output: ((schema: any) => startBuilder().$output(schema)) as any,
+    $errors: ((errors: any) => startBuilder().$errors(errors)) as any,
+    $route: ((route: any) => startBuilder().$route(route)) as any,
+    $meta: ((meta: any) => startBuilder().$meta(meta)) as any,
 
     subscription: ((...args: unknown[]) => createProcedure('subscription', ...args)) as SubscriptionFactory<TBaseCtx>,
 
-    $task: ((config: any) => {
-      return createTaskFromProcedure(config, config.resolve, null, null, ctxFactory, rootWrapsGetter)
-    }) as any,
+    $task: ((cfg: any) => createTaskFromProcedure(cfg, cfg.resolve, null, null, ctxFactory, rootWrapsGetter)) as any,
 
-    router: (def) => {
-      const assigned = assignPaths(def)
-      // Brand the def with this instance's root wraps (if any) so every
-      // downstream compile site — handler(), createCaller(), auto-WS, and
-      // external adapters (Express, Lambda, NestJS, message-port, broker,
-      // batch-server, server-client) — picks them up automatically via
-      // `compileRouter` reading `def[ROOT_WRAPS]`. The brand is a non-
-      // enumerable Symbol, so `Object.entries(def)` in the router walker
-      // never sees it. When `rootWraps` is null we don't stamp anything,
-      // so the def is byte-identical to the pre-feature shape.
-      if (rootWraps) {
-        stampRootWraps(def, rootWraps)
-        stampRootWraps(assigned, rootWraps)
-      }
-      const flat = compileRouter(assigned)
-      // Cache against the original def — don't mutate user's object
-      routerCache.set(def, flat)
-      routerCache.set(assigned, flat)
-      return def
-    },
-
-    createCaller: (routerDef, options) => {
-      return createCaller(routerDef, contextFactory, options)
-    },
-
-    handler: (routerDef, options) => {
-      const prefix = options?.basePath ? normalizePrefix(options.basePath) : undefined
-      const fetchHandler = wrapHandler(
-        createFetchHandler(
-          routerDef,
-          contextFactory,
-          hooks,
-          prefix,
-          bridge as import('./core/context-bridge.ts').ContextBridge,
-        ),
-        routerDef,
-        options ? { ...options, schemaRegistry, hooks } : { schemaRegistry, hooks },
-        prefix,
-      )
-
-      // Check if router has any subscriptions → auto-attach crossws hooks for Nitro/srvx
-      const hasWsProcedures = (function checkWs(def: any): boolean {
-        if (!def || typeof def !== 'object') return false
-        if (def.type === 'subscription') return true
-        for (const v of Object.values(def)) {
-          if (checkWs(v)) return true
-        }
-        return false
-      })(routerDef)
-
-      if (!hasWsProcedures) return fetchHandler
-
-      // Lazy-load WS hooks
-      let wsHooks: Record<string, Function> | undefined
-      let wsInitPromise: Promise<void> | undefined
-
-      async function initWsHooks(): Promise<void> {
-        const { _createWSHooks } = await import('./ws.ts')
-        wsHooks = _createWSHooks(routerDef, {
-          context: (peer) => {
-            const req: Request = (peer?.request instanceof Request ? peer.request : peer) as Request
-            return contextFactory(req)
-          },
-        }) as Record<string, Function>
-      }
-
-      const wsPath = prefix ? `${prefix}/_ws` : '/_ws'
-
-      return async (request: Request): Promise<Response> => {
-        // Intercept /_ws path — return empty response with .crossws hooks for Nitro/h3
-        const url = new URL(request.url)
-        if (url.pathname === wsPath) {
-          if (!wsHooks) {
-            wsInitPromise ??= initWsHooks()
-            await wsInitPromise
-          }
-          const response = new Response(null, { status: 200 })
-          ;(response as any).crossws = wsHooks
-          return response
-        }
-
-        return fetchHandler(request)
-      }
-    },
-
-    serve: async (routerDef, options) => {
-      const { createServeHandler } = await import('./core/serve.ts')
-      const server = await createServeHandler(
-        routerDef,
-        contextFactory,
-        hooks,
-        options,
-        schemaRegistry,
-        bridge as import('./core/context-bridge.ts').ContextBridge,
-      )
-
-      // Auto-discover and start cron tasks from router.
-      // NOTE: currently uses the process-default registry so the analytics
-      // dashboard (which reads `getScheduledTasks()` via the same default)
-      // keeps showing scheduled jobs. `createCronRegistry()` is exported
-      // for users who want fully-isolated registries; a future refactor
-      // will thread that registry through the analytics route so this
-      // serve() can drop to per-instance.
-      const { collectCronTasks, startCronJobs, stopCronJobs } = await import('./core/task.ts')
-      const cronTasks = collectCronTasks(routerDef)
-      if (cronTasks.length > 0) {
-        await startCronJobs(cronTasks)
-        console.log(`  ${cronTasks.length} cron task(s) scheduled`)
-      }
-
-      // Wrap `close` so explicit shutdown always stops cron jobs.
-      // Return a new object instead of mutating the srvx-owned `server`.
-      const originalClose = server.close.bind(server)
-      const wrappedClose = async (force?: boolean): Promise<void> => {
-        stopCronJobs()
-        return originalClose(force)
-      }
-      const silgiServer: SilgiServer = Object.assign(Object.create(Object.getPrototypeOf(server)), server, {
-        close: wrappedClose,
-      })
-
-      // Opt-in OS signal handling — previously always-on, now explicit.
-      // srvx-level graceful HTTP drain is still controlled by the
-      // `gracefulShutdown` option on `ServeOptions`.
-      if (options?.handleSignals) {
-        const onSignal = () => {
-          wrappedClose().catch(() => {})
-        }
-        process.once('SIGINT', onSignal)
-        process.once('SIGTERM', onSignal)
-      }
-
-      return silgiServer
-    },
+    router: registerRouter,
+    createCaller: (routerDef, options) => createCaller(routerDef, contextFactory, options),
+    handler: buildHandler,
+    serve: buildServe,
   }
 
   return instance
