@@ -326,99 +326,64 @@ export function compileProcedure(procedure: ProcedureDef, rootWraps?: readonly W
   const runGuards = selectGuardRunner(guards)
 
   // ─── Build the *inner* handler ───────────────────────────────────
-  // This is the pipeline a request flows through after root wraps
-  // have already wrapped the call. Structure and fast-paths are
-  // unchanged from the pre-fix code — only the root-wrap placement
-  // moved.
+  //
+  // One async flow for every procedure, regardless of whether it has
+  // validation or procedure wraps. The previous three-way split (sync
+  // fast-path / semi-sync / wrap path) shaved a Promise allocation
+  // off the trivial "no wraps, no schemas" case at the cost of
+  // tripling the code on the hot path. The handler is still ~30
+  // lines and stays easy to follow.
+  //
+  // Step order (matches the JSDoc on `SilgiConfig.wraps`):
+  //
+  //   1. Run guards — may mutate `ctx` or throw.
+  //   2. Validate input (if an input schema is declared).
+  //   3. Park input on `ctx[RAW_INPUT]` so wraps (e.g. `mapInput`)
+  //      can rewrite it in place.
+  //   4. Unfold the procedure-wrap onion around the resolver.
+  //   5. Validate output (if an output schema is declared).
 
-  let innerHandler: CompiledHandler
+  const innerHandler: CompiledHandler = async (ctx, rawInput, signal) => {
+    if (runGuards) {
+      const guardResult = runGuards(ctx)
+      if (guardResult && isThenable(guardResult)) await guardResult
+    }
 
-  if (procedureWraps.length === 0 && !inputSchema && !outputSchema) {
-    // Fully synchronous fast path — no validation, no wrap onion.
-    // try/catch converts sync throws (guard errors, fail() calls,
-    // resolver errors) into rejected Promises so callers have a
-    // single error idiom.
-    innerHandler = (ctx, rawInput, signal) => {
-      try {
-        const guardResult = runGuards?.(ctx)
-        if (guardResult && isThenable(guardResult)) {
-          return (guardResult as Promise<void>).then(() =>
-            resolveFn({
-              input: rawInput,
-              ctx,
-              fail: failFn,
-              signal,
-              params: (ctx.params ?? EMPTY_PARAMS) as Record<string, string>,
-            }),
-          )
-        }
-        return resolveFn({
-          input: rawInput,
+    let input: unknown
+    if (inputSchema) {
+      const validated = validateSchema(inputSchema, rawInput ?? {})
+      input = isThenable(validated) ? await validated : validated
+    } else {
+      input = rawInput
+    }
+
+    // Park input on `ctx` so a wrap like `mapInput` can rewrite it
+    // before the resolver reads it back.
+    ;(ctx as Record<PropertyKey, unknown>)[RAW_INPUT] = input
+
+    let execute: () => Promise<unknown> = () => {
+      const resolvedInput = (ctx as Record<PropertyKey, unknown>)[RAW_INPUT] ?? input
+      return Promise.resolve(
+        resolveFn({
+          input: resolvedInput,
           ctx,
           fail: failFn,
           signal,
           params: (ctx.params ?? EMPTY_PARAMS) as Record<string, string>,
-        })
-      } catch (e) {
-        return Promise.reject(e)
-      }
+        }),
+      )
     }
-  } else if (procedureWraps.length === 0) {
-    // Semi-sync: validation runs but no wrap onion.
-    innerHandler = (ctx, rawInput, signal) => {
-      try {
-        const guardResult = runGuards?.(ctx)
-        if (guardResult && isThenable(guardResult)) {
-          return (guardResult as Promise<void>).then(() =>
-            validateAndResolve(inputSchema, outputSchema, resolveFn, rawInput, ctx, failFn, signal),
-          )
-        }
-        return validateAndResolve(inputSchema, outputSchema, resolveFn, rawInput, ctx, failFn, signal)
-      } catch (e) {
-        return Promise.reject(e)
-      }
+
+    for (let i = procedureWraps.length - 1; i >= 0; i--) {
+      const wrapFn = procedureWraps[i]!.fn
+      const next = execute
+      execute = () => wrapFn(ctx, next)
     }
-  } else {
-    // Full wrap path: procedure wraps onion around the resolver.
-    innerHandler = async (ctx, rawInput, signal) => {
-      const guardResult = runGuards?.(ctx)
-      if (guardResult && isThenable(guardResult)) await guardResult
 
-      let input: unknown
-      if (inputSchema) {
-        const validated = validateSchema(inputSchema, rawInput ?? {})
-        input = isThenable(validated) ? await validated : validated
-      } else {
-        input = rawInput
-      }
-
-      // Store input on context so wraps (e.g. mapInput) can read/modify it
-      ;(ctx as Record<PropertyKey, unknown>)[RAW_INPUT] = input
-
-      let execute: () => Promise<unknown> = () => {
-        const resolvedInput = (ctx as Record<PropertyKey, unknown>)[RAW_INPUT] ?? input
-        return Promise.resolve(
-          resolveFn({
-            input: resolvedInput,
-            ctx,
-            fail: failFn,
-            signal,
-            params: (ctx.params ?? EMPTY_PARAMS) as Record<string, string>,
-          }),
-        )
-      }
-
-      for (let i = procedureWraps.length - 1; i >= 0; i--) {
-        const wrapFn = procedureWraps[i]!.fn
-        const next = execute
-        execute = () => wrapFn(ctx, next)
-      }
-
-      const output = await execute()
-      if (!outputSchema) return output
-      const validated = validateSchema(outputSchema, output)
-      return isThenable(validated) ? await validated : validated
-    }
+    const output = await execute()
+    if (!outputSchema) return output
+    const validated = validateSchema(outputSchema, output)
+    return isThenable(validated) ? await validated : validated
   }
 
   // ─── Root-wrap onion (outermost) ─────────────────────────────────
