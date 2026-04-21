@@ -166,6 +166,55 @@ describe('silgi({ wraps })', () => {
     await expect(s.createCaller(r).hello()).rejects.toThrow('sync-throw')
   })
 
+  it('full onion: root wrap → guard → procedure wrap → validation → resolver', async () => {
+    // One integration test that exercises every layer at once so a
+    // future regression in any of: `rootWrapList` extraction, guard
+    // execution position, procedure-wrap onion composition, input
+    // validation placement, or output validation placement lands as
+    // a failure in this single assertion.
+    const { z } = await import('zod')
+    const order: string[] = []
+    const probe = silgi({ context: () => ({}) })
+
+    const rootWrap = probe.wrap(async (_ctx, next) => {
+      order.push('root:before')
+      const out = await next()
+      order.push('root:after')
+      return out
+    })
+    const routeWrap = probe.wrap(async (_ctx, next) => {
+      order.push('route:before')
+      const out = await next()
+      order.push('route:after')
+      return out
+    })
+    const recordingGuard = probe.guard(() => {
+      order.push('guard')
+      return {}
+    })
+
+    const s = silgi({
+      context: () => ({}),
+      wraps: [rootWrap],
+    })
+
+    const r = s.router({
+      echo: s
+        .$use(recordingGuard)
+        .$use(routeWrap)
+        .$input(z.object({ msg: z.string() }))
+        .$output(z.object({ echoed: z.string() }))
+        .$resolve(({ input }) => {
+          order.push('resolve')
+          return { echoed: input.msg }
+        }),
+    })
+
+    const out = await s.createCaller(r).echo({ msg: 'hi' })
+    expect(out).toEqual({ echoed: 'hi' })
+    expect(order).toEqual(['root:before', 'guard', 'route:before', 'resolve', 'route:after', 'root:after'])
+  })
+
   it('multiple root wraps run in declared order (first = outermost)', async () => {
     const order: string[] = []
     const probe = silgi({ context: () => ({}) })

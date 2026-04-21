@@ -253,16 +253,33 @@ function validateAndResolve(
   }
 }
 
-// ── Main Compiler ───────────────────────────────────
+// ─── Procedure compiler ──────────────────────────────────────────────
 
 /**
- * Compile a procedure into the fastest possible handler.
+ * Compile a procedure into its request handler.
  *
- * Optimizations applied:
- * - Guard count specialization (unrolled for 0-4)
- * - Separate fast path for no-wrap case (zero closures per request)
- * - Pre-computed fail function (singleton per procedure)
- * - Sync fast path when all guards are sync
+ * The generated handler is built as two nested onions:
+ *
+ *   root-wrap onion (outer)
+ *     └─ guards → input validation → procedure-wrap onion → resolver
+ *        → output validation                                  (inner)
+ *
+ * The *inner* handler still selects one of three shapes up front:
+ *
+ *   - fully sync fast-path when there are no procedure wraps and no
+ *     input/output schemas;
+ *   - semi-sync when validation is present but no procedure wraps;
+ *   - full async onion when any procedure wrap is attached.
+ *
+ * The *outer* handler is only built when `rootWraps` is non-empty.
+ * When no root wraps are configured we return the inner handler as
+ * is — zero extra closures per request, every fast-path preserved.
+ *
+ * @param procedure  The procedure definition to compile.
+ * @param rootWraps  Instance-level wraps (from `silgi({ wraps })`).
+ *                   These wrap the *whole* inner pipeline, including
+ *                   guards — that is the contract documented on
+ *                   `SilgiConfig.wraps` (issue #14).
  */
 export function compileProcedure(procedure: ProcedureDef, rootWraps?: readonly WrapDef[] | null): CompiledHandler {
   const middlewares = procedure.use ?? []
@@ -414,8 +431,22 @@ export function compileProcedure(procedure: ProcedureDef, rootWraps?: readonly W
   if (!hasRootWraps) return innerHandler
 
   return async (ctx, rawInput, signal) => {
-    let execute: () => Promise<unknown> = async () => innerHandler(ctx, rawInput, signal)
+    // Seed the onion with a thunk that defers to the inner handler.
+    // `Promise.resolve` coerces the inner handler's `unknown |
+    // Promise<unknown>` return into a single Promise so every wrap's
+    // `next()` has a uniform type to await.
+    let execute: () => Promise<unknown> = () => Promise.resolve(innerHandler(ctx, rawInput, signal))
 
+    // Fold the root-wrap list outermost-first — `rootWraps[0]` ends up
+    // as the outermost wrap, matching the JSDoc claim on
+    // `SilgiConfig.wraps`.
+    //
+    // The surrounding `async` block turns any sync throw from `wrapFn`
+    // into a rejected Promise automatically. `Promise.resolve(...)`
+    // here is about the *return value*: it coerces a sync value or a
+    // Promise into the uniform `Promise<unknown>` that `next()`
+    // promises to the next wrap down. Pinned by the
+    // `sync throw inside a root wrap …` test.
     for (let i = rootWrapList.length - 1; i >= 0; i--) {
       const wrapFn = rootWrapList[i]!.fn
       const next = execute
