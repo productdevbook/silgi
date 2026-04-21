@@ -1,5 +1,6 @@
-import type { ErrorEntry, ProcedureCall, RequestEntry, TaskExecution, TraceSpan } from './types'
 import { redactHeader } from './privacy'
+
+import type { ErrorEntry, ProcedureCall, RequestEntry, TaskExecution, TraceSpan } from './types'
 
 function safeJson(value: unknown): string {
   try {
