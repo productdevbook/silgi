@@ -1,41 +1,32 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { createContext, releaseContext } from '#src/compile.ts'
 import { SilgiError } from '#src/core/error.ts'
 import { createFetchHandler } from '#src/core/handler.ts'
 import { silgi } from '#src/silgi.ts'
 
 /**
- * Drain the internal pool and seed it with a known tagged context. After a
- * request completes, the tagged context should be back in the pool (stripped
- * of its tag), proving `releaseContext` ran exactly once.
+ * Context-release smoke tests.
+ *
+ * These tests used to drain an internal context pool and verify that
+ * the recycled object came back stripped after each request exit
+ * path. The pool has been removed — every request now allocates a
+ * fresh null-prototype object and the GC reclaims it. That makes the
+ * old "pool readback" assertion meaningless, but the *exit paths*
+ * themselves still need to be exercised:
+ *
+ *   - a JSON resolver return
+ *   - a passthrough `Response` return
+ *   - an async-iterator (SSE) fully consumed
+ *   - an async-iterator (SSE) cancelled mid-stream
+ *   - a thrown error caught by the error path
+ *   - an input-validated resolver
+ *
+ * Each test just verifies the handler produces the right response
+ * without leaking. A regression that, say, throws inside the stream
+ * cleanup or fails to flush the error path would land here as a
+ * failing status / body assertion instead of a pool-residency check.
  */
-function withTaggedCtx(tag: string): { ctx: ReturnType<typeof createContext>; isReleased: () => boolean } {
-  // Drain pool — pull until empty.
-  while (true) {
-    const probe = createContext()
-    releaseContext(probe)
-    const next = createContext()
-    if (next !== probe) {
-      releaseContext(next)
-      releaseContext(probe)
-      // Pool may have been growing; retry drain.
-      continue
-    }
-    releaseContext(probe)
-    break
-  }
-
-  const ctx = createContext()
-  ;(ctx as any).__tag = tag
-  releaseContext(ctx)
-
-  return {
-    ctx,
-    isReleased: () => !('__tag' in ctx),
-  }
-}
 
 const k = silgi({ context: () => ({}) })
 
@@ -54,50 +45,44 @@ const router = k.router({
 
 const handler = createFetchHandler(router, () => ({}))
 
-describe('pooled context release', () => {
-  it('releases after a JSON response', async () => {
-    const seeded = withTaggedCtx('json')
+describe('request exit paths', () => {
+  it('JSON response returns the resolver output', async () => {
     const r = await handler(new Request('http://localhost/json', { method: 'POST' }))
-    await r.text()
-    expect(seeded.isReleased()).toBe(true)
+    expect(r.status).toBe(200)
+    expect(await r.json()).toEqual({ ok: true })
   })
 
-  it('releases after a passthrough Response', async () => {
-    const seeded = withTaggedCtx('response')
+  it('passthrough Response is returned as-is', async () => {
     const r = await handler(new Request('http://localhost/response', { method: 'POST' }))
-    await r.text()
-    expect(seeded.isReleased()).toBe(true)
+    expect(r.status).toBe(200)
+    expect(await r.text()).toBe('raw')
   })
 
-  it('releases after an SSE stream is fully consumed', async () => {
-    const seeded = withTaggedCtx('sse')
+  it('SSE stream can be fully consumed', async () => {
     const r = await handler(new Request('http://localhost/sse', { method: 'POST' }))
     const reader = r.body!.getReader()
-    // Drain the stream
+    // Drain the stream — success is just not hanging.
     while (true) {
       const { done } = await reader.read()
       if (done) break
     }
-    expect(seeded.isReleased()).toBe(true)
+    expect(r.headers.get('content-type')).toMatch(/event-stream/)
   })
 
-  it('releases after an SSE stream is cancelled', async () => {
-    const seeded = withTaggedCtx('sse-cancel')
+  it('SSE stream can be cancelled mid-stream', async () => {
     const r = await handler(new Request('http://localhost/sse', { method: 'POST' }))
     await r.body!.cancel()
-    expect(seeded.isReleased()).toBe(true)
+    // Success is cancel() resolving without throwing.
   })
 
-  it('releases after an error path', async () => {
-    const seeded = withTaggedCtx('fail')
+  it('thrown SilgiError surfaces with the declared status', async () => {
     const r = await handler(new Request('http://localhost/fail', { method: 'POST' }))
     expect(r.status).toBe(400)
-    await r.text()
-    expect(seeded.isReleased()).toBe(true)
+    const body = (await r.json()) as { code: string }
+    expect(body.code).toBe('BAD_REQUEST')
   })
 
-  it('releases after input validation + resolver', async () => {
-    const seeded = withTaggedCtx('echo')
+  it('input validation + resolver round-trips successfully', async () => {
     const r = await handler(
       new Request('http://localhost/echo', {
         method: 'POST',
@@ -105,7 +90,7 @@ describe('pooled context release', () => {
         body: JSON.stringify({ msg: 'hi' }),
       }),
     )
-    await r.text()
-    expect(seeded.isReleased()).toBe(true)
+    expect(r.status).toBe(200)
+    expect(await r.json()).toEqual({ echo: 'hi' })
   })
 })

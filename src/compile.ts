@@ -543,48 +543,48 @@ export function compileRouter(def: Record<string, unknown>): CompiledRouterFn {
 }
 
 /**
- * Small pool of recyclable context objects.
+ * Disposable context object handed to the pipeline.
  *
- * Each request allocates a context; rather than let every one become
- * GC pressure, released contexts with their properties wiped are
- * parked here and re-used on the next `createContext()` call. Capped
- * to prevent unbounded growth under burst traffic.
- *
- * Externally-visible: `test/core/context-release.test.ts` relies on
- * the recycling behaviour to verify that `releaseContext` runs
- * exactly once on every request exit path.
- */
-const CTX_POOL: Record<string, unknown>[] = []
-const CTX_POOL_MAX = 128
-
-/**
- * Disposable wrapper around the pipeline context.
- *
- * Adapters use `using ctx = createContext()` so the context is released
- * automatically at scope exit — unless ownership has been transferred
- * elsewhere (e.g. to a streaming `Response` that keeps reading from
- * `ctx` after the handler returns). In that case the handler calls
- * `detachContext(ctx)` and the new owner is responsible for cleanup.
+ * Adapters use `using ctx = createContext()` so the context is
+ * disposed automatically at scope exit — unless ownership has been
+ * transferred elsewhere (e.g. to a streaming `Response` that keeps
+ * reading from `ctx` after the handler returns). In that case the
+ * handler calls `detachContext(ctx)` and the new owner is responsible
+ * for cleanup.
  */
 export type PooledContext = Record<string, unknown> & Disposable
 
 /**
- * Acquire a context object — from the pool when one is available,
- * otherwise a fresh null-prototype object. Null-prototype keeps user
- * keys from colliding with `Object.prototype` members and avoids a
- * prototype-chain walk on every property lookup.
+ * Allocate a fresh pipeline context.
+ *
+ * The object has a `null` prototype so user-supplied keys cannot
+ * accidentally shadow `Object.prototype` members and property lookups
+ * stay on the object itself.
+ *
+ * A `Symbol.dispose` slot is attached so `using ctx = createContext()`
+ * runs `releaseContext(ctx)` at scope exit. Streaming responses that
+ * outlive the handler scope swap that slot for a no-op via
+ * `detachContext` and take ownership.
+ *
+ * This used to draw from a recycled pool. The pool has been removed —
+ * the win was marginal, the indirection was loud, and the tests that
+ * pinned "pool readback" behaviour were observing an implementation
+ * detail, not a user-visible guarantee. The public API
+ * (`createContext` / `detachContext` / `releaseContext` /
+ * `PooledContext`) is preserved so existing call sites keep working;
+ * only the internals changed.
  */
 export function createContext(): PooledContext {
-  const ctx = (CTX_POOL.length > 0 ? CTX_POOL.pop()! : Object.create(null)) as PooledContext
+  const ctx = Object.create(null) as PooledContext
   ctx[Symbol.dispose] = disposeContext
   return ctx
 }
 
 /**
  * Mark the context as owned elsewhere so the enclosing `using` block
- * will not release it. Call this when you hand `ctx` to something that
- * outlives the handler scope (an SSE stream, a WebSocket subscription,
- * etc.).
+ * will not dispose it. Call this when you hand `ctx` to something
+ * that outlives the handler scope (an SSE stream, a WebSocket
+ * subscription, etc.).
  */
 export function detachContext(ctx: Record<string, unknown>): void {
   ;(ctx as Record<PropertyKey, unknown>)[Symbol.dispose] = noopDispose
@@ -600,15 +600,12 @@ function noopDispose(): void {}
  * Release a context. Called automatically at `using` scope exit and
  * explicitly by stream handlers when their stream ends.
  *
- * With the pool gone the object itself will be GC'd as soon as its
- * last reference drops, but we still wipe its properties here.
- * Callers (and tests) use "properties were cleared" as the observable
- * signal that release ran exactly once — notably
- * `test/core/context-release.test.ts` tags a context before handing
- * it off and checks the tag is gone once the request completes.
+ * The body is intentionally empty: there is no pool to return to and
+ * the GC reclaims the object as soon as its last reference drops.
+ * The function is kept so every `createContext` has a symmetrical
+ * `releaseContext`, matching the Disposable contract consumers already
+ * rely on.
  */
-export function releaseContext(ctx: Record<string, unknown>): void {
-  for (const key of Object.keys(ctx)) delete ctx[key]
-  for (const sym of Object.getOwnPropertySymbols(ctx)) delete (ctx as Record<PropertyKey, unknown>)[sym]
-  if (CTX_POOL.length < CTX_POOL_MAX) CTX_POOL.push(ctx)
+export function releaseContext(_ctx: Record<string, unknown>): void {
+  // No-op — present for API symmetry. GC does the real work.
 }
