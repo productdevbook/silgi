@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { compileProcedure } from '#src/compile.ts'
 import { SilgiError } from '#src/core/error.ts'
-import { SchemaValidatorCrash, validateSchema, type AnySchema } from '#src/core/schema.ts'
+import { SchemaValidatorCrash, validateSchema } from '#src/core/schema.ts'
 import { silgi } from '#src/silgi.ts'
+
+import type { AnySchema } from '#src/core/schema.ts'
 
 const k = silgi({ context: () => ({}) })
 
