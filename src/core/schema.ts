@@ -19,9 +19,31 @@ export class ValidationError extends Error {
   }
 }
 
+/**
+ * Thrown when a Standard Schema validator itself crashes — e.g. a
+ * misconstructed Zod v4 schema like `z.record(z.unknown())` (missing
+ * `keyType`) that builds silently but throws inside `.validate()`.
+ *
+ * Distinct from `ValidationError` (which means the *value* was bad)
+ * because the failure is a server-side schema bug, not user input.
+ * `cause` holds the original throw so dev tooling can surface the stack.
+ */
+export class SchemaValidatorCrash extends Error {
+  constructor(options: { message?: string; cause: unknown }) {
+    super(options.message ?? 'Schema validator crashed', { cause: options.cause })
+    this.name = 'SchemaValidatorCrash'
+  }
+}
+
 /** Sync fast-path: Zod 4 validate() returns sync result — avoid Promise allocation */
 export function validateSchema(schema: AnySchema, value: unknown): unknown {
-  const result = schema['~standard'].validate(value)
+  let result: ReturnType<AnySchema['~standard']['validate']>
+  try {
+    result = schema['~standard'].validate(value)
+  } catch (e) {
+    // Validator threw synchronously — schema construction bug, not bad input.
+    throw new SchemaValidatorCrash({ cause: e })
+  }
   // Sync result (Zod 4, ArkType, Silgi type()) — no Promise overhead
   if (typeof (result as any)?.then !== 'function') {
     if ('issues' in (result as any) && (result as any).issues) {
@@ -29,13 +51,19 @@ export function validateSchema(schema: AnySchema, value: unknown): unknown {
     }
     return (result as { value: unknown }).value
   }
-  // Async fallback (Valibot or custom async schemas)
-  return (result as Promise<any>).then((r: any) => {
-    if ('issues' in r && r.issues) {
-      throw new ValidationError({ issues: r.issues })
-    }
-    return r.value
-  })
+  // Async fallback (Valibot or custom async schemas) — promise reject is
+  // also a validator crash, not a soft validation failure.
+  return (result as Promise<any>).then(
+    (r: any) => {
+      if ('issues' in r && r.issues) {
+        throw new ValidationError({ issues: r.issues })
+      }
+      return r.value
+    },
+    (e: unknown) => {
+      throw new SchemaValidatorCrash({ cause: e })
+    },
+  )
 }
 
 export function type<TInput, TOutput = TInput>(
