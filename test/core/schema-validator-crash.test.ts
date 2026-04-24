@@ -137,4 +137,48 @@ describe('compileProcedure — schema crash classification', () => {
     const result = await handler({}, undefined, AbortSignal.timeout(1000))
     expect(result).toEqual({ ok: true })
   })
+
+  it('suppresses dev-mode log when NODE_ENV=production but still 500s with cause', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const prevEnv = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+    try {
+      const proc = k.$output(syncCrashSchema('prod-out')).$resolve(() => ({ ok: true }))
+      const handler = compileProcedure(proc)
+      try {
+        await handler({}, undefined, AbortSignal.timeout(1000))
+        throw new Error('expected rejection')
+      } catch (e) {
+        expect(e).toBeInstanceOf(SilgiError)
+        expect((e as SilgiError).code).toBe('INTERNAL_SERVER_ERROR')
+        expect((e as SilgiError).cause).toBeInstanceOf(TypeError)
+        expect(((e as SilgiError).cause as Error).message).toBe('prod-out')
+      }
+      expect(errorSpy).not.toHaveBeenCalled()
+    } finally {
+      if (prevEnv === undefined) delete process.env.NODE_ENV
+      else process.env.NODE_ENV = prevEnv
+      errorSpy.mockRestore()
+    }
+  })
+
+  it('logs dev-mode output crash even when `process` is unavailable (Workers/browser)', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const realProcess = globalThis.process
+    // Simulate a runtime where `process` is not defined at all.
+    delete (globalThis as { process?: unknown }).process
+    try {
+      const proc = k.$output(syncCrashSchema('no-process')).$resolve(() => ({ ok: true }))
+      const handler = compileProcedure(proc)
+      await expect(handler({}, undefined, AbortSignal.timeout(1000))).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        status: 500,
+      })
+      // Without `process`, we default to dev-on so the crash is visible.
+      expect(errorSpy).toHaveBeenCalled()
+    } finally {
+      ;(globalThis as { process?: unknown }).process = realProcess
+      errorSpy.mockRestore()
+    }
+  })
 })

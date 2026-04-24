@@ -60,9 +60,22 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
  * dev-only `console.error(...)` for output-validator crashes — in prod
  * we still surface the cause through `SilgiError.cause`, but we don't
  * spam the log.
+ *
+ * Defaults to `true` when `process` is unavailable (Workers, browser,
+ * Deno without `--allow-env`). The whole point of the log is to make
+ * silent server-side bugs visible — staying loud by default in those
+ * runtimes is the safer call. Production deploys that *do* have
+ * `process.env.NODE_ENV === 'production'` are still respected.
+ *
+ * Read once per crash (not at module-load) so tests can mutate
+ * `process.env.NODE_ENV` to pin behaviour. The crash path runs at
+ * "zero" frequency (only when a schema actually blows up), so a
+ * per-call lookup costs nothing in practice.
  */
-const IS_DEV: boolean =
-  typeof process !== 'undefined' && (process as { env?: { NODE_ENV?: string } }).env?.NODE_ENV !== 'production'
+function isDevEnv(): boolean {
+  if (typeof process === 'undefined') return true
+  return (process as { env?: { NODE_ENV?: string } }).env?.NODE_ENV !== 'production'
+}
 
 /**
  * Re-throw a `SchemaValidatorCrash` with the right HTTP semantics:
@@ -87,7 +100,7 @@ function rethrowSchemaCrash(error: unknown, kind: 'input' | 'output'): never {
       cause: error.cause,
     })
   }
-  if (IS_DEV) {
+  if (isDevEnv()) {
     // Surface the stack in the dev server log — otherwise the only
     // signal is a generic 500 and the bug is invisible.
     console.error('[silgi] output schema validator crashed:', error.cause)

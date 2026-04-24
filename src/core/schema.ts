@@ -27,6 +27,15 @@ export class ValidationError extends Error {
  * Distinct from `ValidationError` (which means the *value* was bad)
  * because the failure is a server-side schema bug, not user input.
  * `cause` holds the original throw so dev tooling can surface the stack.
+ *
+ * **Where you'll see this.** Only on direct `validateSchema()` calls.
+ * The compiled procedure pipeline catches `SchemaValidatorCrash`
+ * internally and rebrands it as a `SilgiError` (`BAD_REQUEST` for input
+ * validators, `INTERNAL_SERVER_ERROR` for output validators) with the
+ * *original* throw — not the `SchemaValidatorCrash` wrapper — preserved
+ * on `SilgiError.cause`. So `instanceof SchemaValidatorCrash` will not
+ * match anything thrown from a procedure handler; inspect
+ * `SilgiError.cause` instead.
  */
 export class SchemaValidatorCrash extends Error {
   constructor(options: { message?: string; cause: unknown }) {
