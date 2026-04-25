@@ -65,7 +65,7 @@ export { SilgiError, isSilgiError, isDefinedError, toSilgiError } from './core/e
 export type { SilgiErrorCode, SilgiErrorOptions, SilgiErrorJSON } from './core/error.ts'
 
 // ── Schema ──────────────────────────────────────────
-export { type, validateSchema, ValidationError } from './core/schema.ts'
+export { type, validateSchema, ValidationError, SchemaValidatorCrash } from './core/schema.ts'
 export type { Schema, AnySchema, InferSchemaInput, InferSchemaOutput } from './core/schema.ts'
 
 // ── Schema Converters ───────────────────────────────
