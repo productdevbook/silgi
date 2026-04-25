@@ -122,6 +122,23 @@ function validateOutput(schema: import('./core/schema.ts').AnySchema, value: unk
   return validated
 }
 
+/**
+ * Wrap a subscription's iterator so each yielded item runs through
+ * `validateOutput`. The pre-#26 path validated the iterator object
+ * itself, which always 400'd because schemas can't find their declared
+ * keys on an iterator. A schema crash mid-stream propagates as a thrown
+ * error that the SSE encoder turns into an `error` event.
+ */
+async function* validateIteratorOutput(
+  iterator: AsyncIterableIterator<unknown>,
+  schema: import('./core/schema.ts').AnySchema,
+): AsyncIterableIterator<unknown> {
+  for await (const item of iterator) {
+    const validated = validateOutput(schema, item)
+    yield isThenable(validated) ? await validated : validated
+  }
+}
+
 function createFail(errors: ErrorDef): (code: string, data?: unknown) => never {
   return (code: string, data?: unknown): never => {
     const def = errors[code]
@@ -376,6 +393,7 @@ export function compileProcedure(procedure: ProcedureDef, rootWraps?: readonly W
   const inputSchema = procedure.input
   const outputSchema = procedure.output
   const resolveFn = procedure.resolve
+  const isSubscription = procedure.type === 'subscription'
 
   // Merge guard errors into procedure errors (runtime)
   let mergedErrors = procedure.errors
@@ -448,6 +466,12 @@ export function compileProcedure(procedure: ProcedureDef, rootWraps?: readonly W
 
     const output = await execute()
     if (!outputSchema) return output
+    // Subscriptions return an async iterator — validate each yielded
+    // item, not the iterator object itself (the latter always failed
+    // because schemas can't find their declared keys on an iterator).
+    if (isSubscription && output && typeof output === 'object' && Symbol.asyncIterator in output) {
+      return validateIteratorOutput(output as AsyncIterableIterator<unknown>, outputSchema)
+    }
     const validated = validateOutput(outputSchema, output)
     return isThenable(validated) ? await validated : validated
   }
