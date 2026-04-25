@@ -56,21 +56,9 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
 }
 
 /**
- * `true` when the runtime is not in production. Used to gate the
- * dev-only `console.error(...)` for output-validator crashes — in prod
- * we still surface the cause through `SilgiError.cause`, but we don't
- * spam the log.
- *
- * Defaults to `true` when `process` is unavailable (Workers, browser,
- * Deno without `--allow-env`). The whole point of the log is to make
- * silent server-side bugs visible — staying loud by default in those
- * runtimes is the safer call. Production deploys that *do* have
- * `process.env.NODE_ENV === 'production'` are still respected.
- *
- * Read once per crash (not at module-load) so tests can mutate
- * `process.env.NODE_ENV` to pin behaviour. The crash path runs at
- * "zero" frequency (only when a schema actually blows up), so a
- * per-call lookup costs nothing in practice.
+ * Defaults to `true` when `process` is unavailable (Workers/browser) so
+ * crashes stay loud by default. Read per-crash so tests can flip
+ * `NODE_ENV` at runtime — the crash path is cold, the cost is moot.
  */
 function isDevEnv(): boolean {
   if (typeof process === 'undefined') return true
@@ -78,53 +66,58 @@ function isDevEnv(): boolean {
 }
 
 /**
- * Re-throw a `SchemaValidatorCrash` with the right HTTP semantics:
- *
- * - **input** validators that crash → `BAD_REQUEST` (the client sent
- *   something the validator couldn't even evaluate). Cause is preserved
- *   so server-side logging still has the stack.
- * - **output** validators that crash → `INTERNAL_SERVER_ERROR` with the
- *   original throw as `cause`. This is a server bug — the resolver
- *   produced data the schema can't validate (or the schema itself is
- *   misconstructed, e.g. zod-v4 `z.record(z.unknown())` without
- *   `keyType`). In dev we also `console.error` the underlying error so
- *   the stack actually appears in the dev server log.
- *
- * Anything that isn't a `SchemaValidatorCrash` is rethrown unchanged.
+ * Validate input. A validator that crashes (e.g. a misconstructed
+ * Zod v4 schema) becomes a `BAD_REQUEST` with the original throw on
+ * `cause` — the client sent something the validator couldn't even
+ * evaluate. Soft `ValidationError` results pass through unchanged.
  */
-function rethrowSchemaCrash(error: unknown, kind: 'input' | 'output'): never {
-  if (!(error instanceof SchemaValidatorCrash)) throw error
-  if (kind === 'input') {
-    throw new SilgiError('BAD_REQUEST', {
-      message: 'Input schema validator crashed',
-      cause: error.cause,
-    })
-  }
-  if (isDevEnv()) {
-    // Surface the stack in the dev server log — otherwise the only
-    // signal is a generic 500 and the bug is invisible.
-    console.error('[silgi] output schema validator crashed:', error.cause)
-  }
-  throw new SilgiError('INTERNAL_SERVER_ERROR', {
-    message: 'Output schema validator crashed',
-    cause: error.cause,
-  })
-}
-
-/** Run `validateSchema` and rebrand any `SchemaValidatorCrash` for the given kind. */
-function validateOrCrash(
-  schema: import('./core/schema.ts').AnySchema,
-  value: unknown,
-  kind: 'input' | 'output',
-): unknown {
+function validateInput(schema: import('./core/schema.ts').AnySchema, value: unknown): unknown {
   let validated: unknown
   try {
     validated = validateSchema(schema, value)
   } catch (e) {
-    rethrowSchemaCrash(e, kind)
+    if (e instanceof SchemaValidatorCrash) {
+      throw new SilgiError('BAD_REQUEST', { message: 'Input schema validator crashed', cause: e.cause })
+    }
+    throw e
   }
   if (isThenable(validated)) {
-    return (validated as Promise<unknown>).catch((e: unknown) => rethrowSchemaCrash(e, kind))
+    return (validated as Promise<unknown>).catch((e: unknown) => {
+      if (e instanceof SchemaValidatorCrash) {
+        throw new SilgiError('BAD_REQUEST', { message: 'Input schema validator crashed', cause: e.cause })
+      }
+      throw e
+    })
+  }
+  return validated
+}
+
+/**
+ * Validate output. A validator that crashes becomes an
+ * `INTERNAL_SERVER_ERROR` (server bug, not user input) with the original
+ * throw on `cause`. In dev the cause is also `console.error`'d so the
+ * stack shows up in the server log — the only signal otherwise is a
+ * generic 500.
+ */
+function validateOutput(schema: import('./core/schema.ts').AnySchema, value: unknown): unknown {
+  let validated: unknown
+  try {
+    validated = validateSchema(schema, value)
+  } catch (e) {
+    if (e instanceof SchemaValidatorCrash) {
+      if (isDevEnv()) console.error('[silgi] output schema validator crashed:', e.cause)
+      throw new SilgiError('INTERNAL_SERVER_ERROR', { message: 'Output schema validator crashed', cause: e.cause })
+    }
+    throw e
+  }
+  if (isThenable(validated)) {
+    return (validated as Promise<unknown>).catch((e: unknown) => {
+      if (e instanceof SchemaValidatorCrash) {
+        if (isDevEnv()) console.error('[silgi] output schema validator crashed:', e.cause)
+        throw new SilgiError('INTERNAL_SERVER_ERROR', { message: 'Output schema validator crashed', cause: e.cause })
+      }
+      throw e
+    })
   }
   return validated
 }
@@ -269,7 +262,6 @@ function selectGuardRunner(
 
 // ── Resolve + output validation helper ──────────────
 
-/** Call resolve, then validate output (sync-first, async fallback) */
 /**
  * Call the resolver, then validate the output. Stays sync when the
  * resolver is sync and there is no output schema; switches to
@@ -292,9 +284,9 @@ function resolveWithOutput(
   })
   if (!outputSchema) return output
   if (isThenable(output)) {
-    return (output as Promise<unknown>).then((o) => validateOrCrash(outputSchema, o, 'output'))
+    return (output as Promise<unknown>).then((o) => validateOutput(outputSchema, o))
   }
-  return validateOrCrash(outputSchema, output, 'output')
+  return validateOutput(outputSchema, output)
 }
 
 /**
@@ -315,7 +307,7 @@ function validateAndResolve(
   signal: AbortSignal,
 ): unknown {
   try {
-    const input = inputSchema ? validateOrCrash(inputSchema, rawInput ?? {}, 'input') : rawInput
+    const input = inputSchema ? validateInput(inputSchema, rawInput ?? {}) : rawInput
     if (isThenable(input)) {
       return (input as Promise<unknown>).then((resolvedInput) =>
         resolveWithOutput(resolveFn, resolvedInput, ctx, failFn, signal, outputSchema),
@@ -425,7 +417,7 @@ export function compileProcedure(procedure: ProcedureDef, rootWraps?: readonly W
 
     let input: unknown
     if (inputSchema) {
-      const validated = validateOrCrash(inputSchema, rawInput ?? {}, 'input')
+      const validated = validateInput(inputSchema, rawInput ?? {})
       input = isThenable(validated) ? await validated : validated
     } else {
       input = rawInput
@@ -456,7 +448,7 @@ export function compileProcedure(procedure: ProcedureDef, rootWraps?: readonly W
 
     const output = await execute()
     if (!outputSchema) return output
-    const validated = validateOrCrash(outputSchema, output, 'output')
+    const validated = validateOutput(outputSchema, output)
     return isThenable(validated) ? await validated : validated
   }
 
