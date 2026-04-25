@@ -9,6 +9,7 @@ import { ofetch, FetchError } from 'ofetch'
 
 import { encode as msgpackEncode, decode as msgpackDecode, MSGPACK_CONTENT_TYPE } from '../../../codec/msgpack.ts'
 import { SilgiError, isSilgiErrorJSON, fromSilgiErrorJSON } from '../../../core/error.ts'
+import { eventStreamToIterator } from '../../../core/sse.ts'
 
 import type { ClientLink, ClientContext, ClientOptions } from '../../types.ts'
 import type { FetchOptions, FetchContext } from 'ofetch'
@@ -109,7 +110,11 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
       }
 
       try {
-        const data = await ofetch(url, {
+        // `responseType: 'stream'` keeps ofetch from consuming the body
+        // so we can branch on `content-type`: subscriptions need the
+        // raw stream for SSE decoding, while query/mutation responses
+        // get decoded here per protocol.
+        const response = await ofetch.raw<ReadableStream<Uint8Array>, 'stream'>(url, {
           method: 'POST',
           headers,
           body,
@@ -122,32 +127,39 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
           onResponse: options.onResponse,
           onRequestError: options.onRequestError,
           onResponseError: options.onResponseError,
-          // Response handling per protocol
-          ...(resolvedProtocol === 'messagepack'
-            ? { responseType: 'arrayBuffer' as const }
-            : resolvedProtocol === 'devalue'
-              ? { responseType: 'text' as const }
-              : {
-                  parseResponse(text: string) {
-                    if (!text) return undefined
-                    try {
-                      return JSON.parse(text)
-                    } catch {
-                      return text
-                    }
-                  },
-                }),
+          responseType: 'stream',
         })
 
-        // Decode response
+        // Subscription response — server emitted an async iterator as SSE.
+        const responseContentType = response.headers.get('content-type') ?? ''
+        if (responseContentType.includes('text/event-stream') && response.body) {
+          return eventStreamToIterator(response.body)
+        }
+
+        // Query/mutation — drain the stream and decode per protocol.
         let decoded: unknown
         if (resolvedProtocol === 'messagepack') {
-          decoded = msgpackDecode(new Uint8Array(data as ArrayBuffer))
+          const buf = new Uint8Array(await new Response(response.body).arrayBuffer())
+          decoded = buf.length > 0 ? msgpackDecode(buf) : undefined
         } else if (resolvedProtocol === 'devalue') {
-          const { decode: devalueDecode } = await import('../../../codec/devalue.ts')
-          decoded = data ? devalueDecode(data as string) : undefined
+          const text = await new Response(response.body).text()
+          if (text) {
+            const { decode: devalueDecode } = await import('../../../codec/devalue.ts')
+            decoded = devalueDecode(text)
+          } else {
+            decoded = undefined
+          }
         } else {
-          decoded = data
+          const text = await new Response(response.body).text()
+          if (!text) {
+            decoded = undefined
+          } else {
+            try {
+              decoded = JSON.parse(text)
+            } catch {
+              decoded = text
+            }
+          }
         }
 
         if (isSilgiErrorJSON(decoded)) {

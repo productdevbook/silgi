@@ -3,6 +3,7 @@
  */
 
 import { SilgiError, isSilgiErrorJSON, fromSilgiErrorJSON, isErrorStatus } from '../../../core/error.ts'
+import { eventStreamToIterator } from '../../../core/sse.ts'
 import { stringifyJSON, parseEmptyableJSON } from '../../../core/utils.ts'
 
 import type { ClientLink, ClientContext, ClientOptions } from '../../types.ts'
@@ -51,6 +52,14 @@ export class RPCLink<TClientContext extends ClientContext = ClientContext> imple
     })
 
     const contentType = response.headers.get('content-type') ?? ''
+
+    // Subscription response — server emitted an async iterator as SSE.
+    // Hand back an iterator that decodes frames lazily; the consumer
+    // drives consumption via `for await` / `consumeIterator`.
+    if (contentType.includes('text/event-stream') && response.body) {
+      return eventStreamToIterator(response.body)
+    }
+
     let responseBody: unknown
     if (contentType.includes('msgpack')) {
       const { decode } = await import('../../../codec/msgpack.ts')
