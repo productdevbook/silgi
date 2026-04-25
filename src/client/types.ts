@@ -17,10 +17,15 @@ export type Client<TClientContext extends ClientContext, TInput, TOutput, _TErro
   ...args: ClientRest<TClientContext, TInput>
 ) => Promise<TOutput>
 
-/** A subscription client — returns async iterator */
+/**
+ * A subscription client — resolves to an async iterator. The Promise
+ * boundary is the network round-trip (open the SSE/WS connection, see
+ * the response headers); the resolved iterator yields each event until
+ * the stream ends.
+ */
 export type SubscriptionClient<TClientContext extends ClientContext, TInput, TOutput> = (
   ...args: ClientRest<TClientContext, TInput>
-) => AsyncIterableIterator<TOutput>
+) => Promise<AsyncIterableIterator<TOutput>>
 
 /** Determine argument shape based on input and context optionality */
 export type ClientRest<TClientContext extends ClientContext, TInput> = undefined extends TInput
