@@ -258,19 +258,19 @@ const client = createClient<AppRouter>(link)
 
 ### Options
 
-| Option            | Type                                                       | Default     | Description                                                                  |
-| ----------------- | ---------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------- |
-| `url`             | `string`                                                   | (required)  | Server base URL                                                              |
-| `headers`         | `Record<string, string>` or function                       | `undefined` | Static headers or per-call factory                                           |
-| `retry`           | `number \| boolean \| RetryOptions`                        | `0`         | Number for limit, `false` to disable, or full retry policy object            |
-| `timeout`         | `number \| false`                                          | `30000`     | Per-attempt timeout in ms                                                    |
-| `totalTimeout`    | `number \| false`                                          | `false`     | Wall-clock deadline across all attempts                                      |
-| `protocol`        | `'json' \| 'messagepack' \| 'devalue'`                     | `'json'`    | Wire protocol                                                                |
-| `idempotencyKey`  | `false \| 'auto' \| string \| (req) => string`             | `false`     | Auto-send `Idempotency-Key` on retried mutations                             |
-| `beforeRequest`   | `(ctx) => void \| Request \| Response`                     | —           | Mutate the request, or short-circuit by returning a `Response`               |
-| `afterResponse`   | `(ctx) => void \| Response`                                | —           | Inspect or replace the response after it's received                          |
-| `beforeError`     | `(error, ctx) => Error`                                    | —           | Transform errors before they're thrown                                       |
-| `onComplete`      | `({ request, response, error, durationMs, attempt }) =>`   | —           | Terminal hook — fires once per logical call after retries                    |
+| Option           | Type                                                     | Default     | Description                                                       |
+| ---------------- | -------------------------------------------------------- | ----------- | ----------------------------------------------------------------- |
+| `url`            | `string`                                                 | (required)  | Server base URL                                                   |
+| `headers`        | `Record<string, string>` or function                     | `undefined` | Static headers or per-call factory                                |
+| `retry`          | `number \| boolean \| RetryOptions`                      | `0`         | Number for limit, `false` to disable, or full retry policy object |
+| `timeout`        | `number \| false`                                        | `30000`     | Per-attempt timeout in ms                                         |
+| `totalTimeout`   | `number \| false`                                        | `false`     | Wall-clock deadline across all attempts                           |
+| `protocol`       | `'json' \| 'messagepack' \| 'devalue'`                   | `'json'`    | Wire protocol                                                     |
+| `idempotencyKey` | `false \| 'auto' \| string \| (req) => string`           | `false`     | Auto-send `Idempotency-Key` on retried mutations                  |
+| `beforeRequest`  | `(ctx) => void \| Request \| Response`                   | —           | Mutate the request, or short-circuit by returning a `Response`    |
+| `afterResponse`  | `(ctx) => void \| Response`                              | —           | Inspect or replace the response after it's received               |
+| `beforeError`    | `(error, ctx) => Error`                                  | —           | Transform errors before they're thrown                            |
+| `onComplete`     | `({ request, response, error, durationMs, attempt }) =>` | —           | Terminal hook — fires once per logical call after retries         |
 
 ### Retry with backoff
 
