@@ -155,9 +155,14 @@ export type RouterDef = {
 // Re-export for circular dependency avoidance
 import type { TaskDef } from './core/task.ts'
 
-/** Return type wrapper — subscription yields, query/mutation returns Promise */
+/**
+ * Return type wrapper — every procedure call resolves through the link's
+ * async `call`, so the client always returns a `Promise`. Subscriptions
+ * resolve to an `AsyncIterableIterator` (the open SSE/WS stream); queries
+ * and mutations resolve to the procedure's output value.
+ */
 type ProcedureResult<TType extends ProcedureType, TOutput> = TType extends 'subscription'
-  ? AsyncIterableIterator<TOutput>
+  ? Promise<AsyncIterableIterator<TOutput>>
   : Promise<TOutput>
 
 /** Infer client type from router */
