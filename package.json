@@ -273,7 +273,7 @@
     "devalue": "^5.6.4",
     "get-port-please": "^3.2.0",
     "hookable": "^6.1.0",
-    "misina": "^0.2.0",
+    "misina": "^0.3.1",
     "msgpackr": "^1.11.9",
     "ocache": "^0.1.4",
     "ofetch": "2.0.0-alpha.3",

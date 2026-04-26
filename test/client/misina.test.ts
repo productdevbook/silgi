@@ -406,4 +406,68 @@ describe('misina client link', () => {
     const result = await client.health()
     expect(result.status).toBe('ok')
   })
+
+  // ── 0.3.x options ──────────────────────────────────────
+
+  it('rejects responses larger than maxResponseSize', async () => {
+    // Server emits a giant payload via Content-Length advertisement.
+    const big = createServer((req, res) => {
+      const payload = JSON.stringify({ blob: 'x'.repeat(10_000) })
+      res.writeHead(200, {
+        'content-type': 'application/json',
+        'content-length': String(Buffer.byteLength(payload)),
+      })
+      res.end(payload)
+    })
+    await new Promise<void>((resolve) => big.listen(0, '127.0.0.1', () => resolve()))
+    const addr = big.address() as { port: number }
+    const url = `http://127.0.0.1:${addr.port}`
+
+    const link = createLink({ url, maxResponseSize: 1024 })
+    const client = createClient<InferClient<AppRouter>>(link)
+
+    await expect(client.health()).rejects.toThrow()
+    big.close()
+  })
+
+  it('accepts bodyTimeout configuration', async () => {
+    const link = createLink({ url: baseUrl, bodyTimeout: 5000 })
+    const client = createClient<InferClient<AppRouter>>(link)
+    const result = await client.health()
+    expect(result.status).toBe('ok')
+  })
+
+  it('accepts decompress option without breaking normal flow', async () => {
+    const link = createLink({ url: baseUrl, decompress: ['gzip', 'br'] })
+    const client = createClient<InferClient<AppRouter>>(link)
+    const result = await client.health()
+    expect(result.status).toBe('ok')
+  })
+
+  it('forwards requestIdHeaders to misina (request-id surfaced in onComplete)', async () => {
+    const idServer = createServer((req, res) => {
+      res.writeHead(200, {
+        'content-type': 'application/json',
+        'x-trace-id': 'abc-123',
+      })
+      res.end(JSON.stringify({ status: 'ok', ts: 1 }))
+    })
+    await new Promise<void>((resolve) => idServer.listen(0, '127.0.0.1', () => resolve()))
+    const addr = idServer.address() as { port: number }
+    const url = `http://127.0.0.1:${addr.port}`
+
+    let observedId: string | undefined
+    const link = createLink({
+      url,
+      requestIdHeaders: ['x-trace-id'],
+      onComplete: (info) => {
+        observedId = info.response?.headers.get('x-trace-id') ?? undefined
+      },
+    })
+    const client = createClient<InferClient<AppRouter>>(link)
+
+    await client.health()
+    expect(observedId).toBe('abc-123')
+    idServer.close()
+  })
 })

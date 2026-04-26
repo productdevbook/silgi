@@ -108,6 +108,56 @@ export interface LinkOptions<TClientContext extends ClientContext = ClientContex
   totalTimeout?: number | false
 
   /**
+   * Separate cap on response-body read time after headers arrive. Useful
+   * when servers send headers fast but stream the body slowly. `false`
+   * (default) disables.
+   */
+  bodyTimeout?: number | false
+
+  /**
+   * Byte cap on response payload. Throws `ResponseTooLargeError` if
+   * exceeded — first via `Content-Length` fast-path, then via mid-stream
+   * counter for chunked responses. `false` (default) disables.
+   *
+   * Useful as a DoS guard when the server is untrusted or you want to
+   * fail fast on malformed payloads.
+   */
+  maxResponseSize?: number | false
+
+  /**
+   * Opt-in response decompression. Most modern runtimes auto-decompress
+   * gzip/br at the fetch layer — set this only when you want zstd
+   * (Node 23.8+, Workers) or you ship a custom driver that doesn't
+   * decompress.
+   *
+   * - `true` — capability-test all formats
+   * - `string[]` — only these formats (e.g. `["zstd"]`)
+   * - `false` (default) — leave it to the transport
+   */
+  decompress?: boolean | readonly ('gzip' | 'deflate' | 'deflate-raw' | 'br' | 'zstd')[]
+
+  /**
+   * Compress the request body before dispatch. Symmetrical with
+   * `decompress`. Useful when posting large payloads to a server that
+   * advertises `Accept-Encoding`. `false` (default) disables.
+   */
+  compressRequestBody?: boolean | 'gzip' | 'deflate' | 'deflate-raw'
+
+  /**
+   * Header names misina scans for the auto-detected request id, surfaced
+   * on `MisinaResponse.requestId` and in `HTTPError` messages. Defaults
+   * to `['x-request-id', 'request-id', 'x-correlation-id']`.
+   */
+  requestIdHeaders?: readonly string[]
+
+  /**
+   * Header names stripped on cross-origin redirects, in addition to the
+   * built-in sensitive set (Authorization, Cookie, Proxy-Authorization,
+   * WWW-Authenticate). Use for custom auth headers like `x-api-key`.
+   */
+  redirectStripHeaders?: string[]
+
+  /**
    * Wire protocol for request/response encoding.
    *
    * - `'json'` — default, standard JSON
@@ -349,12 +399,18 @@ function buildMisina<TClientContext extends ClientContext>(
     baseURL: baseUrl,
     timeout: options.timeout ?? 30_000,
     totalTimeout: options.totalTimeout,
+    bodyTimeout: options.bodyTimeout,
+    maxResponseSize: options.maxResponseSize,
+    decompress: options.decompress,
+    compressRequestBody: options.compressRequestBody,
+    requestIdHeaders: options.requestIdHeaders,
     retry: options.retry ?? 0,
     idempotencyKey: options.idempotencyKey,
     throwHttpErrors: false,
     validateResponse: options.validateResponse,
     redirect: options.redirect,
     redirectSafeHeaders: options.redirectSafeHeaders,
+    redirectStripHeaders: options.redirectStripHeaders,
     redirectMaxCount: options.redirectMaxCount,
     redirectAllowDowngrade: options.redirectAllowDowngrade,
     allowedProtocols: options.allowedProtocols,
