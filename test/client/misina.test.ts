@@ -6,6 +6,7 @@
 
 import { createServer } from 'node:http'
 
+import { createMisina } from 'misina'
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { z } from 'zod'
 
@@ -245,5 +246,164 @@ describe('misina client link', () => {
     await client.health()
     expect(completed).toBe(true)
     expect(durationMs).toBeGreaterThanOrEqual(0)
+  })
+
+  // ── Bring-your-own instance & extended hooks ──────────
+
+  it('uses a user-provided misina instance', async () => {
+    let dispatched = 0
+    const m = createMisina({
+      baseURL: baseUrl,
+      throwHttpErrors: false,
+      hooks: {
+        beforeRequest: () => {
+          dispatched += 1
+        },
+      },
+    })
+    const link = createLink({ url: baseUrl, misina: m })
+    const client = createClient<InferClient<AppRouter>>(link)
+
+    const result = await client.health()
+    expect(result.status).toBe('ok')
+    expect(dispatched).toBe(1)
+  })
+
+  it('supports init hook (sync, runs before Request construction)', async () => {
+    let initCalled = false
+    const link = createLink({
+      url: baseUrl,
+      init: (resolved) => {
+        initCalled = true
+        resolved.headers['x-init'] = 'yes'
+      },
+    })
+    const client = createClient<InferClient<AppRouter>>(link)
+
+    await client.health()
+    expect(initCalled).toBe(true)
+  })
+
+  it('supports beforeRetry hook for token refresh / request rewrite', async () => {
+    // Spin up a flaky server: 500 once, then 200.
+    let calls = 0
+    const flaky = createServer((req, res) => {
+      calls += 1
+      if (calls === 1) {
+        res.writeHead(500, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ error: 'transient' }))
+        return
+      }
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ status: 'ok', ts: Date.now() }))
+    })
+    await new Promise<void>((resolve) => flaky.listen(0, '127.0.0.1', () => resolve()))
+    const addr = flaky.address() as { port: number }
+    const flakyUrl = `http://127.0.0.1:${addr.port}`
+
+    let retryHookFired = false
+    const link = createLink({
+      url: flakyUrl,
+      retry: { limit: 1, statusCodes: [500], methods: ['POST'] },
+      beforeRetry: () => {
+        retryHookFired = true
+      },
+    })
+    const client = createClient<InferClient<AppRouter>>(link)
+
+    const result = await client.health()
+    expect(result.status).toBe('ok')
+    expect(calls).toBe(2)
+    expect(retryHookFired).toBe(true)
+
+    flaky.close()
+  })
+
+  it('supports validateResponse — predicate can reject a 2xx response', async () => {
+    // Adapter forces responseType: 'stream' so predicate inspects status/headers
+    // (data is the ReadableStream at this stage). We reject status === 200 as
+    // a contrived "treat success as failure" check.
+    const link = createLink({
+      url: baseUrl,
+      validateResponse: ({ status }) => status !== 200,
+    })
+    const client = createClient<InferClient<AppRouter>>(link)
+
+    await expect(client.health()).rejects.toThrow()
+  })
+
+  it('supports totalTimeout (wall-clock cap across retries)', async () => {
+    const link = createLink({
+      url: baseUrl,
+      totalTimeout: 5000,
+    })
+    const client = createClient<InferClient<AppRouter>>(link)
+
+    const result = await client.health()
+    expect(result.status).toBe('ok')
+  })
+
+  it('sends Idempotency-Key on retried mutations when idempotencyKey: auto', async () => {
+    let observed: string | undefined
+    let calls = 0
+    const flaky = createServer((req, res) => {
+      observed = req.headers['idempotency-key'] as string | undefined
+      calls += 1
+      if (calls === 1) {
+        res.writeHead(503)
+        res.end()
+        return
+      }
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ status: 'ok', ts: Date.now() }))
+    })
+    await new Promise<void>((resolve) => flaky.listen(0, '127.0.0.1', () => resolve()))
+    const addr = flaky.address() as { port: number }
+    const flakyUrl = `http://127.0.0.1:${addr.port}`
+
+    const link = createLink({
+      url: flakyUrl,
+      idempotencyKey: 'auto',
+      retry: { limit: 1, statusCodes: [503], methods: ['POST'] },
+    })
+    const client = createClient<InferClient<AppRouter>>(link)
+
+    await client.health()
+    expect(calls).toBe(2)
+    expect(observed).toBeDefined()
+    expect(observed).toMatch(/^[0-9a-f-]{36}$/i)
+
+    flaky.close()
+  })
+
+  it('rejects disallowed protocols (allowedProtocols guard)', async () => {
+    // baseUrl is http://...; only allow https → misina should refuse to dispatch.
+    const link = createLink({
+      url: baseUrl,
+      allowedProtocols: ['https'],
+    })
+    const client = createClient<InferClient<AppRouter>>(link)
+
+    await expect(client.health()).rejects.toThrow()
+  })
+
+  it('supports headers as Headers instance', async () => {
+    const link = createLink({
+      url: baseUrl,
+      headers: new Headers({ 'x-custom': 'header-instance' }),
+    })
+    const client = createClient<InferClient<AppRouter>>(link)
+    const result = await client.health()
+    expect(result.status).toBe('ok')
+  })
+
+  it('drops undefined header values silently', async () => {
+    const link = createLink({
+      url: baseUrl,
+      headers: { authorization: undefined, 'x-real': 'present' },
+    })
+    const client = createClient<InferClient<AppRouter>>(link)
+    const result = await client.health()
+    expect(result.status).toBe('ok')
   })
 })
