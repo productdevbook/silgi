@@ -6,6 +6,7 @@ export default defineConfig({
     'src/client/index.ts',
     'src/client/adapters/fetch/index.ts',
     'src/client/adapters/ofetch/index.ts',
+    'src/client/adapters/misina/index.ts',
     'src/client/plugins/index.ts',
     'src/client/adapters/websocket/index.ts',
     'src/client/consume.ts',
