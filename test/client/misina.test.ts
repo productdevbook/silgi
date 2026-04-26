@@ -1,0 +1,249 @@
+/**
+ * misina client link — integration tests.
+ *
+ * Spins up a real silgi server and tests the misina-based client.
+ */
+
+import { createServer } from 'node:http'
+
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { z } from 'zod'
+
+import { createLink } from '#src/client/adapters/misina/index.ts'
+import { createClient } from '#src/client/client.ts'
+import { silgi } from '#src/silgi.ts'
+
+import type { InferClient } from '#src/types.ts'
+import type { Server } from 'node:http'
+
+// ── Server Setup ────────────────────────────────────
+
+const k = silgi({
+  context: () => ({
+    db: {
+      users: [
+        { id: 1, name: 'Alice' },
+        { id: 2, name: 'Bob' },
+      ],
+    },
+  }),
+})
+
+const auth = k.guard(() => ({ userId: 1 }))
+
+const appRouter = k.router({
+  health: k.$resolve(() => ({ status: 'ok', ts: Date.now() })),
+  users: {
+    list: k.$input(z.object({ limit: z.number().optional() })).$resolve(({ input, ctx }) => {
+      const limit = input.limit ?? 10
+      return ctx.db.users.slice(0, limit)
+    }),
+    get: k.$input(z.object({ id: z.number() })).$resolve(({ input, ctx }) => {
+      const user = ctx.db.users.find((u) => u.id === input.id)
+      if (!user) throw new Error('Not found')
+      return user
+    }),
+    create: k
+      .$use(auth)
+      .$input(z.object({ name: z.string().min(1) }))
+      .$errors({ CONFLICT: 409 })
+      .$resolve(({ input }) => ({ id: 3, name: input.name })),
+  },
+  echo: k.$input(z.object({ message: z.string() })).$resolve(({ input }) => ({ echo: input.message })),
+})
+
+type AppRouter = typeof appRouter
+
+const handle = k.handler(appRouter)
+
+let server: Server
+let baseUrl: string
+
+beforeAll(async () => {
+  server = createServer(async (req, res) => {
+    const url = `http://localhost${req.url}`
+    const headers = new Headers()
+    for (const [key, value] of Object.entries(req.headers)) {
+      if (value) headers.set(key, Array.isArray(value) ? value[0]! : value)
+    }
+
+    let body: string | undefined
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      body = await new Promise<string>((resolve) => {
+        let data = ''
+        req.on('data', (chunk: Buffer) => {
+          data += chunk
+        })
+        req.on('end', () => resolve(data))
+      })
+    }
+
+    const fetchReq = new Request(url, {
+      method: req.method,
+      headers,
+      body: body || undefined,
+    })
+
+    const fetchRes = await handle(fetchReq)
+    res.writeHead(fetchRes.status, Object.fromEntries(fetchRes.headers))
+    const resBody = await fetchRes.text()
+    res.end(resBody)
+  })
+
+  await new Promise<void>((resolve) => {
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address() as { port: number }
+      baseUrl = `http://127.0.0.1:${addr.port}`
+      resolve()
+    })
+  })
+})
+
+afterAll(() => {
+  server?.close()
+})
+
+// ── Tests ───────────────────────────────────────────
+
+describe('misina client link', () => {
+  it('creates a typed client and calls a no-input query', async () => {
+    const link = createLink({ url: baseUrl })
+    const client = createClient<InferClient<AppRouter>>(link)
+
+    const result = await client.health()
+    expect(result.status).toBe('ok')
+    expect(typeof result.ts).toBe('number')
+  })
+
+  it('calls a query with input', async () => {
+    const link = createLink({ url: baseUrl })
+    const client = createClient<InferClient<AppRouter>>(link)
+
+    const result = await client.echo({ message: 'hello' })
+    expect(result.echo).toBe('hello')
+  })
+
+  it('calls nested procedures', async () => {
+    const link = createLink({ url: baseUrl })
+    const client = createClient<InferClient<AppRouter>>(link)
+
+    const users = await client.users.list({ limit: 1 })
+    expect(users).toHaveLength(1)
+    expect(users[0]!.name).toBe('Alice')
+  })
+
+  it('calls mutation with input', async () => {
+    const link = createLink({ url: baseUrl })
+    const client = createClient<InferClient<AppRouter>>(link)
+
+    const user = await client.users.create({ name: 'Charlie' })
+    expect(user.id).toBe(3)
+    expect(user.name).toBe('Charlie')
+  })
+
+  it('handles validation errors', async () => {
+    const link = createLink({ url: baseUrl })
+    const client = createClient<InferClient<AppRouter>>(link)
+
+    await expect(client.users.create({ name: '' })).rejects.toThrow()
+  })
+
+  it('handles 404 for unknown routes', async () => {
+    const link = createLink({ url: baseUrl })
+    const client = createClient<InferClient<AppRouter>>(link as any)
+
+    await expect((client as any).nonexistent()).rejects.toThrow()
+  })
+
+  it('supports custom headers', async () => {
+    const link = createLink({
+      url: baseUrl,
+      headers: { 'x-custom': 'test-value' },
+    })
+    const client = createClient<InferClient<AppRouter>>(link)
+
+    const result = await client.health()
+    expect(result.status).toBe('ok')
+  })
+
+  it('supports dynamic headers', async () => {
+    let headersCalled = false
+    const link = createLink({
+      url: baseUrl,
+      headers: () => {
+        headersCalled = true
+        return { authorization: 'Bearer test' }
+      },
+    })
+    const client = createClient<InferClient<AppRouter>>(link)
+
+    await client.health()
+    expect(headersCalled).toBe(true)
+  })
+
+  it('supports timeout', async () => {
+    const link = createLink({
+      url: baseUrl,
+      timeout: 5000,
+    })
+    const client = createClient<InferClient<AppRouter>>(link)
+
+    const result = await client.health()
+    expect(result.status).toBe('ok')
+  })
+
+  it('supports AbortSignal', async () => {
+    const link = createLink({ url: baseUrl })
+    const client = createClient<InferClient<AppRouter>>(link)
+
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(client.health(undefined, { signal: controller.signal })).rejects.toThrow()
+  })
+
+  it('supports beforeRequest hook', async () => {
+    let intercepted = false
+    const link = createLink({
+      url: baseUrl,
+      beforeRequest: () => {
+        intercepted = true
+      },
+    })
+    const client = createClient<InferClient<AppRouter>>(link)
+
+    await client.health()
+    expect(intercepted).toBe(true)
+  })
+
+  it('supports afterResponse hook', async () => {
+    let responseStatus = 0
+    const link = createLink({
+      url: baseUrl,
+      afterResponse: ({ response }) => {
+        if (response) responseStatus = response.status
+      },
+    })
+    const client = createClient<InferClient<AppRouter>>(link)
+
+    await client.health()
+    expect(responseStatus).toBe(200)
+  })
+
+  it('supports onComplete terminal hook', async () => {
+    let completed = false
+    let durationMs = -1
+    const link = createLink({
+      url: baseUrl,
+      onComplete: (info) => {
+        completed = true
+        durationMs = info.durationMs
+      },
+    })
+    const client = createClient<InferClient<AppRouter>>(link)
+
+    await client.health()
+    expect(completed).toBe(true)
+    expect(durationMs).toBeGreaterThanOrEqual(0)
+  })
+})

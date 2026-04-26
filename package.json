@@ -59,6 +59,10 @@
       "import": "./dist/client/adapters/ofetch/index.mjs",
       "types": "./dist/client/adapters/ofetch/index.d.mts"
     },
+    "./client/misina": {
+      "import": "./dist/client/adapters/misina/index.mjs",
+      "types": "./dist/client/adapters/misina/index.d.mts"
+    },
     "./client/plugins": {
       "import": "./dist/client/plugins/index.mjs",
       "types": "./dist/client/plugins/index.d.mts"
@@ -231,6 +235,10 @@
       "import": "./lib/ofetch.mjs",
       "types": "./lib/ofetch.d.mts"
     },
+    "./misina": {
+      "import": "./lib/misina.mjs",
+      "types": "./lib/misina.d.mts"
+    },
     "./srvx": {
       "import": "./lib/srvx.mjs",
       "types": "./lib/srvx.d.mts"
@@ -265,6 +273,7 @@
     "devalue": "^5.6.4",
     "get-port-please": "^3.2.0",
     "hookable": "^6.1.0",
+    "misina": "^0.2.0",
     "msgpackr": "^1.11.9",
     "ocache": "^0.1.4",
     "ofetch": "2.0.0-alpha.3",
