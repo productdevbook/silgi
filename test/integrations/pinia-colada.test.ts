@@ -334,4 +334,28 @@ describe('pinia-colada type inference', () => {
     expectTypeOf<ReturnType<Utils['key']>>().toEqualTypeOf<EntryKey>()
     expectTypeOf<ReturnType<Utils['users']['key']>>().toEqualTypeOf<EntryKey>()
   })
+
+  // Regression: https://github.com/productdevbook/silgi/issues/29
+  // A subscription procedure used to be inferred as `() => AsyncIterableIterator<T>`
+  // which doesn't satisfy `SubscriptionClient` (which expects `Promise<AsyncIterableIterator<T>>`),
+  // collapsing `T extends NestedClient` and producing a union of three RouterUtils arms.
+  it('RouterUtils accepts routers containing subscription procedures', () => {
+    const subRouter = k.router({
+      api: {
+        chat: k.subscription(z.object({ message: z.string() }), async function* ({ input }) {
+          yield { type: 'text-delta' as const, delta: input.message }
+          yield { type: 'done' as const }
+        }),
+        health: k.$resolve(() => ({ status: 'ok' as const })),
+      },
+    })
+
+    type SubClient = InferClient<typeof subRouter>
+    type Utils = RouterUtils<SubClient>
+
+    expectTypeOf<Utils['key']>().toBeFunction()
+    expectTypeOf<Utils['api']['key']>().toBeFunction()
+    expectTypeOf<Utils['api']['chat']>().toHaveProperty('queryOptions')
+    expectTypeOf<Utils['api']['health']>().toHaveProperty('queryOptions')
+  })
 })

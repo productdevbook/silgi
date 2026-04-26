@@ -376,23 +376,23 @@ describe('InferClient', () => {
     }>()
   })
 
-  it('subscription — returns AsyncIterableIterator', () => {
+  it('subscription — returns Promise<AsyncIterableIterator>', () => {
     const stream = k.subscription(async function* () {
       yield { tick: 1, time: 'now' }
     })
 
     type Client = InferClient<typeof stream>
-    expectTypeOf<Client>().toEqualTypeOf<() => AsyncIterableIterator<{ tick: number; time: string }>>()
+    expectTypeOf<Client>().toEqualTypeOf<() => Promise<AsyncIterableIterator<{ tick: number; time: string }>>>()
   })
 
-  it('subscription with input — takes input, returns AsyncIterableIterator', () => {
+  it('subscription with input — takes input, returns Promise<AsyncIterableIterator>', () => {
     const stream = k.subscription(z.object({ channel: z.string() }), async function* ({ input }) {
       yield { channel: input.channel, message: 'hello' }
     })
 
     type Client = InferClient<typeof stream>
     expectTypeOf<Client>().toEqualTypeOf<
-      (input: { channel: string }) => AsyncIterableIterator<{ channel: string; message: string }>
+      (input: { channel: string }) => Promise<AsyncIterableIterator<{ channel: string; message: string }>>
     >()
   })
 
@@ -419,8 +419,8 @@ describe('InferClient', () => {
         create: (input: { name: string }) => Promise<{ id: number; name: string }>
       }
       stream: {
-        ticks: () => AsyncIterableIterator<{ tick: number }>
-        messages: (input: { roomId: string }) => AsyncIterableIterator<{ roomId: string; text: string }>
+        ticks: () => Promise<AsyncIterableIterator<{ tick: number }>>
+        messages: (input: { roomId: string }) => Promise<AsyncIterableIterator<{ roomId: string; text: string }>>
       }
     }>()
   })
