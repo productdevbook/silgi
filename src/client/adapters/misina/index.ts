@@ -1,12 +1,54 @@
 /**
- * misina-based RPC transport — v2 client link.
+ * misina-based RPC transport — silgi client link.
  *
- * Uses misina for: retry (with Retry-After parsing), timeout, hook
- * lifecycle, redirect security, NetworkError vs HTTPError taxonomy,
- * idempotency keys for retried mutations.
+ * Thin shim over a misina instance. The adapter owns four things — and
+ * nothing else:
  *
- * Side-by-side alternative to the ofetch link. Same Silgi semantics,
- * different transport. Pick whichever fits your stack.
+ *   1. URL construction from the path tuple
+ *   2. Protocol negotiation (json / messagepack / devalue) — sets
+ *      content-type/accept and encodes the body accordingly
+ *   3. Per-call `responseType: 'stream'` override so SSE subscription
+ *      responses can be decoded lazily
+ *   4. SilgiError lifting from the response payload, plus mapping
+ *      misina's HTTPError / NetworkError / TimeoutError onto SilgiError
+ *
+ * Everything else — retry, timeout, hooks, idempotency, redirect policy,
+ * plugins (cache, breaker, dedupe, cookies, auth, otel, …) — lives on the
+ * misina instance you pass in. Configure misina once with
+ * `createMisina({ baseURL, retry, use: [plugin(), …] })` and hand the
+ * result here.
+ *
+ * @example
+ * ```ts
+ * import { createMisina } from "misina"
+ * import { cache } from "misina/cache"
+ * import { breaker } from "misina/breaker"
+ * import { bearer } from "misina/auth"
+ * import { createClient } from "silgi/client"
+ * import { createLink } from "silgi/client/misina"
+ *
+ * const url = "http://localhost:3000"
+ *
+ * const link = createLink({
+ *   url,
+ *   misina: createMisina({
+ *     baseURL: url,
+ *     retry: 3,
+ *     idempotencyKey: "auto",
+ *     use: [
+ *       bearer(() => store.token),
+ *       cache({ ttl: 60_000 }),
+ *       breaker({ failureThreshold: 5, windowMs: 30_000 }),
+ *     ],
+ *   }),
+ * })
+ *
+ * const client = createClient<AppRouter>(link)
+ * ```
+ *
+ * If `misina` is omitted, the adapter constructs a minimal default
+ * instance (`createMisina({ baseURL })`). That's fine for plain RPC; opt
+ * into retries, plugins, hooks, etc. by passing your own instance.
  */
 
 import { createMisina, isHTTPError, isNetworkError, isTimeoutError } from 'misina'
@@ -16,37 +58,28 @@ import { SilgiError, isSilgiErrorJSON, fromSilgiErrorJSON } from '../../../core/
 import { eventStreamToIterator } from '../../../core/sse.ts'
 
 import type { ClientLink, ClientContext, ClientOptions } from '../../types.ts'
-import type { AfterResponseHook, BeforeErrorHook, BeforeRequestHook, MisinaHooks, RetryOptions } from 'misina'
-
-type OnCompleteHook =
-  Exclude<MisinaHooks['onComplete'], undefined> extends infer H ? (H extends readonly (infer U)[] ? U : H) : never
+import type { Misina } from 'misina'
 
 export interface LinkOptions<TClientContext extends ClientContext = ClientContext> {
-  /** Server base URL (e.g. "http://localhost:3000") */
+  /** Server base URL (e.g. "http://localhost:3000"). */
   url: string
 
-  /** Static headers or dynamic header factory */
-  headers?: Record<string, string> | ((options: ClientOptions<TClientContext>) => Record<string, string>)
-
   /**
-   * Retry policy. Number sets the limit; pass a full `RetryOptions` to
-   * tune backoff, status codes, jitter. `false` disables retries.
+   * Misina instance the adapter dispatches through. Configure retry,
+   * timeout, hooks, plugins (`use: [...]`), idempotency keys, redirect
+   * policy, custom drivers, etc. on this instance — the adapter does not
+   * accept those options directly.
    *
-   * @default 0
+   * If omitted, the adapter calls `createMisina({ baseURL: url })`. Pass
+   * your own instance to opt into anything beyond default fetch behavior.
    */
-  retry?: number | boolean | RetryOptions
-
-  /** Per-attempt timeout in ms. `false` disables. (default: 30000) */
-  timeout?: number | false
-
-  /** Wall-clock deadline across all attempts (ms). `false` disables. */
-  totalTimeout?: number | false
+  misina?: Misina
 
   /**
    * Wire protocol for request/response encoding.
    *
    * - `'json'` — default, standard JSON
-   * - `'messagepack'` — 2-4x faster, ~50% smaller payloads
+   * - `'messagepack'` — 2–4× faster, ~50% smaller payloads
    * - `'devalue'` — preserves Date, Map, Set, BigInt, circular refs
    *
    * @default 'json'
@@ -54,68 +87,44 @@ export interface LinkOptions<TClientContext extends ClientContext = ClientContex
   protocol?: 'json' | 'messagepack' | 'devalue'
 
   /**
-   * Auto-generate `Idempotency-Key` for retried mutations. `'auto'` uses
-   * `crypto.randomUUID()` when retries are enabled. Pass a string to
-   * pin one, or a function for custom generation.
+   * Static headers or a per-call factory. Headers configured on the
+   * misina instance still apply; these are merged on top per call.
    */
-  idempotencyKey?: false | 'auto' | string | ((request: Request) => string)
-
-  /** misina hooks — direct pass-through */
-  beforeRequest?: BeforeRequestHook
-  afterResponse?: AfterResponseHook
-  beforeError?: BeforeErrorHook
-  onComplete?: OnCompleteHook
+  headers?:
+    | HeadersInit
+    | Record<string, string | undefined>
+    | ((options: ClientOptions<TClientContext>) => HeadersInit | Record<string, string | undefined>)
 }
 
 /**
  * Create a Silgi client link powered by misina.
  *
- * @example
- * ```ts
- * import { createClient } from "silgi/client"
- * import { createLink } from "silgi/client/misina"
- *
- * const link = createLink({ url: "http://localhost:3000" })
- * const client = createClient<AppRouter>(link)
- * const users = await client.users.list({ limit: 10 })
- * ```
+ * @see {@link LinkOptions} for the full shape and the misina-instance
+ * pattern.
  */
 export function createLink<TClientContext extends ClientContext = ClientContext>(
   options: LinkOptions<TClientContext>,
 ): ClientLink<TClientContext> {
   const baseUrl = options.url.endsWith('/') ? options.url.slice(0, -1) : options.url
-  const resolvedProtocol: 'json' | 'messagepack' | 'devalue' = options.protocol ?? 'json'
-
-  const misina = createMisina({
-    timeout: options.timeout ?? 30_000,
-    totalTimeout: options.totalTimeout,
-    retry: options.retry ?? 0,
-    idempotencyKey: options.idempotencyKey,
-    throwHttpErrors: false,
-    hooks: {
-      beforeRequest: options.beforeRequest,
-      afterResponse: options.afterResponse,
-      beforeError: options.beforeError,
-      onComplete: options.onComplete,
-    },
-  })
+  const protocol: 'json' | 'messagepack' | 'devalue' = options.protocol ?? 'json'
+  // Default instance — minimal, no retry, no plugins. Users opting into
+  // any transport-shaping behavior pass their own.
+  const misina = options.misina ?? createMisina({ baseURL: baseUrl })
 
   return {
     async call(path, input, callOptions) {
+      // Always send a fully-qualified URL. The user's misina instance
+      // may or may not have baseURL set; the adapter doesn't depend on it.
       const url = `${baseUrl}/${path.map(encodeURIComponent).join('/')}`
 
-      // Resolve headers
-      const headers: Record<string, string> = {
-        ...(typeof options.headers === 'function' ? options.headers(callOptions) : options.headers),
-      }
+      const headers = resolveHeaders(options.headers, callOptions)
 
-      // Protocol selection: messagepack > devalue > json (default)
       let body: unknown
-      if (resolvedProtocol === 'messagepack') {
+      if (protocol === 'messagepack') {
         headers['content-type'] = MSGPACK_CONTENT_TYPE
         headers['accept'] = MSGPACK_CONTENT_TYPE
         body = input !== undefined && input !== null ? msgpackEncode(input) : undefined
-      } else if (resolvedProtocol === 'devalue') {
+      } else if (protocol === 'devalue') {
         const { encode: devalueEncode, DEVALUE_CONTENT_TYPE } = await import('../../../codec/devalue.ts')
         headers['content-type'] = DEVALUE_CONTENT_TYPE
         headers['accept'] = DEVALUE_CONTENT_TYPE
@@ -125,30 +134,32 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
       }
 
       try {
-        // `responseType: 'stream'` keeps misina from consuming the body
-        // so we can branch on `content-type`: subscriptions need the
-        // raw stream for SSE decoding, while query/mutation responses
-        // get decoded here per protocol.
+        // Per-call overrides win over instance defaults — the adapter must
+        // own `responseType: 'stream'` (so SSE subscriptions can be decoded
+        // lazily and protocol-encoded responses can be drained on our
+        // schedule) and `throwHttpErrors: false` (we lift HTTPError into
+        // SilgiError ourselves and never want misina to swallow the body).
         const result = await misina.post(url, body, {
           headers,
           signal: callOptions.signal,
           responseType: 'stream',
+          throwHttpErrors: false,
         })
 
         const response = result.raw
 
-        // Subscription response — server emitted an async iterator as SSE.
+        // Subscription — server emitted an async iterator as SSE.
         const responseContentType = response.headers.get('content-type') ?? ''
         if (responseContentType.includes('text/event-stream') && response.body) {
           return eventStreamToIterator(response.body)
         }
 
-        // Query/mutation — drain the stream and decode per protocol.
+        // Query/mutation — drain and decode per protocol.
         let decoded: unknown
-        if (resolvedProtocol === 'messagepack') {
+        if (protocol === 'messagepack') {
           const buf = new Uint8Array(await response.arrayBuffer())
           decoded = buf.length > 0 ? msgpackDecode(buf) : undefined
-        } else if (resolvedProtocol === 'devalue') {
+        } else if (protocol === 'devalue') {
           const text = await response.text()
           if (text) {
             const { decode: devalueDecode } = await import('../../../codec/devalue.ts')
@@ -175,10 +186,8 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
 
         return decoded
       } catch (error) {
-        // Re-throw SilgiError as-is
         if (error instanceof SilgiError) throw error
 
-        // misina HTTPError carries server payload — try to lift SilgiError shape
         if (isHTTPError(error)) {
           const data = (error as any).data
           if (isSilgiErrorJSON(data)) {
@@ -203,3 +212,37 @@ export function createLink<TClientContext extends ClientContext = ClientContext>
     },
   }
 }
+
+function resolveHeaders<TClientContext extends ClientContext>(
+  headers: LinkOptions<TClientContext>['headers'],
+  callOptions: ClientOptions<TClientContext>,
+): Record<string, string> {
+  const raw = typeof headers === 'function' ? headers(callOptions) : headers
+  const out: Record<string, string> = {}
+  if (raw == null) return out
+
+  if (raw instanceof Headers) {
+    raw.forEach((value, key) => {
+      out[key] = value
+    })
+    return out
+  }
+
+  if (Array.isArray(raw)) {
+    for (const [k, v] of raw) {
+      if (v == null) continue
+      out[k] = String(v)
+    }
+    return out
+  }
+
+  for (const [k, v] of Object.entries(raw as Record<string, string | undefined>)) {
+    if (v == null) continue
+    out[k] = String(v)
+  }
+  return out
+}
+
+// Re-export the `Misina` type so callers can write `LinkOptions['misina']`
+// or annotate variables without a separate `import from 'misina'`.
+export type { Misina } from 'misina'
