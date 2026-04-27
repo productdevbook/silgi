@@ -21,7 +21,7 @@ Setting up the client takes two steps: create a **link** (the transport layer) a
 A link tells the client _how_ to send requests to the server. Silgi ships two HTTP link adapters with the same Silgi semantics — pick whichever fits your stack:
 
 - **`silgi/client/ofetch`** — the default. Uses [ofetch](https://github.com/unjs/ofetch) for retries, timeouts, and interceptors. Stable, widely used, h3/Nuxt-aligned.
-- **`silgi/client/misina`** — an alternative built on [misina](https://github.com/productdevbook/misina). Adds `Retry-After` parsing, distinct `HTTPError`/`NetworkError`/`TimeoutError` classes, and `Idempotency-Key` auto-generation for retried mutations.
+- **`silgi/client/misina`** — an alternative built on [misina](https://github.com/productdevbook/misina). Adds `Retry-After` parsing, distinct `HTTPError`/`NetworkError`/`TimeoutError` classes, `Idempotency-Key` auto-generation for retried mutations, and a plugin ecosystem (cache, breaker, dedupe, cookies, auth, otel, tracing).
 
 ```ts twoslash
 // @noErrors
@@ -232,93 +232,143 @@ Interceptors are useful for:
 
 ## misina link
 
-The misina link is a drop-in alternative to the ofetch link. Same `createLink` shape, same `protocol` selection, same per-call `signal` — different transport with stricter retry and error semantics.
+The misina link is an alternative transport with stricter retry semantics, distinct error classes, and a plugin ecosystem. Unlike the ofetch link, transport configuration lives on a `Misina` instance you build with `createMisina(...)` and pass through — the link itself only handles silgi-specific concerns (URL construction, protocol negotiation, SSE branching, `SilgiError` lifting).
 
 ```ts twoslash
 // @noErrors
+import { createMisina } from 'misina'
 import { createClient } from 'silgi/client'
 import { createLink } from 'silgi/client/misina'
 
 const link = createLink({
   url: 'http://localhost:3000',
-  retry: 2,
-  idempotencyKey: 'auto',
+  misina: createMisina({
+    retry: 2,
+    idempotencyKey: 'auto',
+  }),
 })
 
 const client = createClient<AppRouter>(link)
 ```
 
+If you omit `misina`, the adapter constructs a minimal default (`createMisina({ baseURL: url })`) — fine for plain RPC, but you opt into retries, hooks, plugins, etc. by passing your own.
+
 ### Why pick misina?
 
-- **`Retry-After` and `RateLimit-Reset` parsing** — when the server signals a delay, the link honors it instead of using your fixed backoff.
-- **Distinct error classes** — `HTTPError` (server responded with an error status), `NetworkError` (DNS, connection reset, offline), `TimeoutError` (per-attempt or wall-clock budget exceeded). All are still mapped into `SilgiError` for catch-by-code, but you can introspect the cause via misina's [`isHTTPError` / `isNetworkError` / `isTimeoutError`](https://github.com/productdevbook/misina) guards inside hooks.
-- **Idempotency-Key auto-generation** — retried POST/PATCH/DELETE calls send the same `Idempotency-Key` across attempts so the server can deduplicate. Set `idempotencyKey: 'auto'` to opt in.
+- **`Retry-After` and `RateLimit-Reset` parsing** — when the server signals a delay, the transport honors it instead of using fixed backoff.
+- **Distinct error classes** — `HTTPError` (server responded with an error status), `NetworkError` (DNS, connection reset, offline), `TimeoutError` (per-attempt or wall-clock budget exceeded). All map into `SilgiError` for catch-by-code, but you can introspect the cause via misina's [`isHTTPError` / `isNetworkError` / `isTimeoutError`](https://github.com/productdevbook/misina) guards.
+- **Idempotency-Key auto-generation** — retried POST/PATCH/DELETE calls send the same `Idempotency-Key` across attempts so the server can deduplicate. Set `idempotencyKey: 'auto'` on the misina instance.
 - **Wall-clock timeout** — `timeout` caps each attempt; `totalTimeout` caps the whole logical call (including retry delays).
 - **Redirect security** — sensitive headers are stripped on cross-origin redirects, and `https → http` downgrades are refused.
+- **Plugin ecosystem** — `cache`, `breaker`, `dedupe`, `cookieJar`, `bearer`, `refreshOn401`, `sigv4`, `otel`, `tracing`, `ratelimit` — all compose via `createMisina({ use: [...] })`.
 
-### Options
+### Link options
 
-| Option           | Type                                                     | Default     | Description                                                       |
-| ---------------- | -------------------------------------------------------- | ----------- | ----------------------------------------------------------------- |
-| `url`            | `string`                                                 | (required)  | Server base URL                                                   |
-| `headers`        | `Record<string, string>` or function                     | `undefined` | Static headers or per-call factory                                |
-| `retry`          | `number \| boolean \| RetryOptions`                      | `0`         | Number for limit, `false` to disable, or full retry policy object |
-| `timeout`        | `number \| false`                                        | `30000`     | Per-attempt timeout in ms                                         |
-| `totalTimeout`   | `number \| false`                                        | `false`     | Wall-clock deadline across all attempts                           |
-| `protocol`       | `'json' \| 'messagepack' \| 'devalue'`                   | `'json'`    | Wire protocol                                                     |
-| `idempotencyKey` | `false \| 'auto' \| string \| (req) => string`           | `false`     | Auto-send `Idempotency-Key` on retried mutations                  |
-| `beforeRequest`  | `(ctx) => void \| Request \| Response`                   | —           | Mutate the request, or short-circuit by returning a `Response`    |
-| `afterResponse`  | `(ctx) => void \| Response`                              | —           | Inspect or replace the response after it's received               |
-| `beforeError`    | `(error, ctx) => Error`                                  | —           | Transform errors before they're thrown                            |
-| `onComplete`     | `({ request, response, error, durationMs, attempt }) =>` | —           | Terminal hook — fires once per logical call after retries         |
+The link surface itself is intentionally small. Configure transport behavior on the misina instance.
+
+| Option     | Type                                                   | Default     | Description                                                                       |
+| ---------- | ------------------------------------------------------ | ----------- | --------------------------------------------------------------------------------- |
+| `url`      | `string`                                               | (required)  | Server base URL                                                                   |
+| `misina`   | `Misina`                                               | `undefined` | Pre-configured misina instance. Defaults to `createMisina({ baseURL: url })`.     |
+| `protocol` | `'json' \| 'messagepack' \| 'devalue'`                 | `'json'`    | Wire protocol                                                                     |
+| `headers`  | `HeadersInit \| Record<string, string \| undefined>` or function | `undefined` | Static headers or per-call factory. Merged on top of headers from the misina instance. |
+
+For everything else — retry, timeout, totalTimeout, hooks, idempotencyKey, validateResponse, redirect policy, plugins, custom drivers, request id headers, body timeouts, max response size — see the [misina docs](https://github.com/productdevbook/misina).
 
 ### Retry with backoff
 
-Pass a full `RetryOptions` object to tune backoff, retriable status codes, and jitter:
+Configure on the instance:
 
 ```ts twoslash
 // @noErrors
+import { createMisina } from 'misina'
+
 const link = createLink({
   url: 'http://localhost:3000',
-  retry: {
-    limit: 3,
-    delay: (attempt) => 0.3 * 2 ** (attempt - 1) * 1000, // 300ms, 600ms, 1200ms
-    backoffLimit: 30_000,
-    jitter: true,
-    statusCodes: [408, 429, 500, 502, 503, 504],
-  },
+  misina: createMisina({
+    retry: {
+      limit: 3,
+      delay: (attempt) => 0.3 * 2 ** (attempt - 1) * 1000, // 300ms, 600ms, 1200ms
+      backoffLimit: 30_000,
+      jitter: true,
+      statusCodes: [408, 429, 500, 502, 503, 504],
+    },
+  }),
 })
 ```
 
 ### Hooks
 
-misina exposes a lifecycle of typed hooks. The link forwards four of them — use them for logging, metrics, or last-resort error transformation:
+misina exposes a typed lifecycle (`init`, `beforeRequest`, `beforeRetry`, `beforeRedirect`, `afterResponse`, `beforeError`, `onComplete`). Pass them through `createMisina({ hooks: { ... } })`:
 
 ```ts twoslash
 // @noErrors
+import { createMisina } from 'misina'
+
 const link = createLink({
   url: 'http://localhost:3000',
-  beforeRequest: (ctx) => {
-    ctx.request.headers.set('x-trace-id', crypto.randomUUID())
-  },
-  afterResponse: ({ response }) => {
-    if (response) console.log('status:', response.status)
-  },
-  onComplete: ({ request, durationMs, attempt, error }) => {
-    metrics.observe('rpc.duration', durationMs, {
-      url: request.url,
-      attempts: String(attempt + 1),
-      ok: error ? 'false' : 'true',
-    })
-  },
+  misina: createMisina({
+    hooks: {
+      beforeRequest: (ctx) => {
+        const headers = new Headers(ctx.request.headers)
+        headers.set('x-trace-id', crypto.randomUUID())
+        return new Request(ctx.request, { headers })
+      },
+      afterResponse: ({ response }) => {
+        if (response) console.log('status:', response.status)
+      },
+      onComplete: ({ request, durationMs, attempt, error }) => {
+        metrics.observe('rpc.duration', durationMs, {
+          url: request.url,
+          attempts: String(attempt + 1),
+          ok: error ? 'false' : 'true',
+        })
+      },
+    },
+  }),
 })
 ```
 
 `onComplete` is the right place for tracing and metrics — it fires exactly once per logical call, after all retries and redirects, with either `response` or `error` populated.
 
+### Plugins
+
+Cross-cutting features (auth, cache, cookies, dedupe, breaker, rate limit, tracing, …) ship as misina plugins. Compose them on the instance via `use: [...]`:
+
+```ts twoslash
+// @noErrors
+import { createMisina } from 'misina'
+import { bearer, refreshOn401 } from 'misina/auth'
+import { cache, memoryStore } from 'misina/cache'
+import { breaker } from 'misina/breaker'
+import { dedupe } from 'misina/dedupe'
+
+const link = createLink({
+  url: 'http://localhost:3000',
+  misina: createMisina({
+    baseURL: 'http://localhost:3000',
+    retry: 3,
+    idempotencyKey: 'auto',
+    use: [
+      bearer(() => store.token),
+      refreshOn401({ refresh: async () => fetchNewToken() }),
+      cache({ store: memoryStore({ max: 500 }), ttl: 60_000 }),
+      breaker({ failureThreshold: 5, windowMs: 30_000 }),
+      dedupe(),
+    ],
+  }),
+})
+```
+
+Plugins apply left-to-right (first is innermost). The full set is documented in the [misina README](https://github.com/productdevbook/misina#plugins-use-).
+
 <Callout type='info'>
   Both links produce the same `SilgiError` instances on failure, so your catch logic doesn't change when you swap. The
   difference is in the request lifecycle — retries, idempotency, and how the underlying transport classifies failures.
+</Callout>
+
+<Callout type='warn'>
+  The adapter forces `responseType: 'stream'` and `throwHttpErrors: false` per call, regardless of your instance defaults — both are required for SSE subscription branching and `SilgiError` lifting. Every other misina option flows through unchanged.
 </Callout>
 
 ## Call options
