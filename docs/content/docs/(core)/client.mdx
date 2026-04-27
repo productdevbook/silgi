@@ -266,11 +266,11 @@ If you omit `misina`, the adapter constructs a minimal default (`createMisina({ 
 
 The link surface itself is intentionally small. Configure transport behavior on the misina instance.
 
-| Option     | Type                                                   | Default     | Description                                                                       |
-| ---------- | ------------------------------------------------------ | ----------- | --------------------------------------------------------------------------------- |
-| `url`      | `string`                                               | (required)  | Server base URL                                                                   |
-| `misina`   | `Misina`                                               | `undefined` | Pre-configured misina instance. Defaults to `createMisina({ baseURL: url })`.     |
-| `protocol` | `'json' \| 'messagepack' \| 'devalue'`                 | `'json'`    | Wire protocol                                                                     |
+| Option     | Type                                                             | Default     | Description                                                                            |
+| ---------- | ---------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------- |
+| `url`      | `string`                                                         | (required)  | Server base URL                                                                        |
+| `misina`   | `Misina`                                                         | `undefined` | Pre-configured misina instance. Defaults to `createMisina({ baseURL: url })`.          |
+| `protocol` | `'json' \| 'messagepack' \| 'devalue'`                           | `'json'`    | Wire protocol                                                                          |
 | `headers`  | `HeadersInit \| Record<string, string \| undefined>` or function | `undefined` | Static headers or per-call factory. Merged on top of headers from the misina instance. |
 
 For everything else — retry, timeout, totalTimeout, hooks, idempotencyKey, validateResponse, redirect policy, plugins, custom drivers, request id headers, body timeouts, max response size — see the [misina docs](https://github.com/productdevbook/misina).
@@ -368,7 +368,9 @@ Plugins apply left-to-right (first is innermost). The full set is documented in 
 </Callout>
 
 <Callout type='warn'>
-  The adapter forces `responseType: 'stream'` and `throwHttpErrors: false` per call, regardless of your instance defaults — both are required for SSE subscription branching and `SilgiError` lifting. Every other misina option flows through unchanged.
+  The adapter forces `responseType: 'stream'` and `throwHttpErrors: false` per call, regardless of your instance
+  defaults — both are required for SSE subscription branching and `SilgiError` lifting. Every other misina option flows
+  through unchanged.
 </Callout>
 
 ## Call options

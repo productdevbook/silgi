@@ -93,9 +93,7 @@ export interface LinkOptions<TClientContext extends ClientContext = ClientContex
   headers?:
     | HeadersInit
     | Record<string, string | undefined>
-    | ((options: ClientOptions<TClientContext>) =>
-        | HeadersInit
-        | Record<string, string | undefined>)
+    | ((options: ClientOptions<TClientContext>) => HeadersInit | Record<string, string | undefined>)
 }
 
 /**
