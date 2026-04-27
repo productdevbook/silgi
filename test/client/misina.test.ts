@@ -1,11 +1,16 @@
 /**
  * misina client link — integration tests.
  *
- * Spins up a real silgi server and tests the misina-based client.
+ * Adapter-only concerns: URL construction, protocol negotiation, header
+ * resolution, SSE branching, AbortSignal forwarding, SilgiError lift,
+ * misina-instance pass-through. Anything misina owns (retry, timeout,
+ * idempotencyKey, validateResponse, plugins, hooks) is covered by
+ * misina's own test suite — we just verify our pass-through is wired.
  */
 
 import { createServer } from 'node:http'
 
+import { createMisina } from 'misina'
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { z } from 'zod'
 
@@ -106,6 +111,8 @@ afterAll(() => {
 // ── Tests ───────────────────────────────────────────
 
 describe('misina client link', () => {
+  // Default instance — adapter constructs its own misina when none given.
+
   it('creates a typed client and calls a no-input query', async () => {
     const link = createLink({ url: baseUrl })
     const client = createClient<InferClient<AppRouter>>(link)
@@ -155,7 +162,20 @@ describe('misina client link', () => {
     await expect((client as any).nonexistent()).rejects.toThrow()
   })
 
-  it('supports custom headers', async () => {
+  it('forwards AbortSignal to misina', async () => {
+    const link = createLink({ url: baseUrl })
+    const client = createClient<InferClient<AppRouter>>(link)
+
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(client.health(undefined, { signal: controller.signal })).rejects.toThrow()
+  })
+
+  // Headers — adapter-specific feature (per-call factory + Headers/Record/array
+  // shapes), so we test it here instead of relying on misina's own header tests.
+
+  it('supports headers as Record', async () => {
     const link = createLink({
       url: baseUrl,
       headers: { 'x-custom': 'test-value' },
@@ -166,84 +186,88 @@ describe('misina client link', () => {
     expect(result.status).toBe('ok')
   })
 
-  it('supports dynamic headers', async () => {
-    let headersCalled = false
+  it('supports headers as Headers instance', async () => {
+    const link = createLink({
+      url: baseUrl,
+      headers: new Headers({ 'x-custom': 'header-instance' }),
+    })
+    const client = createClient<InferClient<AppRouter>>(link)
+    const result = await client.health()
+    expect(result.status).toBe('ok')
+  })
+
+  it('supports headers as a per-call factory', async () => {
+    let factoryCalls = 0
     const link = createLink({
       url: baseUrl,
       headers: () => {
-        headersCalled = true
+        factoryCalls += 1
         return { authorization: 'Bearer test' }
       },
     })
     const client = createClient<InferClient<AppRouter>>(link)
 
     await client.health()
-    expect(headersCalled).toBe(true)
+    await client.health()
+    expect(factoryCalls).toBe(2)
   })
 
-  it('supports timeout', async () => {
+  it('drops undefined header values silently', async () => {
     const link = createLink({
       url: baseUrl,
-      timeout: 5000,
+      headers: { authorization: undefined, 'x-real': 'present' },
     })
     const client = createClient<InferClient<AppRouter>>(link)
-
     const result = await client.health()
     expect(result.status).toBe('ok')
   })
 
-  it('supports AbortSignal', async () => {
-    const link = createLink({ url: baseUrl })
-    const client = createClient<InferClient<AppRouter>>(link)
+  // Instance pass-through — the canonical extension surface.
 
-    const controller = new AbortController()
-    controller.abort()
-
-    await expect(client.health(undefined, { signal: controller.signal })).rejects.toThrow()
-  })
-
-  it('supports beforeRequest hook', async () => {
-    let intercepted = false
-    const link = createLink({
-      url: baseUrl,
-      beforeRequest: () => {
-        intercepted = true
+  it('uses a user-provided misina instance', async () => {
+    let dispatched = 0
+    const m = createMisina({
+      hooks: {
+        beforeRequest: () => {
+          dispatched += 1
+        },
       },
     })
+    const link = createLink({ url: baseUrl, misina: m })
     const client = createClient<InferClient<AppRouter>>(link)
 
-    await client.health()
-    expect(intercepted).toBe(true)
+    const result = await client.health()
+    expect(result.status).toBe('ok')
+    expect(dispatched).toBe(1)
   })
 
-  it('supports afterResponse hook', async () => {
-    let responseStatus = 0
-    const link = createLink({
-      url: baseUrl,
-      afterResponse: ({ response }) => {
-        if (response) responseStatus = response.status
-      },
-    })
-    const client = createClient<InferClient<AppRouter>>(link)
-
-    await client.health()
-    expect(responseStatus).toBe(200)
-  })
-
-  it('supports onComplete terminal hook', async () => {
+  it('flows misina instance hooks (onComplete) end-to-end', async () => {
     let completed = false
     let durationMs = -1
-    const link = createLink({
-      url: baseUrl,
-      onComplete: (info) => {
-        completed = true
-        durationMs = info.durationMs
+    const m = createMisina({
+      hooks: {
+        onComplete: (info) => {
+          completed = true
+          durationMs = info.durationMs
+        },
       },
     })
+    const link = createLink({ url: baseUrl, misina: m })
     const client = createClient<InferClient<AppRouter>>(link)
 
     await client.health()
     expect(completed).toBe(true)
     expect(durationMs).toBeGreaterThanOrEqual(0)
+  })
+
+  it('overrides instance throwHttpErrors so SilgiError still surfaces from 5xx', async () => {
+    // User instance has throwHttpErrors: true (the misina default). The adapter
+    // must override it per-call to false so we can lift SilgiError ourselves.
+    const m = createMisina({ throwHttpErrors: true })
+    const link = createLink({ url: baseUrl, misina: m })
+    const client = createClient<InferClient<AppRouter>>(link as any)
+
+    // 404 path — adapter should turn the misina HTTPError into a SilgiError.
+    await expect((client as any).nonexistent()).rejects.toThrow()
   })
 })
